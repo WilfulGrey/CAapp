@@ -97,74 +97,6 @@ export function AngebotLeistung({ fuer }: { fuer: string | null }) {
 }
 
 /**
- * Runde 23 (Martin 05.10.: „wir haben nur das Angebot, Pflegekräfte einladen, Bewerbung erhalten, auswählen. Wenn die
- * Daten nicht da sind, dann kennen die Pflegekräfte den Job nicht" — das Vervollständigen ist KEIN eigener Schritt,
- * sondern der Hinweis in Schritt 2). Der Weg steht unter dem Titel wie der Stand einer Bestellung; jeder Punkt springt
- * zu seinem Abschnitt. Schritt 1 ist erledigt (das Angebot steht darunter), Schritt 2 ist der aktuelle.
- * Runde 24: Schritt 1 hat keinen eigenen Kopf mehr (Martin: „darunter wieder Ihr Angebot liegt vor"), „Angebot" springt
- * zur Angebotskarte (id `angebot`).
- */
-export const WEG = [
-  { label: 'Angebot', ziel: 'angebot' },
-  { label: 'Einladen', ziel: 'pflegekraefte' },
-  { label: 'Bewerbungen', ziel: 'schritt-bewerbungen' },
-  { label: 'Auswählen', ziel: 'schritt-auswahl' },
-] as const;
-
-function Punkt({ nummer, stand, gross = false }: { nummer: number; stand: 'fertig' | 'jetzt' | 'spaeter'; gross?: boolean }) {
-  const groesse = gross ? 'h-8 w-8 text-[15px]' : 'h-7 w-7 text-[13px]';
-  return (
-    <span
-      aria-hidden="true"
-      className={`relative flex flex-none items-center justify-center rounded-full font-semibold tabular-nums ${groesse} ${
-        stand === 'fertig' ? 'bg-pm-taupe text-white' : stand === 'jetzt' ? 'bg-pm-coral text-white' : 'border-2 border-pm-line bg-pm-paper text-pm-muted'
-      }`}
-    >
-      {stand === 'fertig' ? <Check className="h-4 w-4" strokeWidth={3} /> : nummer}
-    </span>
-  );
-}
-
-export function AngebotWeg({ onSprung }: { onSprung: (ziel: string) => void }) {
-  return (
-    <nav aria-label="Ihr Weg zur Pflegekraft" className="mt-4">
-      <ol className="relative grid grid-cols-4">
-        {/* Linie von der Mitte der ersten bis zur Mitte der letzten Spalte; das erledigte Stück in Taupe (Runde 24:
-            oben nur eine Akzentfarbe, Koralle für den aktuellen Schritt — Martin: „nicht so bunt"). */}
-        <span aria-hidden="true" className="absolute left-[12.5%] right-[12.5%] top-[21px] h-[2px] rounded-full bg-pm-line" />
-        <span aria-hidden="true" className="absolute left-[12.5%] top-[21px] h-[2px] w-[25%] rounded-full bg-pm-taupe" />
-        {WEG.map((w, i) => {
-          const stand = i === 0 ? 'fertig' : i === 1 ? 'jetzt' : 'spaeter';
-          return (
-            <li key={w.ziel} className="flex justify-center">
-              <button
-                type="button"
-                onClick={() => onSprung(w.ziel)}
-                aria-current={stand === 'jetzt' ? 'step' : undefined}
-                className="flex min-h-[44px] flex-col items-center gap-1.5 rounded-xl pt-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-pm-taupe"
-              >
-                <Punkt nummer={i + 1} stand={stand} />
-                <span className={`text-[12px] leading-tight min-[375px]:text-[13px] ${stand === 'jetzt' ? 'font-semibold text-pm-ink' : 'text-pm-muted'}`}>{w.label}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
-  );
-}
-
-/** Kopf eines Schritts weiter unten: dieselben Punkte wie im Weg, daneben der Titel. */
-export function SchrittKopf({ id, nummer, titel, stand }: { id: string; nummer: number; titel: string; stand: 'fertig' | 'jetzt' | 'spaeter' }) {
-  return (
-    <div id={id} className="flex scroll-mt-20 items-center gap-3">
-      <Punkt nummer={nummer} stand={stand} gross />
-      <h2 className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">{titel}</h2>
-    </div>
-  );
-}
-
-/**
  * Runde 22 (Martin 05.10.: „soll sich anfühlen wie ein persönlicher Bereich für den Kunden … mehr Apple-like"): der Kopf
  * wie ein Konto — Kreis mit den Initialen, Begrüßung, „Ihr persönlicher Bereich". Ohne Namen ein neutrales Zeichen.
  */
@@ -183,41 +115,13 @@ export function AngebotPerson({ name, kuerzel }: { name: string | null; kuerzel:
 }
 
 /**
- * Runde 19 (Martin: „eher unsere Vorteile rein, Testsieger, sechsfach und sowas … das Siegel und die Sterne sind noch
- * nicht sichtbar … vorne mit reinbekommen"): Siegel mit Testsieger, Erfahrung und Sternen direkt unter dem Titel, ohne
- * Kasten. Die Sterne stehen ohne Stand nicht da (kein Ersatzwert), die Höhe bleibt reserviert.
- */
-export function AngebotVertrauen({ sterne, eng = false }: { sterne: SterneStand | null; eng?: boolean }) {
-  // Runde 20 (Martin: „überladen, nicht clean, unprofessionell"): zwei Zeilen statt drei, Siegel 48 px.
-  // Runde 25: `eng` = direkt unter dem Testsieger-Satz der Einleitung (Beleg), darum weniger Abstand.
-  return (
-    <div className={`${eng ? 'mt-3' : 'mt-5'} flex items-center gap-3`}>
-      {/* Siegel antippbar: Quelle und Einordnung stehen auf der Testsieger-Seite. */}
-      <a href="https://primundus.de/testsieger-24-stunden-pflege" target="_blank" rel="noreferrer" className="flex-none" aria-label="Testsieger DIE WELT: Quelle ansehen">
-        <img src="/badge-testsieger.webp" alt="" className="h-12 w-auto object-contain" />
-      </a>
-      <div className="min-w-0">
-        <p className="text-[15px] font-semibold leading-[1.35] text-pm-ink">
-          6× in Folge Testsieger <span className="whitespace-nowrap">DIE WELT</span>
-        </p>
-        <div className="flex h-6 items-center">
-          <BewertungsZeile stand={sterne} klein className="-my-2.5" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
  * Runde 25 (Martin 05.10. zu Fassung 19: „Wir brauchen doch ein Angebot inkl. Einleitung und Beschreibung dessen, was der
  * Kunde bekommt", dazu sein Entwurf „Gerne übernehmen wir die Rund-um-Betreuung. Unsere Pflegekräfte sind bei uns
- * angestellt …"): die Einleitung als Absatz unter Titel und Siegel. Fakten: „bei uns angestellt" (Martin 30.09.),
- * Testsieger für den Kundenservice, sechs Jahre in Folge, zuletzt 2026 (testsieger-formulierungslinie). Ist die Liste
- * geladen und leer, entfällt der Hinweis auf die Pflegekräfte (keine Aussage über Kräfte, die nicht da sind).
+ * angestellt …"). Fakten: „bei uns angestellt" (Martin 30.09.), Testsieger für den Kundenservice, sechs Jahre in Folge,
+ * zuletzt 2026 (testsieger-formulierungslinie). Ist die Liste geladen und leer, entfällt der Hinweis auf die Pflegekräfte.
+ * OpenAI 05.10. (mutig11): „kümmern uns um" statt des zweiten „übernehmen", „direkt bei uns angestellt, ohne Vermittler",
+ * Quelle der Auszeichnung im Satz, „aktuell verfügbar" statt „für Sie verfügbar". Nicht übernommen: „Rundum-Betreuung".
  */
-// OpenAI 05.10. (mutig11): „kümmern uns um" statt des zweiten „übernehmen", „direkt bei uns angestellt, ohne Vermittler"
-// (Martins Punkt vom 05.10.), Quelle der Auszeichnung im Satz, „aktuell verfügbar" statt „für Sie verfügbar" (klingt
-// sonst nach Reservierung). Nicht übernommen: „Rundum-Betreuung" (Martins Wort ist „Rund-um-Betreuung").
 export const EINLEITUNG_ABSATZ = 'Gerne übernehmen wir die Rund-um-Betreuung. Unsere Pflegekräfte sind direkt bei uns angestellt, ohne Vermittler, und wir kümmern uns um die komplette Abwicklung von Anfang bis Ende.';
 export const EINLEITUNG_TESTSIEGER = 'Für unseren Service hat uns DIE WELT nun zum sechsten Mal in Folge als Testsieger ausgezeichnet.';
 export const EINLEITUNG_ENDE = 'Unten finden Sie Ihre Kosten mit unserer Bestpreisgarantie und passende Pflegekräfte, die aktuell verfügbar sind.';
@@ -366,6 +270,10 @@ export function KompaktVertrauen({ sterne }: { sterne: SterneStand | null }) {
  * Profil). `aktiv=false` (alle anderen Zustände): nur ein neutraler Rahmen um das Formular wie bisher.
  * `onImBlick`: Hinweis im Bild ja/nein — die schwebende Frage legt sich nicht über das Formular.
  */
+/** Runde 27: Martins Satz („Sie können Pflegekräfte einladen, um Bewerbungen zu erhalten") mit dem freigegebenen Satz zum
+ *  Vertrag (02.10.). */
+export const SO_GEHT_ES_WEITER = 'Sie können passende Pflegekräfte einladen, um Bewerbungen zu erhalten. Das ist kostenlos und unverbindlich: Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen und im Portal unterschreiben.';
+
 export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick, liste, children, look = 'ruhig' }: {
   aktiv: boolean;
   offen: boolean;
@@ -391,14 +299,12 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
     // Schritte 3 und 4 als je ein Satz. Hinweis-Karte = Sprungziel `goto=anfragen`, das Formular klappt darin auf.
     return (
       <section aria-labelledby="pflegekraefte">
-        {/* Runde 25: Oben steht das Angebot (Einleitung, Kosten); der Weg leitet von dort zu den Schritten 2–4 über. */}
-        <h2 className="text-[20px] font-extrabold leading-[1.25] tracking-[-0.02em] text-pm-ink">So geht es weiter</h2>
-        <AngebotWeg onSprung={(ziel) => document.getElementById(ziel)?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
-        <div className="mt-10" />
-        <SchrittKopf id="pflegekraefte" nummer={2} titel="Pflegekräfte einladen" stand="jetzt" />
-        <p className="mt-3 text-[16px] leading-[1.5] text-pm-muted">
-          Gefällt Ihnen eine Pflegekraft, laden Sie sie ein, sich bei Ihnen zu bewerben. Das ist kostenlos und unverbindlich.
-        </p>
+        {/* Runde 27 (Martin zu Fassung 21: „So geht es weiter würde ich gar nicht in vier Punkte machen … der nächste Schritt
+            ist Pflegekräfte einladen … Sie können Pflegekräfte einladen, um Bewerbungen zu erhalten, und zur Not das Profil
+            noch ausfüllen, falls es nicht vorhanden ist … ansonsten reicht das"): eine Überschrift, ein Absatz, bei fehlenden
+            Angaben der Achtung-Kasten, dann die Pflegekräfte. id `pflegekraefte` = Sprungziel `goto=matches`. */}
+        <h2 id="pflegekraefte" className="scroll-mt-20 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">So geht es weiter</h2>
+        <p className="mt-3 text-pretty text-[17px] leading-[1.55] text-pm-body">{SO_GEHT_ES_WEITER}</p>
         <div ref={hinweis} id="patientendaten" className="mt-5 scroll-mt-20">
           {/* Runde 24 (Martin zu Fassung 18: „dann kommt dieser Achtung, würde ich das nennen … also Achtung, auch Symbol"):
               Warnzeichen in Bernstein und das Wort „Achtung" vorn im Titel. */}
@@ -423,21 +329,7 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
             )}
           </Card>
         </div>
-        {/* Runde 24 (Martin zu Fassung 18: „darunter wieder Ihre passenden Pflegekräfte. Also eine Überschrift reicht"):
-            die Karten direkt unter dem Hinweis, ohne eigene Überschrift. */}
         <div className="mt-6">{liste}</div>
-        <div className="mt-14">
-          <SchrittKopf id="schritt-bewerbungen" nummer={3} titel="Bewerbungen erhalten" stand="spaeter" />
-          <p className="mt-3 text-[16px] leading-[1.5] text-pm-muted">
-            Passende Pflegekräfte bewerben sich bei Ihnen mit Foto, Erfahrung, Anreisedatum und Preis. Jede Bewerbung ist 72&nbsp;Stunden für Sie reserviert.
-          </p>
-        </div>
-        <div className="mt-12">
-          <SchrittKopf id="schritt-auswahl" nummer={4} titel="Auswählen und starten" stand="spaeter" />
-          <p className="mt-3 text-[16px] leading-[1.5] text-pm-muted">
-            Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen und im Portal unterschreiben. Anreise schon ab 3&nbsp;Tagen möglich.
-          </p>
-        </div>
       </section>
     );
   }

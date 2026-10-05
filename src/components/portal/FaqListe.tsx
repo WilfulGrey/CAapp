@@ -61,11 +61,48 @@ export const FAQ: { q: string; a: ReactNode }[] = [
 
 const SICHTBAR = 4;
 
-/** `ruhig` (Kompakt-Einstieg, Runde 15): Kopf ohne Eyebrow im ruhigen H2-Stil; sonst unverändert. */
-export function FaqListe({ ruhig = false }: { ruhig?: boolean } = {}) {
+/** `ruhig` (Kompakt-Einstieg, Runde 15): Kopf ohne Eyebrow im ruhigen H2-Stil; sonst unverändert.
+ *  `karte` (Look „angebot", Runde 27 — Martin zu Fassung 21: „die häufig gestellten Fragen sehen nicht gut aus … alles mit
+ *  diesem komischen Hintergrund"): die Fragen in einer weißen Karte mit Zeilen wie die Karten darüber, Pfeil statt Plus. */
+export function FaqListe({ ruhig = false, karte = false }: { ruhig?: boolean; karte?: boolean } = {}) {
   const [offen, setOffen] = useState<number | null>(null);
   const [alle, setAlle] = useState(false);
   const liste = alle ? FAQ : FAQ.slice(0, SICHTBAR);
+  if (karte) {
+    // OpenAI 05.10. (mutig14): die Fragen leiser als die Karten darüber — mittleres Gewicht, kompaktere Zeilen.
+    const zeile = 'flex min-h-[52px] w-full items-center justify-between gap-4 px-5 py-3.5 text-left';
+    return (
+      <section aria-labelledby="faq-titel">
+        <h2 id="faq-titel" className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">Häufige Fragen</h2>
+        <div className="mt-4 overflow-hidden rounded-card border border-pm-line bg-white">
+          {liste.map((item, i) => {
+            const auf = offen === i;
+            return (
+              <div key={item.q} className={i > 0 ? 'border-t border-pm-line' : ''}>
+                <button type="button" onClick={() => setOffen(auf ? null : i)} aria-expanded={auf} className={zeile}>
+                  <span className="text-[15.5px] font-medium leading-[1.4] text-pm-ink">{item.q}</span>
+                  <ChevronDown className={`h-5 w-5 flex-none text-pm-taupe transition-transform ${auf ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </button>
+                {auf && (
+                  <div className="-mt-1 px-5 pb-5">
+                    {typeof item.a === 'string'
+                      ? <p className="text-[15px] leading-[1.65] text-pm-body whitespace-pre-line">{item.a}</p>
+                      : item.a}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {!alle && FAQ.length > SICHTBAR && (
+            <button type="button" onClick={() => setAlle(true)} className={`${zeile} border-t border-pm-line text-[15.5px] font-semibold text-pm-taupe-ink`}>
+              {FAQ.length - SICHTBAR} weitere Fragen
+              <ChevronDown className="h-5 w-5 flex-none text-pm-taupe" aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      </section>
+    );
+  }
   return (
     <section>
       <SectionHeader eyebrow={ruhig ? undefined : 'Gut zu wissen'} titel="Häufige Fragen" ruhig={ruhig} />

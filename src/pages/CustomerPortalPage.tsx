@@ -4224,7 +4224,7 @@ const CustomerPortalPage: FC = () => {
       {patientSaved && angebotSection}
 
       {/* Kompakt-Einstieg (Runde 15): 20 px Rand, 40 px Abstand zum Abschnitt darüber, FAQ-Kopf ohne Eyebrow. */}
-      <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-10' : 'px-3.5 pt-1'} pb-6 space-y-4`}>
+      <div className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'pt-14' : 'pt-10'}` : 'px-3.5 pt-1'} pb-6 space-y-4`}>
         {/* ── So geht es weiter · Häufige Fragen · Marta (Teil 3 des Redesigns).
              Schritt 1 = Pflegesituation gespeichert, Schritt 2 = Bewerbung da. ── */}
         {/* Nach dem Absenden ersetzt „Stand heute" diese Liste (Martin 25.09.).
@@ -4235,10 +4235,10 @@ const CustomerPortalPage: FC = () => {
           </div>
         )}
         <div className={kompakt ? '' : 'pt-6'}>
-          <FaqListe ruhig={kompakt} />
+          <FaqListe ruhig={kompakt} karte={kompakt && KOMPAKT_LOOK === 'angebot'} />
         </div>
         <div className="pt-4">
-          <MartaBox sterne={sterne} />
+          <MartaBox sterne={sterne} ohneVertrauen={kompakt && KOMPAKT_LOOK === 'angebot'} />
         </div>
 
       </div>
