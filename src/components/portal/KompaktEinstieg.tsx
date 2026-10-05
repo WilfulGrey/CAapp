@@ -17,7 +17,8 @@
 // Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
 // Pflegekräfte — so bleibt sie bei 390 px einzeilig.
 import { useEffect, useRef, type ReactNode } from 'react';
-import { AlertCircle, ChevronRight, Sparkles } from 'lucide-react';
+import { BadgeEuro, CalendarCheck, Check, ChevronRight, ShieldCheck, Sparkles, UserCheck, UserRound } from 'lucide-react';
+import { GARANTIE_PORTAL } from '../../lib/garantie';
 import type { Nurse } from '../../types';
 import type { SterneStand } from '../../lib/sterne';
 import { BewertungsZeile } from './BewertungsZeile';
@@ -81,11 +82,31 @@ export function AngebotKopf({ datum }: { datum: string | null }) {
  * Preiskarte über dem Preis — mit der Grundlage aus der Anfrage, falls vorhanden.
  */
 export function AngebotLeistung({ fuer }: { fuer: string | null }) {
-  // Runde 20: nur die Grundlage, eine Zeile über dem Preis („Für zwei Personen mit Pflegegrad 4"); ohne Angaben „Ihr Preis".
+  // Runde 22 (Martin 05.10.: „wenig erklärend"): was der Preis kauft, als Zeile mit Gewicht, darunter die Grundlage
+  // aus der Anfrage („für zwei Personen mit Pflegegrad 4"). Ohne Angaben steht nur die Leistung.
   return (
-    <p className="text-[15px] leading-[1.4] text-pm-muted">
-      {fuer ? fuer.charAt(0).toUpperCase() + fuer.slice(1) : 'Ihr Preis'}
-    </p>
+    <div>
+      <p className="text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-pm-ink">Rund-um-Betreuung zu Hause</p>
+      {fuer && <p className="mt-0.5 text-[15px] leading-[1.4] text-pm-muted">{fuer}</p>}
+    </div>
+  );
+}
+
+/**
+ * Runde 22 (Martin 05.10.: „soll sich anfühlen wie ein persönlicher Bereich für den Kunden … mehr Apple-like"): der Kopf
+ * wie ein Konto — Kreis mit den Initialen, Begrüßung, „Ihr persönlicher Bereich". Ohne Namen ein neutrales Zeichen.
+ */
+export function AngebotPerson({ name, kuerzel }: { name: string | null; kuerzel: string | null }) {
+  return (
+    <div className="flex items-center gap-3.5">
+      <span aria-hidden="true" className="flex h-12 w-12 flex-none items-center justify-center rounded-full bg-pm-taupe text-[17px] font-semibold tracking-[0.03em] text-white">
+        {kuerzel || <UserRound className="h-6 w-6" strokeWidth={2} />}
+      </span>
+      <div className="min-w-0">
+        <p className="text-[17px] font-semibold leading-[1.3] text-pm-ink">Guten Tag{name ? `, ${name}` : ''}</p>
+        <p className="text-[15px] leading-[1.35] text-pm-muted">Ihr persönlicher Bereich</p>
+      </div>
+    </div>
   );
 }
 
@@ -121,31 +142,43 @@ export function AngebotVertrauen({ sterne }: { sterne: SterneStand | null }) {
  * mit „Dazu kommen …" am Preis). Sommerzuschlag nur in der Saison in der Aufstellung (Martin 09.09.).
  */
 export function AngebotVorteile({ onBestpreis }: { onBestpreis: () => void }) {
-  // Runde 20: Maße 1:1 wie `Punkte` auf primundus.de (components/vertrauen/Vertrauen.tsx): Kachel 22 px, Schrift
-  // 15–17 px nach Breite, mittleres Gewicht. Ab 375 px steht so jeder Punkt in einer Zeile (gemessen in WebKit).
-  const zeile = 'flex items-center gap-2.5 text-[15px] font-medium leading-[1.4] text-pm-ink min-[375px]:text-[15.5px] min-[390px]:gap-3 min-[390px]:text-[16.5px] min-[430px]:text-[17px]';
-  const kachel = (
-    <span className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-[7px] bg-pm-coral-tint text-pm-coral" aria-hidden="true">
-      <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M2.5 6.3l2.3 2.2 4.7-5" />
-      </svg>
-    </span>
-  );
+  // Runde 22 (Martin 05.10. mit dem Bild „Willkommen bei Erinnerungen": „das wirkt übersichtlich, ich will das mehr
+  // apple-like"): je Vorteil ein Zeichen, ein kurzer Titel und ein erklärender Satz. Fakten: Vertrag § 3 (kündbar ohne
+  // Kündigungsfrist, anteilige Abrechnung), Garantie-Wortlaut aus GARANTIE_PORTAL, „Keine Vermittlungsgebühr" wie auf
+  // der Startseite. „Alles drin" gilt für die genannten Posten; was dazukommt, steht am Preis.
+  const zeilen = [
+    { Zeichen: BadgeEuro, titel: 'Alles drin', text: 'Lohn, Steuern und Gebühren sind im Preis. Keine Vermittlungsgebühr.' },
+    { Zeichen: UserCheck, titel: 'Bei uns angestellt', text: 'Ihre Betreuungskraft ist sozialversichert. Wir organisieren Anreise, Wechsel und Vertretung.' },
+    { Zeichen: CalendarCheck, titel: 'Täglich kündbar', text: 'Ohne Kündigungsfrist und taggenau abgerechnet.' },
+  ];
+  const kachel = 'flex h-10 w-10 flex-none items-center justify-center rounded-[11px] bg-pm-coral-tint text-pm-coral';
   return (
-    <ul className="mt-6 grid gap-3">
-      <li className={zeile}>{kachel}<span>Lohn, Steuern, Gebühren: alles drin</span></li>
-      <li className={zeile}>{kachel}<span>Bei uns angestellt und sozialversichert</span></li>
-      <li className={zeile}>{kachel}<span>Täglich kündbar, taggenau abgerechnet</span></li>
-      <li className={zeile}>{kachel}<span>
-        Bestpreisgarantie{' '}
-        <button
-          type="button"
-          onClick={onBestpreis}
-          className="inline-flex min-h-[44px] -my-3 items-center font-medium text-pm-taupe-ink underline underline-offset-4 decoration-pm-taupe/40 hover:decoration-pm-taupe-ink"
-        >
-          Mehr Infos
-        </button>
-      </span></li>
+    <ul className="mt-8 grid gap-6">
+      {zeilen.map(({ Zeichen, titel, text }) => (
+        <li key={titel} className="flex gap-4">
+          <span className={kachel} aria-hidden="true"><Zeichen className="h-[22px] w-[22px]" strokeWidth={2} /></span>
+          <div className="min-w-0">
+            <p className="text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-pm-ink">{titel}</p>
+            <p className="mt-0.5 text-[15.5px] leading-[1.45] text-pm-muted">{text}</p>
+          </div>
+        </li>
+      ))}
+      <li className="flex gap-4">
+        <span className={kachel} aria-hidden="true"><ShieldCheck className="h-[22px] w-[22px]" strokeWidth={2} /></span>
+        <div className="min-w-0">
+          <p className="text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-pm-ink">{GARANTIE_PORTAL.titel}</p>
+          <p className="mt-0.5 text-[15.5px] leading-[1.45] text-pm-muted">
+            {GARANTIE_PORTAL.zusage}{' '}
+            <button
+              type="button"
+              onClick={onBestpreis}
+              className="inline-flex min-h-[44px] -my-3 items-center font-medium text-pm-taupe-ink underline underline-offset-4 decoration-pm-taupe/40 hover:decoration-pm-taupe-ink"
+            >
+              Mehr Infos
+            </button>
+          </p>
+        </div>
+      </li>
     </ul>
   );
 }
@@ -233,45 +266,60 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
   }, [aktiv]);
   if (!aktiv) return <div>{children}</div>;
   if (look === 'angebot') {
-    // Runde 17: Überschrift = was der Kunde will (Martin: „als Nächstes muss stehen: passende Pflegekräfte einladen und
-    // Bewerbungen erhalten"), darunter der Achtung-Hinweis in seinem Wortlaut (bernsteinfarbener Kopf mit Zeichen,
-    // weißer Körper mit Knopf; das Formular klappt im Körper auf), dann die Profile.
+    // Runde 22 (Martin 05.10.: „Angebot, dann nur die Punkte, Preis, dann plötzlich die passenden Pflegekräfte … man
+    // weiß nicht, was man nun machen soll"): zwischen Preis und Pflegekräften der Stand als Liste wie eine
+    // Bestellübersicht. Schritt 1 ist erledigt (das Angebot steht darüber), Schritt 2 trägt den einen Knopf; sein Satz
+    // ist Martins Achtung („damit sich Pflegekräfte bewerben können"). Texte der Schritte 3 und 4 wie
+    // `SoGehtEsWeiter` (Registry #109). Offen: Schritte 1–2, darunter das Formular über die volle Kartenbreite.
+    const schritte = [
+      { titel: 'Angebot erstellt', text: 'Ihren Preis sehen Sie oben.' },
+      { titel: 'Pflegesituation vervollständigen', text: 'Damit sich Pflegekräfte bei Ihnen bewerben können. Dauert etwa 2\u00a0Minuten, vieles ist schon ausgefüllt.' },
+      { titel: 'Pflegekräfte einladen und Bewerbungen erhalten', text: 'Mit Foto, Erfahrung, Anreisedatum und Preis.' },
+      { titel: 'Auswählen und starten', text: 'Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen. Anreise schon ab 3 Tagen möglich.' },
+    ];
+    const sichtbar = offen ? schritte.slice(0, 2) : schritte;
     return (
-      <section aria-labelledby="pflegekraefte-titel">
-        {/* 22 px statt 24: so bleibt die Überschrift bei 390 px zweizeilig. */}
-        <div id="pflegekraefte" style={{ scrollMarginTop: 72 }}>
-          <h2 id="pflegekraefte-titel" className="text-[23px] font-extrabold leading-[1.2] tracking-[-0.03em] text-pm-ink">
-            Passende Pflegekräfte einladen und <span className="whitespace-nowrap">Bewerbungen erhalten</span>
-          </h2>
+      <section aria-labelledby="weiter-titel">
+        <h2 id="weiter-titel" className="text-[24px] font-extrabold leading-[1.15] tracking-[-0.03em] text-pm-ink">So geht es weiter</h2>
+        <div ref={hinweis} id="patientendaten" className="mt-4 scroll-mt-16 rounded-card bg-white px-5 pb-6 pt-6 shadow-lift">
+          <ol>
+            {sichtbar.map((s, i) => {
+              const fertig = i === 0;
+              const jetzt = i === 1;
+              const letzte = i === sichtbar.length - 1;
+              return (
+                <li key={s.titel} className={`relative flex gap-4 ${letzte ? '' : 'pb-6'}`} aria-current={jetzt ? 'step' : undefined}>
+                  {/* Linie zum nächsten Schritt: erledigt grün, sonst die feine Linie. */}
+                  {!letzte && (
+                    <span aria-hidden="true" className={`absolute bottom-0 left-[13px] top-8 w-[2px] rounded-full ${fertig ? 'bg-pm-green' : 'bg-pm-line'}`} />
+                  )}
+                  <span
+                    className={`relative flex h-7 w-7 flex-none items-center justify-center rounded-full text-[14px] font-semibold tabular-nums ${
+                      fertig ? 'bg-pm-green text-white' : jetzt ? 'bg-pm-coral text-white' : 'border-2 border-pm-line bg-white text-pm-muted'
+                    }`}
+                  >
+                    {fertig ? <Check className="h-4 w-4" strokeWidth={3} aria-label="erledigt" /> : i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1 pt-[3px]">
+                    <p className={`text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] ${fertig ? 'text-pm-muted' : 'text-pm-ink'}`}>{s.titel}</p>
+                    <p className="mt-1 text-[15px] leading-[1.45] text-pm-muted">{s.text}</p>
+                    {jetzt && !offen && (
+                      <Button breit onClick={onOeffnen} className="mt-4 !font-semibold">
+                        Jetzt vervollständigen
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+          {offen && <div className="mt-5 border-t border-pm-line">{children}</div>}
         </div>
-        <div ref={hinweis} id="patientendaten" className="mt-5 scroll-mt-16">
-          {/* Runde 20: ruhige weiße Karte wie die Preiskarte; das Zeichen in Bernstein trägt das „Achtung". */}
-          <div className="rounded-card bg-white px-5 pb-6 pt-5 shadow-lift">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="mt-[2px] h-5 w-5 flex-none text-pm-amber" strokeWidth={2.25} aria-hidden="true" />
-              {/* „passende" steht schon darüber und darunter (H2, H3); ohne es zwei Zeilen statt drei. */}
-              <p className="text-[16px] font-medium leading-[1.45] text-pm-ink">
-                Es fehlen noch Angaben, damit sich Pflegekräfte <span className="whitespace-nowrap">bewerben können.</span>
-              </p>
-            </div>
-            {offen ? (
-              <div className="mt-4 border-t border-pm-line">{children}</div>
-            ) : (
-              <>
-                <Button breit onClick={onOeffnen} className="mt-5 !px-2 !font-semibold">
-                  Jetzt vervollständigen →
-                </Button>
-                {/* Wortlaut aus Registry #109 (freigegeben), gekürzt. */}
-                <p className="mt-3 text-balance text-center text-[14px] leading-[1.45] text-pm-muted">
-                  Kostenlos und unverbindlich. Vieles ist schon ausgefüllt.
-                </p>
-              </>
-            )}
-          </div>
+        <div id="pflegekraefte" style={{ scrollMarginTop: 72 }} className="mt-12">
+          <h2 id="pflegekraefte-titel" className="text-[24px] font-extrabold leading-[1.15] tracking-[-0.03em] text-pm-ink">Ihre passenden Pflegekräfte</h2>
+          <p className="mt-1.5 text-pretty text-[16px] leading-[1.45] text-pm-muted">Echte Profile, ausgewählt nach Ihren Angaben.</p>
         </div>
-        {/* Dann „Ihre passenden Pflegekräfte" (Martin: „dann kämen die, Ihre passenden Pflegekräfte"). */}
-        <h3 className="mt-9 text-[18px] font-bold leading-[1.3] tracking-[-0.01em] text-pm-ink">Ihre passenden Pflegekräfte</h3>
-        <div className="mt-3">{liste}</div>
+        <div className="mt-4">{liste}</div>
       </section>
     );
   }

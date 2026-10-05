@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, FC } from 'react';
 import { Check, Bell, Clock, Phone, AlertCircle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
 import { Nurse } from '../types';
-import { displayName } from '../components/portal/shared';
+import { displayName, initials } from '../components/portal/shared';
 import {
   fetchLeadByToken,
   Lead,
@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotKopf, AngebotLeistung, AngebotVertrauen, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { AngebotKopf, AngebotLeistung, AngebotPerson, AngebotVertrauen, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2733,7 +2733,7 @@ const CustomerPortalPage: FC = () => {
                           </div>
                         </>
                       )}
-                      <p className={`${angebotLook ? 'mt-2 ' : ''}flex items-baseline gap-2 whitespace-nowrap`}>
+                      <p className={`${angebotLook ? 'mt-4 ' : ''}flex items-baseline gap-2 whitespace-nowrap`}>
                         <span className={`text-[44px] ${angebotLook ? 'font-extrabold tracking-[-0.04em]' : 'font-bold tracking-[-0.03em]'} leading-none tabular-nums text-pm-ink`}>{formatEuro(brutto)}</span>
                         <span className="text-[16px] text-pm-muted">im Monat</span>
                       </p>
@@ -3362,13 +3362,23 @@ const CustomerPortalPage: FC = () => {
         return (
           <div className={kompakt ? '' : 'bg-pm-shell'}>
             <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-6' : `px-[18px] pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}`}>
+              {/* Runde 22 (`?look=angebot`): Kopf wie ein Konto — Initialen, Begrüßung, „Ihr persönlicher Bereich". */}
+              {kompakt && KOMPAKT_LOOK === 'angebot' ? (
+                <AngebotPerson
+                  name={heroNameLine}
+                  kuerzel={lead && (lead.vorname || lead.nachname)
+                    ? initials([lead.vorname, lead.nachname].filter(Boolean).join(' ').trim()).toUpperCase().slice(0, 2)
+                    : null}
+                />
+              ) : (
               <p className={`text-[16px] ${kompakt ? 'text-pm-muted' : 'text-pm-taupe-ink'}`}>
                 Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
               </p>
+              )}
               {/* Kompakt-Einstieg (Runde 5): Titel wie der Betreff der Angebotsmail; höchstens zwei Zeilen —
                   „24-Stunden-Betreuung" bricht nicht um (sonst „24-" allein am Zeilenende). */}
               <h1 className={kompakt
-                ? `mt-2 text-[28px] min-[376px]:text-[30px] ${KOMPAKT_LOOK === 'angebot' ? 'font-extrabold leading-[1.1] tracking-[-0.035em]' : 'font-bold leading-[1.15] tracking-[-0.025em]'} text-pm-ink`
+                ? `${KOMPAKT_LOOK === 'angebot' ? 'mt-7 text-[28px] min-[376px]:text-[31px] font-extrabold leading-[1.1] tracking-[-0.035em]' : 'mt-2 text-[28px] min-[376px]:text-[30px] font-bold leading-[1.15] tracking-[-0.025em]'} text-pm-ink`
                 : 'mt-1 font-extrabold leading-[1.08] tracking-[-0.035em] text-pm-ink text-[31px]'}>
                 {kompakt ? (
                   <>Ihr Angebot zur <span className="whitespace-nowrap">24-Stunden-Betreuung</span></>
