@@ -17,7 +17,7 @@
 // Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
 // Pflegekräfte — so bleibt sie bei 390 px einzeilig.
 import { useEffect, useRef, type ReactNode } from 'react';
-import { BadgeEuro, CalendarCheck, Check, ChevronRight, ShieldCheck, Sparkles, UserCheck, UserRound } from 'lucide-react';
+import { BadgeEuro, CalendarCheck, Check, ChevronRight, ClipboardList, ShieldCheck, Sparkles, UserCheck, UserRound } from 'lucide-react';
 import { GARANTIE_PORTAL } from '../../lib/garantie';
 import type { Nurse } from '../../types';
 import type { SterneStand } from '../../lib/sterne';
@@ -25,6 +25,7 @@ import { BewertungsZeile } from './BewertungsZeile';
 import { DeutschPunkte } from './PflegekraftProfil';
 import { displayName, initials } from './shared';
 import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
 import { SectionHeader } from '../ui/SectionHeader';
 
 /**
@@ -93,6 +94,71 @@ export function AngebotLeistung({ fuer }: { fuer: string | null }) {
 }
 
 /**
+ * Runde 23 (Martin 05.10.: „wir haben nur das Angebot, Pflegekräfte einladen, Bewerbung erhalten, auswählen. Wenn die
+ * Daten nicht da sind, dann kennen die Pflegekräfte den Job nicht" — das Vervollständigen ist KEIN eigener Schritt,
+ * sondern der Hinweis in Schritt 2). Der Weg steht unter dem Titel wie der Stand einer Bestellung; jeder Punkt springt
+ * zu seinem Abschnitt. Schritt 1 ist erledigt (das Angebot steht darunter), Schritt 2 ist der aktuelle.
+ */
+export const WEG = [
+  { label: 'Angebot', ziel: 'angebot' },
+  { label: 'Einladen', ziel: 'pflegekraefte' },
+  { label: 'Bewerbungen', ziel: 'schritt-bewerbungen' },
+  { label: 'Auswählen', ziel: 'schritt-auswahl' },
+] as const;
+
+function Punkt({ nummer, stand, gross = false }: { nummer: number; stand: 'fertig' | 'jetzt' | 'spaeter'; gross?: boolean }) {
+  const groesse = gross ? 'h-8 w-8 text-[15px]' : 'h-7 w-7 text-[13px]';
+  return (
+    <span
+      aria-hidden="true"
+      className={`relative flex flex-none items-center justify-center rounded-full font-semibold tabular-nums ${groesse} ${
+        stand === 'fertig' ? 'bg-pm-green text-white' : stand === 'jetzt' ? 'bg-pm-coral text-white' : 'border-2 border-pm-line bg-pm-paper text-pm-muted'
+      }`}
+    >
+      {stand === 'fertig' ? <Check className="h-4 w-4" strokeWidth={3} /> : nummer}
+    </span>
+  );
+}
+
+export function AngebotWeg({ onSprung }: { onSprung: (ziel: string) => void }) {
+  return (
+    <nav aria-label="Ihr Weg zur Pflegekraft" className="mt-6">
+      <ol className="relative grid grid-cols-4">
+        {/* Linie von der Mitte der ersten bis zur Mitte der letzten Spalte; das erledigte Stück grün. */}
+        <span aria-hidden="true" className="absolute left-[12.5%] right-[12.5%] top-[21px] h-[2px] rounded-full bg-pm-line" />
+        <span aria-hidden="true" className="absolute left-[12.5%] top-[21px] h-[2px] w-[25%] rounded-full bg-pm-green" />
+        {WEG.map((w, i) => {
+          const stand = i === 0 ? 'fertig' : i === 1 ? 'jetzt' : 'spaeter';
+          return (
+            <li key={w.ziel} className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => onSprung(w.ziel)}
+                aria-current={stand === 'jetzt' ? 'step' : undefined}
+                className="flex min-h-[44px] flex-col items-center gap-1.5 rounded-xl pt-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-pm-taupe"
+              >
+                <Punkt nummer={i + 1} stand={stand} />
+                <span className={`text-[12px] leading-tight min-[375px]:text-[13px] ${stand === 'jetzt' ? 'font-semibold text-pm-ink' : 'text-pm-muted'}`}>{w.label}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+/** Kopf eines Schritts weiter unten: dieselben Punkte wie im Weg, daneben der Titel. */
+export function SchrittKopf({ id, nummer, titel, stand }: { id: string; nummer: number; titel: string; stand: 'fertig' | 'jetzt' | 'spaeter' }) {
+  return (
+    <div id={id} className="flex scroll-mt-20 items-center gap-3">
+      <Punkt nummer={nummer} stand={stand} gross />
+      <h2 className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">{titel}</h2>
+    </div>
+  );
+}
+
+/**
  * Runde 22 (Martin 05.10.: „soll sich anfühlen wie ein persönlicher Bereich für den Kunden … mehr Apple-like"): der Kopf
  * wie ein Konto — Kreis mit den Initialen, Begrüßung, „Ihr persönlicher Bereich". Ohne Namen ein neutrales Zeichen.
  */
@@ -147,8 +213,8 @@ export function AngebotVorteile({ onBestpreis }: { onBestpreis: () => void }) {
   // Kündigungsfrist, anteilige Abrechnung), Garantie-Wortlaut aus GARANTIE_PORTAL, „Keine Vermittlungsgebühr" wie auf
   // der Startseite. „Alles drin" gilt für die genannten Posten; was dazukommt, steht am Preis.
   const zeilen = [
-    { Zeichen: BadgeEuro, titel: 'Alles drin', text: 'Lohn, Steuern und Gebühren sind im Preis. Keine Vermittlungsgebühr.' },
-    { Zeichen: UserCheck, titel: 'Bei uns angestellt', text: 'Sozialversichert. Wir organisieren Anreise, Wechsel und Vertretung.' },
+    { Zeichen: BadgeEuro, titel: 'Alles drin', text: 'Lohn, Steuern und Gebühren sind im Preis.' },
+    { Zeichen: UserCheck, titel: 'Bei uns angestellt', text: 'Legal und sozialversicherungspflichtig angestellt, ohne Vermittler.' },
     { Zeichen: CalendarCheck, titel: 'Täglich kündbar', text: 'Ohne Kündigungsfrist. Abgerechnet wird taggenau.' },
   ];
   const kachel = 'flex h-10 w-10 flex-none items-center justify-center rounded-[11px] bg-pm-coral-tint text-pm-coral';
@@ -159,7 +225,7 @@ export function AngebotVorteile({ onBestpreis }: { onBestpreis: () => void }) {
           <span className={kachel} aria-hidden="true"><Zeichen className="h-[22px] w-[22px]" strokeWidth={2} /></span>
           <div className="min-w-0">
             <p className="text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-pm-ink">{titel}</p>
-            <p className="mt-0.5 text-[15.5px] leading-[1.45] text-pm-muted">{text}</p>
+            <p className="mt-0.5 text-balance text-[15.5px] leading-[1.45] text-pm-muted">{text}</p>
           </div>
         </li>
       ))}
@@ -266,60 +332,50 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
   }, [aktiv]);
   if (!aktiv) return <div>{children}</div>;
   if (look === 'angebot') {
-    // Runde 22 (Martin 05.10.: „Angebot, dann nur die Punkte, Preis, dann plötzlich die passenden Pflegekräfte … man
-    // weiß nicht, was man nun machen soll"): zwischen Preis und Pflegekräften der Stand als Liste wie eine
-    // Bestellübersicht. Schritt 1 ist erledigt (das Angebot steht darüber), Schritt 2 trägt den einen Knopf; sein Satz
-    // ist Martins Achtung („damit sich Pflegekräfte bewerben können"). Texte der Schritte 3 und 4 wie
-    // `SoGehtEsWeiter` (Registry #109). Offen: Schritte 1–2, darunter das Formular über die volle Kartenbreite.
-    const schritte = [
-      { titel: 'Angebot erstellt', text: 'Ihren Preis sehen Sie oben.' },
-      { titel: 'Pflegesituation vervollständigen', text: 'Damit sich Pflegekräfte bei Ihnen bewerben können. Dauert etwa 2\u00a0Minuten, vieles ist schon ausgefüllt.' },
-      { titel: 'Pflegekräfte einladen und Bewerbungen erhalten', text: 'Mit Foto, Erfahrung, Anreisedatum und Preis.' },
-      { titel: 'Auswählen und starten', text: 'Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen. Anreise schon ab 3 Tagen möglich.' },
-    ];
-    const sichtbar = offen ? schritte.slice(0, 2) : schritte;
+    // Runde 23: Schritt 2 „Pflegekräfte einladen" mit Martins Hinweis (fehlen Angaben, kennen die Pflegekräfte den
+    // Einsatz nicht) und den Pflegekräften in der Karte des Portals (MatchCard „V", wie nach dem Absenden), danach die
+    // Schritte 3 und 4 als je ein Satz. Hinweis-Karte = Sprungziel `goto=anfragen`, das Formular klappt darin auf.
     return (
-      <section aria-labelledby="weiter-titel">
-        <h2 id="weiter-titel" className="text-[24px] font-extrabold leading-[1.15] tracking-[-0.03em] text-pm-ink">So geht es weiter</h2>
-        <div ref={hinweis} id="patientendaten" className="mt-4 scroll-mt-16 rounded-card bg-white px-5 pb-6 pt-6 shadow-lift">
-          <ol>
-            {sichtbar.map((s, i) => {
-              const fertig = i === 0;
-              const jetzt = i === 1;
-              const letzte = i === sichtbar.length - 1;
-              return (
-                <li key={s.titel} className={`relative flex gap-4 ${letzte ? '' : 'pb-6'}`} aria-current={jetzt ? 'step' : undefined}>
-                  {/* Linie zum nächsten Schritt: erledigt grün, sonst die feine Linie. */}
-                  {!letzte && (
-                    <span aria-hidden="true" className={`absolute bottom-0 left-[13px] top-8 w-[2px] rounded-full ${fertig ? 'bg-pm-green' : 'bg-pm-line'}`} />
-                  )}
-                  <span
-                    className={`relative flex h-7 w-7 flex-none items-center justify-center rounded-full text-[14px] font-semibold tabular-nums ${
-                      fertig ? 'bg-pm-green text-white' : jetzt ? 'bg-pm-coral-tint text-pm-coral' : 'border-2 border-pm-line bg-white text-pm-muted'
-                    }`}
-                  >
-                    {fertig ? <Check className="h-4 w-4" strokeWidth={3} aria-label="erledigt" /> : i + 1}
-                  </span>
-                  <div className="min-w-0 flex-1 pt-[3px]">
-                    <p className={`text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] ${fertig ? 'text-pm-muted' : 'text-pm-ink'}`}>{s.titel}</p>
-                    <p className="mt-1 text-[15px] leading-[1.45] text-pm-muted">{s.text}</p>
-                    {jetzt && !offen && (
-                      <Button breit onClick={onOeffnen} className="mt-5 mb-1 !font-semibold">
-                        Jetzt vervollständigen
-                      </Button>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-          {offen && <div className="mt-5 border-t border-pm-line">{children}</div>}
-        </div>
-        <div id="pflegekraefte" style={{ scrollMarginTop: 72 }} className="mt-14">
-          <h2 id="pflegekraefte-titel" className="text-[24px] font-extrabold leading-[1.15] tracking-[-0.03em] text-pm-ink">Ihre passenden Pflegekräfte</h2>
-          <p className="mt-1.5 text-pretty text-[16px] leading-[1.45] text-pm-muted">Echte Profile, ausgewählt nach Ihren Angaben.</p>
+      <section aria-labelledby="pflegekraefte">
+        <SchrittKopf id="pflegekraefte" nummer={2} titel="Pflegekräfte einladen" stand="jetzt" />
+        <p className="mt-3 text-[16px] leading-[1.5] text-pm-muted">
+          Gefällt Ihnen eine Pflegekraft, laden Sie sie ein, sich bei Ihnen zu bewerben. Das ist kostenlos und unverbindlich.
+        </p>
+        <div ref={hinweis} id="patientendaten" className="mt-5 scroll-mt-20">
+          <Card className="px-5 pb-5 pt-5">
+            <div className="flex gap-4">
+              <span aria-hidden="true" className="flex h-10 w-10 flex-none items-center justify-center rounded-[11px] bg-pm-coral-tint text-pm-coral">
+                <ClipboardList className="h-[22px] w-[22px]" strokeWidth={2} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-pm-ink">Es fehlen noch Angaben zur Pflegesituation</p>
+                <p className="mt-1 text-[15px] leading-[1.45] text-pm-muted">
+                  Erst damit kennen die Pflegekräfte Ihren Einsatz und können sich bewerben. Dauert etwa 2&nbsp;Minuten, vieles ist schon ausgefüllt.
+                </p>
+              </div>
+            </div>
+            {offen ? (
+              <div className="mt-5 border-t border-pm-line">{children}</div>
+            ) : (
+              <Button breit onClick={onOeffnen} className="mt-5 !font-semibold">
+                Jetzt vervollständigen
+              </Button>
+            )}
+          </Card>
         </div>
         <div className="mt-4">{liste}</div>
+        <div className="mt-14">
+          <SchrittKopf id="schritt-bewerbungen" nummer={3} titel="Bewerbungen erhalten" stand="spaeter" />
+          <p className="mt-3 text-[16px] leading-[1.5] text-pm-muted">
+            Passende Pflegekräfte bewerben sich bei Ihnen mit Foto, Erfahrung, Anreisedatum und Preis. Jede Bewerbung ist 72&nbsp;Stunden für Sie reserviert.
+          </p>
+        </div>
+        <div className="mt-12">
+          <SchrittKopf id="schritt-auswahl" nummer={4} titel="Auswählen und starten" stand="spaeter" />
+          <p className="mt-3 text-[16px] leading-[1.5] text-pm-muted">
+            Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen und im Portal unterschreiben. Anreise schon ab 3&nbsp;Tagen möglich.
+          </p>
+        </div>
       </section>
     );
   }

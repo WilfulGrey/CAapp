@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotKopf, AngebotLeistung, AngebotPerson, AngebotVertrauen, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { AngebotKopf, AngebotLeistung, AngebotPerson, AngebotWeg, AngebotVertrauen, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2685,7 +2685,7 @@ const CustomerPortalPage: FC = () => {
               Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
               (Martin: „muss einklappbar sein für spätere Zustände"). */}
           {/* Kompakt-Einstieg (Runde 15): weiß, 20 px Radius, ohne Rand, weicher zweilagiger Schatten, 24 px Innenabstand. */}
-          <Card className={`relative shadow-lift ${kompakt ? `!border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'px-5 pt-3 pb-4'}`}>
+          <Card className={`relative ${angebotLook ? `px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : kompakt ? `shadow-lift !border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'shadow-lift px-5 pt-3 pb-4'}`}>
             {kompakt ? (
               // Runde 13: keine Versalien-Zeile mehr — die Karte beginnt mit dem Preis; der Name bleibt
               // für Screenreader.
@@ -3390,8 +3390,12 @@ const CustomerPortalPage: FC = () => {
                   Punkte. Die Situation (Personen, Pflegegrad) steht unten in der Preiskarte. */}
               {kompakt && KOMPAKT_LOOK === 'angebot' ? (
                 <>
-                  <AngebotVertrauen sterne={sterne} />
-                  <AngebotVorteile onBestpreis={() => setBestpreisOffen(true)} />
+                  {/* Runde 23: der Weg in vier Schritten als Stand unter dem Titel; jeder Punkt springt hin. */}
+                  <AngebotWeg onSprung={(ziel) => document.getElementById(ziel)?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+                  <div id="angebot" className="mt-8 scroll-mt-20">
+                    <AngebotVertrauen sterne={sterne} />
+                    <AngebotVorteile onBestpreis={() => setBestpreisOffen(true)} />
+                  </div>
                 </>
               ) : kompakt && <KompaktEinleitung />}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
@@ -3799,7 +3803,38 @@ const CustomerPortalPage: FC = () => {
           offen={formImKasten}
           onOeffnen={() => setFormImKasten(true)}
           onImBlick={setFormularImBlick}
-          liste={
+          liste={KOMPAKT_LOOK === 'angebot' && !listeLaedt && pflegekraftAuswahl.visibleNurses.length > 0 ? (
+            // Runde 23 (Martin 05.10.: „die Pflegekraftdarstellung muss stimmig sein und zum Portal passen"): die
+            // Karten wie nach dem Absenden, mit derselben Empfehlung; solange die Pflegesituation fehlt, führt
+            // „Profil vervollständigen & einladen" ins Formular im Hinweis darüber (canInviteNurse).
+            <div className="space-y-3">
+              {(() => {
+                const { visibleNurses } = pflegekraftAuswahl;
+                let recIdx = -1;
+                let recBest = -Infinity;
+                visibleNurses.forEach(({ nurse, status }, idx) => {
+                  if (status !== 'pending') return;
+                  const sc = nurseBadgeScore(nurse.history?.assignments);
+                  if (sc > recBest) { recBest = sc; recIdx = idx; }
+                });
+                return visibleNurses.map(({ nurse, i, status }, idx) => (
+                  <MatchCard
+                    profilFehlt={!patientSaved}
+                    key={`k-${i}`}
+                    nurse={nurse}
+                    status={status}
+                    isRecommended={idx === recIdx}
+                    onNurseClick={() => openNurseFromMatch(nurse, i)}
+                    onStufeClick={() => { setNurseModalStufe(true); openNurseFromMatch(nurse, i); }}
+                    onInvite={() => canInviteNurse(i)}
+                    onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
+                    onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
+                    globalInviteLocked={inviteInFlight}
+                  />
+                ));
+              })()}
+            </div>
+          ) : (
             <KompaktePflegekraefte
               eintraege={pflegekraftAuswahl.visibleNurses}
               laedt={listeLaedt}
@@ -3809,7 +3844,7 @@ const CustomerPortalPage: FC = () => {
               telefonHref={TELEFON_HREF}
               gross={KOMPAKT_LOOK === 'angebot'}
             />
-          }
+          )}
         >
         {!hasPending && !kompakt && (() => {
           // Unvollständig = IMMER offen (Martin, 13.08.): Solange die
