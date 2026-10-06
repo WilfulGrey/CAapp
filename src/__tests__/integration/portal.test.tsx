@@ -263,9 +263,13 @@ describe('Portal integration: golden paths', () => {
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
 
-    // Formular über den Kopf „Pflegesituation ✓ Vollständig" öffnen.
-    const kopf = await screen.findByRole('button', { name: /Pflegesituation.*Vollständig/ }, { timeout: 5000 });
+    // Fassung 33: erst warten, bis die Seite den gespeicherten Stand zeigt (mamamia geladen), dann das Formular über die
+    // Zeile „Ihre Pflegesituation · ✓ Vollständig" im Bereich „Angebot und Pflegesituation" öffnen. (Auf dem CI-Runner
+    // war die Zeile sonst schon da, während mamamia noch lud.)
+    expect(await screen.findByText('Ihre Suche läuft', {}, { timeout: 5000 })).toBeInTheDocument();
+    const kopf = await screen.findByRole('button', { name: /Ihre Pflegesituation.*Vollständig/ }, { timeout: 5000 });
     await user.click(kopf);
+    await waitFor(() => expect(screen.getByRole('button', { name: /Ihre Pflegesituation.*Vollständig/ })).toHaveAttribute('aria-expanded', 'true'), { timeout: 5000 });
     const chip = await screen.findByRole('button', { name: 'Männlich' }, { timeout: 5000 });
 
     // Jeden Text mitschreiben, den die Seite zeigt — auch kurz aufblitzende:
@@ -284,7 +288,7 @@ describe('Portal integration: golden paths', () => {
     mo.disconnect();
 
     expect(titel.some((t) => t.includes('Ihr persönliches Angebot') || t.includes('Ihr Angebot zur'))).toBe(false);
-    expect(screen.getByRole('button', { name: /Pflegesituation.*Vollständig/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ihre Pflegesituation.*Vollständig/ })).toBeInTheDocument();
   }, 15_000);
 
   it('erstes Absenden, dann gleich eine Angabe ändern: die Seite bleibt „abgesendet“ (mmCustomer noch „draft“)', async () => {
