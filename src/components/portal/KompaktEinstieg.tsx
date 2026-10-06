@@ -41,7 +41,10 @@ import { SectionHeader } from '../ui/SectionHeader';
  */
 export type KompaktLook = 'ruhig' | 'angebot';
 const SUCHE = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-export const KOMPAKT_LOOK: KompaktLook = SUCHE?.get('look') === 'angebot' ? 'angebot' : 'ruhig';
+// Livegang 06.10.2026 (Martin: „wenn es sinnvoll ist, kannst du es auch live bringen“): Fassung 30 (vor dem Absenden) und
+// Fassung 33 (nach dem Absenden) sind die Standardansicht. `?look=ruhig` zeigt zum Vergleich den älteren Entwurf und die
+// bisherige Ansicht nach dem Absenden.
+export const KOMPAKT_LOOK: KompaktLook = SUCHE?.get('look') === 'ruhig' ? 'ruhig' : 'angebot';
 
 /** „05.10.2026" (Berliner Kalendertag) aus dem Anlagezeitpunkt der Anfrage; ohne gültiges Datum nichts. Der Preis wird
  *  in derselben Sekunde berechnet und als „Ihr Angebot" verschickt, darum „Ihr Angebot vom …" (OpenAI 05.10.). */

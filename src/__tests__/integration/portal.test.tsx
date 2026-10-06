@@ -314,16 +314,16 @@ describe('Portal integration: golden paths', () => {
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
 
-    // Kompakt-Einstieg: Das Formular klappt im Hinweis „Ihre Pflegesituation ist noch nicht vollständig" auf.
-    await user.click(await screen.findByRole('button', { name: 'Pflegesituation vervollständigen →' }, { timeout: 5000 }));
+    // Fassung 30: Das Formular klappt im Achtung-Hinweis auf.
+    await user.click(await screen.findByRole('button', { name: 'Jetzt vervollständigen' }, { timeout: 5000 }));
     for (let i = 0; i < 3; i++) {
       await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
     }
     await user.click(await screen.findByRole('button', { name: /^Bewerbungen erhalten$/ }, { timeout: 5000 }));
     expect(await screen.findByText('Ihre Suche läuft', {}, { timeout: 5000 })).toBeInTheDocument();
 
-    // Angaben öffnen und eine Angabe ändern.
-    await user.click(screen.getByRole('button', { name: /Angaben ansehen oder ändern/ }));
+    // Fassung 33: Angaben im Bereich „Angebot und Pflegesituation" öffnen und eine Angabe ändern.
+    await user.click(await screen.findByRole('button', { name: /Ihre Pflegesituation/ }, { timeout: 5000 }));
     await user.click(await screen.findByRole('button', { name: 'Männlich' }, { timeout: 5000 }));
     expect(screen.getByText('Ihre Suche läuft')).toBeInTheDocument();
     expect(screen.queryByText('Ihr persönliches Angebot')).toBeNull();
@@ -364,9 +364,9 @@ describe('Portal integration: golden paths', () => {
     // Auch der Kasten für Neukunden darf nicht kurz aufblitzen (Registry #102: `!schonAbgesendet`).
     expect(titel.some((t) => t.includes('Noch 2 Minuten bis zum Einladen'))).toBe(false);
     // …und der Kompakt-Einstieg auch nicht (Einleitung, Pflegekräfte-Bereich).
-    expect(titel.some((t) => t.includes('Rund-um-Betreuung zu Hause') || t.includes('Ihre passenden Pflegekräfte') || t.includes('Ihre Pflegesituation ist noch nicht vollständig'))).toBe(false);
+    expect(titel.some((t) => t.includes('Rund-um-Betreuung zu Hause') || t.includes('Ihre passenden Pflegekräfte') || t.includes('Ihre Pflegesituation ist noch nicht vollständig') || t.includes('Es fehlen noch Angaben zur Pflegesituation'))).toBe(false);
     // Wunschstart aus dem gespeicherten Formular, nicht aus mamamia `arrival_at`.
-    expect(screen.getByText(/Wunschstart 15\.11\./)).toBeInTheDocument();
+    expect(screen.getByText(/Wunschstart:? 15\.11\./)).toBeInTheDocument();
   }, 15_000);
 
   it('gebucht, Link aus Mail B (view=application), Annahmen kommen später: keine „aktive Bewerbung“, kein zweites „Angebot prüfen“', async () => {
@@ -417,11 +417,11 @@ describe('Portal integration: golden paths', () => {
     setLocation(`?token=${TEST_LEAD_TOKEN}&goto=anfragen`);
     render(<CustomerPortalPage />);
     await waitFor(() => expect(gescrollt()).toContain('patientendaten'), { timeout: 5000 });
-    // Kompakt-Einstieg: Das Formular steht offen im Hinweis „Ihre Pflegesituation ist noch nicht vollständig" …
+    // Fassung 30: Das Formular steht offen im Achtung-Hinweis …
     const hinweis = document.getElementById('patientendaten')!;
-    expect(within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Ihre Pflegesituation ist noch nicht vollständig')).toBeInTheDocument();
+    expect(within(hinweis).getByText('Achtung: Es fehlen noch Angaben zur Pflegesituation')).toBeInTheDocument();
     expect(await within(hinweis).findByText(/Schritt 1 von 4/, {}, { timeout: 5000 })).toBeInTheDocument();
-    expect(within(hinweis).queryByRole('button', { name: 'Pflegesituation vervollständigen →' })).toBeNull();
+    expect(within(hinweis).queryByRole('button', { name: 'Jetzt vervollständigen' })).toBeNull();
     // … und gesprungen wird genau einmal.
     await new Promise((r) => setTimeout(r, 300));
     expect(gescrollt().filter((id) => id === 'patientendaten')).toHaveLength(1);
@@ -441,18 +441,15 @@ describe('Portal integration: golden paths', () => {
     expect(screen.queryByText(/Schritt 1 von 4/)).toBeNull();
   }, 15_000);
 
-  // ─── Kompakt-Einstieg vor dem ersten Absenden (Vorschlag 03.10.2026, KompaktEinstieg.tsx) ────────
-  // Ersetzt den Kasten „Noch 2 Minuten“ (Registry #102), die Knöpfe je Karte, den Formularkopf
-  // „Jetzt konkrete Bewerbungen erhalten“ und die Liste „So geht es weiter“ (Registry #109).
-  // Runde 8 (Geschäftsführer: „Wir haben doch echte Pflegekräfte … keine Fake-Box") bis Runde 13
-  // („ruhig"): Einleitung im Kopf, Kostenkarte (Preis, Eigenanteil als Text, vier Punkte, Siegel mit
-  // Testsieger/Erfahrung und Sternen), dann „Ihre passenden Pflegekräfte" mit dem Status-Hinweis
-  // „Ihre Pflegesituation ist noch nicht vollständig" (Look B, Formular darin) und den echten Profilen.
-
   // Text ohne geschütztes Leerzeichen (vor dem „·“ der Zeile 3 steht eins).
   const text = (el: Element) => (el.textContent ?? '').replace(/ /g, ' ');
 
-  it('Neukunde: Einleitung mit Sternen und Testsieger, Kostenkarte, dann „Ihre passenden Pflegekräfte“ mit dem Hinweis; der Knopf öffnet das Formular im Hinweis, ohne Sprung', async () => {
+  // ─── Einstieg vor dem ersten Absenden: Fassung 30 (Standard seit dem Livegang 06.10.2026) ────────
+  // Kopf mit Person, Titel, Sternen, Einleitung und Testsieger; Angebotskarte (Kopfleiste, Leistung, Preis, vier Punkte);
+  // „So geht es weiter"; Abschnitt „1 Pflegesituation ergänzen und Pflegekräfte einladen" mit Achtung-Hinweis und Karten.
+  // Der ältere Entwurf („ruhig", per `?look=ruhig`) wird in kompaktRuhig.test.tsx geprüft.
+
+  it('Neukunde (Fassung 30): Kopf, Angebotskarte, „So geht es weiter“, Abschnitt 1 mit Achtung-Hinweis; „Jetzt vervollständigen“ öffnet das Formular im Hinweis', async () => {
     (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
     server.use(
       ...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }),
@@ -460,176 +457,41 @@ describe('Portal integration: golden paths', () => {
     );
     setLocation(`?token=${TEST_LEAD_TOKEN}`);
     render(<CustomerPortalPage />);
-    const bereich = await screen.findByRole('region', { name: 'Ihre passenden Pflegekräfte' }, { timeout: 5000 });
-    // Kopf: Titel wie der Betreff der Angebotsmail, Einleitung, Sterne und Testsieger als ruhige Zeilen.
-    const titel = screen.getByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' });
-    const einleitung = titel.nextElementSibling as HTMLElement;
-    expect(einleitung.textContent).toBe(
-      'Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte Betreuungskräfte. Anreise, Wechsel und Vertretung organisieren wir, und Ihre Ansprechpartnerin ist täglich von 8 bis 20 Uhr für Sie da.',
-    );
-    // Runde 13: im Kopf nur die Einleitung — keine Fakten-Zeile, kein Knopf, keine Haken, kein Siegel, keine Sterne.
-    const kopf = titel.parentElement as HTMLElement;
-    expect(within(kopf).queryByRole('list')).toBeNull();
-    expect(within(kopf).queryByRole('button')).toBeNull();
-    expect(kopf.querySelector('img[src="/badge-testsieger.webp"]')).toBeNull();
-    expect(within(kopf).queryByRole('link', { name: /Bewertungen/ })).toBeNull();
-    // Siegel + Sterne unten in der Kostenkarte.
-    const sterne = await screen.findByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ }, { timeout: 5000 });
-    // Reihenfolge: Kopf → Kostenkarte → Pflegekräfte-Bereich (Kopf, Hinweis, Zeilen).
-    const karte = screen.getByText('Ihre Betreuungskosten').closest('.shadow-lift')!;
-    expect(karte.contains(sterne)).toBe(true);
-    expect(einleitung.compareDocumentPosition(karte) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(karte.compareDocumentPosition(bereich) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // Runde 13: keine Versalien-Zeilen (weder „Für Sie ausgewählt" noch sichtbar „Ihre Betreuungskosten").
-    expect(screen.queryByText('Für Sie ausgewählt')).toBeNull();
-    expect(screen.getByText('Ihre Betreuungskosten').className).toContain('sr-only');
-    expect(text(within(bereich).getByText(/^Echte Profile, ausgewählt nach/))).toBe('Echte Profile, ausgewählt nach Ihren Angaben.');
+    const titel = await screen.findByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' }, { timeout: 5000 });
+    expect(screen.getByText(/^Gerne übernehmen wir/)).toBeInTheDocument();
+    expect(screen.getByText(/6× in Folge Testsieger/)).toBeInTheDocument();
+    // Angebotskarte: Kopfleiste, Leistung, Preis, „Kosten im Überblick ›", vier Punkte.
+    const karte = document.getElementById('angebot')!;
+    expect(titel.compareDocumentPosition(karte) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(karte).getByText(/^Ihr Angebot vom /)).toBeInTheDocument();
+    expect(within(karte).getByText('Rund-um-Betreuung zu Hause')).toBeInTheDocument();
+    expect(text(within(karte).getByText('2.800 €').parentElement!)).toBe('2.800 €im Monat');
+    expect(within(karte).getByRole('button', { name: 'Kosten im Überblick ›' })).toBeInTheDocument();
+    expect(within(karte).getByText('Kein Vertrag vor Ihrer Auswahl')).toBeInTheDocument();
+    // „So geht es weiter" mit drei Schritten, darunter der Abschnitt mit derselben Überschrift wie Schritt 1.
+    expect(screen.getByRole('heading', { level: 2, name: 'So geht es weiter' })).toBeInTheDocument();
+    const abschnitt = screen.getByRole('heading', { level: 2, name: 'Pflegesituation ergänzen und Pflegekräfte einladen' });
+    expect(abschnitt.id).toBe('pflegekraefte');
     const hinweis = document.getElementById('patientendaten')!;
-    expect(bereich.contains(hinweis)).toBe(true);
-    expect(within(hinweis).queryByText('Hinweis')).toBeNull();
-    expect(within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Ihre Pflegesituation ist noch nicht vollständig')).toBeInTheDocument();
-    expect(within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Deshalb können Sie diese Pflegekräfte noch nicht einladen und noch keine Bewerbungen erhalten.')).toBeInTheDocument();
-    expect(text(within(hinweis).getByText(/^Vieles ist schon ausgefüllt\./))).toBe('Vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot ausdrücklich annehmen.');
-    expect(screen.queryByText('Noch 2 Minuten bis zum Einladen')).toBeNull();
-    const ersteZeile = await within(bereich).findByRole('button', { name: 'Profil von Helena K. ansehen' }, { timeout: 5000 });
-    expect(hinweis.compareDocumentPosition(ersteZeile) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-
-    // Weg: Zusammenfassungskarte mit Fotostapel, „Wir kümmern uns um alles", „Die Profile",
-    // „So geht es weiter", Schloss-Hinweis, die Frage „Passt Ihnen …?", der Formularkopf.
-    expect(screen.queryByText(/schon für Sie ausgewählt/)).toBeNull();
-    expect(screen.queryByText('Fotos, Namen und Profile liegen bereit.')).toBeNull();
-    expect(screen.queryByText('Wir kümmern uns um alles')).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Die Profile' })).toBeNull();
-    expect(screen.queryByText('So geht es weiter')).toBeNull();
-    expect(screen.queryByText(/Vor dem Einladen/)).toBeNull();
-    expect(screen.queryByText('Passt Ihnen das Angebot?')).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Jetzt konkrete Bewerbungen erhalten' })).toBeNull();
+    expect(within(hinweis).getByText('Achtung: Es fehlen noch Angaben zur Pflegesituation')).toBeInTheDocument();
     expect(screen.queryByText(/Schritt 1 von 4/)).toBeNull();
-
-    await userEvent.click(within(hinweis).getByRole('button', { name: 'Pflegesituation vervollständigen →' }));
+    // Der Knopf im Hinweis öffnet das Formular darin, ohne Sprung.
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Jetzt vervollständigen' }));
     expect(await within(hinweis).findByText(/Schritt 1 von 4/)).toBeInTheDocument();
-    expect(within(hinweis).queryByRole('button', { name: 'Pflegesituation vervollständigen →' })).toBeNull();
-    // Kein Sprung: Der Knopf steht im Hinweis, das Formular klappt darunter auf.
+    expect(within(hinweis).queryByRole('button', { name: 'Jetzt vervollständigen' })).toBeNull();
     expect(gescrollt()).not.toContain('patientendaten');
   }, 15_000);
 
-  it('Neukunde: Kostenkarte mit Preis, kleiner Schrift, dem Textlink „Alle Kosten im Überblick ›“, den vier Punkten und unten Siegel + Sterne; kein Eigenanteil an der Karte', async () => {
-    server.use(
-      ...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }),
-      http.get('https://primundus.de/api/bewertungen-stand', () => HttpResponse.json({ schnitt: '4,9', wert: 4.9, anzahl: 126 })),
-    );
-    setLocation(`?token=${TEST_LEAD_TOKEN}`);
-    render(<CustomerPortalPage />);
-    await screen.findByRole('region', { name: 'Ihre passenden Pflegekräfte' }, { timeout: 5000 });
-    const karte = screen.getByText('Ihre Betreuungskosten').closest('.shadow-lift') as HTMLElement;
-    const inKarte = within(karte);
-    expect(text(inKarte.getByText('2.800 €').parentElement!)).toBe('2.800 €im Monat');
-    // Runde 14: EIN Absatz kleine Schrift im Wortlaut der Geschäftsführung.
-    const kleineZeile = inKarte.getByText(/^Inklusive Lohn/);
-    expect(text(kleineZeile)).toBe('Inklusive Lohn, Steuern, Sozialabgaben und Gebühren. Dazu kommen Kost und Logis und 125 € Reisekosten pro Fahrt.');
-    // Keine Eigenanteil-Zeilen mehr an der Karte; stattdessen direkt unter der kleinen Schrift ein leiser Textlink (kein Kasten).
-    expect(inKarte.queryByText(/^Ihr Eigenanteil/)).toBeNull();
-    expect(inKarte.queryByText(/^nach Pflegegeld/)).toBeNull();
-    expect(inKarte.queryByRole('button', { name: 'So rechnen wir ›' })).toBeNull();
-    const link = inKarte.getByRole('button', { name: 'Alle Kosten im Überblick ›' });
-    expect(link.parentElement!.previousElementSibling).toBe(kleineZeile);
-    expect(link.className).toContain('underline');
-    expect(link.className).not.toMatch(/\bbg-|\bborder\b|rounded/);
-    // Dann die vier Punkte der Startseite.
-    const punkt = inKarte.getByText('Kein Vertrag vor Ihrer Auswahl');
-    expect(link.compareDocumentPosition(punkt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(inKarte.getByText('Keine Vermittlungsgebühr')).toBeInTheDocument();
-    expect(inKarte.getByText('Täglich kündbar, taggenau abgerechnet')).toBeInTheDocument();
-    expect(karte.querySelector('.bg-pm-mint')).toBeNull();
-    // Unten in der Karte: Siegel, daneben Testsieger/Erfahrung, darunter die Sterne (Runde 15), nach den vier Punkten.
-    const siegel = karte.querySelector('img[src="/badge-testsieger.webp"]')!;
-    const sterne = await inKarte.findByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ }, { timeout: 5000 });
-    expect(within(siegel.parentElement!).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['6× in Folge Testsieger DIE WELT', 'über 20 Jahre Erfahrung']);
-    expect(siegel.compareDocumentPosition(sterne) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(punkt.compareDocumentPosition(siegel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // Runde 15: Karte ohne Rand, Haken im Marken-Grün statt Koralle.
-    expect(karte.className).toContain('!border-0');
-    expect(punkt.closest('li')!.querySelector('svg')!.getAttribute('class')).toContain('text-pm-green');
-    expect(karte.querySelector('.text-pm-coral')).toBeNull();
-    // Weg aus der Karte: „Wir kümmern uns um alles", die Klappzeile „Alle Kosten im Überblick".
-    expect(inKarte.queryByText('Wir kümmern uns um alles')).toBeNull();
-    expect(inKarte.queryByRole('button', { name: 'Alle Kosten im Überblick' })).toBeNull();
-    // „Mehr Infos" an der Bestpreisgarantie öffnet das Pop-up.
-    await userEvent.click(inKarte.getByRole('button', { name: 'Mehr Infos' }));
-    const sheet = await screen.findByRole('dialog', { name: 'Bestpreisgarantie' });
-    await userEvent.click(within(sheet).getAllByRole('button', { name: 'Schließen' })[0]);
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Bestpreisgarantie' })).toBeNull());
-
-    // Kosten-Satz und Heimvergleich nur in der Aufstellung; zu geht sie mit „Weniger anzeigen".
-    expect(screen.queryByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeNull();
-    expect(screen.queryByText(/Zuhause statt Pflegeheim/)).toBeNull();
-    await userEvent.click(link);
-    expect(inKarte.getByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeInTheDocument();
-    expect(inKarte.getByText(/Zuhause statt Pflegeheim/)).toBeInTheDocument();
-    expect(inKarte.queryByText(/6× Testsieger/)).toBeNull();
-    await userEvent.click(inKarte.getByRole('button', { name: 'Weniger anzeigen' }));
-    expect(screen.queryByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeNull();
-    expect(inKarte.queryByRole('button', { name: 'Weniger anzeigen' })).toBeNull();
-    expect(inKarte.queryByRole('button', { name: 'Alle Kosten im Überblick' })).toBeNull();
-    // Der Textlink bleibt stehen und öffnet wieder.
-    expect(inKarte.getByRole('button', { name: 'Alle Kosten im Überblick ›' })).toBeInTheDocument();
-  }, 15_000);
-
-  it('Neukunde: „Alle Kosten im Überblick ›“ öffnet die Aufstellung und springt an ihren Anfang — darin „Was bleibt für Sie übrig“ mit dem Eigenanteil', async () => {
+  it('Neukunde (Fassung 30): „Kosten im Überblick ›“ öffnet die Aufstellung mit „Was bleibt für Sie übrig“', async () => {
     (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
     server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
     setLocation(`?token=${TEST_LEAD_TOKEN}`);
     render(<CustomerPortalPage />);
-    await screen.findByRole('region', { name: 'Ihre passenden Pflegekräfte' }, { timeout: 5000 });
-    expect(document.getElementById('kosten-ueberblick')).toBeNull();
-    expect(screen.queryByText('Was bleibt für Sie übrig')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Alle Kosten im Überblick ›' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Kosten im Überblick ›' }, { timeout: 5000 }));
     const ueberblick = document.getElementById('kosten-ueberblick')!;
     expect(text(within(ueberblick).getByText('Betreuung').parentElement!)).toBe('Betreuung2.800 € / Monat');
-    expect(screen.getByRole('button', { name: 'Weniger anzeigen' })).toBeInTheDocument();
     await waitFor(() => expect(gescrollt()).toContain('kosten-ueberblick'));
-    // Der Eigenanteil steht in der Aufstellung (defaultLead: 2.800 € − Pflegegeld 347 € = 2.453 €).
-    const rechnung = screen.getByText('Was bleibt für Sie übrig').parentElement!;
-    expect(ueberblick.compareDocumentPosition(rechnung) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(text(within(rechnung).getByText('Ihr Eigenanteil').parentElement!)).toBe('Ihr Eigenanteil2.453 €');
-  }, 15_000);
-
-  it('Neukunde ohne Zuschüsse in der Kalkulation: Textlink da, die Aufstellung ohne „Was bleibt für Sie übrig“', async () => {
-    server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
-    setLocation('?token=token-ohne-zuschuesse');
-    render(<CustomerPortalPage />);
-    await screen.findByRole('region', { name: 'Ihre passenden Pflegekräfte' }, { timeout: 5000 });
-    const karte = screen.getByText('Ihre Betreuungskosten').closest('.shadow-lift') as HTMLElement;
-    expect(within(karte).getByText('Kein Vertrag vor Ihrer Auswahl')).toBeInTheDocument();
-    expect(within(karte).getByRole('button', { name: 'Mehr Infos' })).toBeInTheDocument();
-    await userEvent.click(within(karte).getByRole('button', { name: 'Alle Kosten im Überblick ›' }));
-    expect(document.getElementById('kosten-ueberblick')).not.toBeNull();
-    expect(screen.queryByText('Was bleibt für Sie übrig')).toBeNull();
-    expect(screen.queryByText(/Ihr Eigenanteil/)).toBeNull();
-  }, 15_000);
-
-  it('Neukunde: die Profile als Zeilen in EINER weißen Karte, ohne Knöpfe und ohne Sterne — Deutsch mit Punkten, Erfahrung und Einsätze bei uns', async () => {
-    server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
-    setLocation(`?token=${TEST_LEAD_TOKEN}`);
-    render(<CustomerPortalPage />);
-    // Kopf „Ihre passenden Pflegekräfte" (Runde 13 ohne Versalien-Zeile); keine Zahl, keine eigene Überschrift über den Zeilen.
-    const bereich = await screen.findByRole('region', { name: 'Ihre passenden Pflegekräfte' }, { timeout: 5000 });
-    expect(within(bereich).queryByText('Für Sie ausgewählt')).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Die Profile' })).toBeNull();
-    // Der Kopf steht sofort, die Zeilen kommen mit den Vorschlägen.
-    const zeile = await within(bereich).findByRole('button', { name: 'Profil von Helena K. ansehen' }, { timeout: 5000 });
-    expect(within(zeile).getByText('Unsere Empfehlung')).toBeInTheDocument();
-    expect(within(zeile).getByText('Deutsch gut')).toBeInTheDocument();
-    expect(zeile.querySelectorAll('span.bg-pm-taupe')).toHaveLength(3);
-    // Ganze Teile; der Trenner „·" kommt per CSS (am Zeilenanfang abgeschnitten).
-    expect([...zeile.querySelectorAll('.whitespace-nowrap')].map((t) => t.textContent)).toEqual(['5 Jahre Erfahrung', '15 Einsätze bei uns']);
-    expect(zeile.textContent).not.toContain('★');
-    // Runde 15: eine weiße Karte mit Haarlinien.
-    expect(zeile.parentElement!.className).toContain('rounded-card');
-    expect(zeile.parentElement!.className).toContain('divide-y');
-    // Keine Knöpfe je Pflegekraft mehr.
-    expect(screen.queryByRole('button', { name: 'Profil vervollständigen & einladen' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Einladen' })).toBeNull();
+    expect(text(within(screen.getByText('Was bleibt für Sie übrig').parentElement!).getByText('Ihr Eigenanteil').parentElement!)).toBe('Ihr Eigenanteil2.453 €');
   }, 15_000);
 
   it('Neukunde: die Zeile öffnet das Profil, „Einladen“ dort führt in den Hinweis zum Formular, ohne Einladung', async () => {
@@ -669,11 +531,11 @@ describe('Portal integration: golden paths', () => {
     render(<CustomerPortalPage />);
 
     expect(await screen.findByText('Ihre Suche läuft', {}, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.getByText('Stand heute')).toBeInTheDocument();
+    // Fassung 33: „So geht es weiter" mit Stand statt „Stand heute".
+    expect(screen.getByRole('heading', { level: 2, name: 'So geht es weiter' })).toBeInTheDocument();
+    expect(screen.queryByText('Stand heute')).toBeNull();
     expect(await screen.findByText('Gerade keine weiteren Vorschläge', {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText(/Bewerbungen bekommen Sie trotzdem per E.Mail/)).toBeInTheDocument();
-    // „So geht es weiter" ersetzt der Stand.
-    expect(screen.queryByText('So geht es weiter')).toBeNull();
   }, 15_000);
 
   // ─── Path 3: Einsatzort-Wall (Registry #65) ─────────────────────────────
@@ -718,8 +580,8 @@ describe('Portal integration: golden paths', () => {
 
     // Durch die vier Schritte — der Entwurf ist vollständig, also lässt jeder
     // „Weiter" durch; der Einsatzort fällt erst beim Speichern auf.
-    // Kompakt-Einstieg: zuerst das Formular im Hinweis „Ihre Pflegesituation ist noch nicht vollständig" öffnen.
-    await user.click(await screen.findByRole('button', { name: 'Pflegesituation vervollständigen →' }, { timeout: 5000 }));
+    // Fassung 30: zuerst das Formular im Achtung-Hinweis öffnen.
+    await user.click(await screen.findByRole('button', { name: 'Jetzt vervollständigen' }, { timeout: 5000 }));
     for (let i = 0; i < 3; i++) {
       const weiter = await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 });
       await user.click(weiter);
