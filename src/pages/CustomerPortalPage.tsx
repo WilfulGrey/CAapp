@@ -637,17 +637,28 @@ const CustomerPortalPage: FC = () => {
 
   const [feedbackReif, setFeedbackReif] = useState(IS_PREVIEW_ANY);
   useEffect(() => {
-    if (feedbackReif) return;
-    const el = document.getElementById('patientendaten');
-    if (!el || typeof IntersectionObserver === 'undefined') return;
+    if (feedbackReif || typeof IntersectionObserver === 'undefined') return;
     const io = new IntersectionObserver(
       entries => { if (entries.some(e => e.isIntersecting)) setFeedbackReif(true); },
       { rootMargin: '0px 0px -20% 0px' },
     );
-    io.observe(el);
-    return () => io.disconnect();
-    // `patientSaved` in den Abhängigkeiten, weil der beobachtete Abschnitt erst existiert, wenn er gerendert ist.
-  }, [feedbackReif, patientSaved]);
+    // Den Abschnitt erst suchen, wenn er dasteht (Befund 06.10.): Beim ersten Render zeigt die Seite „Ihr Angebot wird
+    // geladen…“, #patientendaten fehlt noch. Bis dahin gab der Beobachter auf und versuchte es nie wieder; von echten
+    // Kunden kam seit dem 12.08. keine Antwort. Deshalb hängt er sich an, sobald der Abschnitt im DOM erscheint, und
+    // wechselt mit, wenn React ihn neu einsetzt (Absenden, offene Bewerbungen).
+    let beobachtet: Element | null = null;
+    const anhaengen = () => {
+      const el = document.getElementById('patientendaten');
+      if (el === beobachtet) return;
+      if (beobachtet) io.unobserve(beobachtet);
+      beobachtet = el;
+      if (el) io.observe(el);
+    };
+    anhaengen();
+    const mo = typeof MutationObserver === 'undefined' ? null : new MutationObserver(anhaengen);
+    mo?.observe(document.body, { childList: true, subtree: true });
+    return () => { mo?.disconnect(); io.disconnect(); };
+  }, [feedbackReif]);
 
   // Sektion „Pflegesituation" klappt wie „Ihr persönliches Angebot" ueber die
   // Kopfzeile (Martin, 2026-07-12): offen solange nicht gespeichert,
