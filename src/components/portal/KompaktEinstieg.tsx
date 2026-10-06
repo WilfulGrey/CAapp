@@ -297,11 +297,17 @@ export function AngebotSicherheit({ onBestpreis }: { onBestpreis: () => void }) 
    06.10. dazu: „Es muss klar sein, dass wir die Pflegesituation vollständig benötigen, um Bewerbungen zu erhalten, und
    natürlich kann der Kunde auch passende Favoriten einladen" → Text von Schritt 1 (OpenAI mutig26; „sich bei Ihnen zu
    bewerben" wie der freigegebene Satz vom 02.10.). */
+/* Runde 35 (Martin 06.10. zu Fassung 29: „die Texte der 3 Schritte … wirken nicht einladend"): Bedingungs-Anfänge
+   („Damit … benötigen wir", „Sobald … vollständig") und Amtsdeutsch („richtet sich nach") raus; der Leser handelt, der Nutzen
+   steht vorn. „Danach bewerben sich …" macht klar, dass Bewerbungen erst nach der Pflegesituation kommen (Martins Diktat).
+   „die Ihnen zusagen" und „um den Rest kümmern wir uns" sind seine Worte. Keine Wiederholung des Achtung-Hinweises (2 Minuten,
+   vieles ausgefüllt). OpenAI mutig27–29: einladend und natürlich, keine Fehler; „Wenn Sie möchten …"/„Sobald …" nicht
+   übernommen (wieder Bedingungs-Anfänge). */
 export const ABLAUF_TITEL_1 = 'Pflegesituation ergänzen und Pflegekräfte einladen';
 export const ABLAUF = [
-  { titel: ABLAUF_TITEL_1, text: 'Damit Sie Bewerbungen erhalten, benötigen wir die vollständigen Angaben zur Pflegesituation. Ihre Favoriten unter den passenden Pflegekräften können Sie zusätzlich einladen, sich bei Ihnen zu bewerben. Das ist kostenlos und unverbindlich.' },
-  { titel: 'Bewerbungen erhalten', text: 'Sobald Ihre Angaben vollständig sind, erhalten Sie Bewerbungen passender Pflegekräfte, hier im Portal und per E-Mail.' },
-  { titel: 'Auswählen und starten', text: 'Sie wählen eine Pflegekraft aus, unterschreiben den Vertrag online und wir kümmern uns um den Rest. Die Anreise richtet sich nach Ihrem Wunschtermin und ist schon ab 3 Tagen möglich.' },
+  { titel: ABLAUF_TITEL_1, text: 'Ergänzen Sie kurz die Pflegesituation. Pflegekräfte, die Ihnen zusagen, laden Sie gleich mit ein, kostenlos und unverbindlich.' },
+  { titel: 'Bewerbungen erhalten', text: 'Danach bewerben sich passende Pflegekräfte bei Ihnen, mit Foto und Erfahrung. Jede Bewerbung sehen Sie hier im Portal und erhalten sie per E-Mail.' },
+  { titel: 'Auswählen und starten', text: 'Sie wählen Ihre Pflegekraft aus und unterschreiben den Vertrag online. Um den Rest kümmern wir uns. Die Anreise ist schon ab 3 Tagen möglich.' },
 ] as const;
 
 /** `onErsterSchritt`: Link unter Schritt 1 („Pflegesituation ergänzen ›") öffnet das Formular im Achtung-Hinweis. */
