@@ -293,10 +293,13 @@ export function AngebotSicherheit({ onBestpreis }: { onBestpreis: () => void }) 
    Bewerbungen von passenden Pflegekräften hier und per E-Mail"): Die Pflegesituation ist damit Teil von Schritt 1, kein
    eigener Schritt. Titel mit „ergänzen" (gemessen: zwei Zeilen bei 360 bis 414 px, mit „vervollständigen" drei). Die Zeit
    („etwa 2 Minuten, vieles ist schon ausgefüllt") steht im Achtung-Hinweis, hier nicht noch einmal. OpenAI (mutig24/25): „zur
-   Bewerbung ein" (sonst klangen Einladen und Bewerben wie zwei Abläufe), Text und Link mit „vervollständigen" wie der Knopf. */
+   Bewerbung ein" (sonst klangen Einladen und Bewerben wie zwei Abläufe), Link „Jetzt vervollständigen" wie der Knopf. Martin
+   06.10. dazu: „Es muss klar sein, dass wir die Pflegesituation vollständig benötigen, um Bewerbungen zu erhalten, und
+   natürlich kann der Kunde auch passende Favoriten einladen" → Text von Schritt 1 (OpenAI mutig26; „sich bei Ihnen zu
+   bewerben" wie der freigegebene Satz vom 02.10.). */
 export const ABLAUF_TITEL_1 = 'Pflegesituation ergänzen und Pflegekräfte einladen';
 export const ABLAUF = [
-  { titel: ABLAUF_TITEL_1, text: 'Vervollständigen Sie weiter unten die Angaben zur Pflegesituation. Danach laden Sie Pflegekräfte, die Ihnen zusagen, zur Bewerbung ein. Das ist kostenlos und unverbindlich.' },
+  { titel: ABLAUF_TITEL_1, text: 'Damit Sie Bewerbungen erhalten, benötigen wir die vollständigen Angaben zur Pflegesituation. Ihre Favoriten unter den passenden Pflegekräften können Sie zusätzlich einladen, sich bei Ihnen zu bewerben. Das ist kostenlos und unverbindlich.' },
   { titel: 'Bewerbungen erhalten', text: 'Sobald Ihre Angaben vollständig sind, erhalten Sie Bewerbungen passender Pflegekräfte, hier im Portal und per E-Mail.' },
   { titel: 'Auswählen und starten', text: 'Sie wählen eine Pflegekraft aus, unterschreiben den Vertrag online und wir kümmern uns um den Rest. Die Anreise richtet sich nach Ihrem Wunschtermin und ist schon ab 3 Tagen möglich.' },
 ] as const;
