@@ -330,8 +330,16 @@ export const STAND_TEXT_1 = 'Pflegekräfte, die Ihnen zusagen, können Sie weite
 export const EINLADEN_TITEL = 'Pflegekräfte einladen';
 export const EINLADEN_ZEILE = 'Mit Ihrer Einladung bitten wir die Pflegekraft um eine Bewerbung.';
 
-/** Fassung 32, nur für die Abnahme: `&angebot=offen` zeigt das Angebot nach dem Absenden offen (Alternative), sonst als Zeile. */
-export const ANGEBOT_NACH_ABSENDEN: 'zeile' | 'offen' = SUCHE?.get('angebot') === 'offen' ? 'offen' : 'zeile';
+/* Fassung 33 (Martin zu 32: „die Patientensituation ist dann verschwunden … man kann das nicht mehr sehen und ändern. Vielleicht
+   kann man Ihr Angebot und die Patientensituation irgendwie zusammen machen, so ein bisschen in so einen eigenen Bereich
+   darunter"): ein Bereich mit Überschrift und EINER Karte, zwei aufklappbare Zeilen. OpenAI mutig33: Überschrift kurz mit dem
+   Seitenbegriff, je Zeile ein Verb („ansehen", nicht „ändern"), damit man sie als antippbar erkennt; die Pflegesituation bleibt
+   auch bei offener Bewerbung erreichbar. */
+export const BEREICH_TITEL = 'Angebot und Pflegesituation';
+export const ANGEBOT_ANSEHEN = 'Angebot ansehen';
+export const PFLEGE_TITEL = 'Ihre Pflegesituation';
+export const PFLEGE_STATUS = 'Vollständig';
+export const PFLEGE_ANSEHEN = 'Angaben ansehen';
 
 /** Erklärung über der Interesse-Karte (OpenAI mutig30: „stößt … an" und der Gedankenstrich raus; „kostenlos und unverbindlich"
  *  steht in Schritt 1, deshalb hier nicht noch einmal). */

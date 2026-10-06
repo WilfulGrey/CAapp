@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, FC } from 'react';
-import { Check, Bell, Clock, Phone, AlertCircle, ChevronDown, X, ArrowLeft, ArrowRight, Heart, FileText } from 'lucide-react';
+import { Check, Bell, Clock, Phone, AlertCircle, ChevronDown, X, ArrowLeft, ArrowRight, Heart, FileText, ClipboardCheck } from 'lucide-react';
 import { Nurse } from '../types';
 import { displayName, initials } from '../components/portal/shared';
 import {
@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { ANGEBOT_NACH_ABSENDEN, AngebotAbschnitt, AngebotAblaufStand, AngebotEinleitung, AngebotKopfleiste, AngebotLeistung, AngebotPerson, AngebotSicherheit, AngebotSterne, AngebotTestsieger, EINLADEN_TITEL, EINLADEN_ZEILE, KOMPAKT_LOOK, SUCHE_LAEUFT_SATZ, interesseText, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { ANGEBOT_ANSEHEN, AngebotAbschnitt, AngebotAblaufStand, BEREICH_TITEL, PFLEGE_ANSEHEN, PFLEGE_STATUS, PFLEGE_TITEL, AngebotEinleitung, AngebotKopfleiste, AngebotLeistung, AngebotPerson, AngebotSicherheit, AngebotSterne, AngebotTestsieger, EINLADEN_TITEL, EINLADEN_ZEILE, KOMPAKT_LOOK, SUCHE_LAEUFT_SATZ, interesseText, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2630,6 +2630,297 @@ const CustomerPortalPage: FC = () => {
     </ul>
   );
 
+      // Fassung 33: das Formular der Pflegesituation an EINER Stelle gebaut. Vor dem Absenden steht es wie bisher im Hinweis
+      // bzw. unter „Pflegesituation", nach dem Absenden (Look „angebot") in der Karte „Angebot und Pflegesituation".
+      const patientFormular = (eingebettet: boolean) => (
+        <AngebotCard
+          eingebettet={eingebettet}
+          lead={lead}
+          mmCustomer={mmCustomer}
+          onPatientSaved={(saved) => {
+            // Angaben ändern nach dem Absenden (Martin 25.09.: „sobald man
+            // irgendwas anklickt, lädt die ganze Seite neu"): Jede Eingabe
+            // meldete „nicht gespeichert", der Server-Abgleich unten
+            // (mmCustomer.status ≠ draft) setzte sofort zurück — die Seite
+            // kippte bei jedem Tipp in den Ausgangszustand und wieder zurück.
+            // Führt mamamia den Kunden als aktiv, bleibt die Seite „gespeichert".
+            if (!saved && schonAbgesendet) return;
+            if (saved && !patientSaved) {
+              // Hauptweg zuerst (Martin 24.09.): Bewerbungen, Einladen ist die Zugabe.
+              showToast('✓ Vielen Dank! Passende Pflegekräfte können sich jetzt bei Ihnen bewerben.', 7000);
+              // Frisch gespeichert → Abschnitt klappt zu (Referenz-Zustand).
+              // Ohne den Reset würde ein früher gesetzter manual-Wert den
+              // Bogen offen halten, obwohl die Aufgabe erledigt ist.
+              setPatientExpandedManual(null);
+            }
+            setPatientSaved(saved);
+          }}
+          triggerOpenPatient={triggerOpenPatient}
+          onTriggerHandled={() => setTriggerOpenPatient(false)}
+          // Im Kompakt-Einstieg meldet der Kasten selbst, ob er im Bild ist (er umschließt das Formular).
+          onImBlick={eingebettet ? undefined : setFormularImBlick}
+          schonAbgesendet={schonAbgesendet}
+          onAbgesendet={(nurAenderung) => {
+            setAbgesendetInSitzung(true);
+            // Angaben geändert (nicht die erste Anfrage): bestätigen und zuklappen.
+            if (!nurAenderung) return;
+            showToast('✓ Ihre Angaben sind gespeichert.', 5000);
+            setPatientExpandedManual(null);
+          }}
+          gewaehlterStart={formularStart}
+          mamamiaEnabled={mmReady}
+          onSaveToMamamia={async (form) => {
+            const existingPatientIds = mmCustomer?.patients?.map(p => p.id) ?? [];
+
+            // ── Save flow ──────────────────────────────────────────────────
+            //
+            // One write to land the full patient profile, then a separate
+            // narrow write to overlay the AI-generated job_description.
+            //
+            // Why narrow overlay (proxy action `updateJobDescription`)
+            // instead of re-sending the whole patch with AI text spread:
+            //   - re-sending the full patch a second time bounces every
+            //     association through Mamamia's resolver again — the
+            //     resolver takes ~10-15 s to fully validate, during which
+            //     panel-side StoreRequest (invite) returns Unauthorized.
+            //   - a thin `{ job_description }` payload would trip Mamamia's
+            //     "omitted associations = wipe" rule AND the proxy's
+            //     defensive `patches=[]` workaround → wipes patients.
+            //   - the dedicated proxy action re-fetches current patient
+            //     and equipment ids and re-passes them as bare-id stubs,
+            //     which Mamamia merges into the existing rows. Nothing
+            //     else is touched, no wipe, no 10s lag.
+            //
+            // Sonnet (generateJobDescription) is fire-and-forget after the
+            // gating write so the invite gate opens in ~1 s instead of
+            // ~5 s. Mechanical job_description from the mapper is already
+            // persisted by the gating write — if AI fails or never lands,
+            // the customer profile still has a usable summary.
+
+            // ── Einsatzort-Wall (Registry #65) ───────────────────────────
+            // Ohne `location_id` NICHT speichern. Mamamia stempelt bei einem
+            // unauflösbaren `location_custom_text` einen Platzhalter (prod:
+            // id 16480 für JEDE solche PLZ), kippt den Kunden auf
+            // `status='active'` und das Portal zeigt „Vollständig" für ein
+            // Profil, das nirgends steht — schlimmer als gar kein Speichern.
+            // Der Lookup steht als ERSTES im Handler, also hinterlässt ein
+            // Wurf hier nichts: kein Mamamia-Write, kein Snapshot in
+            // leads.patient_form, keine Mails. Die Arbeit des Kunden bleibt
+            // im localStorage-Entwurf.
+            let locationId: number | undefined;
+            let lookupDown = false;
+            const plz = form.plz?.trim() ?? '';
+            const ortEingabe = form.ort?.trim() ?? '';
+            if (/^\d{5}$/.test(plz)) {
+              try {
+                const r = await callMamamia<{
+                  LocationsWithPagination: {
+                    data: Array<{ id: number; location: string; zip_code: string; country_code: string }>;
+                  };
+                  // limit 50, nicht 10: eine PLZ kann viele Ortsteile haben
+                  // ('04916' → 6 Zeilen), und die Wahl des Kunden muss auf die
+                  // Seite passen.
+                }>('searchLocations', { search: plz, limit: 50, page: 1 });
+                const de = r.LocationsWithPagination.data
+                  .filter(l => l.country_code === 'DE' && l.zip_code === plz);
+                // Exakte PLZ, nicht „erster Treffer": `search` matcht PRÄFIXE —
+                // '503' liefert 50321 Brühl (Sonde 11.09.2026). Unter den
+                // Ortsteilen derselben PLZ zuerst den, den der Kunde gewählt hat.
+                locationId = (de.find(l => l.location === ortEingabe) ?? de[0])?.id;
+              } catch (e) {
+                const raw = e instanceof Error ? e.message : String(e ?? '');
+                // Abgelaufene Sitzung ist KEIN Suchausfall. Diese Meldung ist die
+                // einzige Erkennung eines abgelaufenen Tokens mitten in der
+                // Sitzung; sie sitzt sonst im catch der Mutation weiter unten,
+                // den ein Wurf von HIER nicht erreicht (der try umschliesst nur
+                // die Mutation). Also hier melden und erst dann werfen.
+                if (/401|unauthorized|unauthenticated|token/i.test(raw)) {
+                  showToast('Ihr Zugangslink ist abgelaufen. Sie können sich gleich einen neuen Link zusenden lassen.');
+                  setSaveTokenExpired(true);
+                  throw e;
+                }
+                lookupDown = true;
+              }
+            }
+            if (locationId == null) {
+              reportLeadEvent(
+                lead?.token,
+                'patient_form_location_unresolved',
+                { plz, ort: ortEingabe, ...(lookupDown ? { lookup_down: '1' } : {}) },
+                // Proxy-Ausfall: Zeile ja, Team-Mail nein — sonst schickt eine
+                // 20-Minuten-Störung eine Mail pro Speichern pro Kunde.
+                !lookupDown,
+              );
+              throw new Error(lookupDown ? 'EINSATZORT_LOOKUP' : 'EINSATZORT:' + plz);
+            }
+
+            const patch = mapPatientFormToUpdateCustomerInput(form, {
+              existingPatientIds,
+              locationId,
+              // Kontaktperson (Osoba Kontaktowa) aus dem Lead → customer_contract
+              // (salutation/first_name/last_name), damit das Mamamia-Panel die
+              // Kontaktdaten zeigt statt nur Customer.first_name top-level.
+              //
+              // Vermittler-Lead (Registry #67): die Kontaktspalten tragen dort
+              // den Ansprechpartner der Agentur — er gehoert NICHT unter die
+              // Adresse des Patienten. Das MM-Team fuellt diesen Bogen ueber den
+              // gespiegelten Token aus (gotcha #10), also ist das hier der
+              // einzige Weg, auf dem das Formular bei solchen Leads ueberhaupt
+              // laeuft; ohne die Fallunterscheidung wuerde es den Server-Fix
+              // wieder ueberschreiben.
+              ...(lead?.vermittler
+                ? {
+                    vermittler: true,
+                    contact: {
+                      anrede: lead?.patient_anrede ?? null,
+                      vorname: lead?.patient_vorname ?? null,
+                      nachname: lead?.patient_nachname ?? null,
+                    },
+                  }
+                : {
+                    contact: {
+                      anrede: lead?.anrede_text ?? lead?.anrede ?? null,
+                      vorname: lead?.vorname ?? null,
+                      nachname: lead?.nachname ?? null,
+                    },
+                  }),
+            });
+
+            // ── Gating write: full mechanical patch. Awaited so the caller
+            // (AngebotCard) keeps patientSaved=false until Mamamia has the
+            // complete profile — invite gate opens only on success.
+            // portal_form_snapshot: der ROHE Patientenbogen — der Proxy friert ihn
+            // nach erfolgreichem Write an leads.patient_form ein (SA-Portal zeigt
+            // ihn im Anfrage-Block); Mamamia erreicht das Feld nie (Allowlist).
+            try {
+              await updateCustomerMutation.mutate({
+                ...(patch as Record<string, unknown>),
+                portal_form_snapshot: form,
+              });
+              setAbgesendetesFormular(form);
+            } catch (err) {
+              const raw = err instanceof Error ? err.message : String(err ?? '');
+              // Token während des Ausfüllens abgelaufen → ehrlich sagen und in
+              // den Selbst-Service (neuen Link anfordern) leiten statt eines
+              // ratlosen „fehlgeschlagen".
+              if (/401|unauthorized|unauthenticated|token/i.test(raw)) {
+                showToast('Ihr Zugangslink ist abgelaufen. Sie können sich gleich einen neuen Link zusenden lassen.');
+                setSaveTokenExpired(true);
+              } else {
+                // Sprechende Meldung statt Ratespiel — häufige mamamia-Ablehnungen übersetzt.
+                const friendly = /location/i.test(raw)
+                  ? 'Die Postleitzahl konnte nicht zugeordnet werden — bitte PLZ und Ort prüfen.'
+                  : /too long|exceeds|max/i.test(raw)
+                    ? 'Eine Angabe ist zu lang (z. B. Diagnosen) — bitte etwas kürzen und erneut speichern.'
+                    : `Speichern fehlgeschlagen: ${raw.slice(0, 140)}`;
+                showToast(friendly);
+              }
+              // Fürs Team sichtbar machen, WORAN Kunden scheitern (Dashboard/Report).
+              reportLeadEvent(lead?.token, 'patient_form_save_failed', { error: raw.slice(0, 200) });
+              throw err;
+            }
+
+            // Report back to the kostenrechner lead — patient data complete
+            // unlocks invites/applications, so the Nachfass switches to the
+            // "last step: invite" variant. Fire-and-forget.
+            //
+            // Pass phone so the kostenrechner endpoint can refresh
+            // leads.telefon (kept in sync with Mamamia Customer.phone after
+            // a step-4 edit). Dedupe key includes phone, so a follow-up
+            // save with an edited number re-fires.
+            const phoneForLead = form.phone?.trim();
+            const startDateForLead = form.startDate?.trim();
+            // Vorname/Nachname für den Bridge-Sync nach leads.vorname/nachname.
+            // Identischer Split wie im Mapper (splitCustomerName) → Mamamia
+            // Customer.first_name/last_name und die leads-Spalten bleiben
+            // konsistent. Der Mapper hat den Namen bereits in den updateCustomer-
+            // Patch gelegt; hier nur für die Bridge-Metadaten wiederverwendet.
+            const { vorname: vornameForLead, nachname: nachnameForLead } = splitCustomerName(form.name);
+            const leadEventMeta: Record<string, string> = {};
+            if (phoneForLead) leadEventMeta.phone = phoneForLead;
+            if (startDateForLead) leadEventMeta.startDate = startDateForLead;
+            if (vornameForLead) leadEventMeta.vorname = vornameForLead;
+            if (nachnameForLead) leadEventMeta.nachname = nachnameForLead;
+            reportLeadEvent(
+              lead?.token,
+              'patient_data_saved',
+              Object.keys(leadEventMeta).length > 0 ? leadEventMeta : undefined,
+            );
+            // Patient form save flippa customer na active + dorzuca pełne
+            // patient/wish dane. Mamamia matching engine re-scoreuje całą
+            // listę z nowymi inputami — początkowo zwrócone caregivers
+            // (na bazie minimal onboard payload) mogą już nie pasować lub
+            // mogą się pojawić nowi. Refetch listę żeby user widział
+            // aktualny scoring, nie stale wynik z czasu onboardu.
+            refetchMatchings();
+
+            // ── JobOffer.arrival_at sync (fire-and-forget).
+            // Form Step 5 collects "Voraussichtliches Startdatum" — push it
+            // to Mamamia's JobOffer.arrival_at via UpdateJobOfferDates.
+            // Onboard set arrival_at as a fuzzy offset from care_start_timing
+            // (e.g. "sofort" → +7d); the customer's explicit pick wins.
+            //
+            // Only fire when the user's pick actually differs from what
+            // Mamamia currently holds — avoid no-op writes that would log
+            // noise + reload the JobOffer.
+            const pickedStartDate = form.startDate?.trim();
+            // mamamia liefert „2026-10-15 00:00:00", das Formular „2026-10-15":
+            // nur den Tag vergleichen, sonst schreibt jedes Speichern neu.
+            const currentArrival = kalenderTag(mmJobOffer?.arrival_at);
+            if (pickedStartDate && pickedStartDate !== currentArrival) {
+              void (async () => {
+                try {
+                  await updateJobOfferDatesMutation.mutate({ arrival_at: pickedStartDate });
+                  refetchJobOffer();
+                } catch (err) {
+                  // Best-effort. Customer profile is saved; only the
+                  // arrival_at didn't update. Surface a soft toast so the
+                  // user knows to retry the form Save if the date was
+                  // critical, but don't block the flow.
+                  console.warn('updateJobOfferDates failed:', err);
+                  showToast('Startdatum konnte nicht aktualisiert werden. Ihre Angaben wurden gespeichert.');
+                }
+              })();
+            }
+
+            // ── AI overlay (fire-and-forget). Only writes job_description.
+            // Sonnet polishes the mechanical summary into a 2-3 sentence
+            // German text. The proxy's `updateJobDescription` action
+            // preserves patients + equipments by re-fetching their ids,
+            // so nothing else in the customer state is touched.
+            void (async () => {
+              try {
+                const aiResult = await callMamamia<{ description: string | null }>(
+                  'generateJobDescription',
+                  {
+                    anzahl: form.anzahl,
+                    geschlecht: form.geschlecht, geburtsjahr: form.geburtsjahr,
+                    pflegegrad: form.pflegegrad, mobilitaet: form.mobilitaet,
+                    heben: form.heben, demenz: form.demenz,
+                    inkontinenz: form.inkontinenz, nacht: form.nacht,
+                    diagnosen: form.diagnosen,
+                    p2_geschlecht: form.p2_geschlecht, p2_geburtsjahr: form.p2_geburtsjahr,
+                    p2_pflegegrad: form.p2_pflegegrad, p2_mobilitaet: form.p2_mobilitaet,
+                    p2_demenz: form.p2_demenz,
+                    ort: form.ort, wohnungstyp: form.wohnungstyp,
+                    urbanisierung: form.urbanisierung, familieNahe: form.familieNahe,
+                    haushalt: form.haushalt, pflegedienst: form.pflegedienst,
+                    aufgaben: form.aufgaben, sonstigeWuensche: form.sonstigeWuensche,
+                  },
+                );
+                if (aiResult.description) {
+                  await updateJobDescriptionMutation.mutate({ text: aiResult.description });
+                }
+              } catch (err) {
+                // AI overlay is best-effort. Mechanical job_description
+                // from the mapper is already persisted by the gating write.
+                console.warn('AI job_description overlay failed (mechanical retained):', err);
+              }
+            })();
+          }}
+        />
+      );
+
       const angebotSection = (() => {
         // Seit 11.08. steuert dieser Toggle NUR noch die Konditionen und den
         // Mustervertrag — der Preis steht immer. Default zu: Der Kunde soll
@@ -2647,12 +2938,9 @@ const CustomerPortalPage: FC = () => {
         // zugeklappt mit dem Preis in der Zeile („Angebot ansehen ›"). `k` = Darstellung wie vor dem Absenden.
         const neu = nachAbsendenNeu;
         const k = kompakt || neu;
-        // Fassung 32: nach dem Absenden eine Zeile, die aufklappt; mit offener Bewerbung immer (ohne Preis).
-        const zeile = neu && (hasPending || ANGEBOT_NACH_ABSENDEN === 'zeile');
+        // Fassung 32/33: nach dem Absenden zu Beginn zugeklappt (eine Zeile im Bereich „Angebot und Pflegesituation").
         const offerExpanded =
-          kompakt || (neu
-            ? (zeile ? (offerExpandedManual ?? false) : true)
-            : (offerExpandedManual ?? (!hasPending && !patientSaved)));
+          kompakt || (neu ? (offerExpandedManual ?? false) : (offerExpandedManual ?? (!hasPending && !patientSaved)));
         // Schrift im Kompakt-Einstieg: Fließtext 16 px, kleine Schrift 14 px (sonst wie bisher).
         const grund = k ? 'text-[16px]' : 'text-[15px]';
         const klein = k ? 'text-[14px]' : 'text-[13px]';
@@ -2701,70 +2989,7 @@ const CustomerPortalPage: FC = () => {
         );
         // Runde 17 (`?look=angebot`): die Karte als Angebot — Kopf mit Datum und Grundlage, Zeilen statt „Inklusive …".
         const angebotLook = k && KOMPAKT_LOOK === 'angebot';
-        return (
-        <div id={angebotLook ? 'angebot' : undefined} className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'scroll-mt-20 pt-7' : 'pt-10'}` : neu ? 'px-5 pt-10 scroll-mt-20' : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
-          {/* Karte im Look des Rechners (Teil 3, Martin 24.09.). „Ihr persönliches
-              Angebot" steht im Kopf — der Abschnitt heißt nach seinem Inhalt. Der
-              Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
-              (Martin: „muss einklappbar sein für spätere Zustände"). */}
-          {/* Kompakt-Einstieg (Runde 15): weiß, 20 px Radius, ohne Rand, weicher zweilagiger Schatten, 24 px Innenabstand. */}
-          <Card ton={angebotLook ? 'hervorgehoben' : 'standard'} className={`relative ${angebotLook ? `overflow-hidden px-5 ${zeile ? (offerExpanded ? 'pt-0 pb-6' : 'py-0') : 'pt-6 pb-6'}` : kompakt ? `shadow-lift !border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'shadow-lift px-5 pt-3 pb-4'}`}>
-            {k ? (
-              // Runde 13: keine Versalien-Zeile mehr — die Karte beginnt mit dem Preis; der Name bleibt
-              // für Screenreader.
-              <h2 className="sr-only">{neu ? 'Ihr Angebot' : 'Ihre Betreuungskosten'}</h2>
-            ) : (
-            <button
-              type="button"
-              onClick={() => setOfferExpandedManual(!offerExpanded)}
-              aria-expanded={offerExpanded}
-              className="w-full min-h-[44px] flex items-center justify-between gap-3 text-left"
-            >
-              {/* Preis UNTER dem Label: Nebeneinander brach bei 360 px beides um
-                  („Ihre Betreuungs-/kosten", „3.050 € /" „Monat"). */}
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className={EYEBROW}>{hasPending ? 'Ihr Angebot' : 'Ihre Betreuungskosten'}</span>
-                {/* Preis nur ohne offene Bewerbung: Die Bewerbung nennt ihren eigenen
-                    Tagessatz, zwei Preise nebeneinander widersprächen sich (Review 25.09.). */}
-                {!offerExpanded && !hasPending && (
-                  <span className="whitespace-nowrap text-[17px] font-bold tabular-nums text-pm-ink">
-                    {formatEuro(brutto)}<span className="text-[15px] font-normal text-pm-muted"> / Monat</span>
-                  </span>
-                )}
-              </span>
-              <ChevronDown className={`w-5 h-5 flex-shrink-0 text-pm-taupe transition-transform duration-200 ${offerExpanded ? 'rotate-180' : ''}`} />
-            </button>
-            )}
-
-          {/* Fassung 32 (Martin zu 31: „Angebot so, dann so viel Platz und alles so unklar"; OpenAI mutig31: Variante B): nach dem
-              Absenden EINE Zeile „Ihr Angebot vom … · 3.050 € im Monat", die beim Antippen dieselbe Karte wie vor dem Absenden
-              aufklappt (die Zeile wird dann zur Kopfleiste). Mit offener Bewerbung ohne Preis: Die Bewerbung nennt ihren eigenen
-              Tagessatz (Review 25.09.). Für die Abnahme zeigt `&angebot=offen` die Alternative: die Karte offen. */}
-          {neu && !zeile && <AngebotKopfleiste datum={angebotDatum(lead?.created_at)} />}
-          {zeile && (
-            <button
-              type="button"
-              onClick={() => setOfferExpandedManual(!offerExpanded)}
-              aria-expanded={offerExpanded}
-              className={`-mx-5 flex w-[calc(100%+2.5rem)] min-h-[64px] items-center gap-3 px-5 py-4 text-left ${offerExpanded ? 'mb-5 bg-pm-shell' : ''}`}
-            >
-              <FileText className="h-5 w-5 flex-none text-pm-taupe-ink" aria-hidden="true" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[16px] font-semibold leading-[1.3] tabular-nums text-pm-ink">
-                  {angebotDatum(lead?.created_at) ? `Ihr Angebot vom ${angebotDatum(lead?.created_at)}` : 'Ihr Angebot'}
-                </span>
-                {!hasPending && !offerExpanded && (
-                  <span className="mt-0.5 block text-[15px] leading-[1.35] tabular-nums text-pm-muted">{formatEuro(brutto)} im Monat</span>
-                )}
-              </span>
-              <ChevronDown className={`h-5 w-5 flex-none text-pm-taupe transition-transform duration-200 ${offerExpanded ? 'rotate-180' : ''}`} aria-hidden="true" />
-            </button>
-          )}
-
-          {/* Die Kosten stehen IMMER (Martin, 11.08.), solange der Abschnitt offen
-              ist. Der MONATSBETRAG führt, nicht der Tagessatz: Angehörige rechnen
-              in Monaten. */}
-          {offerExpanded && (
+        const angebotInhalt = (
           <>
                 {/* NUR unser Angebot (Martin, 11.08.). Pflegegeld,
                     Steuerersparnis und der daraus gebildete Eigenanteil stehen
@@ -3009,7 +3234,120 @@ const CustomerPortalPage: FC = () => {
                 {/* Runde 30: Martins „Hemmnisnehmer" als Abschluss derselben Karte (keine eigene Überschrift mehr). */}
                 {angebotLook && <AngebotSicherheit onBestpreis={() => setBestpreisOffen(true)} />}
           </>
-          )}
+        );
+        // Fassung 33 (Martin zu 32: „Vielleicht kann man Ihr Angebot und die Patientensituation irgendwie zusammen machen, so ein
+        // bisschen in so einen eigenen Bereich darunter"): nach dem Absenden EIN Bereich „Angebot und Pflegesituation" mit zwei
+        // aufklappbaren Zeilen in einer Karte. Zeile 1 klappt die Angebotskarte auf (mit offener Bewerbung ohne Preis in der Zeile:
+        // Die Bewerbung nennt ihren eigenen Tagessatz, Review 25.09.), Zeile 2 das Formular (eingebettet, „Änderungen speichern").
+        // Kein Link zum Ändern oben in den Schritten (Martin zu 31). Keine `overflow-hidden` an der Karte: Die mitlaufende
+        // Knopfleiste des Formulars (sticky) bliebe sonst in der Karte hängen.
+        if (neu) {
+          const mitPflege = patientSaved || schonAbgesendet;
+          const pflegeOffen = patientExpandedManual ?? false;
+          const datum = angebotDatum(lead?.created_at);
+          // Drei Zeilen je Eintrag: Titel, Stand, Aktion (die Aktion brach sonst bei 390 px mitten im Wortpaar um).
+          const zeileKlasse = '-mx-5 flex w-[calc(100%+2.5rem)] min-h-[64px] items-start gap-3 px-5 py-4 text-left';
+          const symbol = 'mt-0.5 flex h-9 w-9 flex-none items-center justify-center rounded-[10px]';
+          const aktion = 'mt-1 block text-[15px] font-semibold leading-[1.35] text-pm-taupe-ink';
+          return (
+            <div id="angebot" className="max-w-3xl mx-auto px-5 pt-10 scroll-mt-20">
+              {mitPflege
+                ? <h2 className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">{BEREICH_TITEL}</h2>
+                : <h2 className="sr-only">Ihr Angebot</h2>}
+              <Card ton="hervorgehoben" className={`${mitPflege ? 'mt-4 ' : ''}px-5`}>
+                <button
+                  type="button"
+                  onClick={() => setOfferExpandedManual(!offerExpanded)}
+                  aria-expanded={offerExpanded}
+                  className={`${zeileKlasse} ${offerExpanded ? 'mb-5 rounded-t-[18.5px] bg-pm-shell' : ''}`}
+                >
+                  <span aria-hidden="true" className={`${symbol} ${offerExpanded ? 'bg-white' : 'bg-pm-shell'} text-pm-taupe-ink`}>
+                    <FileText className="h-[18px] w-[18px]" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[16px] font-semibold leading-[1.3] tabular-nums text-pm-ink">
+                      {datum ? `Ihr Angebot vom ${datum}` : 'Ihr Angebot'}
+                    </span>
+                    {!offerExpanded && !hasPending && (
+                      <span className="mt-0.5 block text-[15px] leading-[1.35] tabular-nums text-pm-muted">{formatEuro(brutto)} im Monat</span>
+                    )}
+                    {!offerExpanded && <span className={aktion}>{ANGEBOT_ANSEHEN}</span>}
+                  </span>
+                  <ChevronDown className={`mt-2 h-5 w-5 flex-none text-pm-taupe transition-transform duration-200 ${offerExpanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </button>
+                {offerExpanded && <div className="pb-6">{angebotInhalt}</div>}
+                {mitPflege && (
+                  <div id="patientendaten" className="-mx-5 scroll-mt-20 border-t border-pm-line px-5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !pflegeOffen;
+                        setPatientExpandedManual(next);
+                        // Gleich im bearbeitbaren Formular landen, ohne zweiten Tipp (wie bisher beim Aufklappen).
+                        if (next) setTriggerOpenPatient(true);
+                      }}
+                      aria-expanded={pflegeOffen}
+                      className={zeileKlasse}
+                    >
+                      <span aria-hidden="true" className={`${symbol} bg-pm-mint text-pm-green-deep`}>
+                        <ClipboardCheck className="h-[18px] w-[18px]" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[16px] font-semibold leading-[1.3] text-pm-ink">{PFLEGE_TITEL}</span>
+                        <span className="mt-0.5 flex items-center gap-1 text-[15px] font-semibold leading-[1.35] text-pm-green-deep">
+                          <Check className="h-4 w-4 flex-none" strokeWidth={3} aria-hidden="true" />
+                          {PFLEGE_STATUS}
+                        </span>
+                        {!pflegeOffen && <span className={aktion}>{PFLEGE_ANSEHEN}</span>}
+                      </span>
+                      <ChevronDown className={`mt-2 h-5 w-5 flex-none text-pm-taupe transition-transform duration-200 ${pflegeOffen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                    </button>
+                    {pflegeOffen && <div className="border-t border-pm-line-soft">{patientFormular(true)}</div>}
+                  </div>
+                )}
+              </Card>
+            </div>
+          );
+        }
+        return (
+        <div id={angebotLook ? 'angebot' : undefined} className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'scroll-mt-20 pt-7' : 'pt-10'}` : neu ? 'px-5 pt-10 scroll-mt-20' : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
+          {/* Karte im Look des Rechners (Teil 3, Martin 24.09.). „Ihr persönliches
+              Angebot" steht im Kopf — der Abschnitt heißt nach seinem Inhalt. Der
+              Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
+              (Martin: „muss einklappbar sein für spätere Zustände"). */}
+          {/* Kompakt-Einstieg (Runde 15): weiß, 20 px Radius, ohne Rand, weicher zweilagiger Schatten, 24 px Innenabstand. */}
+          <Card ton={angebotLook ? 'hervorgehoben' : 'standard'} className={`relative ${angebotLook ? 'overflow-hidden px-5 pt-6 pb-6' : kompakt ? `shadow-lift !border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'shadow-lift px-5 pt-3 pb-4'}`}>
+            {k ? (
+              // Runde 13: keine Versalien-Zeile mehr — die Karte beginnt mit dem Preis; der Name bleibt
+              // für Screenreader.
+              <h2 className="sr-only">{neu ? 'Ihr Angebot' : 'Ihre Betreuungskosten'}</h2>
+            ) : (
+            <button
+              type="button"
+              onClick={() => setOfferExpandedManual(!offerExpanded)}
+              aria-expanded={offerExpanded}
+              className="w-full min-h-[44px] flex items-center justify-between gap-3 text-left"
+            >
+              {/* Preis UNTER dem Label: Nebeneinander brach bei 360 px beides um
+                  („Ihre Betreuungs-/kosten", „3.050 € /" „Monat"). */}
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className={EYEBROW}>{hasPending ? 'Ihr Angebot' : 'Ihre Betreuungskosten'}</span>
+                {/* Preis nur ohne offene Bewerbung: Die Bewerbung nennt ihren eigenen
+                    Tagessatz, zwei Preise nebeneinander widersprächen sich (Review 25.09.). */}
+                {!offerExpanded && !hasPending && (
+                  <span className="whitespace-nowrap text-[17px] font-bold tabular-nums text-pm-ink">
+                    {formatEuro(brutto)}<span className="text-[15px] font-normal text-pm-muted"> / Monat</span>
+                  </span>
+                )}
+              </span>
+              <ChevronDown className={`w-5 h-5 flex-shrink-0 text-pm-taupe transition-transform duration-200 ${offerExpanded ? 'rotate-180' : ''}`} />
+            </button>
+            )}
+
+          {/* Die Kosten stehen IMMER (Martin, 11.08.), solange der Abschnitt offen
+              ist. Der MONATSBETRAG führt, nicht der Tagessatz: Angehörige rechnen
+              in Monaten. */}
+          {offerExpanded && angebotInhalt}
           </Card>
         </div>
         );
@@ -4011,292 +4349,7 @@ const CustomerPortalPage: FC = () => {
              pending application, not on revisiting saved patient data. */}
         {!hasPending && !(nachAbsendenNeu && (patientSaved || schonAbgesendet)) && (kompakt ? formImKasten : (patientSaved ? (patientExpandedManual ?? false) : true)) && (
         <div>
-        <AngebotCard
-          eingebettet={kompakt}
-          lead={lead}
-          mmCustomer={mmCustomer}
-          onPatientSaved={(saved) => {
-            // Angaben ändern nach dem Absenden (Martin 25.09.: „sobald man
-            // irgendwas anklickt, lädt die ganze Seite neu"): Jede Eingabe
-            // meldete „nicht gespeichert", der Server-Abgleich unten
-            // (mmCustomer.status ≠ draft) setzte sofort zurück — die Seite
-            // kippte bei jedem Tipp in den Ausgangszustand und wieder zurück.
-            // Führt mamamia den Kunden als aktiv, bleibt die Seite „gespeichert".
-            if (!saved && schonAbgesendet) return;
-            if (saved && !patientSaved) {
-              // Hauptweg zuerst (Martin 24.09.): Bewerbungen, Einladen ist die Zugabe.
-              showToast('✓ Vielen Dank! Passende Pflegekräfte können sich jetzt bei Ihnen bewerben.', 7000);
-              // Frisch gespeichert → Abschnitt klappt zu (Referenz-Zustand).
-              // Ohne den Reset würde ein früher gesetzter manual-Wert den
-              // Bogen offen halten, obwohl die Aufgabe erledigt ist.
-              setPatientExpandedManual(null);
-            }
-            setPatientSaved(saved);
-          }}
-          triggerOpenPatient={triggerOpenPatient}
-          onTriggerHandled={() => setTriggerOpenPatient(false)}
-          // Im Kompakt-Einstieg meldet der Kasten selbst, ob er im Bild ist (er umschließt das Formular).
-          onImBlick={kompakt ? undefined : setFormularImBlick}
-          schonAbgesendet={schonAbgesendet}
-          onAbgesendet={(nurAenderung) => {
-            setAbgesendetInSitzung(true);
-            // Angaben geändert (nicht die erste Anfrage): bestätigen und zuklappen.
-            if (!nurAenderung) return;
-            showToast('✓ Ihre Angaben sind gespeichert.', 5000);
-            setPatientExpandedManual(null);
-          }}
-          gewaehlterStart={formularStart}
-          mamamiaEnabled={mmReady}
-          onSaveToMamamia={async (form) => {
-            const existingPatientIds = mmCustomer?.patients?.map(p => p.id) ?? [];
-
-            // ── Save flow ──────────────────────────────────────────────────
-            //
-            // One write to land the full patient profile, then a separate
-            // narrow write to overlay the AI-generated job_description.
-            //
-            // Why narrow overlay (proxy action `updateJobDescription`)
-            // instead of re-sending the whole patch with AI text spread:
-            //   - re-sending the full patch a second time bounces every
-            //     association through Mamamia's resolver again — the
-            //     resolver takes ~10-15 s to fully validate, during which
-            //     panel-side StoreRequest (invite) returns Unauthorized.
-            //   - a thin `{ job_description }` payload would trip Mamamia's
-            //     "omitted associations = wipe" rule AND the proxy's
-            //     defensive `patches=[]` workaround → wipes patients.
-            //   - the dedicated proxy action re-fetches current patient
-            //     and equipment ids and re-passes them as bare-id stubs,
-            //     which Mamamia merges into the existing rows. Nothing
-            //     else is touched, no wipe, no 10s lag.
-            //
-            // Sonnet (generateJobDescription) is fire-and-forget after the
-            // gating write so the invite gate opens in ~1 s instead of
-            // ~5 s. Mechanical job_description from the mapper is already
-            // persisted by the gating write — if AI fails or never lands,
-            // the customer profile still has a usable summary.
-
-            // ── Einsatzort-Wall (Registry #65) ───────────────────────────
-            // Ohne `location_id` NICHT speichern. Mamamia stempelt bei einem
-            // unauflösbaren `location_custom_text` einen Platzhalter (prod:
-            // id 16480 für JEDE solche PLZ), kippt den Kunden auf
-            // `status='active'` und das Portal zeigt „Vollständig" für ein
-            // Profil, das nirgends steht — schlimmer als gar kein Speichern.
-            // Der Lookup steht als ERSTES im Handler, also hinterlässt ein
-            // Wurf hier nichts: kein Mamamia-Write, kein Snapshot in
-            // leads.patient_form, keine Mails. Die Arbeit des Kunden bleibt
-            // im localStorage-Entwurf.
-            let locationId: number | undefined;
-            let lookupDown = false;
-            const plz = form.plz?.trim() ?? '';
-            const ortEingabe = form.ort?.trim() ?? '';
-            if (/^\d{5}$/.test(plz)) {
-              try {
-                const r = await callMamamia<{
-                  LocationsWithPagination: {
-                    data: Array<{ id: number; location: string; zip_code: string; country_code: string }>;
-                  };
-                  // limit 50, nicht 10: eine PLZ kann viele Ortsteile haben
-                  // ('04916' → 6 Zeilen), und die Wahl des Kunden muss auf die
-                  // Seite passen.
-                }>('searchLocations', { search: plz, limit: 50, page: 1 });
-                const de = r.LocationsWithPagination.data
-                  .filter(l => l.country_code === 'DE' && l.zip_code === plz);
-                // Exakte PLZ, nicht „erster Treffer": `search` matcht PRÄFIXE —
-                // '503' liefert 50321 Brühl (Sonde 11.09.2026). Unter den
-                // Ortsteilen derselben PLZ zuerst den, den der Kunde gewählt hat.
-                locationId = (de.find(l => l.location === ortEingabe) ?? de[0])?.id;
-              } catch (e) {
-                const raw = e instanceof Error ? e.message : String(e ?? '');
-                // Abgelaufene Sitzung ist KEIN Suchausfall. Diese Meldung ist die
-                // einzige Erkennung eines abgelaufenen Tokens mitten in der
-                // Sitzung; sie sitzt sonst im catch der Mutation weiter unten,
-                // den ein Wurf von HIER nicht erreicht (der try umschliesst nur
-                // die Mutation). Also hier melden und erst dann werfen.
-                if (/401|unauthorized|unauthenticated|token/i.test(raw)) {
-                  showToast('Ihr Zugangslink ist abgelaufen. Sie können sich gleich einen neuen Link zusenden lassen.');
-                  setSaveTokenExpired(true);
-                  throw e;
-                }
-                lookupDown = true;
-              }
-            }
-            if (locationId == null) {
-              reportLeadEvent(
-                lead?.token,
-                'patient_form_location_unresolved',
-                { plz, ort: ortEingabe, ...(lookupDown ? { lookup_down: '1' } : {}) },
-                // Proxy-Ausfall: Zeile ja, Team-Mail nein — sonst schickt eine
-                // 20-Minuten-Störung eine Mail pro Speichern pro Kunde.
-                !lookupDown,
-              );
-              throw new Error(lookupDown ? 'EINSATZORT_LOOKUP' : 'EINSATZORT:' + plz);
-            }
-
-            const patch = mapPatientFormToUpdateCustomerInput(form, {
-              existingPatientIds,
-              locationId,
-              // Kontaktperson (Osoba Kontaktowa) aus dem Lead → customer_contract
-              // (salutation/first_name/last_name), damit das Mamamia-Panel die
-              // Kontaktdaten zeigt statt nur Customer.first_name top-level.
-              //
-              // Vermittler-Lead (Registry #67): die Kontaktspalten tragen dort
-              // den Ansprechpartner der Agentur — er gehoert NICHT unter die
-              // Adresse des Patienten. Das MM-Team fuellt diesen Bogen ueber den
-              // gespiegelten Token aus (gotcha #10), also ist das hier der
-              // einzige Weg, auf dem das Formular bei solchen Leads ueberhaupt
-              // laeuft; ohne die Fallunterscheidung wuerde es den Server-Fix
-              // wieder ueberschreiben.
-              ...(lead?.vermittler
-                ? {
-                    vermittler: true,
-                    contact: {
-                      anrede: lead?.patient_anrede ?? null,
-                      vorname: lead?.patient_vorname ?? null,
-                      nachname: lead?.patient_nachname ?? null,
-                    },
-                  }
-                : {
-                    contact: {
-                      anrede: lead?.anrede_text ?? lead?.anrede ?? null,
-                      vorname: lead?.vorname ?? null,
-                      nachname: lead?.nachname ?? null,
-                    },
-                  }),
-            });
-
-            // ── Gating write: full mechanical patch. Awaited so the caller
-            // (AngebotCard) keeps patientSaved=false until Mamamia has the
-            // complete profile — invite gate opens only on success.
-            // portal_form_snapshot: der ROHE Patientenbogen — der Proxy friert ihn
-            // nach erfolgreichem Write an leads.patient_form ein (SA-Portal zeigt
-            // ihn im Anfrage-Block); Mamamia erreicht das Feld nie (Allowlist).
-            try {
-              await updateCustomerMutation.mutate({
-                ...(patch as Record<string, unknown>),
-                portal_form_snapshot: form,
-              });
-              setAbgesendetesFormular(form);
-            } catch (err) {
-              const raw = err instanceof Error ? err.message : String(err ?? '');
-              // Token während des Ausfüllens abgelaufen → ehrlich sagen und in
-              // den Selbst-Service (neuen Link anfordern) leiten statt eines
-              // ratlosen „fehlgeschlagen".
-              if (/401|unauthorized|unauthenticated|token/i.test(raw)) {
-                showToast('Ihr Zugangslink ist abgelaufen. Sie können sich gleich einen neuen Link zusenden lassen.');
-                setSaveTokenExpired(true);
-              } else {
-                // Sprechende Meldung statt Ratespiel — häufige mamamia-Ablehnungen übersetzt.
-                const friendly = /location/i.test(raw)
-                  ? 'Die Postleitzahl konnte nicht zugeordnet werden — bitte PLZ und Ort prüfen.'
-                  : /too long|exceeds|max/i.test(raw)
-                    ? 'Eine Angabe ist zu lang (z. B. Diagnosen) — bitte etwas kürzen und erneut speichern.'
-                    : `Speichern fehlgeschlagen: ${raw.slice(0, 140)}`;
-                showToast(friendly);
-              }
-              // Fürs Team sichtbar machen, WORAN Kunden scheitern (Dashboard/Report).
-              reportLeadEvent(lead?.token, 'patient_form_save_failed', { error: raw.slice(0, 200) });
-              throw err;
-            }
-
-            // Report back to the kostenrechner lead — patient data complete
-            // unlocks invites/applications, so the Nachfass switches to the
-            // "last step: invite" variant. Fire-and-forget.
-            //
-            // Pass phone so the kostenrechner endpoint can refresh
-            // leads.telefon (kept in sync with Mamamia Customer.phone after
-            // a step-4 edit). Dedupe key includes phone, so a follow-up
-            // save with an edited number re-fires.
-            const phoneForLead = form.phone?.trim();
-            const startDateForLead = form.startDate?.trim();
-            // Vorname/Nachname für den Bridge-Sync nach leads.vorname/nachname.
-            // Identischer Split wie im Mapper (splitCustomerName) → Mamamia
-            // Customer.first_name/last_name und die leads-Spalten bleiben
-            // konsistent. Der Mapper hat den Namen bereits in den updateCustomer-
-            // Patch gelegt; hier nur für die Bridge-Metadaten wiederverwendet.
-            const { vorname: vornameForLead, nachname: nachnameForLead } = splitCustomerName(form.name);
-            const leadEventMeta: Record<string, string> = {};
-            if (phoneForLead) leadEventMeta.phone = phoneForLead;
-            if (startDateForLead) leadEventMeta.startDate = startDateForLead;
-            if (vornameForLead) leadEventMeta.vorname = vornameForLead;
-            if (nachnameForLead) leadEventMeta.nachname = nachnameForLead;
-            reportLeadEvent(
-              lead?.token,
-              'patient_data_saved',
-              Object.keys(leadEventMeta).length > 0 ? leadEventMeta : undefined,
-            );
-            // Patient form save flippa customer na active + dorzuca pełne
-            // patient/wish dane. Mamamia matching engine re-scoreuje całą
-            // listę z nowymi inputami — początkowo zwrócone caregivers
-            // (na bazie minimal onboard payload) mogą już nie pasować lub
-            // mogą się pojawić nowi. Refetch listę żeby user widział
-            // aktualny scoring, nie stale wynik z czasu onboardu.
-            refetchMatchings();
-
-            // ── JobOffer.arrival_at sync (fire-and-forget).
-            // Form Step 5 collects "Voraussichtliches Startdatum" — push it
-            // to Mamamia's JobOffer.arrival_at via UpdateJobOfferDates.
-            // Onboard set arrival_at as a fuzzy offset from care_start_timing
-            // (e.g. "sofort" → +7d); the customer's explicit pick wins.
-            //
-            // Only fire when the user's pick actually differs from what
-            // Mamamia currently holds — avoid no-op writes that would log
-            // noise + reload the JobOffer.
-            const pickedStartDate = form.startDate?.trim();
-            // mamamia liefert „2026-10-15 00:00:00", das Formular „2026-10-15":
-            // nur den Tag vergleichen, sonst schreibt jedes Speichern neu.
-            const currentArrival = kalenderTag(mmJobOffer?.arrival_at);
-            if (pickedStartDate && pickedStartDate !== currentArrival) {
-              void (async () => {
-                try {
-                  await updateJobOfferDatesMutation.mutate({ arrival_at: pickedStartDate });
-                  refetchJobOffer();
-                } catch (err) {
-                  // Best-effort. Customer profile is saved; only the
-                  // arrival_at didn't update. Surface a soft toast so the
-                  // user knows to retry the form Save if the date was
-                  // critical, but don't block the flow.
-                  console.warn('updateJobOfferDates failed:', err);
-                  showToast('Startdatum konnte nicht aktualisiert werden. Ihre Angaben wurden gespeichert.');
-                }
-              })();
-            }
-
-            // ── AI overlay (fire-and-forget). Only writes job_description.
-            // Sonnet polishes the mechanical summary into a 2-3 sentence
-            // German text. The proxy's `updateJobDescription` action
-            // preserves patients + equipments by re-fetching their ids,
-            // so nothing else in the customer state is touched.
-            void (async () => {
-              try {
-                const aiResult = await callMamamia<{ description: string | null }>(
-                  'generateJobDescription',
-                  {
-                    anzahl: form.anzahl,
-                    geschlecht: form.geschlecht, geburtsjahr: form.geburtsjahr,
-                    pflegegrad: form.pflegegrad, mobilitaet: form.mobilitaet,
-                    heben: form.heben, demenz: form.demenz,
-                    inkontinenz: form.inkontinenz, nacht: form.nacht,
-                    diagnosen: form.diagnosen,
-                    p2_geschlecht: form.p2_geschlecht, p2_geburtsjahr: form.p2_geburtsjahr,
-                    p2_pflegegrad: form.p2_pflegegrad, p2_mobilitaet: form.p2_mobilitaet,
-                    p2_demenz: form.p2_demenz,
-                    ort: form.ort, wohnungstyp: form.wohnungstyp,
-                    urbanisierung: form.urbanisierung, familieNahe: form.familieNahe,
-                    haushalt: form.haushalt, pflegedienst: form.pflegedienst,
-                    aufgaben: form.aufgaben, sonstigeWuensche: form.sonstigeWuensche,
-                  },
-                );
-                if (aiResult.description) {
-                  await updateJobDescriptionMutation.mutate({ text: aiResult.description });
-                }
-              } catch (err) {
-                // AI overlay is best-effort. Mechanical job_description
-                // from the mapper is already persisted by the gating write.
-                console.warn('AI job_description overlay failed (mechanical retained):', err);
-              }
-            })();
-          }}
-        />
+        {patientFormular(kompakt)}
         </div>
         )}
         </KompaktPflegekraefteBereich>{/* Ende Hervorhebung Pflegesituation (Kopf + Formular) */}

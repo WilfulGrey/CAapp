@@ -4,6 +4,7 @@
 // VOR dem Import stehen (vi.hoisted).
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { server } from '../../../test/mocks/server';
 import { http, HttpResponse } from 'msw';
 import { defaultHandlers, defaultLead, sampleCustomer } from '../../../test/fixtures/mamamia-mocks';
@@ -59,13 +60,22 @@ describe('Ansicht nach dem Absenden im Look „angebot" (Fassung 31)', () => {
     expect(await screen.findByRole('heading', { level: 2, name: 'Pflegekräfte einladen' }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.queryByText('Unsicher bei der Auswahl?')).toBeNull();
     expect(screen.queryByText(/meldet sich meist innerhalb/)).toBeNull();
-    // Kein Weg zum Ändern (Martin zu Fassung 31), keine eingeklappte Pflegesituation mehr.
-    expect(screen.queryByText(/Angaben ansehen oder ändern/)).toBeNull();
+    // Kein Link zum Ändern oben (Martin zu Fassung 31), kein alter Abschnitt „Für Ihre Bewerbungen · Pflegesituation".
+    expect(screen.queryByText(/ändern/)).toBeNull();
     expect(screen.queryByText('Für Ihre Bewerbungen')).toBeNull();
-    expect(screen.queryByRole('button', { name: /Pflegesituation/ })).toBeNull();
-    // Angebot als eine Zeile mit Preis, aufklappbar.
-    const zeile = screen.getByRole('button', { name: /Ihr Angebot/ });
-    expect(zeile).toHaveAttribute('aria-expanded', 'false');
-    expect(zeile.textContent).toContain('im Monat');
+    // Fassung 33: Bereich „Angebot und Pflegesituation" mit zwei Zeilen, beide zu Beginn zugeklappt.
+    expect(screen.getByRole('heading', { level: 2, name: 'Angebot und Pflegesituation' })).toBeInTheDocument();
+    const angebot = screen.getByRole('button', { name: /Ihr Angebot/ });
+    expect(angebot).toHaveAttribute('aria-expanded', 'false');
+    expect(angebot.textContent).toContain('im Monat');
+    expect(angebot.textContent).toContain('Angebot ansehen');
+    const pflege = screen.getByRole('button', { name: /Ihre Pflegesituation/ });
+    expect(pflege).toHaveAttribute('aria-expanded', 'false');
+    expect(pflege.textContent).toContain('Vollständig');
+    expect(pflege.textContent).toContain('Angaben ansehen');
+    // Antippen klappt das Formular IN der Karte auf (eingebettet, Knopf „Änderungen speichern" erst im letzten Schritt).
+    await userEvent.click(pflege);
+    expect(await screen.findByText(/Schritt 1 von 4/)).toBeInTheDocument();
+    expect(pflege).toHaveAttribute('aria-expanded', 'true');
   }, 15_000);
 });
