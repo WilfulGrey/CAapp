@@ -42,10 +42,13 @@ export const MatchCard: FC<{
    *  (`zurPflegesituation`) und gibt `false` zurück. Vom 24.09. bis 02.10. stand hier
    *  „Einladen" mit Schloss und ein Erklärfenster. */
   profilFehlt?: boolean;
+  /** Fassung 31 (Ansicht nach dem Absenden im Look „angebot"): „Einladen" über die volle Breite wie der Knopf vor dem
+   *  Absenden, statt rechtsbündig. */
+  breit?: boolean;
   /** Tipp auf die Stufen-Plakette: Profil mit geöffneter Erklärung (07.09.,
    *  Clarity: Kunden tippten Stammkraft/Bewährt und nichts passierte). */
   onStufeClick?: () => void;
-}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin, isRecommended, globalInviteLocked, profilFehlt, onStufeClick }) => {
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin, isRecommended, globalInviteLocked, profilFehlt, breit, onStufeClick }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
 
   const handleInvite = async () => {
@@ -182,7 +185,7 @@ export const MatchCard: FC<{
         ) : (
           <button
             onClick={e => { e.stopPropagation(); handleInvite(); }}
-            className="min-h-[44px] inline-flex items-center gap-1.5 px-[18px] rounded-full text-[15px] font-bold whitespace-nowrap transition-colors active:scale-[0.98] bg-pm-coral text-white hover:bg-pm-coral-deep"
+            className={`${breit ? 'w-full justify-center px-3 ' : 'px-[18px] '}min-h-[44px] inline-flex items-center gap-1.5 rounded-full text-[15px] font-bold whitespace-nowrap transition-colors active:scale-[0.98] bg-pm-coral text-white hover:bg-pm-coral-deep`}
           >
             <UserPlus className="w-4 h-4" aria-hidden="true" />
             Einladen

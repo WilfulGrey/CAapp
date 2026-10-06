@@ -24,6 +24,7 @@ import type { Nurse } from '../../types';
 import type { SterneStand } from '../../lib/sterne';
 import { BewertungsZeile } from './BewertungsZeile';
 import { DeutschPunkte } from './PflegekraftProfil';
+import { kurzDatum } from './SucheStand';
 import { displayName, initials } from './shared';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -309,6 +310,89 @@ export const ABLAUF = [
   { titel: 'Bewerbungen erhalten', text: 'Danach bewerben sich passende Pflegekräfte bei Ihnen, mit Foto und Erfahrung. Jede Bewerbung sehen Sie hier im Portal und erhalten sie per E-Mail.' },
   { titel: 'Auswählen und starten', text: 'Sie wählen Ihre Pflegekraft aus und unterschreiben den Vertrag online. Um den Rest kümmern wir uns. Die Anreise ist schon ab 3 Tagen möglich.' },
 ] as const;
+
+/* Fassung 31 (Martin 06.10.: „alle 4 ja, aber die anderen screens will ich vorher absegnen"): die Ansicht NACH dem Absenden im
+   Aufbau von Fassung 30. Texte von OpenAI geprüft (mutig30): Der Satz unter „Ihre Suche läuft" ersetzt „Sobald sich eine
+   Pflegekraft bewirbt, bekommen Sie eine E-Mail." (Bedingungs-Anfang; der Hinweis auf die E-Mail steht jetzt in Schritt 2, sonst
+   stünde er doppelt). Schritt 3 bleibt wörtlich wie vor dem Absenden (freigegeben), dazu der Wunschstart aus dem Formular. Kein
+   „72 Stunden reserviert" (Martin zu Fassung 28: „unnötig"), keine Zeitzusage („meldet sich meist innerhalb von 1–2 Tagen" war
+   nicht belegt). */
+export const SUCHE_LAEUFT_SATZ = 'Passende Pflegekräfte sehen jetzt Ihre Anfrage und können sich bei Ihnen bewerben.';
+export const STAND_TITEL_1 = 'Pflegesituation ergänzt';
+export const EINLADEN_TITEL = 'Pflegekräfte einladen';
+export const EINLADEN_ZEILE = 'Laden Sie Pflegekräfte ein, die Ihnen zusagen. Wir bitten sie dann um eine Bewerbung, kostenlos und unverbindlich.';
+
+/** Erklärung über der Interesse-Karte (OpenAI mutig30: „stößt … an" und der Gedankenstrich raus; „kostenlos und unverbindlich"
+ *  steht im Abschnitt „Pflegekräfte einladen" direkt darunter, deshalb hier nicht noch einmal). */
+export function interesseText(anzahl: number): string {
+  return anzahl === 1
+    ? 'Diese Pflegekraft hat Ihre Anfrage gesehen und möchte die Betreuung übernehmen. Laden Sie sie ein, dann bereiten wir ihre Bewerbung vor.'
+    : 'Diese Pflegekräfte haben Ihre Anfrage gesehen und möchten die Betreuung übernehmen. Laden Sie ein, wer zu Ihnen passt, dann bereiten wir die Bewerbungen vor.';
+}
+
+/** Text von Schritt 2 nach dem Absenden: ohne bisherige Bewerbung mit der Zahl der passenden Pflegekräfte (fehlt sie oder ist
+ *  sie 0, entfällt der Satz statt zu raten). */
+export function standSchritt2(passende: number | null, bisherigeBewerbungen: number): string {
+  if (bisherigeBewerbungen > 0) {
+    const bisher = bisherigeBewerbungen === 1 ? 'eine Bewerbung' : `${bisherigeBewerbungen} Bewerbungen`;
+    return `Sie haben bisher ${bisher} erhalten. Jede weitere sehen Sie hier im Portal und erhalten sie per E\u2011Mail.`;
+  }
+  const zahl = passende && passende > 0
+    ? ` Für Ihre Pflegesituation gibt es aktuell ${passende} passende ${passende === 1 ? 'Pflegekraft' : 'Pflegekräfte'}.`
+    : '';
+  return `Jede Bewerbung sehen Sie hier im Portal und erhalten sie per E\u2011Mail.${zahl}`;
+}
+
+/**
+ * „So geht es weiter" nach dem Absenden: dieselben drei Schritte wie vorher, jetzt mit Stand. Schritt 1 abgehakt (mit dem Weg
+ * zu den Angaben), Schritt 2 läuft (Koralle wie der aktuelle Schritt vor dem Absenden), Schritt 3 kommt. Ersetzt im Look
+ * „angebot" die Karte „Stand heute" (SucheStand, fünf Schritte).
+ */
+export function AngebotAblaufStand({ passende, bisherigeBewerbungen = 0, wunschstart, onAngaben }: {
+  passende: number | null;
+  bisherigeBewerbungen?: number;
+  wunschstart: string | null | undefined;
+  onAngaben: () => void;
+}) {
+  const start = kurzDatum(wunschstart);
+  const titel = 'text-[17px] font-semibold leading-[1.3] text-pm-ink';
+  const text = 'mt-1 text-pretty text-[15px] leading-[1.5] text-pm-muted';
+  const kreis = 'flex h-8 w-8 flex-none items-center justify-center rounded-full text-[15px] font-semibold tabular-nums';
+  return (
+    <ol className="grid gap-5">
+      <li className="flex gap-4">
+        <span className={`${kreis} bg-pm-mint text-pm-green-deep`}>
+          <Check className="h-4 w-4" strokeWidth={3} aria-label="erledigt" />
+        </span>
+        <div className="min-w-0 pt-[3px]">
+          <p className={titel}>{STAND_TITEL_1}</p>
+          <button
+            type="button"
+            onClick={onAngaben}
+            className="-mb-3 -mt-1 inline-flex min-h-[44px] items-center text-[15px] font-semibold text-pm-taupe-ink hover:text-pm-ink"
+          >
+            Angaben ansehen oder ändern&nbsp;›
+          </button>
+        </div>
+      </li>
+      <li className="flex gap-4" aria-current="step">
+        <span aria-hidden="true" className={`${kreis} bg-pm-coral text-white`}>2</span>
+        <div className="min-w-0 pt-[3px]">
+          <p className={titel}>{ABLAUF[1].titel}</p>
+          <p className={text}>{standSchritt2(passende, bisherigeBewerbungen)}</p>
+        </div>
+      </li>
+      <li className="flex gap-4">
+        <span aria-hidden="true" className={`${kreis} bg-pm-shell text-pm-taupe-ink`}>3</span>
+        <div className="min-w-0 pt-[3px]">
+          <p className={titel}>{ABLAUF[2].titel}</p>
+          <p className={text}>{ABLAUF[2].text}</p>
+          {start && <p className="mt-1.5 text-[15px] font-semibold tabular-nums text-pm-ink">Ihr Wunschstart: {start}</p>}
+        </div>
+      </li>
+    </ol>
+  );
+}
 
 /** `onErsterSchritt`: Link unter Schritt 1 („Pflegesituation ergänzen ›") öffnet das Formular im Achtung-Hinweis. */
 export function AngebotAblauf({ onErsterSchritt }: { onErsterSchritt?: () => void }) {

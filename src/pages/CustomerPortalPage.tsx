@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotEinleitung, AngebotKopfleiste, AngebotLeistung, AngebotPerson, AngebotSicherheit, AngebotSterne, AngebotTestsieger, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { AngebotAbschnitt, AngebotAblaufStand, AngebotEinleitung, AngebotKopfleiste, AngebotLeistung, AngebotPerson, AngebotSicherheit, AngebotSterne, AngebotTestsieger, EINLADEN_TITEL, EINLADEN_ZEILE, KOMPAKT_LOOK, SUCHE_LAEUFT_SATZ, interesseText, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -1313,6 +1313,10 @@ const CustomerPortalPage: FC = () => {
   // Kompakt-Einstieg (KompaktEinstieg.tsx): nur VOR dem ersten Absenden der Pflegesituation, ohne
   // offene Bewerbung. Nie für Kunden, die schon abgesendet haben — auch nicht kurz (`schonAbgesendet`).
   const kompakt = !hasPending && !patientSaved && !schonAbgesendet && !lokalAbgesendet;
+  // Fassung 31 (Martin 06.10.: „alle 4 ja, aber die anderen screens will ich vorher absegnen"): die Ansicht NACH dem Absenden
+  // im Aufbau von Fassung 30 — Kopf wie dort, „So geht es weiter" mit Stand, Pflegekräfte zum Einladen, Angebot und
+  // Pflegesituation zugeklappt. Vorerst nur mit `?look=angebot`; ohne Schalter bleibt die heutige Ansicht.
+  const nachAbsendenNeu = !kompakt && KOMPAKT_LOOK === 'angebot';
 
   // „Ihre Suche läuft" (Martin 25.09.): gespeichert, keine offene Bewerbung und
   // die Bewerbungen sind geladen — sonst zeigt der Kopf „Einen Moment …" und
@@ -2639,11 +2643,15 @@ const CustomerPortalPage: FC = () => {
         // Nach dem Absenden eingeklappt, mit dem Preis in der Zeile (Martin 25.09.:
         // dann zählen Bewerbungen, das Angebot ist Nachschlagewerk).
         // Kompakt-Einstieg: kein Einklappen der ganzen Karte, nur „Alle Kosten im Überblick".
+        // Fassung 31: nach dem Absenden im Look „angebot" dieselbe Karte wie vorher (Kopfleiste, Leistung, Preis, vier Punkte),
+        // zugeklappt mit dem Preis in der Zeile („Angebot ansehen ›"). `k` = Darstellung wie vor dem Absenden.
+        const neu = nachAbsendenNeu;
+        const k = kompakt || neu;
         const offerExpanded =
           kompakt || (offerExpandedManual ?? (!hasPending && !patientSaved));
         // Schrift im Kompakt-Einstieg: Fließtext 16 px, kleine Schrift 14 px (sonst wie bisher).
-        const grund = kompakt ? 'text-[16px]' : 'text-[15px]';
-        const klein = kompakt ? 'text-[14px]' : 'text-[13px]';
+        const grund = k ? 'text-[16px]' : 'text-[15px]';
+        const klein = k ? 'text-[14px]' : 'text-[13px]';
         const brutto = lead?.kalkulation?.bruttopreis ?? 3050;
         const tagessatz = Math.round(brutto / 30);
         // Heimvergleich EINMAL berechnet (Karte + Aufklapper): Eigenanteil aus dem
@@ -2661,7 +2669,7 @@ const CustomerPortalPage: FC = () => {
         // Kein fünfter Haken (Martin, 09.09.): „Kosten erst, wenn die
         // Pflegekraft da ist" ist eine Erklärung, kein Punkt der Liste.
         const kostenErst = (
-          <p className={`mt-3 ${kompakt ? 'text-[14px]' : 'text-[14.5px]'} leading-[1.5] text-pm-muted`}>
+          <p className={`mt-3 ${k ? 'text-[14px]' : 'text-[14.5px]'} leading-[1.5] text-pm-muted`}>
             Kosten erst, wenn die Pflegekraft da ist.
           </p>
         );
@@ -2669,7 +2677,7 @@ const CustomerPortalPage: FC = () => {
         // Herkunft der Zahl direkt darunter.
         const heimVergleich = eigenanteil !== null && heimErsparnis > 0 && (
           <div className="mt-3 pt-3 border-t border-pm-line-soft">
-            <p className={`${kompakt ? 'text-[16px]' : 'text-[14.5px]'} leading-[1.5] text-pm-ink`}>
+            <p className={`${k ? 'text-[16px]' : 'text-[14.5px]'} leading-[1.5] text-pm-ink`}>
               Zuhause statt Pflegeheim: rund <b className="text-pm-green-deep">{formatEuro(heimErsparnis)} weniger</b> im Monat.
             </p>
             <p className={`mt-1 ${klein} leading-snug text-pm-muted`}>
@@ -2688,19 +2696,19 @@ const CustomerPortalPage: FC = () => {
           </div>
         );
         // Runde 17 (`?look=angebot`): die Karte als Angebot — Kopf mit Datum und Grundlage, Zeilen statt „Inklusive …".
-        const angebotLook = kompakt && KOMPAKT_LOOK === 'angebot';
+        const angebotLook = k && KOMPAKT_LOOK === 'angebot';
         return (
-        <div id={angebotLook ? 'angebot' : undefined} className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'scroll-mt-20 pt-7' : 'pt-10'}` : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
+        <div id={angebotLook ? 'angebot' : undefined} className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'scroll-mt-20 pt-7' : 'pt-10'}` : neu ? 'px-5 pt-10 scroll-mt-20' : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
           {/* Karte im Look des Rechners (Teil 3, Martin 24.09.). „Ihr persönliches
               Angebot" steht im Kopf — der Abschnitt heißt nach seinem Inhalt. Der
               Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
               (Martin: „muss einklappbar sein für spätere Zustände"). */}
           {/* Kompakt-Einstieg (Runde 15): weiß, 20 px Radius, ohne Rand, weicher zweilagiger Schatten, 24 px Innenabstand. */}
-          <Card ton={angebotLook ? 'hervorgehoben' : 'standard'} className={`relative ${angebotLook ? 'overflow-hidden px-5 pt-6 pb-6' : kompakt ? `shadow-lift !border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'shadow-lift px-5 pt-3 pb-4'}`}>
-            {kompakt ? (
+          <Card ton={angebotLook ? 'hervorgehoben' : 'standard'} className={`relative ${angebotLook ? `overflow-hidden px-5 pt-6 ${neu && !offerExpanded ? 'pb-3' : 'pb-6'}` : kompakt ? `shadow-lift !border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'shadow-lift px-5 pt-3 pb-4'}`}>
+            {k ? (
               // Runde 13: keine Versalien-Zeile mehr — die Karte beginnt mit dem Preis; der Name bleibt
               // für Screenreader.
-              <h2 className="sr-only">Ihre Betreuungskosten</h2>
+              <h2 className="sr-only">{neu ? 'Ihr Angebot' : 'Ihre Betreuungskosten'}</h2>
             ) : (
             <button
               type="button"
@@ -2724,6 +2732,28 @@ const CustomerPortalPage: FC = () => {
             </button>
             )}
 
+          {/* Fassung 31: Kopfleiste immer, zugeklappt darunter nur der Preis und „Angebot ansehen ›" (mit offener Bewerbung ohne
+              Preis: Die Bewerbung nennt ihren eigenen Tagessatz, Review 25.09.). OpenAI mutig30: „gut". */}
+          {neu && <AngebotKopfleiste datum={angebotDatum(lead?.created_at)} />}
+          {neu && !offerExpanded && (
+            <div className="flex flex-wrap items-center justify-between gap-x-3">
+              {!hasPending && (
+                <p className="flex items-baseline gap-2 whitespace-nowrap">
+                  <span className="text-[28px] font-extrabold leading-none tracking-[-0.03em] tabular-nums text-pm-ink">{formatEuro(brutto)}</span>
+                  <span className="text-[15px] text-pm-muted">im Monat</span>
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => setOfferExpandedManual(true)}
+                aria-expanded={false}
+                className="inline-flex min-h-[44px] flex-none items-center text-[15px] font-semibold text-pm-taupe-ink hover:text-pm-ink"
+              >
+                Angebot ansehen&nbsp;›
+              </button>
+            </div>
+          )}
+
           {/* Die Kosten stehen IMMER (Martin, 11.08.), solange der Abschnitt offen
               ist. Der MONATSBETRAG führt, nicht der Tagessatz: Angehörige rechnen
               in Monaten. */}
@@ -2733,13 +2763,13 @@ const CustomerPortalPage: FC = () => {
                     Steuerersparnis und der daraus gebildete Eigenanteil stehen
                     nicht am Preis — das sind fremde Leistungen mit eigenen
                     Voraussetzungen. */}
-                  {kompakt ? (
+                  {k ? (
                     <>
                       {angebotLook && (
                         // Runde 30: EIN Angebot — Kopfleiste mit Datum, Leistung mit Grundlage, was der Kunde bekommt,
                         // dann (Haarlinie) der Preis, am Ende der Karte die vier festen Punkte und das Siegel.
                         <>
-                          <AngebotKopfleiste datum={angebotDatum(lead?.created_at)} />
+                          {!neu && <AngebotKopfleiste datum={angebotDatum(lead?.created_at)} />}
                           <AngebotLeistung fuer={angebotFuer((lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined)} />
                           {/* Runde 32 (Martin zu Fassung 26: „nach Rund-um-Betreuung zu Hause muss schon der Preis kommen und
                               nicht, wie es funktioniert"): kein Beschreibungstext mehr in der Karte, der steht in den Fragen. */}
@@ -2793,23 +2823,23 @@ const CustomerPortalPage: FC = () => {
                       16 px), Haarlinie, Testsieger-Siegel mit Testsieger/Erfahrung und darunter die Sterne. */}
                   {/* Runde 25: im Look „angebot" die Konditionen (kündbar, Bestpreisgarantie) als Teil des Angebots. */}
                   {/* Runde 29: die Konditionen stehen jetzt unter „Ihre Sicherheit". */}
-                  {kompakt ? (angebotLook ? null : vierPunkteRuhig) : vierPunkte('mt-4 flex flex-col gap-2.5')}
+                  {k ? (angebotLook ? null : vierPunkteRuhig) : vierPunkte('mt-4 flex flex-col gap-2.5')}
                   {/* Runde 19: Im Look „angebot" stehen Siegel und Sterne oben unter dem Titel. */}
                   {kompakt && !angebotLook && <KompaktVertrauen sterne={sterne} />}
-                  {!kompakt && kostenErst}
-                  {!kompakt && heimVergleich}
-                  {!kompakt && testsieger}
+                  {!k && kostenErst}
+                  {!k && heimVergleich}
+                  {!k && testsieger}
 
                   {/* Der Toggle sitzt IM Kasten (Martin, 11.08.) — er gehört
                       zum Angebot, nicht daneben. Kompakt-Einstieg: keine eigene Zeile „Alle Kosten
                       im Überblick" — der Textlink unter der kleinen Schrift öffnet die Aufstellung,
                       die Zeile erscheint nur offen als „Weniger anzeigen". */}
-                  {(!kompakt || costsExpanded) && (
+                  {(!k || (costsExpanded && !neu)) && (
                   <button
                     type="button"
                     onClick={() => setCostsExpanded(!costsExpanded)}
                     aria-expanded={costsExpanded}
-                    className={`w-full flex items-center justify-between gap-2 border-t pt-2 ${kompakt ? 'mt-5 border-pm-line min-h-[48px] text-[16px]' : 'border-pm-line-soft mt-3 min-h-[48px] text-[15px]'} font-semibold text-pm-taupe-ink`}
+                    className={`w-full flex items-center justify-between gap-2 border-t pt-2 ${k ? 'mt-5 border-pm-line min-h-[48px] text-[16px]' : 'border-pm-line-soft mt-3 min-h-[48px] text-[15px]'} font-semibold text-pm-taupe-ink`}
                   >
                     {costsExpanded ? 'Weniger anzeigen' : 'Alle Kosten im Überblick'}
                     <ChevronDown className={`w-5 h-5 text-pm-taupe transition-transform duration-200 ${costsExpanded ? 'rotate-180' : ''}`} />
@@ -2875,8 +2905,8 @@ const CustomerPortalPage: FC = () => {
                     11.08.: „nicht doppeln"). */}
                 {/* id = Sprungziel des Textlinks „Alle Kosten im Überblick ›" (nur Kompakt-Einstieg). */}
                 <div
-                  id={kompakt ? 'kosten-ueberblick' : undefined}
-                  className={`mt-1 rounded-[16px] bg-pm-paper px-4 py-3.5 space-y-3${kompakt ? ' scroll-mt-16' : ''}`}
+                  id={k ? 'kosten-ueberblick' : undefined}
+                  className={`mt-1 rounded-[16px] bg-pm-paper px-4 py-3.5 space-y-3${k ? ' scroll-mt-16' : ''}`}
                 >
                   {[
                     { label: 'Betreuung', value: `${formatEuro(brutto)} / Monat`, note: '' },
@@ -2905,7 +2935,7 @@ const CustomerPortalPage: FC = () => {
                     </div>
                   ))}
                 </div>
-                {kompakt && kostenErst}
+                {k && kostenErst}
 
                 {/* ── Was bleibt für Sie übrig (Martin, 12.08.): Eigenanteil HIER,
                     nicht am Hauptpreis. Gerechnet aus dem ANGEZEIGTEN Brutto
@@ -2914,7 +2944,7 @@ const CustomerPortalPage: FC = () => {
                     wird. Der Heimvergleich steht seit Teil 3 nur noch an der Karte. */}
                 {eigenanteil !== null && (
                     <div className="mt-2.5 rounded-[16px] bg-pm-paper px-4 py-3.5">
-                      <p className={kompakt ? 'mb-3 text-[15px] font-semibold text-pm-ink' : `${EYEBROW} mb-3`}>Was bleibt für Sie übrig</p>
+                      <p className={k ? 'mb-3 text-[15px] font-semibold text-pm-ink' : `${EYEBROW} mb-3`}>Was bleibt für Sie übrig</p>
                       <div className="space-y-3">
                         <div className="flex items-baseline justify-between gap-4">
                           <span className={`${grund} flex-shrink-0 text-pm-muted`}>Betreuung</span>
@@ -2955,7 +2985,7 @@ const CustomerPortalPage: FC = () => {
                       </p>
                     </div>
                 )}
-                {kompakt && heimVergleich}
+                {k && heimVergleich}
 
                 <a
                   href="/primundus-mustervertrag.pdf"
@@ -2971,6 +3001,25 @@ const CustomerPortalPage: FC = () => {
                 </>)}
                 {/* Runde 30: Martins „Hemmnisnehmer" als Abschluss derselben Karte (keine eigene Überschrift mehr). */}
                 {angebotLook && <AngebotSicherheit onBestpreis={() => setBestpreisOffen(true)} />}
+                {neu && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOfferExpandedManual(false);
+                      setCostsExpanded(false);
+                      // Die Karte schrumpft um gut 600 px; ohne Rücksprung stünde der Kunde danach mitten in den Fragen.
+                      requestAnimationFrame(() => {
+                        const karte = document.getElementById('angebot');
+                        if (karte && karte.getBoundingClientRect().top < 0) karte.scrollIntoView({ block: 'start' });
+                      });
+                    }}
+                    aria-expanded={true}
+                    className="mt-4 w-full min-h-[48px] flex items-center justify-between gap-2 border-t border-pm-line pt-2 text-[16px] font-semibold text-pm-taupe-ink"
+                  >
+                    Weniger anzeigen
+                    <ChevronDown className="w-5 h-5 rotate-180 text-pm-taupe" aria-hidden="true" />
+                  </button>
+                )}
           </>
           )}
           </Card>
@@ -3371,7 +3420,7 @@ const CustomerPortalPage: FC = () => {
               // Bewerbungen kommen („Ihr Betreuungsportal" sagte nichts davon).
               frist: null as Date | null,
               title: 'Ihre Suche läuft',
-              subtitle: 'Sobald sich eine Pflegekraft bewirbt, bekommen Sie eine E\u2011Mail.',
+              subtitle: nachAbsendenNeu ? SUCHE_LAEUFT_SATZ : 'Sobald sich eine Pflegekraft bewirbt, bekommen Sie eine E\u2011Mail.',
               // Kein Pill (Martin, 13.08.): „unverbindlich" steht schon im
               // Satz darüber — die Zeile war eine Wiederholung.
               pill: '',
@@ -3418,10 +3467,10 @@ const CustomerPortalPage: FC = () => {
         // (paper), 20 px Rand wie alle Abschnitte; Begrüßung 16 px muted, Titel 30 px (bis 375 px: 28) in 700,
         // die Kostenkarte folgt mit 40 px Abstand (statt über der Kante zu liegen).
         return (
-          <div className={kompakt ? '' : 'bg-pm-shell'}>
-            <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-6' : `px-[18px] pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}`}>
+          <div className={kompakt || nachAbsendenNeu ? '' : 'bg-pm-shell'}>
+            <div className={`max-w-3xl mx-auto ${kompakt || nachAbsendenNeu ? 'px-5 pt-6' : `px-[18px] pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}`}>
               {/* Runde 22 (`?look=angebot`): Kopf wie ein Konto — Initialen, Begrüßung, „Ihr persönlicher Bereich". */}
-              {kompakt && KOMPAKT_LOOK === 'angebot' ? (
+              {(kompakt || nachAbsendenNeu) && KOMPAKT_LOOK === 'angebot' ? (
                 <AngebotPerson
                   name={heroNameLine}
                   kuerzel={lead && (lead.vorname || lead.nachname)
@@ -3435,7 +3484,7 @@ const CustomerPortalPage: FC = () => {
               )}
               {/* Kompakt-Einstieg (Runde 5): Titel wie der Betreff der Angebotsmail; höchstens zwei Zeilen —
                   „24-Stunden-Betreuung" bricht nicht um (sonst „24-" allein am Zeilenende). */}
-              <h1 className={kompakt
+              <h1 className={kompakt || nachAbsendenNeu
                 ? `${KOMPAKT_LOOK === 'angebot' ? 'mt-6 text-[28px] min-[376px]:text-[31px] font-extrabold leading-[1.1] tracking-[-0.035em]' : 'mt-2 text-[28px] min-[376px]:text-[30px] font-bold leading-[1.15] tracking-[-0.025em]'} text-pm-ink`
                 : 'mt-1 font-extrabold leading-[1.08] tracking-[-0.035em] text-pm-ink text-[31px]'}>
                 {kompakt ? (
@@ -3469,7 +3518,7 @@ const CustomerPortalPage: FC = () => {
                 </p>
               )}
               {heroCopy.subtitle && (
-                <p className="mt-3 text-[16px] leading-[1.55] text-pm-muted">
+                <p className={nachAbsendenNeu ? 'mt-4 text-pretty text-[17px] leading-[1.55] text-pm-body' : 'mt-3 text-[16px] leading-[1.55] text-pm-muted'}>
                   {heroCopy.subtitle}
                 </p>
               )}
@@ -3488,7 +3537,21 @@ const CustomerPortalPage: FC = () => {
 
       {/* ── Stand heute (Martin 25.09.): nach dem Absenden liegt diese Karte über
            der Kante des Kopfs, wie vorher die Kostenkarte. ── */}
-      {sucheLaeuft && (
+      {sucheLaeuft && nachAbsendenNeu && (
+        <div id="stand" className="max-w-3xl mx-auto px-5 pt-9 scroll-mt-20">
+          <AngebotAbschnitt id="so-geht-es-weiter" titel="So geht es weiter" className="">
+            <AngebotAblaufStand
+              passende={IS_PREVIEW_ANY || (mmReady && !matchingsLoadingOrError)
+                ? effectiveMatched.filter((m) => (nurseStatusById.get(m.caregiverId) ?? 'pending') !== 'declined').length
+                : null}
+              bisherigeBewerbungen={applications.length}
+              wunschstart={formularStart}
+              onAngaben={zurPflegesituation}
+            />
+          </AngebotAbschnitt>
+        </div>
+      )}
+      {sucheLaeuft && !nachAbsendenNeu && (
         <div id="stand" className="max-w-3xl mx-auto px-3.5 -mt-6 scroll-mt-24">
           <SucheStand
             // Abgelehnte zählen nicht als „gefunden" — sonst widerspräche die Zahl
@@ -3515,7 +3578,7 @@ const CustomerPortalPage: FC = () => {
       {/* Im Kompakt-Einstieg stehen die Profile und „Bereits bearbeitet" UNTER der Pflegekräfte-Karte
           (weiter unten); Bewerbungen und Interesse gibt es dort nicht. */}
       {!kompakt && (
-      <div className="max-w-3xl mx-auto px-3.5 pt-1 pb-6 space-y-4">
+      <div className={`max-w-3xl mx-auto ${nachAbsendenNeu ? 'px-5 pt-6 pb-2' : 'px-3.5 pt-1 pb-6'} space-y-4`}>
 
 
         {/* ── SECTION HEADER: Ihre Bewerbungen — NUR bei offenen
@@ -3577,6 +3640,14 @@ const CustomerPortalPage: FC = () => {
           {/* Kleine Abschnitts-Überschrift wie bei den Nachbarn (Martin,
               13.08.) — der Kasten hing vorher ohne Einordnung zwischen
               Kosten und Pflegekräften. */}
+          {nachAbsendenNeu ? (
+            <div className="pt-4">
+              <h2 className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">
+                {visibleInterests.length === 1 ? 'Interessierte Pflegekraft' : 'Interessierte Pflegekräfte'}
+              </h2>
+              <p className="mt-2 text-pretty text-[16px] leading-[1.55] text-pm-muted">{interesseText(visibleInterests.length)}</p>
+            </div>
+          ) : (<>
           <div className="px-1 pt-2">
             <h2 className={H2}>
               {visibleInterests.length === 1 ? 'Interessierte Pflegekraft' : 'Interessierte Pflegekräfte'}
@@ -3592,6 +3663,7 @@ const CustomerPortalPage: FC = () => {
               ? 'Diese Pflegekraft hat Ihre Anfrage gesehen und würde die Betreuung gerne übernehmen. Wenn Sie sie einladen, stößt ein Mitarbeiter von uns die offizielle Bewerbung an — für Sie ganz unverbindlich.'
               : 'Diese Pflegekräfte haben Ihre Anfrage gesehen und würden die Betreuung gerne übernehmen. Wenn Sie eine einladen, stößt ein Mitarbeiter von uns die offizielle Bewerbung an — für Sie ganz unverbindlich.'}
           </p>
+          </>)}
           {/* Eigener, hervorgehobener Kasten ÜBER den passenden Pflegekräften
              (Martin, 11.08.): Proaktives Interesse ist mehr wert als ein
              Matching — vorher lag es optisch gleichauf in derselben Liste und
@@ -3659,7 +3731,13 @@ const CustomerPortalPage: FC = () => {
              genau da, wo der Kunde landen soll. Deshalb KEIN zweiter Anker
              weiter unten: doppelte ids sind ungueltig, und getElementById
              nimmt ohnehin den ersten. */}
-        {!hasPending && (
+        {!hasPending && nachAbsendenNeu && (
+          <div className="pt-6" id="pflegekraefte" style={{scrollMarginTop:96}}>
+            <h2 className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">{EINLADEN_TITEL}</h2>
+            <p className="mt-2 text-pretty text-[16px] leading-[1.55] text-pm-muted">{EINLADEN_ZEILE}</p>
+          </div>
+        )}
+        {!hasPending && !nachAbsendenNeu && (
           <div className="px-1 pt-6" id="pflegekraefte" style={{scrollMarginTop:96}}>
             {/* Vor dem Absenden wieder der Wortlaut der guten Phase bis 24.09. (Registry #109,
                 Martin 02.10.: „4 ja“): Was „Einladen“ heißt und dass es nichts kostet und
@@ -3763,6 +3841,7 @@ const CustomerPortalPage: FC = () => {
                             onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
                             onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
                             globalInviteLocked={inviteInFlight}
+                            breit={nachAbsendenNeu}
                           />
                         );
                       });
@@ -3772,7 +3851,7 @@ const CustomerPortalPage: FC = () => {
                   {/* Beratungs-CTA — direkt unter den 3 Match-Karten.
                        Fängt Kunden ab die überfordert oder unsicher sind
                        und sonst still abspringen würden. */}
-                  {patientSaved && (
+                  {patientSaved && !nachAbsendenNeu && (
                     <div className="mt-4">
                       <BeratungCTA
                         headline="Unsicher bei der Auswahl?"
@@ -3843,9 +3922,12 @@ const CustomerPortalPage: FC = () => {
       </div>
       )}
 
+      {/* Fassung 31: nach dem Absenden steht das Angebot vor der Pflegesituation, wie vor dem Absenden. */}
+      {patientSaved && nachAbsendenNeu && angebotSection}
+
       {!hasPending && (
       <div>
-      <div className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'pt-10' : 'pt-10'}` : 'px-3.5 pt-1 pb-4 space-y-4'}`}>
+      <div className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'pt-10' : 'pt-10'}` : nachAbsendenNeu ? 'px-5 pb-2' : 'px-3.5 pt-1 pb-4 space-y-4'}`}>
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
              PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}
@@ -3896,7 +3978,7 @@ const CustomerPortalPage: FC = () => {
           // offen — nach dem Speichern ist es Referenz und fällt auf den
           // ruhigen Rahmen zurück.
           return (
-          <div id="patientendaten" className="px-1 pt-6 scroll-mt-24">
+          <div id="patientendaten" className={nachAbsendenNeu ? 'pt-10 scroll-mt-20' : 'px-1 pt-6 scroll-mt-24'}>
             {/* Ein Kopf (Teil 3, Entwurf v4): Eyebrow, Status, Titel, ein Satz. Titel
                 und Satz seit Registry #109 wieder wie bis 24.09. („Jetzt konkrete
                 Bewerbungen erhalten“, Strecke v2, 11.09.): der Nutzen in der
@@ -3923,10 +4005,14 @@ const CustomerPortalPage: FC = () => {
                   if (next) setTriggerOpenPatient(true);
                 }}
               >
+                {nachAbsendenNeu ? (
+                  <span className="min-w-0 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">Ihre Pflegesituation</span>
+                ) : (
                 <span className="min-w-0">
                   <span className={`block ${EYEBROW}`}>Für Ihre Bewerbungen</span>
                   <span className={`block mt-1.5 ${H2}`}>Pflegesituation</span>
                 </span>
+                )}
                 <span className="flex items-center gap-2 flex-shrink-0 pb-1">
                   <StatusBadge ton="fertig">✓ Vollständig</StatusBadge>
                   <ChevronDown className={`w-5 h-5 text-pm-taupe transition-transform duration-200 ${patientExpanded ? 'rotate-180' : ''}`} />
@@ -4249,10 +4335,10 @@ const CustomerPortalPage: FC = () => {
           13.08.). Der Kunde hat den Preis längst gesehen; jetzt ist die Seite
           sein Betreuungsportal, und oben gehören die Dinge hin, auf die er
           wartet. Als Referenz bleibt das Angebot vollständig erreichbar. */}
-      {patientSaved && angebotSection}
+      {patientSaved && !nachAbsendenNeu && angebotSection}
 
       {/* Kompakt-Einstieg (Runde 15): 20 px Rand, 40 px Abstand zum Abschnitt darüber, FAQ-Kopf ohne Eyebrow. */}
-      <div className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'pt-14' : 'pt-10'}` : 'px-3.5 pt-1'} pb-6 space-y-4`}>
+      <div className={`max-w-3xl mx-auto ${kompakt || nachAbsendenNeu ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'pt-14' : 'pt-10'}` : 'px-3.5 pt-1'} pb-6 space-y-4`}>
         {/* ── So geht es weiter · Häufige Fragen · Marta (Teil 3 des Redesigns).
              Schritt 1 = Pflegesituation gespeichert, Schritt 2 = Bewerbung da. ── */}
         {/* Nach dem Absenden ersetzt „Stand heute" diese Liste (Martin 25.09.).
@@ -4262,8 +4348,8 @@ const CustomerPortalPage: FC = () => {
             <SoGehtEsWeiter erledigt={[patientSaved, hasPending, false]} onVervollstaendigen={zurPflegesituation} />
           </div>
         )}
-        <div className={kompakt ? '' : 'pt-6'}>
-          <FaqListe ruhig={kompakt} karte={kompakt && KOMPAKT_LOOK === 'angebot'} />
+        <div className={kompakt || nachAbsendenNeu ? '' : 'pt-6'}>
+          <FaqListe ruhig={kompakt || nachAbsendenNeu} karte={(kompakt || nachAbsendenNeu) && KOMPAKT_LOOK === 'angebot'} />
         </div>
         <div className="pt-4">
           <MartaBox sterne={sterne} ohneVertrauen={kompakt && KOMPAKT_LOOK === 'angebot'} />

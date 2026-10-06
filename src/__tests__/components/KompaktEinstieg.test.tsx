@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, PflegekraftZeile, VERTRAUEN } from '../../components/portal/KompaktEinstieg';
+import { ABLAUF, AngebotAblaufStand, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, PflegekraftZeile, STAND_TITEL_1, VERTRAUEN, interesseText, standSchritt2 } from '../../components/portal/KompaktEinstieg';
 import type { Nurse } from '../../types';
 
 const basis: Nurse = {
@@ -250,5 +250,51 @@ describe('KompaktPflegekraefteBereich', () => {
     expect(screen.queryByRole('region')).toBeNull();
     expect(screen.queryByText((_, el) => el?.tagName === 'P' && el.textContent === 'Ihre Pflegesituation ist noch nicht vollständig')).toBeNull();
     expect(screen.queryByText('Zeilen')).toBeNull();
+  });
+});
+
+// Fassung 31: „So geht es weiter" NACH dem Absenden — dieselben drei Schritte mit Stand (Texte OpenAI mutig30).
+describe('AngebotAblaufStand', () => {
+  it('Schritt 1 abgehakt mit Weg zu den Angaben, Schritt 2 läuft mit der Zahl der Pflegekräfte, Schritt 3 wie vor dem Absenden plus Wunschstart', async () => {
+    const onAngaben = vi.fn();
+    render(<AngebotAblaufStand passende={4} wunschstart="2026-10-15" onAngaben={onAngaben} />);
+    const schritte = screen.getAllByRole('listitem');
+    expect(schritte).toHaveLength(3);
+    expect(within(schritte[0]).getByText(STAND_TITEL_1)).toBeInTheDocument();
+    expect(within(schritte[0]).getByLabelText('erledigt')).toBeInTheDocument();
+    expect(schritte[1]).toHaveAttribute('aria-current', 'step');
+    expect(schritte[1].textContent).toContain('Für Ihre Pflegesituation gibt es aktuell 4 passende Pflegekräfte.');
+    expect(schritte[2].textContent).toContain(ABLAUF[2].text);
+    expect(schritte[2].textContent).toContain('Ihr Wunschstart: 15.10.');
+    await userEvent.click(within(schritte[0]).getByRole('button', { name: /Angaben ansehen oder ändern/ }));
+    expect(onAngaben).toHaveBeenCalledTimes(1);
+  });
+
+  it('ohne Wunschstart keine Startzeile; keine Reservierungsfrist, keine Zeitzusage', () => {
+    render(<AngebotAblaufStand passende={null} wunschstart={null} onAngaben={() => {}} />);
+    expect(screen.queryByText(/Wunschstart/)).toBeNull();
+    expect(screen.queryByText(/72|Stunden|Tagen\b.*melde/)).toBeNull();
+  });
+});
+
+describe('standSchritt2', () => {
+  it('ohne Zahl oder bei 0 nur der Satz zur E-Mail, nie eine geratene Zahl', () => {
+    expect(standSchritt2(null, 0)).toBe('Jede Bewerbung sehen Sie hier im Portal und erhalten sie per E\u2011Mail.');
+    expect(standSchritt2(0, 0)).toBe('Jede Bewerbung sehen Sie hier im Portal und erhalten sie per E\u2011Mail.');
+  });
+  it('Einzahl und Mehrzahl', () => {
+    expect(standSchritt2(1, 0)).toContain('aktuell 1 passende Pflegekraft.');
+    expect(standSchritt2(1, 1)).toBe('Sie haben bisher eine Bewerbung erhalten. Jede weitere sehen Sie hier im Portal und erhalten sie per E\u2011Mail.');
+    expect(standSchritt2(5, 3)).toContain('Sie haben bisher 3 Bewerbungen erhalten.');
+  });
+});
+
+describe('interesseText', () => {
+  it('Einzahl und Mehrzahl, ohne Gedankenstrich und ohne „stößt … an"', () => {
+    expect(interesseText(1)).toBe('Diese Pflegekraft hat Ihre Anfrage gesehen und möchte die Betreuung übernehmen. Laden Sie sie ein, dann bereiten wir ihre Bewerbung vor.');
+    expect(interesseText(2)).toContain('Diese Pflegekräfte haben Ihre Anfrage gesehen');
+    for (const t of [interesseText(1), interesseText(3)]) {
+      expect(t).not.toMatch(/—|stößt/);
+    }
   });
 });

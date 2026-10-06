@@ -6,6 +6,8 @@ const STERN = 'M10 1.6l2.47 5.2 5.7.72-4.2 3.93 1.08 5.64L10 14.3l-5.05 2.79 1.0
 
 // `klein` (nur Kompakt-Einstieg, Sternzeile unter dem Testsieger-Siegel der Kostenkarte): 12-px-Sterne,
 // Text 12,5 / 13,5 / 14 px (360 / 375 / ab 390 px) — so bleibt die Zeile bei 24 px Innenabstand einzeilig.
+// Fassung 31: ohne `whitespace-nowrap` — wo die Zeile nicht passt (Bewerbungskarte bei 360 px mit 20 px Seitenrand), bricht
+// der Text neben den Sternen um, statt über den Rand zu stehen. Wo sie passt, bleibt sie einzeilig.
 export function BewertungsZeile({ stand, className = '', klein = false }: { stand: SterneStand | null; className?: string; klein?: boolean }) {
   if (!stand) return null;
   const stern = klein ? 12 : 16;
@@ -14,7 +16,7 @@ export function BewertungsZeile({ stand, className = '', klein = false }: { stan
       href={ERFAHRUNGEN_URL}
       target="_blank"
       rel="noreferrer"
-      className={`inline-flex min-h-[44px] items-center ${klein ? 'gap-1' : 'gap-2'} whitespace-nowrap ${className}`}
+      className={`inline-flex min-h-[44px] items-center ${klein ? 'gap-1' : 'gap-2'} ${className}`}
     >
       <span className="inline-flex items-center gap-[2px]" aria-hidden="true">
         {[0, 1, 2, 3, 4].map((i) => {
