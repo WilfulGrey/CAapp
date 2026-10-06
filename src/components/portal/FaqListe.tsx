@@ -59,16 +59,74 @@ export const FAQ: { q: string; a: ReactNode }[] = [
   { q: 'Kann ich die Pflegesachleistungen der Pflegekasse dafür einsetzen?', a: 'Nein — die 24-Stunden-Betreuung zählt nicht als Pflegesachleistung; diese sind zugelassenen ambulanten Pflegediensten vorbehalten. Sie nutzen stattdessen die Geldleistungen Ihrer Pflegekasse, allen voran das Pflegegeld. Welche Leistungen in Ihrer Situation zusammenkommen, sehen Sie in Ihrem Angebot unter „Alle Kosten im Überblick".' },
 ];
 
+/**
+ * Look „angebot" (Runde 32, Martin 06.10. zu Fassung 26: „wie es funktioniert … kann weiter unten oder zu den Fragen:
+ * Voraussetzung, normaler Ablauf, was übernehmen die Pflegekräfte/Pflegedienste. Das fehlt sonst"): drei Grundfragen
+ * direkt nach den Deutsch-Niveaus (Martin 13.08.: die zuerst). Die Ablauf-Frage ersetzt „Wie lange bleibt die
+ * Pflegekraft …" („nahtlos") und „Was passiert, wenn die Pflegekraft ausfällt?" („umgehend" — Ersatz nur „schnellstmöglich,
+ * in der Regel innerhalb von 3 Tagen", Mustervertrag § 1 Nr. 4, Martin 01.10.). Fakten: Mustervertrag Anlage 2 (Grundpflege:
+ * Körperpflege, Ernährung, Mobilität; Haushalt: Einkaufen, Kochen, Wäsche, Spaziergänge), Behandlungspflege ausgeschlossen;
+ * Zimmer, Grundausstattung und Pflegedienst im Wortlaut der Startseite primundus.de („Voraussetzungen"); „in der Regel direkt
+ * zu Ihnen nach Hause gebracht" und 6–8 Wochen (Martin 17.09.). OpenAI 06.10. (mutig21): „wohnt während des Einsatzes",
+ * „sorgen wir schnellstmöglich für Ersatz", „Verpflegung" nicht mit „Kost und Logis" gleichsetzen.
+ */
+export const FAQ_GRUNDFRAGEN: { q: string; a: string }[] = [
+  { q: 'Was übernimmt die Pflegekraft, was ein Pflegedienst?', a: 'Die Pflegekraft wohnt während des Einsatzes mit im Haus und hilft bei der Körperpflege, beim Essen und Trinken, beim Aufstehen und Gehen, im Haushalt, beim Einkaufen und bei Spaziergängen. Medizinische Behandlungspflege wie Spritzen oder Wundversorgung übernimmt ein ambulanter Pflegedienst.' },
+  { q: 'Was brauche ich zu Hause?', a: 'Ein eigenes, abschließbares Zimmer mit Bett für die Pflegekraft. Küche, Bad und ein Internetanschluss sollten vorhanden sein. Zimmer und Verpflegung stellen Sie, das ist mit „Kost und Logis“ im Angebot gemeint.' },
+  { q: 'Wie läuft die Betreuung ab?', a: 'Die Pflegekraft wird in der Regel direkt zu Ihnen nach Hause gebracht und bleibt meist 6 bis 8 Wochen. Den Wechsel zur nächsten Pflegekraft organisieren wir. Fällt eine Pflegekraft aus oder passt die Zusammenarbeit nicht, sorgen wir schnellstmöglich für Ersatz, in der Regel innerhalb von 3 Tagen.' },
+];
+const ERSETZT = ['Wie lange bleibt die Pflegekraft — und wie läuft der Wechsel?', 'Was passiert, wenn die Pflegekraft ausfällt?'];
+export const FAQ_ANGEBOT = [FAQ[0], ...FAQ_GRUNDFRAGEN, ...FAQ.slice(1).filter((x) => !ERSETZT.includes(x.q))];
+
 const SICHTBAR = 4;
 
-export function FaqListe() {
+/** `ruhig` (Kompakt-Einstieg, Runde 15): Kopf ohne Eyebrow im ruhigen H2-Stil; sonst unverändert.
+ *  `karte` (Look „angebot", Runde 27 — Martin zu Fassung 21: „die häufig gestellten Fragen sehen nicht gut aus … alles mit
+ *  diesem komischen Hintergrund"): die Fragen in einer weißen Karte mit Zeilen wie die Karten darüber, Pfeil statt Plus. */
+export function FaqListe({ ruhig = false, karte = false }: { ruhig?: boolean; karte?: boolean } = {}) {
   const [offen, setOffen] = useState<number | null>(null);
   const [alle, setAlle] = useState(false);
-  const liste = alle ? FAQ : FAQ.slice(0, SICHTBAR);
+  const quelle = karte ? FAQ_ANGEBOT : FAQ;
+  const liste = alle ? quelle : quelle.slice(0, SICHTBAR);
+  if (karte) {
+    // OpenAI 05.10. (mutig14): die Fragen leiser als die Karten darüber — mittleres Gewicht, kompaktere Zeilen.
+    const zeile = 'flex min-h-[52px] w-full items-center justify-between gap-4 px-5 py-3.5 text-left';
+    return (
+      <section aria-labelledby="faq-titel">
+        <h2 id="faq-titel" className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">Häufige Fragen</h2>
+        <div className="mt-4 overflow-hidden rounded-card border border-pm-line bg-white">
+          {liste.map((item, i) => {
+            const auf = offen === i;
+            return (
+              <div key={item.q} className={i > 0 ? 'border-t border-pm-line' : ''}>
+                <button type="button" onClick={() => setOffen(auf ? null : i)} aria-expanded={auf} className={zeile}>
+                  <span className="text-[15.5px] font-medium leading-[1.4] text-pm-ink">{item.q}</span>
+                  <ChevronDown className={`h-5 w-5 flex-none text-pm-taupe transition-transform ${auf ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </button>
+                {auf && (
+                  <div className="-mt-1 px-5 pb-5">
+                    {typeof item.a === 'string'
+                      ? <p className="text-[15px] leading-[1.65] text-pm-body whitespace-pre-line">{item.a}</p>
+                      : item.a}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {!alle && quelle.length > SICHTBAR && (
+            <button type="button" onClick={() => setAlle(true)} className={`${zeile} border-t border-pm-line text-[15.5px] font-semibold text-pm-taupe-ink`}>
+              {quelle.length - SICHTBAR} weitere Fragen
+              <ChevronDown className="h-5 w-5 flex-none text-pm-taupe" aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      </section>
+    );
+  }
   return (
     <section>
-      <SectionHeader eyebrow="Gut zu wissen" titel="Häufige Fragen" />
-      <div className="mt-3.5 border-b border-pm-line">
+      <SectionHeader eyebrow={ruhig ? undefined : 'Gut zu wissen'} titel="Häufige Fragen" ruhig={ruhig} />
+      <div className={`${ruhig ? 'mt-5' : 'mt-3.5'} border-b border-pm-line`}>
         {liste.map((item, i) => {
           const auf = offen === i;
           return (

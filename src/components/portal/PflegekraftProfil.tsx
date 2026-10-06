@@ -16,6 +16,15 @@ import { displayName, initials, nurseLevel } from './shared';
  *    drumherum.
  * Die ganze Fläche öffnet das Profil (Clarity 07.09.: tote Klicks auf Name und Stufe).
  */
+/** Deutsch als drei Punkte (Profil „V"); auch in den Zeilen des Kompakt-Einstiegs. */
+export const DeutschPunkte: FC<{ punkte: number }> = ({ punkte }) => (
+  <span className="inline-flex gap-[3px]" aria-hidden="true">
+    {[1, 2, 3].map((i) => (
+      <span key={i} className={`w-[9px] h-[9px] rounded-full ${i <= punkte ? 'bg-pm-taupe' : 'bg-pm-profil-linie'}`} />
+    ))}
+  </span>
+);
+
 export const PflegekraftProfil: FC<{
   nurse: Nurse;
   onProfil: () => void;
@@ -72,13 +81,7 @@ export const PflegekraftProfil: FC<{
           </p>
           {deutsch && (
             <p className="mt-1.5 flex items-center gap-1.5 text-[15px] text-pm-muted">
-              {punkte > 0 && (
-                <span className="inline-flex gap-[3px]" aria-hidden="true">
-                  {[1, 2, 3].map((i) => (
-                    <span key={i} className={`w-[9px] h-[9px] rounded-full ${i <= punkte ? 'bg-pm-taupe' : 'bg-pm-profil-linie'}`} />
-                  ))}
-                </span>
-              )}
+              {punkte > 0 && <DeutschPunkte punkte={punkte} />}
               Deutsch {deutsch.toLowerCase()}
             </p>
           )}

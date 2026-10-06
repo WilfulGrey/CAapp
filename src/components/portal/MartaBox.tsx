@@ -25,7 +25,9 @@ function Sterne({ wert }: { wert: number }) {
   );
 }
 
-export function MartaBox({ sterne }: { sterne: SterneStand | null }) {
+/** `ohneVertrauen` (Look „angebot", Runde 27): ohne Siegel und Sterne — die stehen dort oben, getrennt (Martin zu Fassung 20:
+ *  „die Sterne passen da nicht dazu … als würde das zusammengehören"). */
+export function MartaBox({ sterne, ohneVertrauen = false }: { sterne: SterneStand | null; ohneVertrauen?: boolean }) {
   return (
     <div className="rounded-card bg-white border border-[#EFEBE4] p-[18px]">
       <p className="text-[15px] font-bold text-pm-ink">Noch Fragen?</p>
@@ -52,6 +54,7 @@ export function MartaBox({ sterne }: { sterne: SterneStand | null }) {
           <WhatsAppIcon className="w-[22px] h-[22px]" />
         </a>
       </div>
+      {!ohneVertrauen && (<>
       <div className="mt-4 pt-3.5 border-t border-pm-line-soft flex items-center gap-3">
         <img src="/badge-testsieger.webp" alt="Testsieger DIE WELT" className="h-12 w-auto flex-none object-contain" />
         <p className="leading-[1.3]">
@@ -71,6 +74,7 @@ export function MartaBox({ sterne }: { sterne: SterneStand | null }) {
           <b className="text-pm-ink">{sterne.schnitt}</b> · <span className="underline underline-offset-2">{anzahlText(sterne.anzahl)}</span>
         </a>
       )}
+      </>)}
     </div>
   );
 }

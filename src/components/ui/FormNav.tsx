@@ -6,8 +6,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from './Button';
 
 export function FormNav({
-  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, zurueckAlsLink,
+  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, zurueckAlsLink, ruhig = false,
 }: {
+  /** Kompakt-Einstieg (Runde 15): im Hinweis-Kasten mit 24 px Innenabstand — Leiste bündig bis an den
+   *  Rand (-mx-6), Hauptknopf in 600 wie alle Knöpfe dort. Sonst unverändert. */
+  ruhig?: boolean;
   onZurueck?: () => void;
   /** Letzter Schritt: Hauptknopf allein über die volle Breite, „Zurück" als Textlink
    *  darunter (Martin 25.09.: „Bewerbungen anfragen" passte neben „Zurück" nicht). */
@@ -31,7 +34,7 @@ export function FormNav({
   }, []);
 
   return (
-    <div className={`${tastatur ? '' : 'sticky bottom-0'} z-10 -mx-5 px-5 pt-3.5 pb-[calc(16px+env(safe-area-inset-bottom))] bg-white border-t border-[#EFEBE4] rounded-b-card`}>
+    <div className={`${tastatur ? '' : 'sticky bottom-0'} z-10 ${ruhig ? '-mx-6 px-6' : '-mx-5 px-5'} pt-3.5 pb-[calc(16px+env(safe-area-inset-bottom))] bg-white border-t border-[#EFEBE4] rounded-b-card`}>
       {hinweis && <div className="mb-2.5 text-center text-[13.5px] text-pm-error-ink">{hinweis}</div>}
       <div className={onZurueck && !zurueckAlsLink ? 'grid grid-cols-[auto_1fr] gap-2.5' : ''}>
         {onZurueck && !zurueckAlsLink && (
@@ -39,7 +42,7 @@ export function FormNav({
             Zurück
           </Button>
         )}
-        <Button onClick={onWeiter} laedt={laedt} ladeText={ladeText} breit className="px-2 whitespace-nowrap">
+        <Button onClick={onWeiter} laedt={laedt} ladeText={ladeText} breit className={`px-2 whitespace-nowrap${ruhig ? ' !font-semibold' : ''}`}>
           {weiterText}
         </Button>
       </div>
