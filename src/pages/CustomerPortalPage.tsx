@@ -3656,7 +3656,15 @@ const CustomerPortalPage: FC = () => {
             && !!lead?.token
             && contractAppId !== null;
           return (
+            <div className="bg-pm-paper">
             <BookedScreen
+              kopf={{
+                name: lead ? customerSalutation(lead) : 'Herr Mustermann',
+                kuerzel: lead && (lead.vorname || lead.nachname)
+                  ? initials([lead.vorname, lead.nachname].filter(Boolean).join(' ').trim()).toUpperCase().slice(0, 2)
+                  : null,
+              }}
+              sterne={sterne}
               app={acceptedApp}
               onNurseClick={setSelectedNurse}
               vertragSigned={vertragSigned}
@@ -3678,6 +3686,7 @@ const CustomerPortalPage: FC = () => {
               // "📋 Einsatz beendet" statt "🎊 Vielen Dank gebucht".
               einsatzBeendet={IS_EINSATZ_BEENDET}
             />
+            </div>
           );
         })()
       ) : (

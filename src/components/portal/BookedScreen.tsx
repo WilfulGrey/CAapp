@@ -1,9 +1,18 @@
 import type { FC } from 'react';
+import { Check, FileText } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
+import type { SterneStand } from '../../lib/sterne';
 import { PflegekraftProfil } from './PflegekraftProfil';
 import { MonatsAufstellung } from './MonatsAufstellung';
+import { MartaBox } from './MartaBox';
+import { AngebotPerson } from './KompaktEinstieg';
+import { Button } from '../ui/Button';
 import { KOSTENRECHNER_URL } from '../../lib/leadEvents';
+
+// Fassung 34 (Martin 06.10.: „nur Kleinigkeiten, damit das einfach nur optisch zu dem anderen passt. Sonst ist das ja schon
+// gut."): derselbe Aufbau wie vor und nach dem Absenden — Kopf mit Initialen und großem Titel links statt Emoji, Abschnitte mit
+// Überschrift, „Als Nächstes“ als Schritte in einer Karte (Kreise statt Emojis), Marta am Ende. Die Texte bleiben.
 
 export const BookedScreen: FC<{
   app: Application;
@@ -29,7 +38,11 @@ export const BookedScreen: FC<{
   // "📋 Einsatz beendet" + Datums-Zeile. Folge-Einsatz-Milestone fliegt
   // ebenfalls raus (gibt's für abgeschlossene Einsätze nicht mehr).
   einsatzBeendet?: boolean;
-}> = ({ app, onNurseClick, onSignContract, vertragSigned, leadId, leadToken, onShowContract, einsatzBeendet }) => {
+  /** Fassung 34: Kopf wie auf den anderen Bildschirmen (Anrede und Initialen). */
+  kopf?: { name: string | null; kuerzel: string | null };
+  /** Fassung 34: Marta am Ende, mit Siegel und Sternen (wie nach dem Absenden). `undefined` = kein Kasten. */
+  sterne?: SterneStand | null;
+}> = ({ app, onNurseClick, onSignContract, vertragSigned, leadId, leadToken, onShowContract, einsatzBeendet, kopf, sterne }) => {
   const { nurse, offer } = app;
 
   const milestones = einsatzBeendet
@@ -65,13 +78,13 @@ export const BookedScreen: FC<{
       ];
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-5" style={{ animation: 'fadeIn 0.4s ease-out' }}>
-      <div className="text-center py-4">
-        <div className="text-5xl mb-3">{einsatzBeendet ? '📋' : '🎊'}</div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-1.5">
+    <div className="max-w-3xl mx-auto px-5 pt-6 pb-10" style={{ animation: 'fadeIn 0.4s ease-out' }}>
+      <div>
+        {kopf && <AngebotPerson name={kopf.name} kuerzel={kopf.kuerzel} />}
+        <h1 className={`${kopf ? 'mt-6' : ''} text-[28px] min-[376px]:text-[31px] font-extrabold leading-[1.1] tracking-[-0.035em] text-pm-ink`}>
           {einsatzBeendet ? 'Einsatz beendet' : 'Vielen Dank — Pflegekraft gebucht!'}
         </h1>
-        <p className="text-sm text-gray-600 leading-relaxed">
+        <p className="mt-4 text-pretty text-[17px] leading-[1.55] text-pm-body">
           {einsatzBeendet
             ? `Der Einsatz vom ${offer.anreisedatum} bis ${offer.abreisedatum} ist abgeschlossen. Ihre Unterlagen bleiben jederzeit zugänglich.`
             : vertragSigned
@@ -83,20 +96,28 @@ export const BookedScreen: FC<{
       </div>
 
       {/* Ihre Pflegekraft: dasselbe geschlossene Profil wie überall (Martin 27.09.2026, „V"). */}
-      <PflegekraftProfil nurse={nurse} onProfil={() => onNurseClick(nurse)} />
+      <div className="mt-8">
+        <PflegekraftProfil nurse={nurse} onProfil={() => onNurseClick(nurse)} />
+      </div>
 
       {app.coverMessage && (
-        <div className="rounded-2xl bg-[#F5F5F6] border border-[#E9E9EB] px-4 py-3">
-          <p className="text-[11px] font-semibold text-[#8B7355] uppercase tracking-wide mb-1.5">Hinweis der Agentur</p>
-          <p className="text-sm leading-relaxed text-gray-700 italic">„{app.coverMessage}"</p>
+        <div className="mt-4 rounded-card border border-pm-line bg-white px-5 py-4">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.06em] text-pm-taupe-ink">Hinweis der Agentur</p>
+          <p className="mt-1.5 text-pretty text-[15px] leading-[1.55] text-pm-body italic">„{app.coverMessage}"</p>
         </div>
       )}
 
-      <MonatsAufstellung offer={offer} />
+      <section className="mt-10">
+        <MonatsAufstellung offer={offer} abschnitt />
+      </section>
 
-      <div className="space-y-2.5">
-        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider px-1">Als nächstes</p>
-        {milestones.map((m) => {
+      <section aria-labelledby="als-naechstes" className="mt-10">
+        <h2 id="als-naechstes" className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">
+          {/* Beendeter Einsatz: nichts folgt mehr, der Abschnitt zeigt nur noch den Vertrag (Fassung 34, Vorschlag). */}
+          {einsatzBeendet ? 'Ihre Unterlagen' : 'Als Nächstes'}
+        </h2>
+        <ol className="mt-4 grid gap-5 rounded-card border border-pm-line bg-white px-5 py-5">
+        {milestones.map((m, i) => {
           const isVertrag = m.title === 'Vertrag';
           // !einsatzBeendet als Gürtel+Hosenträger: für abgeschlossene
           // Einsätze gibt es keinen nachholbaren Vertragsschritt mehr.
@@ -120,69 +141,87 @@ export const BookedScreen: FC<{
           // separater Download-Zeile) waren beide zu umständlich.
           if (vertragDone && pdfUrl) {
             return (
-              <div key={m.title} className="bg-white border border-[#2A9D5C]/40 rounded-2xl px-4 py-3.5 flex items-start gap-3.5 shadow-sm">
-                <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0 text-lg">✅</div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                    <p className="text-sm font-bold text-gray-800">{m.title}</p>
-                    <span className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">✓ Unterschrieben</span>
+              <li key={m.title} className="flex gap-4">
+                <span className={`${KREIS} bg-pm-mint text-pm-green-deep`}>
+                  <Check className="h-4 w-4" strokeWidth={3} aria-label="erledigt" />
+                </span>
+                <div className="min-w-0 pt-[3px]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className={TITEL}>{m.title}</p>
+                    <span className={`${CHIP} bg-pm-mint text-pm-green-deep`}>✓ Unterschrieben</span>
                   </div>
-                  <p className="text-sm text-gray-500 leading-relaxed mb-1.5">
+                  <p className={TEXT}>
                     Ihr unterschriebener Dienstleistungsvertrag. Eine Kopie haben Sie auch per E-Mail erhalten.
                   </p>
                   <a
                     href={pdfUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="-my-2.5 inline-flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-[#1f7a45] hover:underline"
+                    className="-mb-3 -mt-1 inline-flex min-h-[44px] items-center gap-1.5 text-[15px] font-semibold text-pm-taupe-ink hover:text-pm-ink"
                   >
-                    📄 Vertrag
+                    <FileText className="h-4 w-4" aria-hidden="true" />
+                    Vertrag
                   </a>
                 </div>
-              </div>
+              </li>
             );
           }
 
           return (
-            <div key={m.title} className={`bg-white border rounded-2xl px-4 py-3.5 flex items-start gap-3.5 shadow-sm ${vertragActionable ? 'border-[#2A9D5C]/40' : 'border-gray-200'}`}>
-              <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 text-lg">
-                {vertragDone ? '✅' : m.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <p className="text-sm font-bold text-gray-800">{m.title}</p>
+            <li key={m.title} className="flex gap-4" aria-current={vertragActionable ? 'step' : undefined}>
+              <span
+                aria-hidden={!vertragDone}
+                className={`${KREIS} ${vertragDone ? 'bg-pm-mint text-pm-green-deep' : vertragActionable ? 'bg-pm-coral text-white' : 'bg-pm-shell text-pm-taupe-ink'}`}
+              >
+                {vertragDone ? <Check className="h-4 w-4" strokeWidth={3} aria-label="erledigt" /> : i + 1}
+              </span>
+              <div className="min-w-0 pt-[3px]">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className={TITEL}>{m.title}</p>
                   {vertragDone ? (
-                    <span className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">✓ Unterschrieben</span>
+                    <span className={`${CHIP} bg-pm-mint text-pm-green-deep`}>✓ Unterschrieben</span>
                   ) : vertragActionable ? (
-                    <span className="text-xs font-bold text-[#2A9D5C] bg-[#2A9D5C]/10 border border-[#2A9D5C]/30 px-2 py-0.5 rounded-full">Offen</span>
+                    <span className={`${CHIP} bg-pm-coral-tint text-pm-coral-ink`}>Offen</span>
                   ) : (
-                    <span className="text-xs font-bold text-gray-400 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">Folgt</span>
+                    <span className={`${CHIP} bg-pm-shell text-pm-taupe-ink`}>Folgt</span>
                   )}
                 </div>
-                <p className="text-sm text-gray-500 leading-relaxed">
+                <p className={TEXT}>
                   {vertragDone ? 'Ihr Vertrag ist online unterschrieben. Eine Kopie wurde Ihnen per E-Mail gesendet — Sie können ihn jederzeit hier ansehen.'
                     : vertragActionable ? 'Bitte schließen Sie noch Ihren Betreuungsvertrag ab.'
                     : m.desc}
                 </p>
                 {vertragActionable && (
-                  <button onClick={onSignContract}
-                    className="mt-2.5 inline-flex items-center gap-1.5 rounded-xl bg-[#2A9D5C] hover:bg-[#248a50] text-white text-sm font-bold px-4 py-2.5 transition-colors">
+                  <Button onClick={onSignContract} groesse="sm" className="mt-3">
                     Vertrag jetzt abschließen →
-                  </button>
+                  </Button>
                 )}
                 {/* Fallback: wenn keine leadId/Token verfügbar (sollte nicht
                     passieren, aber Defensive UI) → alter Modal-Weg. */}
                 {vertragDone && onShowContract && (
                   <button onClick={onShowContract}
-                    className="mt-2.5 inline-flex items-center gap-1.5 rounded-xl border border-[#2A9D5C]/40 bg-white hover:bg-green-50 text-[#1f7a45] text-sm font-bold px-4 py-2.5 transition-colors">
-                    📄 Unterschriebenen Vertrag ansehen →
+                    className="-mb-3 -mt-1 inline-flex min-h-[44px] items-center gap-1.5 text-[15px] font-semibold text-pm-taupe-ink hover:text-pm-ink">
+                    <FileText className="h-4 w-4" aria-hidden="true" />
+                    Unterschriebenen Vertrag ansehen →
                   </button>
                 )}
               </div>
-            </div>
+            </li>
           );
         })}
-      </div>
+        </ol>
+      </section>
+
+      {sterne !== undefined && (
+        <div className="mt-10">
+          <MartaBox sterne={sterne} />
+        </div>
+      )}
     </div>
   );
 };
+
+const KREIS = 'flex h-8 w-8 flex-none items-center justify-center rounded-full text-[15px] font-semibold tabular-nums';
+const TITEL = 'text-[17px] font-semibold leading-[1.3] text-pm-ink';
+const TEXT = 'mt-1 text-pretty text-[15px] leading-[1.5] text-pm-muted';
+const CHIP = 'rounded-full px-2.5 py-0.5 text-[13px] font-semibold';

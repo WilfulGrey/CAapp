@@ -4,9 +4,12 @@ import { buildMonthlyBreakdown, computeZuschlagRelevance } from './konditionen';
 
 // Einsatz-Zeitraum (Anreise/Abreise) + monatliche Kosten-Zusammenfassung.
 // Nutzt dieselbe Berechnung wie die Bewerbungsprüfung (konditionen.ts).
-export const MonatsAufstellung: FC<{ offer: OfferDetails; title?: string }> = ({
+export const MonatsAufstellung: FC<{ offer: OfferDetails; title?: string; abschnitt?: boolean }> = ({
   offer,
   title = 'Einsatz-Zeitraum & Kosten',
+  // Fassung 34: auf dem Gebucht-Bildschirm als Abschnitt mit Überschrift wie „Als Nächstes" (im Dialog „Angebot prüfen"
+  // bleibt die kleine Zeile).
+  abschnitt = false,
 }) => {
   const tagessatz = Math.round(offer.monatlicheKosten / 30);
   const summary = buildMonthlyBreakdown(
@@ -21,10 +24,17 @@ export const MonatsAufstellung: FC<{ offer: OfferDetails; title?: string }> = ({
 
   return (
     <div>
+      {abschnitt ? (
+        <div className="mb-4">
+          <h2 className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">{title}</h2>
+          <p className="mt-1 text-[15px] tabular-nums text-pm-muted">Tagessatz {tagessatz} €/Tag</p>
+        </div>
+      ) : (
       <div className="flex items-center justify-between mb-2">
         <p className="text-sm font-bold text-gray-700">{title}</p>
         <p className="text-xs text-gray-400">Tagessatz {tagessatz} €/Tag</p>
       </div>
+      )}
       <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100">
         <div className="flex items-center justify-between px-4 py-2.5 bg-white">
           <span className="text-sm text-gray-500">Anreise</span>
