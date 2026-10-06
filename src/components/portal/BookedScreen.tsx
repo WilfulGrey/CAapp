@@ -157,7 +157,7 @@ export const BookedScreen: FC<{
                     href={pdfUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="-mb-3 inline-flex min-h-[44px] items-center gap-1.5 text-[15px] font-semibold text-pm-taupe-ink hover:text-pm-ink"
+                    className="-mb-3 -mt-1 inline-flex min-h-[44px] items-center gap-1.5 text-[15px] font-semibold text-pm-taupe-ink hover:text-pm-ink"
                   >
                     <FileText className="h-4 w-4" aria-hidden="true" />
                     Vertrag
@@ -200,7 +200,7 @@ export const BookedScreen: FC<{
                     passieren, aber Defensive UI) → alter Modal-Weg. */}
                 {vertragDone && onShowContract && (
                   <button onClick={onShowContract}
-                    className="-mb-3 inline-flex min-h-[44px] items-center gap-1.5 text-[15px] font-semibold text-pm-taupe-ink hover:text-pm-ink">
+                    className="-mb-3 -mt-1 inline-flex min-h-[44px] items-center gap-1.5 text-[15px] font-semibold text-pm-taupe-ink hover:text-pm-ink">
                     <FileText className="h-4 w-4" aria-hidden="true" />
                     Unterschriebenen Vertrag ansehen →
                   </button>
