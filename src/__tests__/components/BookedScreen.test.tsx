@@ -137,7 +137,7 @@ describe('BookedScreen — Fassung 34', () => {
 
   it('Einleitung nennt Marta (Fassung 35, Martin 06.10.: „Marta Kapcio oder ein Kollege meldet sich … viel persönlicher“)', () => {
     render(<BookedScreen app={makeApp()} onNurseClick={() => {}} vertragSigned />);
-    expect(screen.getByText(/Marta\sKapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen/)).toBeTruthy();
+    expect(screen.getByText(/Marta\sKapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen, um die Anreise zu besprechen\./)).toBeTruthy();
     expect(screen.queryByText(/^Ihr Vertrag ist unterschrieben\. Jemand/)).toBeNull();
   });
 

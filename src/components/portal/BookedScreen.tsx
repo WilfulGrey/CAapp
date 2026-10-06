@@ -88,7 +88,7 @@ export const BookedScreen: FC<{
           {einsatzBeendet
             ? `Der Einsatz vom ${offer.anreisedatum} bis ${offer.abreisedatum} ist abgeschlossen. Ihre Unterlagen bleiben jederzeit zugänglich.`
             : vertragSigned
-              ? 'Ihr Vertrag ist unterschrieben. Marta\u00a0Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen, um die Anreise zu organisieren.'
+              ? 'Ihr Vertrag ist unterschrieben. Marta\u00a0Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen, um die Anreise zu besprechen.'
               : onSignContract
                 ? 'Ihre Pflegekraft ist gebucht. Bitte schließen Sie noch Ihren Betreuungsvertrag ab — alles Weitere übernimmt das Primundus-Team.'
                 : 'Wir bereiten Ihre Vertragsdokumente vor. Marta\u00a0Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen.'}
