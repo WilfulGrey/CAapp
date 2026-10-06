@@ -288,13 +288,20 @@ export function AngebotSicherheit({ onBestpreis }: { onBestpreis: () => void }) 
    72-Stunden-Satz („unnötig"); Schritt 3 „Sie wählen eine Pflegekraft aus, unterzeichnen online den Vertrag und wir kümmern
    uns um den Rest", Anreise ab 3 Tagen bleibt, aber „der Kunde gibt ja schon ein Datum ein" → „richtet sich nach Ihrem
    Wunschtermin". OpenAI 06.10. (mutig23): „Laden Sie diejenigen ein" statt „wer Ihnen zusagt", kein Komma vor „und wir". */
+/* Runde 34 (Martin 06.10. zu Fassung 28: „Vielleicht müssen wir doch Pflegesituation vervollständigen und Pflegekräfte
+   einladen als einen Punkt … Bewerbungen erhalten: Nachdem Sie die Patientendaten vervollständigt haben, erhalten Sie
+   Bewerbungen von passenden Pflegekräften hier und per E-Mail"): Die Pflegesituation ist damit Teil von Schritt 1, kein
+   eigener Schritt. Titel mit „ergänzen" (gemessen: zwei Zeilen bei 360 bis 414 px, mit „vervollständigen" drei). Die Zeit
+   („etwa 2 Minuten, vieles ist schon ausgefüllt") steht im Achtung-Hinweis, hier nicht noch einmal. OpenAI (mutig24). */
+export const ABLAUF_TITEL_1 = 'Pflegesituation ergänzen und Pflegekräfte einladen';
 export const ABLAUF = [
-  { titel: 'Pflegekräfte einladen', text: 'Weiter unten sehen Sie bereits passende Pflegekräfte. Laden Sie diejenigen ein, die Ihnen zusagen. Das ist kostenlos und unverbindlich.' },
-  { titel: 'Bewerbungen erhalten', text: 'Passende Pflegekräfte bewerben sich bei Ihnen mit Foto und Erfahrung.' },
+  { titel: ABLAUF_TITEL_1, text: 'Ergänzen Sie weiter unten die Angaben zur Pflegesituation. Danach laden Sie die Pflegekräfte ein, die Ihnen zusagen. Das ist kostenlos und unverbindlich.' },
+  { titel: 'Bewerbungen erhalten', text: 'Sobald Ihre Angaben vollständig sind, erhalten Sie Bewerbungen passender Pflegekräfte, hier im Portal und per E-Mail.' },
   { titel: 'Auswählen und starten', text: 'Sie wählen eine Pflegekraft aus, unterschreiben den Vertrag online und wir kümmern uns um den Rest. Die Anreise richtet sich nach Ihrem Wunschtermin und ist schon ab 3 Tagen möglich.' },
 ] as const;
 
-export function AngebotAblauf() {
+/** `onErsterSchritt`: Link unter Schritt 1 („Pflegesituation ergänzen ›") öffnet das Formular im Achtung-Hinweis. */
+export function AngebotAblauf({ onErsterSchritt }: { onErsterSchritt?: () => void }) {
   return (
     <ol className="grid gap-5">
       {ABLAUF.map((schritt, i) => (
@@ -310,15 +317,16 @@ export function AngebotAblauf() {
           <div className="min-w-0 pt-[3px]">
             <p className="text-[17px] font-semibold leading-[1.3] text-pm-ink">{schritt.titel}</p>
             <p className="mt-1 text-pretty text-[15px] leading-[1.5] text-pm-muted">{schritt.text}</p>
-            {/* Runde 31 (Martin zu Fassung 25: „Pflegekräfte einladen. Da muss natürlich auch ein Link hin"): Sprung zum
-                Abschnitt „Pflegekräfte einladen" weiter unten. */}
+            {/* Runde 31 (Martin zu Fassung 25: „da muss natürlich auch ein Link hin"); seit Runde 34 heißt er wie der erste
+                Teil des Schritts und öffnet das Formular (OpenAI mutig24: „Pflegekräfte ansehen" führte zuerst auf den
+                Achtung-Hinweis). Ohne Handler springt er zum Abschnitt. */}
             {i === 0 && (
               <button
                 type="button"
-                onClick={() => document.getElementById('pflegekraefte')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                onClick={() => (onErsterSchritt ? onErsterSchritt() : document.getElementById('pflegekraefte')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))}
                 className="-mb-3 -mt-1 inline-flex min-h-[44px] items-center text-[15px] font-semibold text-pm-taupe-ink hover:text-pm-ink"
               >
-                Pflegekräfte ansehen&nbsp;›
+                Pflegesituation ergänzen&nbsp;›
               </button>
             )}
           </div>
@@ -425,14 +433,15 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
             Hinweis direkt unter der Überschrift (nur solange Angaben fehlen). id `pflegekraefte` = Sprungziel
             `goto=matches`; id `patientendaten` = Sprungziel `goto=anfragen` und aller Knöpfe ins Formular. */}
         <AngebotAbschnitt id="so-geht-es-weiter" titel="So geht es weiter" className="">
-          <AngebotAblauf />
+          {/* Wie `zurPflegesituation` im Kompakt-Einstieg: ohne Animation zum Hinweis, dann aufklappen (WebKit, Registry #102). */}
+          <AngebotAblauf onErsterSchritt={() => { hinweis.current?.scrollIntoView({ block: 'start' }); onOeffnen(); }} />
         </AngebotAbschnitt>
         <section aria-labelledby="pflegekraefte" className="mt-10">
           {/* Runde 31 (Martin: „Warum ist die Überschrift dann nicht Pflegekräfte einladen … damit das auch zu dem So geht's
               weiter Punkt passt"): Titel und Zahl wie Schritt 1. */}
           <div className="flex items-center gap-3">
             <span aria-hidden="true" className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-pm-coral text-[15px] font-semibold tabular-nums text-white">1</span>
-            <h2 id="pflegekraefte" className="scroll-mt-20 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">Pflegekräfte einladen</h2>
+            <h2 id="pflegekraefte" className="scroll-mt-20 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">{ABLAUF_TITEL_1}</h2>
           </div>
           <div ref={hinweis} id="patientendaten" className="mt-4 scroll-mt-20">
             {/* Runde 24 (Martin zu Fassung 18: „Achtung, auch Symbol"): Warnzeichen in Bernstein, „Achtung" vorn im Titel. */}
