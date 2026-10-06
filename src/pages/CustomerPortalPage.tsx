@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotEinleitung, AngebotEnthalten, AngebotKopfleiste, AngebotLeistung, AngebotPerson, AngebotSicherheit, AngebotSterne, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { AngebotBeschreibung, AngebotEinleitung, AngebotKopfleiste, AngebotLeistung, AngebotPerson, AngebotSicherheit, AngebotSterne, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2730,7 +2730,7 @@ const CustomerPortalPage: FC = () => {
                         <>
                           <AngebotKopfleiste datum={angebotDatum(lead?.created_at)} />
                           <AngebotLeistung fuer={angebotFuer((lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined)} />
-                          <AngebotEnthalten />
+                          <AngebotBeschreibung />
                         </>
                       )}
                       <p className={`${angebotLook ? 'mt-5 border-t border-pm-line pt-5 ' : ''}flex items-baseline gap-2 whitespace-nowrap`}>

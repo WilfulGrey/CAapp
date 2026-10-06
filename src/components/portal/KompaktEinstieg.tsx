@@ -17,7 +17,7 @@
 // Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
 // Pflegekräfte — so bleibt sie bei 390 px einzeilig.
 import { useEffect, useRef, type ReactNode } from 'react';
-import { AlertTriangle, BadgeCheck, Check, ChevronRight, FileText, Home, RefreshCw, Sparkles, UserRound } from 'lucide-react';
+import { AlertTriangle, Check, ChevronRight, FileText, Sparkles, UserRound } from 'lucide-react';
 import { GARANTIE_PORTAL } from '../../lib/garantie';
 import { HERO_PUNKTE } from '../../lib/heroPunkte';
 import type { Nurse } from '../../types';
@@ -123,11 +123,14 @@ export function AngebotPerson({ name, kuerzel }: { name: string | null; kuerzel:
 export const EINLEITUNG_ABSATZ = 'Gerne übernehmen wir die Rund-um-Betreuung. Unsere Pflegekräfte sind direkt bei uns angestellt, ohne Vermittler, und wir kümmern uns um die komplette Abwicklung von Anfang bis Ende.';
 export const EINLEITUNG_TESTSIEGER = 'Für unseren Service hat uns DIE WELT nun zum sechsten Mal in Folge als Testsieger ausgezeichnet.';
 /**
- * Runde 29 (Martin 06.10. zu Fassung 23: „wir müssen im normalen Angebot bleiben, also was bekomme ich, was kostet das,
- * Hemmnisnehmer und dann die next Steps … klar machen, was ich bekomme und wie der Ablauf ist"): die Einleitung nennt
- * genau diese Abschnitte, die darunter folgen.
+ * Runde 31 (Martin 06.10. zu Fassung 25: „Gerne übernehmen wir … Hier sehen Sie, was Sie bekommen. Das hört sich schlecht
+ * an, der Satz ist miserabel. Das musst du mit OpenAI besser machen."): zurück zu seinem eigenen Entwurf vom 05.10.
+ * („Gerne übernehmen wir die Rund-um-Betreuung. Unsere Pflegekräfte sind bei uns angestellt und wir übernehmen die
+ * komplette Abwicklung von Anfang bis Ende."), dazu der Nutzen aus seinem Wort vom 20.09. („Entlastung der Angehörigen").
+ * „kümmern uns um" statt des zweiten „übernehmen" (OpenAI 05.10., mutig11). OpenAI 06.10. (mutig19): Nutzen in die
+ * Einleitung, keine ankündigenden Sätze („Hier sehen Sie …"). „Ihre Familie" passt auch, wenn der Leser selbst betreut wird.
  */
-export const EINLEITUNG = 'Gerne übernehmen wir die Rund-um-Betreuung, von Anfang bis Ende. Hier sehen Sie, was Sie bekommen, was es kostet und wie es weitergeht.';
+export const EINLEITUNG = 'Gerne übernehmen wir die Rund-um-Betreuung und entlasten Ihre Familie. Unsere Pflegekräfte sind bei uns angestellt, und wir kümmern uns um die komplette Abwicklung von Anfang bis Ende.';
 
 /** „Rund-um-Betreuung" bricht nie am Bindestrich um. */
 function ohneTrennung(text: string) {
@@ -237,41 +240,17 @@ export function AngebotKopfleiste({ datum }: { datum: string | null }) {
 }
 
 /**
- * „Das bekommen Sie" (Runde 30, Martins „was bekomme ich"): drei Punkte statt fünf Sätzen, jeder mit eigenem Inhalt —
- * nichts, was die vier festen Punkte, die Preiszeile, „So geht es weiter" oder Martas Kasten schon sagen (die alten
- * Sätze zu Vermittler, Ansprechpartnerin und Auswahl standen dort doppelt). Fakten: wohnt im Haushalt; Grundpflege und
- * Haushalt (Mustervertrag Anlage 2); „bei uns angestellt" (Martin 30.09.); Anreise und Wechsel organisieren wir; Ersatz
- * „in der Regel innerhalb von 3 Tagen", auch wenn es nicht passt (Mustervertrag § 1 Nr. 4, Martin 01.10.).
- * OpenAI 06.10. (mutig17): Nutzen zuerst mit fetten Anfangswörtern; kein „1:1" (Angebote für zwei Personen), kein „nachts".
- * mutig18: „legal und sozialversichert" (Martin 05.10.: „legal, ohne Vermittler"; Mustervertrag § 9), „wenn die Zusammenarbeit
- * nicht passt" statt „wenn es nicht passt".
+ * Leistung in der Angebotskarte (Runde 31, Martin zu Fassung 25: „Das bekommen Sie finde ich total schlecht … bei uns
+ * angestellt und plötzlich Anreise und Wechsel organisieren wir, das ist alles Mist"): zwei Sätze wie in einem
+ * Angebotsschreiben, ohne Zwischenzeile und ohne „Wort: Satz". Wer kommt und was sie tut, dann was passiert, wenn es
+ * hakt. „Bei uns angestellt" und die Abwicklung stehen in der Einleitung, hier nicht noch einmal. Fakten: wohnt im
+ * Haushalt; Grundpflege und Haushalt (Mustervertrag Anlage 2); Ersatz „in der Regel innerhalb von 3 Tagen", auch wenn es
+ * nicht passt (Mustervertrag § 1 Nr. 4, Martin 01.10.). Eine Pflegekraft auch bei zwei Personen.
  */
-export const ENTHALTEN = [
-  { titel: 'Ihre Pflegekraft', text: 'wohnt bei Ihnen und hilft bei Körperpflege, Essen, Haushalt und Einkauf.' },
-  { titel: 'Bei uns angestellt', text: 'legal und sozialversichert. Anreise und Wechsel organisieren wir.' },
-  { titel: 'Ersatz', text: 'bei Ausfall oder wenn die Zusammenarbeit nicht passt, in der Regel innerhalb von 3 Tagen.' },
-] as const;
-const ENTHALTEN_SYMBOL = [Home, BadgeCheck, RefreshCw] as const;
+export const BESCHREIBUNG = 'Eine Pflegekraft wohnt bei Ihnen und hilft bei Körperpflege, Essen, Haushalt und Einkauf. Fällt sie aus oder passt die Zusammenarbeit nicht, kommt in der Regel innerhalb von 3 Tagen Ersatz.';
 
-export function AngebotEnthalten() {
-  return (
-    <div className="mt-5">
-      <p className="text-[12.5px] font-semibold uppercase tracking-[0.08em] text-pm-taupe-ink">Das bekommen Sie</p>
-      <ul className="mt-3 grid gap-3">
-        {ENTHALTEN.map(({ titel, text }, i) => {
-          const Symbol = ENTHALTEN_SYMBOL[i];
-          return (
-            <li key={titel} className="flex items-start gap-3 text-[15.5px] leading-[1.45] text-pm-body">
-              <span aria-hidden="true" className="mt-px flex h-[26px] w-[26px] flex-none items-center justify-center rounded-[8px] bg-pm-shell text-pm-taupe-ink">
-                <Symbol className="h-[15px] w-[15px]" strokeWidth={2} />
-              </span>
-              <span><b className="font-semibold text-pm-ink">{titel}:</b> {text}</span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
+export function AngebotBeschreibung() {
+  return <p className="mt-3 text-pretty text-[16px] leading-[1.55] text-pm-body">{BESCHREIBUNG}</p>;
 }
 
 /** Haken-Kachel 20 px wie `AngebotKonditionen` (gemessen: so bleibt „Täglich kündbar, taggenau abgerechnet" bei 390 px einzeilig). */
@@ -342,6 +321,17 @@ export function AngebotAblauf() {
           <div className="min-w-0 pt-[3px]">
             <p className="text-[17px] font-semibold leading-[1.3] text-pm-ink">{schritt.titel}</p>
             <p className="mt-1 text-pretty text-[15px] leading-[1.5] text-pm-muted">{schritt.text}</p>
+            {/* Runde 31 (Martin zu Fassung 25: „Pflegekräfte einladen. Da muss natürlich auch ein Link hin"): Sprung zum
+                Abschnitt „Pflegekräfte einladen" weiter unten. */}
+            {i === 0 && (
+              <button
+                type="button"
+                onClick={() => document.getElementById('pflegekraefte')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className="-mb-3 -mt-1 inline-flex min-h-[44px] items-center text-[15px] font-semibold text-pm-taupe-ink hover:text-pm-ink"
+              >
+                Pflegekräfte ansehen&nbsp;›
+              </button>
+            )}
           </div>
         </li>
       ))}
@@ -449,7 +439,12 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
           <AngebotAblauf />
         </AngebotAbschnitt>
         <section aria-labelledby="pflegekraefte" className="mt-10">
-          <h2 id="pflegekraefte" className="scroll-mt-20 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">Ihre passenden Pflegekräfte</h2>
+          {/* Runde 31 (Martin: „Warum ist die Überschrift dann nicht Pflegekräfte einladen … damit das auch zu dem So geht's
+              weiter Punkt passt"): Titel und Zahl wie Schritt 1. */}
+          <div className="flex items-center gap-3">
+            <span aria-hidden="true" className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-pm-coral text-[15px] font-semibold tabular-nums text-white">1</span>
+            <h2 id="pflegekraefte" className="scroll-mt-20 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">Pflegekräfte einladen</h2>
+          </div>
           <div ref={hinweis} id="patientendaten" className="mt-4 scroll-mt-20">
             {/* Runde 24 (Martin zu Fassung 18: „Achtung, auch Symbol"): Warnzeichen in Bernstein, „Achtung" vorn im Titel. */}
             <Card className="px-5 py-4">
