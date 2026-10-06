@@ -292,10 +292,11 @@ export function AngebotSicherheit({ onBestpreis }: { onBestpreis: () => void }) 
    einladen als einen Punkt … Bewerbungen erhalten: Nachdem Sie die Patientendaten vervollständigt haben, erhalten Sie
    Bewerbungen von passenden Pflegekräften hier und per E-Mail"): Die Pflegesituation ist damit Teil von Schritt 1, kein
    eigener Schritt. Titel mit „ergänzen" (gemessen: zwei Zeilen bei 360 bis 414 px, mit „vervollständigen" drei). Die Zeit
-   („etwa 2 Minuten, vieles ist schon ausgefüllt") steht im Achtung-Hinweis, hier nicht noch einmal. OpenAI (mutig24). */
+   („etwa 2 Minuten, vieles ist schon ausgefüllt") steht im Achtung-Hinweis, hier nicht noch einmal. OpenAI (mutig24/25): „zur
+   Bewerbung ein" (sonst klangen Einladen und Bewerben wie zwei Abläufe), Text und Link mit „vervollständigen" wie der Knopf. */
 export const ABLAUF_TITEL_1 = 'Pflegesituation ergänzen und Pflegekräfte einladen';
 export const ABLAUF = [
-  { titel: ABLAUF_TITEL_1, text: 'Ergänzen Sie weiter unten die Angaben zur Pflegesituation. Danach laden Sie die Pflegekräfte ein, die Ihnen zusagen. Das ist kostenlos und unverbindlich.' },
+  { titel: ABLAUF_TITEL_1, text: 'Vervollständigen Sie weiter unten die Angaben zur Pflegesituation. Danach laden Sie Pflegekräfte, die Ihnen zusagen, zur Bewerbung ein. Das ist kostenlos und unverbindlich.' },
   { titel: 'Bewerbungen erhalten', text: 'Sobald Ihre Angaben vollständig sind, erhalten Sie Bewerbungen passender Pflegekräfte, hier im Portal und per E-Mail.' },
   { titel: 'Auswählen und starten', text: 'Sie wählen eine Pflegekraft aus, unterschreiben den Vertrag online und wir kümmern uns um den Rest. Die Anreise richtet sich nach Ihrem Wunschtermin und ist schon ab 3 Tagen möglich.' },
 ] as const;
@@ -326,7 +327,7 @@ export function AngebotAblauf({ onErsterSchritt }: { onErsterSchritt?: () => voi
                 onClick={() => (onErsterSchritt ? onErsterSchritt() : document.getElementById('pflegekraefte')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))}
                 className="-mb-3 -mt-1 inline-flex min-h-[44px] items-center text-[15px] font-semibold text-pm-taupe-ink hover:text-pm-ink"
               >
-                Pflegesituation ergänzen&nbsp;›
+                Jetzt vervollständigen&nbsp;›
               </button>
             )}
           </div>
