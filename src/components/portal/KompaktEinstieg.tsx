@@ -145,12 +145,14 @@ export function AngebotEinleitung() {
  * Siegel mit Überschrift und dem Satz zur Auszeichnung (Runde 26, Martin: „daneben machen mit dieser Überschrift"); seit
  * Runde 28 als Beleg direkt unter dem Preis statt in der Einleitung, damit die Empfehlung in den ersten Bildschirm rückt.
  */
+/* Runde 33 (Martin zu Fassung 27: „das Testsiegersiegel würde ich einen Tick größer machen … damit das von oben und unten
+   passt"): unter der Einleitung 85 px hoch, so hoch wie Überschrift und Satz daneben (gemessen bei 360 bis 414 px). */
 export function AngebotTestsieger({ className = 'mt-6', klein = false }: { className?: string; klein?: boolean }) {
   return (
     <div className={`${className} flex items-center ${klein ? 'gap-3.5' : 'gap-4'}`}>
       {/* Siegel antippbar: Quelle und Einordnung stehen auf der Testsieger-Seite. */}
       <a href="https://primundus.de/testsieger-24-stunden-pflege" target="_blank" rel="noreferrer" className="flex-none" aria-label="Testsieger DIE WELT: Quelle ansehen">
-        <img src="/badge-testsieger.webp" alt="" className={`${klein ? 'h-[60px]' : 'h-[76px]'} w-auto object-contain`} />
+        <img src="/badge-testsieger.webp" alt="" className={`${klein ? 'h-[85px]' : 'h-[76px]'} w-auto object-contain`} />
       </a>
       <div className="min-w-0">
         <p className={`${klein ? 'text-[15px]' : 'text-[15.5px]'} font-semibold leading-[1.35] text-pm-ink`}>
@@ -281,10 +283,15 @@ export function AngebotSicherheit({ onBestpreis }: { onBestpreis: () => void }) 
  * „So geht es weiter" (Runde 29, Martin: „wie der Ablauf ist" — untereinander, nicht als Leiste): drei Schritte mit den
  * freigegebenen Sätzen (02.10.). Die Pflegesituation ist KEIN Schritt; sie steht als Achtung darunter.
  */
+/* Runde 33 (Martin 06.10. zu Fassung 27, diktiert): Schritt 1 „Wir haben Ihnen bereits unten passende Pflegekräfte
+   angezeigt. Laden Sie diese ein, die Ihnen zusagen"; Schritt 2 ohne Anreisedatum („das wissen wir"), ohne Preis und ohne
+   72-Stunden-Satz („unnötig"); Schritt 3 „Sie wählen eine Pflegekraft aus, unterzeichnen online den Vertrag und wir kümmern
+   uns um den Rest", Anreise ab 3 Tagen bleibt, aber „der Kunde gibt ja schon ein Datum ein" → „richtet sich nach Ihrem
+   Wunschtermin". OpenAI 06.10. (mutig23): „Laden Sie diejenigen ein" statt „wer Ihnen zusagt", kein Komma vor „und wir". */
 export const ABLAUF = [
-  { titel: 'Pflegekräfte einladen', text: 'Gefällt Ihnen eine Pflegekraft, laden Sie sie ein, sich bei Ihnen zu bewerben. Das ist kostenlos und unverbindlich.' },
-  { titel: 'Bewerbungen erhalten', text: 'Passende Pflegekräfte bewerben sich bei Ihnen mit Foto, Erfahrung, Anreisedatum und Preis. Jede Bewerbung ist 72 Stunden für Sie reserviert.' },
-  { titel: 'Auswählen und starten', text: 'Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen und im Portal unterschreiben. Anreise schon ab 3 Tagen möglich.' },
+  { titel: 'Pflegekräfte einladen', text: 'Weiter unten sehen Sie bereits passende Pflegekräfte. Laden Sie diejenigen ein, die Ihnen zusagen. Das ist kostenlos und unverbindlich.' },
+  { titel: 'Bewerbungen erhalten', text: 'Passende Pflegekräfte bewerben sich bei Ihnen mit Foto und Erfahrung.' },
+  { titel: 'Auswählen und starten', text: 'Sie wählen eine Pflegekraft aus, unterschreiben den Vertrag online und wir kümmern uns um den Rest. Die Anreise richtet sich nach Ihrem Wunschtermin und ist schon ab 3 Tagen möglich.' },
 ] as const;
 
 export function AngebotAblauf() {
