@@ -40,9 +40,6 @@ import { SectionHeader } from '../ui/SectionHeader';
 export type KompaktLook = 'ruhig' | 'angebot';
 const SUCHE = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 export const KOMPAKT_LOOK: KompaktLook = SUCHE?.get('look') === 'angebot' ? 'angebot' : 'ruhig';
-/** Runde 26: neben dem Siegel die fette Zeile „6× in Folge Testsieger DIE WELT" (Martin: „daneben machen mit dieser
- *  Überschrift"; OpenAI 05.10.: trifft seine Worte und wirkt professioneller). Nur zur Abnahme `&siegel=ohne`: ohne die Zeile. */
-const SIEGEL_MIT_KOPF = SUCHE?.get('siegel') !== 'ohne';
 
 /** „05.10.2026" (Berliner Kalendertag) aus dem Anlagezeitpunkt der Anfrage; ohne gültiges Datum nichts. Der Preis wird
  *  in derselben Sekunde berechnet und als „Ihr Angebot" verschickt, darum „Ihr Angebot vom …" (OpenAI 05.10.). */
@@ -124,8 +121,21 @@ export function AngebotPerson({ name, kuerzel }: { name: string | null; kuerzel:
  */
 export const EINLEITUNG_ABSATZ = 'Gerne übernehmen wir die Rund-um-Betreuung. Unsere Pflegekräfte sind direkt bei uns angestellt, ohne Vermittler, und wir kümmern uns um die komplette Abwicklung von Anfang bis Ende.';
 export const EINLEITUNG_TESTSIEGER = 'Für unseren Service hat uns DIE WELT nun zum sechsten Mal in Folge als Testsieger ausgezeichnet.';
-export const EINLEITUNG_ENDE = 'Unten finden Sie Ihre Kosten mit unserer Bestpreisgarantie und passende Pflegekräfte, die aktuell verfügbar sind.';
-export const EINLEITUNG_ENDE_OHNE_KRAEFTE = 'Unten finden Sie Ihre Kosten mit unserer Bestpreisgarantie.';
+const ZAHLWORT = ['', 'eine', 'zwei', 'drei', 'vier', 'fünf'];
+/**
+ * Runde 28 (Martin 06.10. zu Fassung 22: „nicht aufgebaut wie ein psychologisch gutes Angebot mit Fokus auf die
+ * Pflegekräfte"): der zweite Absatz führt direkt zur Empfehlung darunter. `anzahl` = sichtbare Vorschläge (null = noch
+ * nicht geladen, 0 = keine — dann entfällt der Absatz; nie eine Aussage über Kräfte, die nicht da sind).
+ */
+export function auswahlSatz(anzahl: number | null): string {
+  // Ohne Vorschläge Martins voller Absatz (keine Aussage über Kräfte, die nicht da sind).
+  if (anzahl === 0) return EINLEITUNG_ABSATZ;
+  const n = anzahl !== null && anzahl >= 1 && anzahl <= 5 ? anzahl : null;
+  const auswahl = n === 1
+    ? 'Für Sie haben wir eine passende Pflegekraft ausgewählt, direkt bei uns angestellt und aktuell verfügbar.'
+    : `Für Sie haben wir ${n ? `${ZAHLWORT[n]} ` : ''}passende Pflegekräfte ausgewählt, alle direkt bei uns angestellt und aktuell verfügbar.`;
+  return `Gerne übernehmen wir die Rund-um-Betreuung, von Anfang bis Ende. ${auswahl} Sie entscheiden, wer zu Ihnen kommt.`;
+}
 
 /** „Rund-um-Betreuung" bricht nie am Bindestrich um. */
 function ohneTrennung(text: string) {
@@ -134,31 +144,32 @@ function ohneTrennung(text: string) {
 }
 
 /**
- * `teil="anfang"`: Absatz zur Leistung, dann der Testsieger-Satz mit dem Siegel daneben (Runde 26, Martin zu Fassung 20:
- * „das Siegel passt natürlich zu ‚für unseren Service hat uns DIE WELT' … kannst du daneben machen"). `teil="ende"`:
- * „Unten finden Sie …" direkt über den Kosten.
+ * Runde 28: EIN Absatz, der direkt zur Empfehlung darunter führt (Martins Kernaussagen: Rund-um-Betreuung von Anfang bis
+ * Ende, direkt bei uns angestellt, aktuell verfügbar; dazu „Sie entscheiden, wer zu Ihnen kommt"). So steht das Foto der
+ * Empfehlung im ersten Bildschirm.
  */
-export function AngebotEinleitung({ teil, ohneKraefte = false }: { teil: 'anfang' | 'ende'; ohneKraefte?: boolean }) {
-  const absatz = 'text-pretty text-[17px] leading-[1.55] text-pm-body';
-  if (teil === 'ende') return <p className={`mt-6 ${absatz}`}>{ohneKraefte ? EINLEITUNG_ENDE_OHNE_KRAEFTE : EINLEITUNG_ENDE}</p>;
+export function AngebotEinleitung({ anzahl }: { anzahl: number | null }) {
+  return <p className="mt-5 text-pretty text-[17px] leading-[1.55] text-pm-body">{ohneTrennung(auswahlSatz(anzahl))}</p>;
+}
+
+/**
+ * Siegel mit Überschrift und dem Satz zur Auszeichnung (Runde 26, Martin: „daneben machen mit dieser Überschrift"); seit
+ * Runde 28 als Beleg direkt unter dem Preis statt in der Einleitung, damit die Empfehlung in den ersten Bildschirm rückt.
+ */
+export function AngebotTestsieger() {
   return (
-    <>
-      <p className={`mt-5 ${absatz}`}>{ohneTrennung(EINLEITUNG_ABSATZ)}</p>
-      <div className="mt-5 flex items-center gap-4">
-        {/* Siegel antippbar: Quelle und Einordnung stehen auf der Testsieger-Seite. */}
-        <a href="https://primundus.de/testsieger-24-stunden-pflege" target="_blank" rel="noreferrer" className="flex-none" aria-label="Testsieger DIE WELT: Quelle ansehen">
-          <img src="/badge-testsieger.webp" alt="" className={`${SIEGEL_MIT_KOPF ? 'h-[76px]' : 'h-[60px]'} w-auto object-contain`} />
-        </a>
-        <div className="min-w-0">
-          {SIEGEL_MIT_KOPF && (
-            <p className="text-[15.5px] font-semibold leading-[1.35] text-pm-ink">
-              6× in Folge Testsieger <span className="whitespace-nowrap">DIE WELT</span>
-            </p>
-          )}
-          <p className={SIEGEL_MIT_KOPF ? 'mt-1 text-pretty text-[15px] leading-[1.5] text-pm-muted' : absatz}>{EINLEITUNG_TESTSIEGER}</p>
-        </div>
+    <div className="mt-6 flex items-center gap-4">
+      {/* Siegel antippbar: Quelle und Einordnung stehen auf der Testsieger-Seite. */}
+      <a href="https://primundus.de/testsieger-24-stunden-pflege" target="_blank" rel="noreferrer" className="flex-none" aria-label="Testsieger DIE WELT: Quelle ansehen">
+        <img src="/badge-testsieger.webp" alt="" className="h-[76px] w-auto object-contain" />
+      </a>
+      <div className="min-w-0">
+        <p className="text-[15.5px] font-semibold leading-[1.35] text-pm-ink">
+          6× in Folge Testsieger <span className="whitespace-nowrap">DIE WELT</span>
+        </p>
+        <p className="mt-1 text-pretty text-[15px] leading-[1.5] text-pm-muted">{EINLEITUNG_TESTSIEGER}</p>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -298,12 +309,13 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
     // Einsatz nicht) und den Pflegekräften in der Karte des Portals (MatchCard „V", wie nach dem Absenden), danach die
     // Schritte 3 und 4 als je ein Satz. Hinweis-Karte = Sprungziel `goto=anfragen`, das Formular klappt darin auf.
     return (
-      <section aria-labelledby="pflegekraefte">
+      <section aria-labelledby="so-geht-es-weiter">
         {/* Runde 27 (Martin zu Fassung 21: „So geht es weiter würde ich gar nicht in vier Punkte machen … der nächste Schritt
             ist Pflegekräfte einladen … Sie können Pflegekräfte einladen, um Bewerbungen zu erhalten, und zur Not das Profil
             noch ausfüllen, falls es nicht vorhanden ist … ansonsten reicht das"): eine Überschrift, ein Absatz, bei fehlenden
-            Angaben der Achtung-Kasten, dann die Pflegekräfte. id `pflegekraefte` = Sprungziel `goto=matches`. */}
-        <h2 id="pflegekraefte" className="scroll-mt-20 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">So geht es weiter</h2>
+            Angaben der Achtung-Kasten, dann die Pflegekräfte. Seit Runde 28 steht die Empfehlung oben (Sprungziel
+            `pflegekraefte` dort), hier die übrigen. */}
+        <h2 id="so-geht-es-weiter" className="scroll-mt-20 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">So geht es weiter</h2>
         <p className="mt-3 text-pretty text-[17px] leading-[1.55] text-pm-body">{SO_GEHT_ES_WEITER}</p>
         <div ref={hinweis} id="patientendaten" className="mt-5 scroll-mt-20">
           {/* Runde 24 (Martin zu Fassung 18: „dann kommt dieser Achtung, würde ich das nennen … also Achtung, auch Symbol"):

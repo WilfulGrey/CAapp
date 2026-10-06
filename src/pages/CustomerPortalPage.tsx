@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotEinleitung, AngebotKonditionen, AngebotKopf, AngebotLeistung, AngebotPerson, AngebotSterne, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { AngebotEinleitung, AngebotKonditionen, AngebotKopf, AngebotLeistung, AngebotPerson, AngebotSterne, AngebotTestsieger, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2959,6 +2959,8 @@ const CustomerPortalPage: FC = () => {
           </>
           )}
           </Card>
+          {/* Runde 28: Auszeichnung als Beleg direkt am Preis (vorher in der Einleitung). */}
+          {angebotLook && <AngebotTestsieger />}
         </div>
         );
       })();
@@ -3020,6 +3022,45 @@ const CustomerPortalPage: FC = () => {
       ? [pendingNurses[bestIdx], ...pendingNurses.filter((_, idx) => idx !== bestIdx)]
       : pendingNurses;
     return { allVisible, heldInvites, visibleNurses };
+  })();
+
+  // Runde 28 (Look „angebot", Martin 06.10.: „Fokus auf die Pflegekräfte"): die Empfehlung steht direkt unter der Einleitung,
+  // die übrigen Vorschläge unter „So geht es weiter". Dieselbe Karte wie im Portal (MatchCard „V"). `geladen`: echte Liste da.
+  const kartenGeladen = !listeLaedt && (IS_PREVIEW_ANY || (mmReady && !!mmMatchings?.data));
+  const angebotKarten = (() => {
+    const { visibleNurses } = pflegekraftAuswahl;
+    let recIdx = -1;
+    let recBest = -Infinity;
+    visibleNurses.forEach(({ nurse, status }, idx) => {
+      if (status !== 'pending') return;
+      const sc = nurseBadgeScore(nurse.history?.assignments);
+      if (sc > recBest) { recBest = sc; recIdx = idx; }
+    });
+    const karte = (idx: number) => {
+      const { nurse, i, status } = visibleNurses[idx];
+      return (
+        <MatchCard
+          profilFehlt={!patientSaved}
+          key={`k-${i}`}
+          nurse={nurse}
+          status={status}
+          isRecommended={idx === recIdx}
+          onNurseClick={() => openNurseFromMatch(nurse, i)}
+          onStufeClick={() => { setNurseModalStufe(true); openNurseFromMatch(nurse, i); }}
+          onInvite={() => canInviteNurse(i)}
+          onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
+          onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
+          globalInviteLocked={inviteInFlight}
+        />
+      );
+    };
+    const obenIdx = visibleNurses.length ? (recIdx >= 0 ? recIdx : 0) : -1;
+    return {
+      oben: obenIdx >= 0 ? karte(obenIdx) : null,
+      // Vorname der Empfehlung für den Satz unter ihrem Knopf („… dann kann sich Ewa bei Ihnen bewerben").
+      obenVorname: obenIdx >= 0 ? (displayName(visibleNurses[obenIdx].nurse.name).split(' ')[0] || null) : null,
+      rest: visibleNurses.map((_, idx) => idx).filter((idx) => idx !== obenIdx).map(karte),
+    };
   })();
 
   // ── SECTION: Bereits bearbeitet ──
@@ -3398,9 +3439,27 @@ const CustomerPortalPage: FC = () => {
                       vier Schritten steht erst unter dem Angebot (KompaktPflegekraefteBereich). */}
                   {/* Runde 26: Sterne unter dem Titel, das Siegel steht neben dem Testsieger-Satz der Einleitung. */}
                   <AngebotSterne sterne={sterne} />
-                  <AngebotEinleitung teil="anfang" />
-                  {/* Kurzfassung nur, wenn die echte Liste geladen und leer ist — sonst springt der Satz beim Laden um. */}
-                  <AngebotEinleitung teil="ende" ohneKraefte={!listeLaedt && mmReady && !!mmMatchings?.data && pflegekraftAuswahl.allVisible.length === 0} />
+                  <AngebotEinleitung anzahl={kartenGeladen ? pflegekraftAuswahl.visibleNurses.length : null} />
+                  {/* Runde 28: die Empfehlung im ersten Bildschirm; bis die Liste da ist, der Lade-Hinweis an derselben Stelle.
+                      id `pflegekraefte` = Sprungziel `goto=matches` (Mail „Pflegekräfte ansehen") — landet bei der Empfehlung. */}
+                  <div id="pflegekraefte" className="scroll-mt-20">
+                  {!kartenGeladen ? (
+                    <div className="mt-6">
+                      <KompaktePflegekraefte eintraege={[]} laedt alleBearbeitet={false} keineVorschlaege={false} onProfil={openNurseFromMatch} telefonHref={TELEFON_HREF} />
+                    </div>
+                  ) : angebotKarten.oben && (
+                    <div className="mt-6">
+                      {angebotKarten.oben}
+                      {/* OpenAI 06.10. (mutig15): der erste Knopf klingt nach Arbeit — direkt darunter, was er bringt und
+                          was er kostet (sonst steht das erst im Achtung-Kasten weiter unten). */}
+                      {!patientSaved && (
+                        <p className="mt-3 text-center text-[14.5px] leading-[1.45] text-pm-muted">
+                          Kostenlos und unverbindlich. Dauert etwa 2&nbsp;Minuten, dann kann sich {angebotKarten.obenVorname ?? 'die Pflegekraft'} bei Ihnen bewerben.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  </div>
                 </>
               ) : kompakt && <KompaktEinleitung />}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
@@ -3808,38 +3867,10 @@ const CustomerPortalPage: FC = () => {
           offen={formImKasten}
           onOeffnen={() => setFormImKasten(true)}
           onImBlick={setFormularImBlick}
-          liste={KOMPAKT_LOOK === 'angebot' && !listeLaedt && pflegekraftAuswahl.visibleNurses.length > 0 ? (
-            // Runde 23 (Martin 05.10.: „die Pflegekraftdarstellung muss stimmig sein und zum Portal passen"): die
-            // Karten wie nach dem Absenden, mit derselben Empfehlung; solange die Pflegesituation fehlt, führt
-            // „Profil vervollständigen & einladen" ins Formular im Hinweis darüber (canInviteNurse).
-            <div className="space-y-3">
-              {(() => {
-                const { visibleNurses } = pflegekraftAuswahl;
-                let recIdx = -1;
-                let recBest = -Infinity;
-                visibleNurses.forEach(({ nurse, status }, idx) => {
-                  if (status !== 'pending') return;
-                  const sc = nurseBadgeScore(nurse.history?.assignments);
-                  if (sc > recBest) { recBest = sc; recIdx = idx; }
-                });
-                return visibleNurses.map(({ nurse, i, status }, idx) => (
-                  <MatchCard
-                    profilFehlt={!patientSaved}
-                    key={`k-${i}`}
-                    nurse={nurse}
-                    status={status}
-                    isRecommended={idx === recIdx}
-                    onNurseClick={() => openNurseFromMatch(nurse, i)}
-                    onStufeClick={() => { setNurseModalStufe(true); openNurseFromMatch(nurse, i); }}
-                    onInvite={() => canInviteNurse(i)}
-                    onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
-                    onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
-                    globalInviteLocked={inviteInFlight}
-                  />
-                ));
-              })()}
-            </div>
-          ) : (
+          liste={KOMPAKT_LOOK === 'angebot' && kartenGeladen && pflegekraftAuswahl.visibleNurses.length > 0 ? (
+            // Runde 28: die Empfehlung steht oben unter der Einleitung, hier die übrigen Vorschläge (MatchCard wie im Portal).
+            <div className="space-y-3">{angebotKarten.rest}</div>
+          ) : KOMPAKT_LOOK === 'angebot' && !kartenGeladen ? null : (
             <KompaktePflegekraefte
               eintraege={pflegekraftAuswahl.visibleNurses}
               laedt={listeLaedt}
