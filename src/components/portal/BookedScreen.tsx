@@ -112,7 +112,10 @@ export const BookedScreen: FC<{
       </section>
 
       <section aria-labelledby="als-naechstes" className="mt-10">
-        <h2 id="als-naechstes" className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">Als Nächstes</h2>
+        <h2 id="als-naechstes" className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">
+          {/* Beendeter Einsatz: nichts folgt mehr, der Abschnitt zeigt nur noch den Vertrag (Fassung 34, Vorschlag). */}
+          {einsatzBeendet ? 'Ihre Unterlagen' : 'Als Nächstes'}
+        </h2>
         <ol className="mt-4 grid gap-5 rounded-card border border-pm-line bg-white px-5 py-5">
         {milestones.map((m, i) => {
           const isVertrag = m.title === 'Vertrag';
