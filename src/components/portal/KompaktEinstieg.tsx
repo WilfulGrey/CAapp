@@ -17,7 +17,7 @@
 // Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
 // Pflegekräfte — so bleibt sie bei 390 px einzeilig.
 import { useEffect, useRef, type ReactNode } from 'react';
-import { AlertTriangle, Check, ChevronRight, Sparkles, UserRound } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, Check, ChevronRight, FileText, Home, RefreshCw, Sparkles, UserRound } from 'lucide-react';
 import { GARANTIE_PORTAL } from '../../lib/garantie';
 import { HERO_PUNKTE } from '../../lib/heroPunkte';
 import type { Nurse } from '../../types';
@@ -143,18 +143,18 @@ export function AngebotEinleitung() {
  * Siegel mit Überschrift und dem Satz zur Auszeichnung (Runde 26, Martin: „daneben machen mit dieser Überschrift"); seit
  * Runde 28 als Beleg direkt unter dem Preis statt in der Einleitung, damit die Empfehlung in den ersten Bildschirm rückt.
  */
-export function AngebotTestsieger({ className = 'mt-6' }: { className?: string }) {
+export function AngebotTestsieger({ className = 'mt-6', klein = false }: { className?: string; klein?: boolean }) {
   return (
-    <div className={`${className} flex items-center gap-4`}>
+    <div className={`${className} flex items-center ${klein ? 'gap-3.5' : 'gap-4'}`}>
       {/* Siegel antippbar: Quelle und Einordnung stehen auf der Testsieger-Seite. */}
       <a href="https://primundus.de/testsieger-24-stunden-pflege" target="_blank" rel="noreferrer" className="flex-none" aria-label="Testsieger DIE WELT: Quelle ansehen">
-        <img src="/badge-testsieger.webp" alt="" className="h-[76px] w-auto object-contain" />
+        <img src="/badge-testsieger.webp" alt="" className={`${klein ? 'h-[60px]' : 'h-[76px]'} w-auto object-contain`} />
       </a>
       <div className="min-w-0">
-        <p className="text-[15.5px] font-semibold leading-[1.35] text-pm-ink">
+        <p className={`${klein ? 'text-[15px]' : 'text-[15.5px]'} font-semibold leading-[1.35] text-pm-ink`}>
           6× in Folge Testsieger <span className="whitespace-nowrap">DIE WELT</span>
         </p>
-        <p className="mt-1 text-pretty text-[15px] leading-[1.5] text-pm-muted">{EINLEITUNG_TESTSIEGER}</p>
+        <p className={`mt-1 text-pretty ${klein ? 'text-[14px] leading-[1.45]' : 'text-[15px] leading-[1.5]'} text-pm-muted`}>{EINLEITUNG_TESTSIEGER}</p>
       </div>
     </div>
   );
@@ -205,17 +205,6 @@ export function AngebotKonditionen({ onBestpreis }: { onBestpreis: () => void })
   );
 }
 
-/** Haken-Kachel wie `Punkte` auf primundus.de (Fassung 16, Martin: „die Punkte finde ich schon ganz gut"). */
-function Haken() {
-  return (
-    <span className="mt-[2px] flex h-[22px] w-[22px] flex-none items-center justify-center rounded-[7px] bg-pm-coral-tint text-pm-coral" aria-hidden="true">
-      <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M2.5 6.3l2.3 2.2 4.7-5" />
-      </svg>
-    </span>
-  );
-}
-
 /**
  * Runde 29: ein Abschnitt des Angebots — Überschrift auf dem Seitengrund, der Inhalt in einer weißen Karte (Martin zu
  * Fassung 21: nichts lose „mit diesem komischen Hintergrund"). `karte=false` für Inhalte mit eigener Karte (Preis).
@@ -231,45 +220,83 @@ export function AngebotAbschnitt({ id, titel, children, karte = true, className 
   );
 }
 
-const PUNKT = 'flex items-start gap-3 text-[16px] leading-[1.45] text-pm-ink';
-
 /**
- * „Was Sie bekommen" (Runde 29): die Leistung in fünf Sätzen. Fakten: wohnt im Haushalt, Hilfe bei Körperpflege, Essen und
- * Haushalt (Mustervertrag Anlage 2; Martins Fassung vom 03.10.), „bei uns angestellt" (Martin 30.09.; „legal, ohne
- * Vermittler" Martin 05.10.), Anreise/Wechsel/Vertretung organisieren wir, Ansprechpartnerin täglich 8–20 Uhr, Pflegekräfte
- * vorab sehen und selbst auswählen (USP „Pflegekräfte sofort einsehen", „Kein Vertrag vor der Auswahl").
+ * Runde 30 (Martin 06.10. zu Fassung 24: „Was Sie bekommen finde ich inhaltlich nicht toll … Ihre Sicherheit, dann
+ * wiederholen wir das nochmal. Das Angebot kann man schon zusammenpacken … schöner, kompakter, zusammengehöriger, aber
+ * trotzdem erklären, was er bekommt, was das für ein Angebot ist"): EIN Angebot in EINER Karte. Ganz oben die
+ * Kopfleiste der Pflegekraft-Karte („Unsere Empfehlung für Sie"), damit Angebot und Empfehlung zusammengehören.
+ * Steht als erstes Kind in der Karte (`overflow-hidden`, Innenabstand px-5 pt-6).
  */
-export const LEISTUNGEN = [
-  'Eine Pflegekraft, die bei Ihnen wohnt und im Alltag hilft: bei der Körperpflege, beim Essen und im Haushalt.',
-  'Sie ist legal bei uns angestellt, ohne Vermittler.',
-  'Anreise, Wechsel und Vertretung organisieren wir.',
-  'Ihre Ansprechpartnerin ist täglich von 8 bis 20 Uhr für Sie da.',
-  'Passende Pflegekräfte sehen Sie vorab, und Sie entscheiden, wer zu Ihnen kommt.',
-] as const;
-
-export function AngebotLeistungsListe() {
+export function AngebotKopfleiste({ datum }: { datum: string | null }) {
   return (
-    <ul className="grid gap-3.5">
-      {LEISTUNGEN.map((t) => (
-        <li key={t} className={PUNKT}><Haken /><span>{ohneTrennung(t)}</span></li>
-      ))}
-    </ul>
+    <div className="-mx-5 -mt-6 mb-5 flex items-center gap-2 bg-pm-shell px-5 py-3 text-[15px] font-extrabold tabular-nums text-pm-taupe-ink">
+      <FileText className="h-4 w-4 flex-none" aria-hidden="true" />
+      {datum ? `Ihr Angebot vom ${datum}` : 'Ihr Angebot'}
+    </div>
   );
 }
 
 /**
- * „Ihre Sicherheit" (Runde 29, Martins „Hemmnisnehmer"): die vier Punkte der Startseite (HERO_PUNKTE + Bestpreisgarantie,
- * Martin 26.09.: „die müssen doch überall gleich sein") und die Auszeichnung als Beleg.
+ * „Das bekommen Sie" (Runde 30, Martins „was bekomme ich"): drei Punkte statt fünf Sätzen, jeder mit eigenem Inhalt —
+ * nichts, was die vier festen Punkte, die Preiszeile, „So geht es weiter" oder Martas Kasten schon sagen (die alten
+ * Sätze zu Vermittler, Ansprechpartnerin und Auswahl standen dort doppelt). Fakten: wohnt im Haushalt; Grundpflege und
+ * Haushalt (Mustervertrag Anlage 2); „bei uns angestellt" (Martin 30.09.); Anreise und Wechsel organisieren wir; Ersatz
+ * „in der Regel innerhalb von 3 Tagen", auch wenn es nicht passt (Mustervertrag § 1 Nr. 4, Martin 01.10.).
+ * OpenAI 06.10. (mutig17): Nutzen zuerst mit fetten Anfangswörtern; kein „1:1" (Angebote für zwei Personen), kein „nachts".
+ */
+export const ENTHALTEN = [
+  { titel: 'Ihre Pflegekraft', text: 'wohnt bei Ihnen und hilft bei Körperpflege, Essen, Haushalt und Einkauf.' },
+  { titel: 'Bei uns angestellt', text: 'Anreise und Wechsel organisieren wir.' },
+  { titel: 'Ersatz', text: 'bei Ausfall oder wenn es nicht passt, in der Regel innerhalb von 3 Tagen.' },
+] as const;
+const ENTHALTEN_SYMBOL = [Home, BadgeCheck, RefreshCw] as const;
+
+export function AngebotEnthalten() {
+  return (
+    <div className="mt-5">
+      <p className="text-[12.5px] font-semibold uppercase tracking-[0.08em] text-pm-taupe-ink">Das bekommen Sie</p>
+      <ul className="mt-3 grid gap-3">
+        {ENTHALTEN.map(({ titel, text }, i) => {
+          const Symbol = ENTHALTEN_SYMBOL[i];
+          return (
+            <li key={titel} className="flex items-start gap-3 text-[15.5px] leading-[1.45] text-pm-body">
+              <span aria-hidden="true" className="mt-px flex h-[26px] w-[26px] flex-none items-center justify-center rounded-[8px] bg-pm-shell text-pm-taupe-ink">
+                <Symbol className="h-[15px] w-[15px]" strokeWidth={2} />
+              </span>
+              <span><b className="font-semibold text-pm-ink">{titel}:</b> {text}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** Haken-Kachel 20 px wie `AngebotKonditionen` (gemessen: so bleibt „Täglich kündbar, taggenau abgerechnet" bei 390 px einzeilig). */
+function KleinerHaken() {
+  return (
+    <span className="mt-px flex h-5 w-5 flex-none items-center justify-center rounded-[6px] bg-pm-coral-tint text-pm-coral" aria-hidden="true">
+      <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2.5 6.3l2.3 2.2 4.7-5" />
+      </svg>
+    </span>
+  );
+}
+
+/**
+ * Abschluss der Angebotskarte (Runde 30): die vier festen Punkte (HERO_PUNKTE + Bestpreisgarantie, Martin 26.09.: „die
+ * müssen doch überall gleich sein"), darunter die Auszeichnung klein — ohne eigene Überschrift und ohne zweite Karte.
  */
 export function AngebotSicherheit({ onBestpreis }: { onBestpreis: () => void }) {
+  const zeile = 'flex items-start gap-2 text-[14.5px] font-medium leading-[1.4] text-pm-ink';
   return (
-    <>
-      <ul className="grid gap-3.5">
+    <div className="mt-5 border-t border-pm-line pt-5">
+      <ul className="grid gap-3">
         {HERO_PUNKTE.map((t) => (
-          <li key={t} className={PUNKT}><Haken /><span>{t}</span></li>
+          <li key={t} className={zeile}><KleinerHaken /><span>{t}</span></li>
         ))}
-        <li className={PUNKT}>
-          <Haken />
+        <li className={zeile}>
+          <KleinerHaken />
           <span className="flex-1">{GARANTIE_PORTAL.titel}</span>
           <button
             type="button"
@@ -281,9 +308,9 @@ export function AngebotSicherheit({ onBestpreis }: { onBestpreis: () => void }) 
         </li>
       </ul>
       <div className="mt-5 border-t border-pm-line pt-5">
-        <AngebotTestsieger className="" />
+        <AngebotTestsieger className="" klein />
       </div>
-    </>
+    </div>
   );
 }
 
@@ -412,38 +439,38 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
     // Schritte 3 und 4 als je ein Satz. Hinweis-Karte = Sprungziel `goto=anfragen`, das Formular klappt darin auf.
     return (
       <>
-        {/* Runde 29 (Martin 06.10.: „was bekomme ich, was kostet das, Hemmnisnehmer und dann die next Steps … wie der Ablauf
-            ist"): der Ablauf in drei Schritten untereinander, darunter die Achtung (nur solange Angaben fehlen), dann die
-            Pflegekräfte zum Einladen — die Empfehlung zuerst. id `pflegekraefte` = Sprungziel `goto=matches`. */}
+        {/* Runde 30 (Martin 06.10.: „So geht es weiter finde ich ganz gut … der Achtung-Hinweis gehört natürlich zu Ihre
+            passenden Pflegekräfte, und ein bisschen kleiner"): erst der Ablauf, dann die Pflegekräfte mit dem kleinen
+            Hinweis direkt unter der Überschrift (nur solange Angaben fehlen). id `pflegekraefte` = Sprungziel
+            `goto=matches`; id `patientendaten` = Sprungziel `goto=anfragen` und aller Knöpfe ins Formular. */}
         <AngebotAbschnitt id="so-geht-es-weiter" titel="So geht es weiter" className="">
           <AngebotAblauf />
         </AngebotAbschnitt>
-        <div ref={hinweis} id="patientendaten" className="mt-5 scroll-mt-20">
-          {/* Runde 24 (Martin zu Fassung 18: „dann kommt dieser Achtung, würde ich das nennen … also Achtung, auch Symbol"):
-              Warnzeichen in Bernstein und das Wort „Achtung" vorn im Titel. */}
-          <Card className="px-5 pb-5 pt-5">
-            <div className="flex gap-4">
-              <span aria-hidden="true" className="flex h-10 w-10 flex-none items-center justify-center rounded-[11px] bg-pm-amber-tint text-pm-amber">
-                <AlertTriangle className="h-[22px] w-[22px]" strokeWidth={2} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-pm-ink">Achtung: Es fehlen noch Angaben zur Pflegesituation</p>
-                <p className="mt-1 text-[15px] leading-[1.45] text-pm-muted">
-                  Erst damit kennen die Pflegekräfte Ihren Einsatz und können sich bewerben. Dauert etwa 2&nbsp;Minuten, vieles ist schon ausgefüllt.
-                </p>
-              </div>
-            </div>
-            {offen ? (
-              <div className="mt-5 border-t border-pm-line">{children}</div>
-            ) : (
-              <Button breit onClick={onOeffnen} className="mt-5 !font-semibold">
-                Jetzt vervollständigen
-              </Button>
-            )}
-          </Card>
-        </div>
         <section aria-labelledby="pflegekraefte" className="mt-10">
           <h2 id="pflegekraefte" className="scroll-mt-20 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">Ihre passenden Pflegekräfte</h2>
+          <div ref={hinweis} id="patientendaten" className="mt-4 scroll-mt-20">
+            {/* Runde 24 (Martin zu Fassung 18: „Achtung, auch Symbol"): Warnzeichen in Bernstein, „Achtung" vorn im Titel. */}
+            <Card className="px-5 py-4">
+              <div className="flex gap-3">
+                <span aria-hidden="true" className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px] bg-pm-amber-tint text-pm-amber">
+                  <AlertTriangle className="h-[18px] w-[18px]" strokeWidth={2} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[15.5px] font-semibold leading-[1.3] text-pm-ink">Achtung: Es fehlen noch Angaben zur Pflegesituation</p>
+                  <p className="mt-1 text-[14.5px] leading-[1.45] text-pm-muted">
+                    Erst damit kennen die Pflegekräfte Ihren Einsatz und können sich bewerben. Dauert etwa 2&nbsp;Minuten, vieles ist schon ausgefüllt.
+                  </p>
+                </div>
+              </div>
+              {offen ? (
+                <div className="mt-4 border-t border-pm-line">{children}</div>
+              ) : (
+                <Button breit groesse="sm" onClick={onOeffnen} className="mt-4 !font-semibold">
+                  Jetzt vervollständigen
+                </Button>
+              )}
+            </Card>
+          </div>
           <div className="mt-4">{liste}</div>
         </section>
       </>

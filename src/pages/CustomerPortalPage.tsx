@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotAbschnitt, AngebotEinleitung, AngebotKopf, AngebotLeistung, AngebotLeistungsListe, AngebotPerson, AngebotSicherheit, AngebotSterne, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { AngebotEinleitung, AngebotEnthalten, AngebotKopfleiste, AngebotLeistung, AngebotPerson, AngebotSicherheit, AngebotSterne, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2679,15 +2679,13 @@ const CustomerPortalPage: FC = () => {
         // Runde 17 (`?look=angebot`): die Karte als Angebot — Kopf mit Datum und Grundlage, Zeilen statt „Inklusive …".
         const angebotLook = kompakt && KOMPAKT_LOOK === 'angebot';
         return (
-        <div id={angebotLook ? 'angebot' : undefined} className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'scroll-mt-20 pt-10' : 'pt-10'}` : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
-          {/* Runde 29: Überschrift „Was es kostet" über der Angebotskarte. */}
-          {angebotLook && <h2 className="mb-4 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">Was es kostet</h2>}
+        <div id={angebotLook ? 'angebot' : undefined} className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'scroll-mt-20 pt-7' : 'pt-10'}` : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
           {/* Karte im Look des Rechners (Teil 3, Martin 24.09.). „Ihr persönliches
               Angebot" steht im Kopf — der Abschnitt heißt nach seinem Inhalt. Der
               Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
               (Martin: „muss einklappbar sein für spätere Zustände"). */}
           {/* Kompakt-Einstieg (Runde 15): weiß, 20 px Radius, ohne Rand, weicher zweilagiger Schatten, 24 px Innenabstand. */}
-          <Card className={`relative ${angebotLook ? `px-5 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : kompakt ? `shadow-lift !border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'shadow-lift px-5 pt-3 pb-4'}`}>
+          <Card ton={angebotLook ? 'hervorgehoben' : 'standard'} className={`relative ${angebotLook ? 'overflow-hidden px-5 pt-6 pb-6' : kompakt ? `shadow-lift !border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'shadow-lift px-5 pt-3 pb-4'}`}>
             {kompakt ? (
               // Runde 13: keine Versalien-Zeile mehr — die Karte beginnt mit dem Preis; der Name bleibt
               // für Screenreader.
@@ -2727,15 +2725,15 @@ const CustomerPortalPage: FC = () => {
                   {kompakt ? (
                     <>
                       {angebotLook && (
-                        // Runde 21: „IHR ANGEBOT VOM …" als kleine Zeile, darunter die Grundlage über dem Preis.
+                        // Runde 30: EIN Angebot — Kopfleiste mit Datum, Leistung mit Grundlage, was der Kunde bekommt,
+                        // dann (Haarlinie) der Preis, am Ende der Karte die vier festen Punkte und das Siegel.
                         <>
-                          <AngebotKopf datum={angebotDatum(lead?.created_at)} />
-                          <div className="mt-1.5">
-                            <AngebotLeistung fuer={angebotFuer((lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined)} />
-                          </div>
+                          <AngebotKopfleiste datum={angebotDatum(lead?.created_at)} />
+                          <AngebotLeistung fuer={angebotFuer((lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined)} />
+                          <AngebotEnthalten />
                         </>
                       )}
-                      <p className={`${angebotLook ? 'mt-4 ' : ''}flex items-baseline gap-2 whitespace-nowrap`}>
+                      <p className={`${angebotLook ? 'mt-5 border-t border-pm-line pt-5 ' : ''}flex items-baseline gap-2 whitespace-nowrap`}>
                         <span className={`text-[44px] ${angebotLook ? 'font-extrabold tracking-[-0.04em]' : 'font-bold tracking-[-0.03em]'} leading-none tabular-nums text-pm-ink`}>{formatEuro(brutto)}</span>
                         <span className="text-[16px] text-pm-muted">im Monat</span>
                       </p>
@@ -2959,15 +2957,11 @@ const CustomerPortalPage: FC = () => {
                   Mustervertrag als PDF herunterladen
                 </a>
                 </>)}
+                {/* Runde 30: Martins „Hemmnisnehmer" als Abschluss derselben Karte (keine eigene Überschrift mehr). */}
+                {angebotLook && <AngebotSicherheit onBestpreis={() => setBestpreisOffen(true)} />}
           </>
           )}
           </Card>
-          {/* Runde 29: Martins „Hemmnisnehmer" nach dem Preis — die vier Punkte der Startseite und die Auszeichnung. */}
-          {angebotLook && (
-            <AngebotAbschnitt id="ihre-sicherheit" titel="Ihre Sicherheit">
-              <AngebotSicherheit onBestpreis={() => setBestpreisOffen(true)} />
-            </AngebotAbschnitt>
-          )}
         </div>
         );
       })();
@@ -3448,11 +3442,7 @@ const CustomerPortalPage: FC = () => {
                   {/* Runde 26: Sterne unter dem Titel, das Siegel steht neben dem Testsieger-Satz der Einleitung. */}
                   <AngebotSterne sterne={sterne} />
                   <AngebotEinleitung />
-                  {/* Runde 29: das Angebot in der Reihenfolge, nach der Kunden fragen — was bekomme ich, was kostet es, worauf
-                      kann ich mich verlassen, wie geht es weiter. */}
-                  <AngebotAbschnitt id="was-sie-bekommen" titel="Was Sie bekommen">
-                    <AngebotLeistungsListe />
-                  </AngebotAbschnitt>
+                  {/* Runde 30: was der Kunde bekommt, steht jetzt IN der einen Angebotskarte darunter. */}
                 </>
               ) : kompakt && <KompaktEinleitung />}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
