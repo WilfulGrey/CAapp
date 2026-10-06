@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, FC } from 'react';
-import { Check, Bell, Clock, Phone, AlertCircle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
+import { Check, Bell, Clock, Phone, AlertCircle, ChevronDown, X, ArrowLeft, ArrowRight, Heart, FileText } from 'lucide-react';
 import { Nurse } from '../types';
 import { displayName, initials } from '../components/portal/shared';
 import {
@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotAbschnitt, AngebotAblaufStand, AngebotEinleitung, AngebotKopfleiste, AngebotLeistung, AngebotPerson, AngebotSicherheit, AngebotSterne, AngebotTestsieger, EINLADEN_TITEL, EINLADEN_ZEILE, KOMPAKT_LOOK, SUCHE_LAEUFT_SATZ, interesseText, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { ANGEBOT_NACH_ABSENDEN, AngebotAbschnitt, AngebotAblaufStand, AngebotEinleitung, AngebotKopfleiste, AngebotLeistung, AngebotPerson, AngebotSicherheit, AngebotSterne, AngebotTestsieger, EINLADEN_TITEL, EINLADEN_ZEILE, KOMPAKT_LOOK, SUCHE_LAEUFT_SATZ, interesseText, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2647,8 +2647,12 @@ const CustomerPortalPage: FC = () => {
         // zugeklappt mit dem Preis in der Zeile („Angebot ansehen ›"). `k` = Darstellung wie vor dem Absenden.
         const neu = nachAbsendenNeu;
         const k = kompakt || neu;
+        // Fassung 32: nach dem Absenden eine Zeile, die aufklappt; mit offener Bewerbung immer (ohne Preis).
+        const zeile = neu && (hasPending || ANGEBOT_NACH_ABSENDEN === 'zeile');
         const offerExpanded =
-          kompakt || (offerExpandedManual ?? (!hasPending && !patientSaved));
+          kompakt || (neu
+            ? (zeile ? (offerExpandedManual ?? false) : true)
+            : (offerExpandedManual ?? (!hasPending && !patientSaved)));
         // Schrift im Kompakt-Einstieg: Fließtext 16 px, kleine Schrift 14 px (sonst wie bisher).
         const grund = k ? 'text-[16px]' : 'text-[15px]';
         const klein = k ? 'text-[14px]' : 'text-[13px]';
@@ -2704,7 +2708,7 @@ const CustomerPortalPage: FC = () => {
               Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
               (Martin: „muss einklappbar sein für spätere Zustände"). */}
           {/* Kompakt-Einstieg (Runde 15): weiß, 20 px Radius, ohne Rand, weicher zweilagiger Schatten, 24 px Innenabstand. */}
-          <Card ton={angebotLook ? 'hervorgehoben' : 'standard'} className={`relative ${angebotLook ? `overflow-hidden px-5 pt-6 ${neu && !offerExpanded ? 'pb-3' : 'pb-6'}` : kompakt ? `shadow-lift !border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'shadow-lift px-5 pt-3 pb-4'}`}>
+          <Card ton={angebotLook ? 'hervorgehoben' : 'standard'} className={`relative ${angebotLook ? `overflow-hidden px-5 ${zeile ? (offerExpanded ? 'pt-0 pb-6' : 'py-0') : 'pt-6 pb-6'}` : kompakt ? `shadow-lift !border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'shadow-lift px-5 pt-3 pb-4'}`}>
             {k ? (
               // Runde 13: keine Versalien-Zeile mehr — die Karte beginnt mit dem Preis; der Name bleibt
               // für Screenreader.
@@ -2732,26 +2736,29 @@ const CustomerPortalPage: FC = () => {
             </button>
             )}
 
-          {/* Fassung 31: Kopfleiste immer, zugeklappt darunter nur der Preis und „Angebot ansehen ›" (mit offener Bewerbung ohne
-              Preis: Die Bewerbung nennt ihren eigenen Tagessatz, Review 25.09.). OpenAI mutig30: „gut". */}
-          {neu && <AngebotKopfleiste datum={angebotDatum(lead?.created_at)} />}
-          {neu && !offerExpanded && (
-            <div className="flex flex-wrap items-center justify-between gap-x-3">
-              {!hasPending && (
-                <p className="flex items-baseline gap-2 whitespace-nowrap">
-                  <span className="text-[28px] font-extrabold leading-none tracking-[-0.03em] tabular-nums text-pm-ink">{formatEuro(brutto)}</span>
-                  <span className="text-[15px] text-pm-muted">im Monat</span>
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={() => setOfferExpandedManual(true)}
-                aria-expanded={false}
-                className="inline-flex min-h-[44px] flex-none items-center text-[15px] font-semibold text-pm-taupe-ink hover:text-pm-ink"
-              >
-                Angebot ansehen&nbsp;›
-              </button>
-            </div>
+          {/* Fassung 32 (Martin zu 31: „Angebot so, dann so viel Platz und alles so unklar"; OpenAI mutig31: Variante B): nach dem
+              Absenden EINE Zeile „Ihr Angebot vom … · 3.050 € im Monat", die beim Antippen dieselbe Karte wie vor dem Absenden
+              aufklappt (die Zeile wird dann zur Kopfleiste). Mit offener Bewerbung ohne Preis: Die Bewerbung nennt ihren eigenen
+              Tagessatz (Review 25.09.). Für die Abnahme zeigt `&angebot=offen` die Alternative: die Karte offen. */}
+          {neu && !zeile && <AngebotKopfleiste datum={angebotDatum(lead?.created_at)} />}
+          {zeile && (
+            <button
+              type="button"
+              onClick={() => setOfferExpandedManual(!offerExpanded)}
+              aria-expanded={offerExpanded}
+              className={`-mx-5 flex w-[calc(100%+2.5rem)] min-h-[64px] items-center gap-3 px-5 py-4 text-left ${offerExpanded ? 'mb-5 bg-pm-shell' : ''}`}
+            >
+              <FileText className="h-5 w-5 flex-none text-pm-taupe-ink" aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[16px] font-semibold leading-[1.3] tabular-nums text-pm-ink">
+                  {angebotDatum(lead?.created_at) ? `Ihr Angebot vom ${angebotDatum(lead?.created_at)}` : 'Ihr Angebot'}
+                </span>
+                {!hasPending && !offerExpanded && (
+                  <span className="mt-0.5 block text-[15px] leading-[1.35] tabular-nums text-pm-muted">{formatEuro(brutto)} im Monat</span>
+                )}
+              </span>
+              <ChevronDown className={`h-5 w-5 flex-none text-pm-taupe transition-transform duration-200 ${offerExpanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+            </button>
           )}
 
           {/* Die Kosten stehen IMMER (Martin, 11.08.), solange der Abschnitt offen
@@ -3001,25 +3008,6 @@ const CustomerPortalPage: FC = () => {
                 </>)}
                 {/* Runde 30: Martins „Hemmnisnehmer" als Abschluss derselben Karte (keine eigene Überschrift mehr). */}
                 {angebotLook && <AngebotSicherheit onBestpreis={() => setBestpreisOffen(true)} />}
-                {neu && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOfferExpandedManual(false);
-                      setCostsExpanded(false);
-                      // Die Karte schrumpft um gut 600 px; ohne Rücksprung stünde der Kunde danach mitten in den Fragen.
-                      requestAnimationFrame(() => {
-                        const karte = document.getElementById('angebot');
-                        if (karte && karte.getBoundingClientRect().top < 0) karte.scrollIntoView({ block: 'start' });
-                      });
-                    }}
-                    aria-expanded={true}
-                    className="mt-4 w-full min-h-[48px] flex items-center justify-between gap-2 border-t border-pm-line pt-2 text-[16px] font-semibold text-pm-taupe-ink"
-                  >
-                    Weniger anzeigen
-                    <ChevronDown className="w-5 h-5 rotate-180 text-pm-taupe" aria-hidden="true" />
-                  </button>
-                )}
           </>
           )}
           </Card>
@@ -3541,12 +3529,9 @@ const CustomerPortalPage: FC = () => {
         <div id="stand" className="max-w-3xl mx-auto px-5 pt-9 scroll-mt-20">
           <AngebotAbschnitt id="so-geht-es-weiter" titel="So geht es weiter" className="">
             <AngebotAblaufStand
-              passende={IS_PREVIEW_ANY || (mmReady && !matchingsLoadingOrError)
-                ? effectiveMatched.filter((m) => (nurseStatusById.get(m.caregiverId) ?? 'pending') !== 'declined').length
-                : null}
               bisherigeBewerbungen={applications.length}
               wunschstart={formularStart}
-              onAngaben={zurPflegesituation}
+              onEinladen={() => document.getElementById('pflegekraefte')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
             />
           </AngebotAbschnitt>
         </div>
@@ -3961,7 +3946,9 @@ const CustomerPortalPage: FC = () => {
             />
           )}
         >
-        {!hasPending && !kompakt && (() => {
+        {/* Fassung 32: nach dem Absenden im Look „angebot" keine Pflegesituation zum Ändern mehr (Martin zu 31: „Die sollen doch
+            nicht plötzlich irgendwas ändern, das wollen wir nicht"). Wer etwas ändern muss, meldet sich bei Marta (Kasten unten). */}
+        {!hasPending && !kompakt && !(nachAbsendenNeu && (patientSaved || schonAbgesendet)) && (() => {
           // Unvollständig = IMMER offen (Martin, 13.08.): Solange die
           // Angaben fehlen, gibt es nichts wegzuklappen — der Bogen ist die
           // Aufgabe. Erst „Vollständig" macht den Abschnitt zur Referenz,
@@ -3978,7 +3965,7 @@ const CustomerPortalPage: FC = () => {
           // offen — nach dem Speichern ist es Referenz und fällt auf den
           // ruhigen Rahmen zurück.
           return (
-          <div id="patientendaten" className={nachAbsendenNeu ? 'pt-10 scroll-mt-20' : 'px-1 pt-6 scroll-mt-24'}>
+          <div id="patientendaten" className="px-1 pt-6 scroll-mt-24">
             {/* Ein Kopf (Teil 3, Entwurf v4): Eyebrow, Status, Titel, ein Satz. Titel
                 und Satz seit Registry #109 wieder wie bis 24.09. („Jetzt konkrete
                 Bewerbungen erhalten“, Strecke v2, 11.09.): der Nutzen in der
@@ -4005,14 +3992,10 @@ const CustomerPortalPage: FC = () => {
                   if (next) setTriggerOpenPatient(true);
                 }}
               >
-                {nachAbsendenNeu ? (
-                  <span className="min-w-0 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">Ihre Pflegesituation</span>
-                ) : (
                 <span className="min-w-0">
                   <span className={`block ${EYEBROW}`}>Für Ihre Bewerbungen</span>
                   <span className={`block mt-1.5 ${H2}`}>Pflegesituation</span>
                 </span>
-                )}
                 <span className="flex items-center gap-2 flex-shrink-0 pb-1">
                   <StatusBadge ton="fertig">✓ Vollständig</StatusBadge>
                   <ChevronDown className={`w-5 h-5 text-pm-taupe transition-transform duration-200 ${patientExpanded ? 'rotate-180' : ''}`} />
@@ -4026,7 +4009,7 @@ const CustomerPortalPage: FC = () => {
         {/* ── Kombinierte Karte: Identität + Anfrage + Stepper ──
              Hidden once a Bewerbung is in: customer should focus on the
              pending application, not on revisiting saved patient data. */}
-        {!hasPending && (kompakt ? formImKasten : (patientSaved ? (patientExpandedManual ?? false) : true)) && (
+        {!hasPending && !(nachAbsendenNeu && (patientSaved || schonAbgesendet)) && (kompakt ? formImKasten : (patientSaved ? (patientExpandedManual ?? false) : true)) && (
         <div>
         <AngebotCard
           eingebettet={kompakt}

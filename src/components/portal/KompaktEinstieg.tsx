@@ -316,43 +316,46 @@ export const ABLAUF = [
    Pflegekraft bewirbt, bekommen Sie eine E-Mail." (Bedingungs-Anfang; der Hinweis auf die E-Mail steht jetzt in Schritt 2, sonst
    stünde er doppelt). Schritt 3 bleibt wörtlich wie vor dem Absenden (freigegeben), dazu der Wunschstart aus dem Formular. Kein
    „72 Stunden reserviert" (Martin zu Fassung 28: „unnötig"), keine Zeitzusage („meldet sich meist innerhalb von 1–2 Tagen" war
-   nicht belegt). */
+   nicht belegt).
+   Fassung 32 (Martin zu 31: „da steht nirgendwo, dass man Pflegekräfte einladen soll … Angaben ansehen oder ändern: Die sollen
+   doch nicht plötzlich irgendwas ändern, das wollen wir nicht … Prüft das vorher mit OpenAI"): Schritt 1 ist erledigt, nennt aber
+   das Einladen und führt zu den Pflegekräften; kein Weg zum Ändern mehr (wer etwas ändern muss, meldet sich bei Marta). Schritt 2
+   ist der aktive. OpenAI mutig31: so „ehrlich", der Abschnitt darunter ohne rote „1" (sonst stünde unten eine aktive 1 gegen die
+   aktive 2 oben). Nicht übernommen: „Sobald eine Bewerbung eingeht …" (Bedingungs-Anfang) und ein umformulierter Schritt 3. */
 export const SUCHE_LAEUFT_SATZ = 'Passende Pflegekräfte sehen jetzt Ihre Anfrage und können sich bei Ihnen bewerben.';
-export const STAND_TITEL_1 = 'Pflegesituation ergänzt';
+export const STAND_TEXT_1 = 'Ihre Pflegesituation ist vollständig. Pflegekräfte, die Ihnen zusagen, können Sie weiter einladen, kostenlos und unverbindlich.';
 export const EINLADEN_TITEL = 'Pflegekräfte einladen';
-export const EINLADEN_ZEILE = 'Laden Sie Pflegekräfte ein, die Ihnen zusagen. Wir bitten sie dann um eine Bewerbung, kostenlos und unverbindlich.';
+export const EINLADEN_ZEILE = 'Mit Ihrer Einladung bitten wir die Pflegekraft um eine Bewerbung.';
+
+/** Fassung 32, nur für die Abnahme: `&angebot=offen` zeigt das Angebot nach dem Absenden offen (Alternative), sonst als Zeile. */
+export const ANGEBOT_NACH_ABSENDEN: 'zeile' | 'offen' = SUCHE?.get('angebot') === 'offen' ? 'offen' : 'zeile';
 
 /** Erklärung über der Interesse-Karte (OpenAI mutig30: „stößt … an" und der Gedankenstrich raus; „kostenlos und unverbindlich"
- *  steht im Abschnitt „Pflegekräfte einladen" direkt darunter, deshalb hier nicht noch einmal). */
+ *  steht in Schritt 1, deshalb hier nicht noch einmal). */
 export function interesseText(anzahl: number): string {
   return anzahl === 1
     ? 'Diese Pflegekraft hat Ihre Anfrage gesehen und möchte die Betreuung übernehmen. Laden Sie sie ein, dann bereiten wir ihre Bewerbung vor.'
     : 'Diese Pflegekräfte haben Ihre Anfrage gesehen und möchten die Betreuung übernehmen. Laden Sie ein, wer zu Ihnen passt, dann bereiten wir die Bewerbungen vor.';
 }
 
-/** Text von Schritt 2 nach dem Absenden: ohne bisherige Bewerbung mit der Zahl der passenden Pflegekräfte (fehlt sie oder ist
- *  sie 0, entfällt der Satz statt zu raten). */
-export function standSchritt2(passende: number | null, bisherigeBewerbungen: number): string {
+/** Text von Schritt 2 nach dem Absenden (OpenAI mutig31 für den Fall mit Bewerbungen; ohne Bewerbung der Satz aus Fassung 30). */
+export function standSchritt2(bisherigeBewerbungen: number): string {
   if (bisherigeBewerbungen > 0) {
     const bisher = bisherigeBewerbungen === 1 ? 'eine Bewerbung' : `${bisherigeBewerbungen} Bewerbungen`;
-    return `Sie haben bisher ${bisher} erhalten. Jede weitere sehen Sie hier im Portal und erhalten sie per E\u2011Mail.`;
+    return `Sie haben bisher ${bisher} erhalten. Neue Bewerbungen sehen Sie hier im Portal und erhalten sie per E\u2011Mail.`;
   }
-  const zahl = passende && passende > 0
-    ? ` Für Ihre Pflegesituation gibt es aktuell ${passende} passende ${passende === 1 ? 'Pflegekraft' : 'Pflegekräfte'}.`
-    : '';
-  return `Jede Bewerbung sehen Sie hier im Portal und erhalten sie per E\u2011Mail.${zahl}`;
+  return 'Jede Bewerbung sehen Sie hier im Portal und erhalten sie per E\u2011Mail.';
 }
 
 /**
- * „So geht es weiter" nach dem Absenden: dieselben drei Schritte wie vorher, jetzt mit Stand. Schritt 1 abgehakt (mit dem Weg
- * zu den Angaben), Schritt 2 läuft (Koralle wie der aktuelle Schritt vor dem Absenden), Schritt 3 kommt. Ersetzt im Look
- * „angebot" die Karte „Stand heute" (SucheStand, fünf Schritte).
+ * „So geht es weiter" nach dem Absenden: dieselben drei Schritte wie vorher, jetzt mit Stand. Schritt 1 erledigt (grüner Haken),
+ * mit dem Hinweis aufs weitere Einladen und dem Link zu den Pflegekräften; Schritt 2 läuft (Koralle wie der aktuelle Schritt vor
+ * dem Absenden); Schritt 3 kommt. Ersetzt im Look „angebot" die Karte „Stand heute" (SucheStand, fünf Schritte).
  */
-export function AngebotAblaufStand({ passende, bisherigeBewerbungen = 0, wunschstart, onAngaben }: {
-  passende: number | null;
+export function AngebotAblaufStand({ bisherigeBewerbungen = 0, wunschstart, onEinladen }: {
   bisherigeBewerbungen?: number;
   wunschstart: string | null | undefined;
-  onAngaben: () => void;
+  onEinladen: () => void;
 }) {
   const start = kurzDatum(wunschstart);
   const titel = 'text-[17px] font-semibold leading-[1.3] text-pm-ink';
@@ -365,13 +368,14 @@ export function AngebotAblaufStand({ passende, bisherigeBewerbungen = 0, wunschs
           <Check className="h-4 w-4" strokeWidth={3} aria-label="erledigt" />
         </span>
         <div className="min-w-0 pt-[3px]">
-          <p className={titel}>{STAND_TITEL_1}</p>
+          <p className={titel}>{ABLAUF_TITEL_1}</p>
+          <p className={text}>{STAND_TEXT_1}</p>
           <button
             type="button"
-            onClick={onAngaben}
+            onClick={onEinladen}
             className="-mb-3 -mt-1 inline-flex min-h-[44px] items-center text-[15px] font-semibold text-pm-taupe-ink hover:text-pm-ink"
           >
-            Angaben ansehen oder ändern&nbsp;›
+            {EINLADEN_TITEL}&nbsp;›
           </button>
         </div>
       </li>
@@ -379,7 +383,7 @@ export function AngebotAblaufStand({ passende, bisherigeBewerbungen = 0, wunschs
         <span aria-hidden="true" className={`${kreis} bg-pm-coral text-white`}>2</span>
         <div className="min-w-0 pt-[3px]">
           <p className={titel}>{ABLAUF[1].titel}</p>
-          <p className={text}>{standSchritt2(passende, bisherigeBewerbungen)}</p>
+          <p className={text}>{standSchritt2(bisherigeBewerbungen)}</p>
         </div>
       </li>
       <li className="flex gap-4">

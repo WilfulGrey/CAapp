@@ -52,12 +52,20 @@ describe('Ansicht nach dem Absenden im Look „angebot" (Fassung 31)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Ihre Suche läuft' }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText('Passende Pflegekräfte sehen jetzt Ihre Anfrage und können sich bei Ihnen bewerben.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'So geht es weiter' })).toBeInTheDocument();
-    expect(screen.getByText('Pflegesituation ergänzt')).toBeInTheDocument();
+    expect(screen.getByText('Pflegesituation ergänzen und Pflegekräfte einladen')).toBeInTheDocument();
+    expect(screen.getByText(/Ihre Pflegesituation ist vollständig\. Pflegekräfte, die Ihnen zusagen, können Sie weiter einladen/)).toBeInTheDocument();
     expect(await screen.findByText('Ihr Wunschstart: 15.11.')).toBeInTheDocument();
     expect(screen.queryByText('Stand heute')).toBeNull();
     expect(await screen.findByRole('heading', { level: 2, name: 'Pflegekräfte einladen' }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.queryByText('Unsicher bei der Auswahl?')).toBeNull();
     expect(screen.queryByText(/meldet sich meist innerhalb/)).toBeNull();
-    expect(screen.getByRole('button', { name: /Angebot ansehen/ })).toBeInTheDocument();
+    // Kein Weg zum Ändern (Martin zu Fassung 31), keine eingeklappte Pflegesituation mehr.
+    expect(screen.queryByText(/Angaben ansehen oder ändern/)).toBeNull();
+    expect(screen.queryByText('Für Ihre Bewerbungen')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Pflegesituation/ })).toBeNull();
+    // Angebot als eine Zeile mit Preis, aufklappbar.
+    const zeile = screen.getByRole('button', { name: /Ihr Angebot/ });
+    expect(zeile).toHaveAttribute('aria-expanded', 'false');
+    expect(zeile.textContent).toContain('im Monat');
   }, 15_000);
 });

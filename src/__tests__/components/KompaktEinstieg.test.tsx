@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ABLAUF, AngebotAblaufStand, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, PflegekraftZeile, STAND_TITEL_1, VERTRAUEN, interesseText, standSchritt2 } from '../../components/portal/KompaktEinstieg';
+import { ABLAUF, ABLAUF_TITEL_1, AngebotAblaufStand, EINLADEN_TITEL, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, PflegekraftZeile, STAND_TEXT_1, VERTRAUEN, interesseText, standSchritt2 } from '../../components/portal/KompaktEinstieg';
 import type { Nurse } from '../../types';
 
 const basis: Nurse = {
@@ -253,39 +253,37 @@ describe('KompaktPflegekraefteBereich', () => {
   });
 });
 
-// Fassung 31: „So geht es weiter" NACH dem Absenden — dieselben drei Schritte mit Stand (Texte OpenAI mutig30).
+// Fassung 31/32: „So geht es weiter" NACH dem Absenden — dieselben drei Schritte mit Stand (Texte OpenAI mutig30/31).
 describe('AngebotAblaufStand', () => {
-  it('Schritt 1 abgehakt mit Weg zu den Angaben, Schritt 2 läuft mit der Zahl der Pflegekräfte, Schritt 3 wie vor dem Absenden plus Wunschstart', async () => {
-    const onAngaben = vi.fn();
-    render(<AngebotAblaufStand passende={4} wunschstart="2026-10-15" onAngaben={onAngaben} />);
+  it('Schritt 1 erledigt und nennt das Einladen (Link zu den Pflegekräften), Schritt 2 läuft, Schritt 3 wie vor dem Absenden plus Wunschstart', async () => {
+    const onEinladen = vi.fn();
+    render(<AngebotAblaufStand wunschstart="2026-10-15" onEinladen={onEinladen} />);
     const schritte = screen.getAllByRole('listitem');
     expect(schritte).toHaveLength(3);
-    expect(within(schritte[0]).getByText(STAND_TITEL_1)).toBeInTheDocument();
+    expect(within(schritte[0]).getByText(ABLAUF_TITEL_1)).toBeInTheDocument();
     expect(within(schritte[0]).getByLabelText('erledigt')).toBeInTheDocument();
+    expect(schritte[0].textContent).toContain(STAND_TEXT_1);
     expect(schritte[1]).toHaveAttribute('aria-current', 'step');
-    expect(schritte[1].textContent).toContain('Für Ihre Pflegesituation gibt es aktuell 4 passende Pflegekräfte.');
+    expect(schritte[1].textContent).toContain('Jede Bewerbung sehen Sie hier im Portal');
     expect(schritte[2].textContent).toContain(ABLAUF[2].text);
     expect(schritte[2].textContent).toContain('Ihr Wunschstart: 15.10.');
-    await userEvent.click(within(schritte[0]).getByRole('button', { name: /Angaben ansehen oder ändern/ }));
-    expect(onAngaben).toHaveBeenCalledTimes(1);
+    await userEvent.click(within(schritte[0]).getByRole('button', { name: new RegExp(EINLADEN_TITEL) }));
+    expect(onEinladen).toHaveBeenCalledTimes(1);
   });
 
-  it('ohne Wunschstart keine Startzeile; keine Reservierungsfrist, keine Zeitzusage', () => {
-    render(<AngebotAblaufStand passende={null} wunschstart={null} onAngaben={() => {}} />);
+  it('kein Weg zum Ändern der Angaben (Martin zu Fassung 31), ohne Wunschstart keine Startzeile, keine Frist', () => {
+    render(<AngebotAblaufStand wunschstart={null} onEinladen={() => {}} />);
+    expect(screen.queryByText(/ändern/)).toBeNull();
     expect(screen.queryByText(/Wunschstart/)).toBeNull();
-    expect(screen.queryByText(/72|Stunden|Tagen\b.*melde/)).toBeNull();
+    expect(screen.queryByText(/72|Stunden/)).toBeNull();
   });
 });
 
 describe('standSchritt2', () => {
-  it('ohne Zahl oder bei 0 nur der Satz zur E-Mail, nie eine geratene Zahl', () => {
-    expect(standSchritt2(null, 0)).toBe('Jede Bewerbung sehen Sie hier im Portal und erhalten sie per E\u2011Mail.');
-    expect(standSchritt2(0, 0)).toBe('Jede Bewerbung sehen Sie hier im Portal und erhalten sie per E\u2011Mail.');
-  });
-  it('Einzahl und Mehrzahl', () => {
-    expect(standSchritt2(1, 0)).toContain('aktuell 1 passende Pflegekraft.');
-    expect(standSchritt2(1, 1)).toBe('Sie haben bisher eine Bewerbung erhalten. Jede weitere sehen Sie hier im Portal und erhalten sie per E\u2011Mail.');
-    expect(standSchritt2(5, 3)).toContain('Sie haben bisher 3 Bewerbungen erhalten.');
+  it('ohne Bewerbung der Satz aus Fassung 30, mit Bewerbungen die Zahl (Einzahl und Mehrzahl)', () => {
+    expect(standSchritt2(0)).toBe('Jede Bewerbung sehen Sie hier im Portal und erhalten sie per E\u2011Mail.');
+    expect(standSchritt2(1)).toBe('Sie haben bisher eine Bewerbung erhalten. Neue Bewerbungen sehen Sie hier im Portal und erhalten sie per E\u2011Mail.');
+    expect(standSchritt2(3)).toContain('Sie haben bisher 3 Bewerbungen erhalten.');
   });
 });
 
