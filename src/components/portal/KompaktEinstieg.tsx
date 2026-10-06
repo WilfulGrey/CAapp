@@ -321,9 +321,12 @@ export const ABLAUF = [
    doch nicht plötzlich irgendwas ändern, das wollen wir nicht … Prüft das vorher mit OpenAI"): Schritt 1 ist erledigt, nennt aber
    das Einladen und führt zu den Pflegekräften; kein Weg zum Ändern mehr (wer etwas ändern muss, meldet sich bei Marta). Schritt 2
    ist der aktive. OpenAI mutig31: so „ehrlich", der Abschnitt darunter ohne rote „1" (sonst stünde unten eine aktive 1 gegen die
-   aktive 2 oben). Nicht übernommen: „Sobald eine Bewerbung eingeht …" (Bedingungs-Anfang) und ein umformulierter Schritt 3. */
+   aktive 2 oben). Nicht übernommen: „Sobald eine Bewerbung eingeht …" (Bedingungs-Anfang) und ein umformulierter Schritt 3.
+   Endkontrolle mutig32: Titel von Schritt 1 nach dem Absenden „Pflegesituation vollständig" (unter dem grünen Haken klang der
+   Aufgaben-Titel unerledigt, und „Pflegekräfte einladen" stand viermal untereinander); das Einladen steht in Text und Link. */
 export const SUCHE_LAEUFT_SATZ = 'Passende Pflegekräfte sehen jetzt Ihre Anfrage und können sich bei Ihnen bewerben.';
-export const STAND_TEXT_1 = 'Ihre Pflegesituation ist vollständig. Pflegekräfte, die Ihnen zusagen, können Sie weiter einladen, kostenlos und unverbindlich.';
+export const STAND_TITEL_1 = 'Pflegesituation vollständig';
+export const STAND_TEXT_1 = 'Pflegekräfte, die Ihnen zusagen, können Sie weiter einladen, kostenlos und unverbindlich.';
 export const EINLADEN_TITEL = 'Pflegekräfte einladen';
 export const EINLADEN_ZEILE = 'Mit Ihrer Einladung bitten wir die Pflegekraft um eine Bewerbung.';
 
@@ -368,7 +371,7 @@ export function AngebotAblaufStand({ bisherigeBewerbungen = 0, wunschstart, onEi
           <Check className="h-4 w-4" strokeWidth={3} aria-label="erledigt" />
         </span>
         <div className="min-w-0 pt-[3px]">
-          <p className={titel}>{ABLAUF_TITEL_1}</p>
+          <p className={titel}>{STAND_TITEL_1}</p>
           <p className={text}>{STAND_TEXT_1}</p>
           <button
             type="button"

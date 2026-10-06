@@ -52,8 +52,8 @@ describe('Ansicht nach dem Absenden im Look „angebot" (Fassung 31)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Ihre Suche läuft' }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText('Passende Pflegekräfte sehen jetzt Ihre Anfrage und können sich bei Ihnen bewerben.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'So geht es weiter' })).toBeInTheDocument();
-    expect(screen.getByText('Pflegesituation ergänzen und Pflegekräfte einladen')).toBeInTheDocument();
-    expect(screen.getByText(/Ihre Pflegesituation ist vollständig\. Pflegekräfte, die Ihnen zusagen, können Sie weiter einladen/)).toBeInTheDocument();
+    expect(screen.getByText('Pflegesituation vollständig')).toBeInTheDocument();
+    expect(screen.getByText(/Pflegekräfte, die Ihnen zusagen, können Sie weiter einladen, kostenlos und unverbindlich/)).toBeInTheDocument();
     expect(await screen.findByText('Ihr Wunschstart: 15.11.')).toBeInTheDocument();
     expect(screen.queryByText('Stand heute')).toBeNull();
     expect(await screen.findByRole('heading', { level: 2, name: 'Pflegekräfte einladen' }, { timeout: 5000 })).toBeInTheDocument();

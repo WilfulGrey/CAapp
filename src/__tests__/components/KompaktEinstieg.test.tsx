@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ABLAUF, ABLAUF_TITEL_1, AngebotAblaufStand, EINLADEN_TITEL, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, PflegekraftZeile, STAND_TEXT_1, VERTRAUEN, interesseText, standSchritt2 } from '../../components/portal/KompaktEinstieg';
+import { ABLAUF, AngebotAblaufStand, EINLADEN_TITEL, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, PflegekraftZeile, STAND_TEXT_1, STAND_TITEL_1, VERTRAUEN, interesseText, standSchritt2 } from '../../components/portal/KompaktEinstieg';
 import type { Nurse } from '../../types';
 
 const basis: Nurse = {
@@ -260,7 +260,7 @@ describe('AngebotAblaufStand', () => {
     render(<AngebotAblaufStand wunschstart="2026-10-15" onEinladen={onEinladen} />);
     const schritte = screen.getAllByRole('listitem');
     expect(schritte).toHaveLength(3);
-    expect(within(schritte[0]).getByText(ABLAUF_TITEL_1)).toBeInTheDocument();
+    expect(within(schritte[0]).getByText(STAND_TITEL_1)).toBeInTheDocument();
     expect(within(schritte[0]).getByLabelText('erledigt')).toBeInTheDocument();
     expect(schritte[0].textContent).toContain(STAND_TEXT_1);
     expect(schritte[1]).toHaveAttribute('aria-current', 'step');
