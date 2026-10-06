@@ -19,6 +19,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { AlertTriangle, Check, ChevronRight, Sparkles, UserRound } from 'lucide-react';
 import { GARANTIE_PORTAL } from '../../lib/garantie';
+import { HERO_PUNKTE } from '../../lib/heroPunkte';
 import type { Nurse } from '../../types';
 import type { SterneStand } from '../../lib/sterne';
 import { BewertungsZeile } from './BewertungsZeile';
@@ -121,21 +122,12 @@ export function AngebotPerson({ name, kuerzel }: { name: string | null; kuerzel:
  */
 export const EINLEITUNG_ABSATZ = 'Gerne übernehmen wir die Rund-um-Betreuung. Unsere Pflegekräfte sind direkt bei uns angestellt, ohne Vermittler, und wir kümmern uns um die komplette Abwicklung von Anfang bis Ende.';
 export const EINLEITUNG_TESTSIEGER = 'Für unseren Service hat uns DIE WELT nun zum sechsten Mal in Folge als Testsieger ausgezeichnet.';
-const ZAHLWORT = ['', 'eine', 'zwei', 'drei', 'vier', 'fünf'];
 /**
- * Runde 28 (Martin 06.10. zu Fassung 22: „nicht aufgebaut wie ein psychologisch gutes Angebot mit Fokus auf die
- * Pflegekräfte"): der zweite Absatz führt direkt zur Empfehlung darunter. `anzahl` = sichtbare Vorschläge (null = noch
- * nicht geladen, 0 = keine — dann entfällt der Absatz; nie eine Aussage über Kräfte, die nicht da sind).
+ * Runde 29 (Martin 06.10. zu Fassung 23: „wir müssen im normalen Angebot bleiben, also was bekomme ich, was kostet das,
+ * Hemmnisnehmer und dann die next Steps … klar machen, was ich bekomme und wie der Ablauf ist"): die Einleitung nennt
+ * genau diese Abschnitte, die darunter folgen.
  */
-export function auswahlSatz(anzahl: number | null): string {
-  // Ohne Vorschläge Martins voller Absatz (keine Aussage über Kräfte, die nicht da sind).
-  if (anzahl === 0) return EINLEITUNG_ABSATZ;
-  const n = anzahl !== null && anzahl >= 1 && anzahl <= 5 ? anzahl : null;
-  const auswahl = n === 1
-    ? 'Für Sie haben wir eine passende Pflegekraft ausgewählt, direkt bei uns angestellt und aktuell verfügbar.'
-    : `Für Sie haben wir ${n ? `${ZAHLWORT[n]} ` : ''}passende Pflegekräfte ausgewählt, alle direkt bei uns angestellt und aktuell verfügbar.`;
-  return `Gerne übernehmen wir die Rund-um-Betreuung, von Anfang bis Ende. ${auswahl} Sie entscheiden, wer zu Ihnen kommt.`;
-}
+export const EINLEITUNG = 'Gerne übernehmen wir die Rund-um-Betreuung, von Anfang bis Ende. Hier sehen Sie, was Sie bekommen, was es kostet und wie es weitergeht.';
 
 /** „Rund-um-Betreuung" bricht nie am Bindestrich um. */
 function ohneTrennung(text: string) {
@@ -143,22 +135,17 @@ function ohneTrennung(text: string) {
   return nach === undefined ? text : <>{vor}<span className="whitespace-nowrap">Rund-um-Betreuung</span>{nach}</>;
 }
 
-/**
- * Runde 28: EIN Absatz, der direkt zur Empfehlung darunter führt (Martins Kernaussagen: Rund-um-Betreuung von Anfang bis
- * Ende, direkt bei uns angestellt, aktuell verfügbar; dazu „Sie entscheiden, wer zu Ihnen kommt"). So steht das Foto der
- * Empfehlung im ersten Bildschirm.
- */
-export function AngebotEinleitung({ anzahl }: { anzahl: number | null }) {
-  return <p className="mt-5 text-pretty text-[17px] leading-[1.55] text-pm-body">{ohneTrennung(auswahlSatz(anzahl))}</p>;
+export function AngebotEinleitung() {
+  return <p className="mt-5 text-pretty text-[17px] leading-[1.55] text-pm-body">{ohneTrennung(EINLEITUNG)}</p>;
 }
 
 /**
  * Siegel mit Überschrift und dem Satz zur Auszeichnung (Runde 26, Martin: „daneben machen mit dieser Überschrift"); seit
  * Runde 28 als Beleg direkt unter dem Preis statt in der Einleitung, damit die Empfehlung in den ersten Bildschirm rückt.
  */
-export function AngebotTestsieger() {
+export function AngebotTestsieger({ className = 'mt-6' }: { className?: string }) {
   return (
-    <div className="mt-6 flex items-center gap-4">
+    <div className={`${className} flex items-center gap-4`}>
       {/* Siegel antippbar: Quelle und Einordnung stehen auf der Testsieger-Seite. */}
       <a href="https://primundus.de/testsieger-24-stunden-pflege" target="_blank" rel="noreferrer" className="flex-none" aria-label="Testsieger DIE WELT: Quelle ansehen">
         <img src="/badge-testsieger.webp" alt="" className="h-[76px] w-auto object-contain" />
@@ -215,6 +202,121 @@ export function AngebotKonditionen({ onBestpreis }: { onBestpreis: () => void })
         </button>
       </li>
     </ul>
+  );
+}
+
+/** Haken-Kachel wie `Punkte` auf primundus.de (Fassung 16, Martin: „die Punkte finde ich schon ganz gut"). */
+function Haken() {
+  return (
+    <span className="mt-[2px] flex h-[22px] w-[22px] flex-none items-center justify-center rounded-[7px] bg-pm-coral-tint text-pm-coral" aria-hidden="true">
+      <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2.5 6.3l2.3 2.2 4.7-5" />
+      </svg>
+    </span>
+  );
+}
+
+/**
+ * Runde 29: ein Abschnitt des Angebots — Überschrift auf dem Seitengrund, der Inhalt in einer weißen Karte (Martin zu
+ * Fassung 21: nichts lose „mit diesem komischen Hintergrund"). `karte=false` für Inhalte mit eigener Karte (Preis).
+ */
+export function AngebotAbschnitt({ id, titel, children, karte = true, className = 'mt-10' }: {
+  id: string; titel: string; children: ReactNode; karte?: boolean; className?: string;
+}) {
+  return (
+    <section aria-labelledby={id} className={className}>
+      <h2 id={id} className="scroll-mt-20 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">{titel}</h2>
+      {karte ? <div className="mt-4 rounded-card border border-pm-line bg-white px-5 py-5">{children}</div> : <div className="mt-4">{children}</div>}
+    </section>
+  );
+}
+
+const PUNKT = 'flex items-start gap-3 text-[16px] leading-[1.45] text-pm-ink';
+
+/**
+ * „Was Sie bekommen" (Runde 29): die Leistung in fünf Sätzen. Fakten: wohnt im Haushalt, Hilfe bei Körperpflege, Essen und
+ * Haushalt (Mustervertrag Anlage 2; Martins Fassung vom 03.10.), „bei uns angestellt" (Martin 30.09.; „legal, ohne
+ * Vermittler" Martin 05.10.), Anreise/Wechsel/Vertretung organisieren wir, Ansprechpartnerin täglich 8–20 Uhr, Pflegekräfte
+ * vorab sehen und selbst auswählen (USP „Pflegekräfte sofort einsehen", „Kein Vertrag vor der Auswahl").
+ */
+export const LEISTUNGEN = [
+  'Eine Pflegekraft, die bei Ihnen wohnt und im Alltag hilft: bei der Körperpflege, beim Essen und im Haushalt.',
+  'Sie ist legal bei uns angestellt, ohne Vermittler.',
+  'Anreise, Wechsel und Vertretung organisieren wir.',
+  'Ihre Ansprechpartnerin ist täglich von 8 bis 20 Uhr für Sie da.',
+  'Passende Pflegekräfte sehen Sie vorab, und Sie entscheiden, wer zu Ihnen kommt.',
+] as const;
+
+export function AngebotLeistungsListe() {
+  return (
+    <ul className="grid gap-3.5">
+      {LEISTUNGEN.map((t) => (
+        <li key={t} className={PUNKT}><Haken /><span>{ohneTrennung(t)}</span></li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * „Ihre Sicherheit" (Runde 29, Martins „Hemmnisnehmer"): die vier Punkte der Startseite (HERO_PUNKTE + Bestpreisgarantie,
+ * Martin 26.09.: „die müssen doch überall gleich sein") und die Auszeichnung als Beleg.
+ */
+export function AngebotSicherheit({ onBestpreis }: { onBestpreis: () => void }) {
+  return (
+    <>
+      <ul className="grid gap-3.5">
+        {HERO_PUNKTE.map((t) => (
+          <li key={t} className={PUNKT}><Haken /><span>{t}</span></li>
+        ))}
+        <li className={PUNKT}>
+          <Haken />
+          <span className="flex-1">{GARANTIE_PORTAL.titel}</span>
+          <button
+            type="button"
+            onClick={onBestpreis}
+            className="inline-flex min-h-[44px] -my-3 flex-none items-center font-semibold text-pm-taupe-ink hover:text-pm-ink"
+          >
+            Mehr Infos&nbsp;›
+          </button>
+        </li>
+      </ul>
+      <div className="mt-5 border-t border-pm-line pt-5">
+        <AngebotTestsieger className="" />
+      </div>
+    </>
+  );
+}
+
+/**
+ * „So geht es weiter" (Runde 29, Martin: „wie der Ablauf ist" — untereinander, nicht als Leiste): drei Schritte mit den
+ * freigegebenen Sätzen (02.10.). Die Pflegesituation ist KEIN Schritt; sie steht als Achtung darunter.
+ */
+export const ABLAUF = [
+  { titel: 'Pflegekräfte einladen', text: 'Gefällt Ihnen eine Pflegekraft, laden Sie sie ein, sich bei Ihnen zu bewerben. Das ist kostenlos und unverbindlich.' },
+  { titel: 'Bewerbungen erhalten', text: 'Passende Pflegekräfte bewerben sich bei Ihnen mit Foto, Erfahrung, Anreisedatum und Preis. Jede Bewerbung ist 72 Stunden für Sie reserviert.' },
+  { titel: 'Auswählen und starten', text: 'Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen und im Portal unterschreiben. Anreise schon ab 3 Tagen möglich.' },
+] as const;
+
+export function AngebotAblauf() {
+  return (
+    <ol className="grid gap-5">
+      {ABLAUF.map((schritt, i) => (
+        <li key={schritt.titel} className="flex gap-4">
+          <span
+            aria-hidden="true"
+            className={`flex h-8 w-8 flex-none items-center justify-center rounded-full text-[15px] font-semibold tabular-nums ${
+              i === 0 ? 'bg-pm-coral text-white' : 'bg-pm-shell text-pm-taupe-ink'
+            }`}
+          >
+            {i + 1}
+          </span>
+          <div className="min-w-0 pt-[3px]">
+            <p className="text-[17px] font-semibold leading-[1.3] text-pm-ink">{schritt.titel}</p>
+            <p className="mt-1 text-pretty text-[15px] leading-[1.5] text-pm-muted">{schritt.text}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -309,14 +411,13 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
     // Einsatz nicht) und den Pflegekräften in der Karte des Portals (MatchCard „V", wie nach dem Absenden), danach die
     // Schritte 3 und 4 als je ein Satz. Hinweis-Karte = Sprungziel `goto=anfragen`, das Formular klappt darin auf.
     return (
-      <section aria-labelledby="so-geht-es-weiter">
-        {/* Runde 27 (Martin zu Fassung 21: „So geht es weiter würde ich gar nicht in vier Punkte machen … der nächste Schritt
-            ist Pflegekräfte einladen … Sie können Pflegekräfte einladen, um Bewerbungen zu erhalten, und zur Not das Profil
-            noch ausfüllen, falls es nicht vorhanden ist … ansonsten reicht das"): eine Überschrift, ein Absatz, bei fehlenden
-            Angaben der Achtung-Kasten, dann die Pflegekräfte. Seit Runde 28 steht die Empfehlung oben (Sprungziel
-            `pflegekraefte` dort), hier die übrigen. */}
-        <h2 id="so-geht-es-weiter" className="scroll-mt-20 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">So geht es weiter</h2>
-        <p className="mt-3 text-pretty text-[17px] leading-[1.55] text-pm-body">{SO_GEHT_ES_WEITER}</p>
+      <>
+        {/* Runde 29 (Martin 06.10.: „was bekomme ich, was kostet das, Hemmnisnehmer und dann die next Steps … wie der Ablauf
+            ist"): der Ablauf in drei Schritten untereinander, darunter die Achtung (nur solange Angaben fehlen), dann die
+            Pflegekräfte zum Einladen — die Empfehlung zuerst. id `pflegekraefte` = Sprungziel `goto=matches`. */}
+        <AngebotAbschnitt id="so-geht-es-weiter" titel="So geht es weiter" className="">
+          <AngebotAblauf />
+        </AngebotAbschnitt>
         <div ref={hinweis} id="patientendaten" className="mt-5 scroll-mt-20">
           {/* Runde 24 (Martin zu Fassung 18: „dann kommt dieser Achtung, würde ich das nennen … also Achtung, auch Symbol"):
               Warnzeichen in Bernstein und das Wort „Achtung" vorn im Titel. */}
@@ -341,8 +442,11 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
             )}
           </Card>
         </div>
-        <div className="mt-6">{liste}</div>
-      </section>
+        <section aria-labelledby="pflegekraefte" className="mt-10">
+          <h2 id="pflegekraefte" className="scroll-mt-20 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">Ihre passenden Pflegekräfte</h2>
+          <div className="mt-4">{liste}</div>
+        </section>
+      </>
     );
   }
   return (

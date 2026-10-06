@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotEinleitung, AngebotKonditionen, AngebotKopf, AngebotLeistung, AngebotPerson, AngebotSterne, AngebotTestsieger, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { AngebotAbschnitt, AngebotEinleitung, AngebotKopf, AngebotLeistung, AngebotLeistungsListe, AngebotPerson, AngebotSicherheit, AngebotSterne, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2679,7 +2679,9 @@ const CustomerPortalPage: FC = () => {
         // Runde 17 (`?look=angebot`): die Karte als Angebot — Kopf mit Datum und Grundlage, Zeilen statt „Inklusive …".
         const angebotLook = kompakt && KOMPAKT_LOOK === 'angebot';
         return (
-        <div id={angebotLook ? 'angebot' : undefined} className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'scroll-mt-20 pt-7' : 'pt-10'}` : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
+        <div id={angebotLook ? 'angebot' : undefined} className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'scroll-mt-20 pt-10' : 'pt-10'}` : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
+          {/* Runde 29: Überschrift „Was es kostet" über der Angebotskarte. */}
+          {angebotLook && <h2 className="mb-4 text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">Was es kostet</h2>}
           {/* Karte im Look des Rechners (Teil 3, Martin 24.09.). „Ihr persönliches
               Angebot" steht im Kopf — der Abschnitt heißt nach seinem Inhalt. Der
               Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
@@ -2780,7 +2782,8 @@ const CustomerPortalPage: FC = () => {
                   {/* Kompakt-Einstieg: Haarlinie, die vier Punkte der Startseite (Runde 15: feiner grüner Haken,
                       16 px), Haarlinie, Testsieger-Siegel mit Testsieger/Erfahrung und darunter die Sterne. */}
                   {/* Runde 25: im Look „angebot" die Konditionen (kündbar, Bestpreisgarantie) als Teil des Angebots. */}
-                  {kompakt ? (angebotLook ? <AngebotKonditionen onBestpreis={() => setBestpreisOffen(true)} /> : vierPunkteRuhig) : vierPunkte('mt-4 flex flex-col gap-2.5')}
+                  {/* Runde 29: die Konditionen stehen jetzt unter „Ihre Sicherheit". */}
+                  {kompakt ? (angebotLook ? null : vierPunkteRuhig) : vierPunkte('mt-4 flex flex-col gap-2.5')}
                   {/* Runde 19: Im Look „angebot" stehen Siegel und Sterne oben unter dem Titel. */}
                   {kompakt && !angebotLook && <KompaktVertrauen sterne={sterne} />}
                   {!kompakt && kostenErst}
@@ -2959,8 +2962,12 @@ const CustomerPortalPage: FC = () => {
           </>
           )}
           </Card>
-          {/* Runde 28: Auszeichnung als Beleg direkt am Preis (vorher in der Einleitung). */}
-          {angebotLook && <AngebotTestsieger />}
+          {/* Runde 29: Martins „Hemmnisnehmer" nach dem Preis — die vier Punkte der Startseite und die Auszeichnung. */}
+          {angebotLook && (
+            <AngebotAbschnitt id="ihre-sicherheit" titel="Ihre Sicherheit">
+              <AngebotSicherheit onBestpreis={() => setBestpreisOffen(true)} />
+            </AngebotAbschnitt>
+          )}
         </div>
         );
       })();
@@ -3056,6 +3063,7 @@ const CustomerPortalPage: FC = () => {
     };
     const obenIdx = visibleNurses.length ? (recIdx >= 0 ? recIdx : 0) : -1;
     return {
+      alle: visibleNurses.map((_, idx) => karte(idx)),
       oben: obenIdx >= 0 ? karte(obenIdx) : null,
       // Vorname der Empfehlung für den Satz unter ihrem Knopf („… dann kann sich Ewa bei Ihnen bewerben").
       obenVorname: obenIdx >= 0 ? (displayName(visibleNurses[obenIdx].nurse.name).split(' ')[0] || null) : null,
@@ -3439,27 +3447,12 @@ const CustomerPortalPage: FC = () => {
                       vier Schritten steht erst unter dem Angebot (KompaktPflegekraefteBereich). */}
                   {/* Runde 26: Sterne unter dem Titel, das Siegel steht neben dem Testsieger-Satz der Einleitung. */}
                   <AngebotSterne sterne={sterne} />
-                  <AngebotEinleitung anzahl={kartenGeladen ? pflegekraftAuswahl.visibleNurses.length : null} />
-                  {/* Runde 28: die Empfehlung im ersten Bildschirm; bis die Liste da ist, der Lade-Hinweis an derselben Stelle.
-                      id `pflegekraefte` = Sprungziel `goto=matches` (Mail „Pflegekräfte ansehen") — landet bei der Empfehlung. */}
-                  <div id="pflegekraefte" className="scroll-mt-20">
-                  {!kartenGeladen ? (
-                    <div className="mt-6">
-                      <KompaktePflegekraefte eintraege={[]} laedt alleBearbeitet={false} keineVorschlaege={false} onProfil={openNurseFromMatch} telefonHref={TELEFON_HREF} />
-                    </div>
-                  ) : angebotKarten.oben && (
-                    <div className="mt-6">
-                      {angebotKarten.oben}
-                      {/* OpenAI 06.10. (mutig15): der erste Knopf klingt nach Arbeit — direkt darunter, was er bringt und
-                          was er kostet (sonst steht das erst im Achtung-Kasten weiter unten). */}
-                      {!patientSaved && (
-                        <p className="mt-3 text-balance text-center text-[14.5px] leading-[1.45] text-pm-muted">
-                          Kostenlos und unverbindlich. Dauert etwa 2&nbsp;Minuten, dann kann sich {angebotKarten.obenVorname ?? 'die Pflegekraft'} bei Ihnen bewerben.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  </div>
+                  <AngebotEinleitung />
+                  {/* Runde 29: das Angebot in der Reihenfolge, nach der Kunden fragen — was bekomme ich, was kostet es, worauf
+                      kann ich mich verlassen, wie geht es weiter. */}
+                  <AngebotAbschnitt id="was-sie-bekommen" titel="Was Sie bekommen">
+                    <AngebotLeistungsListe />
+                  </AngebotAbschnitt>
                 </>
               ) : kompakt && <KompaktEinleitung />}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
@@ -3848,7 +3841,7 @@ const CustomerPortalPage: FC = () => {
 
       {!hasPending && (
       <div>
-      <div className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'pt-14' : 'pt-10'}` : 'px-3.5 pt-1 pb-4 space-y-4'}`}>
+      <div className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'pt-10' : 'pt-10'}` : 'px-3.5 pt-1 pb-4 space-y-4'}`}>
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
              PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}
@@ -3868,9 +3861,9 @@ const CustomerPortalPage: FC = () => {
           onOeffnen={() => setFormImKasten(true)}
           onImBlick={setFormularImBlick}
           liste={KOMPAKT_LOOK === 'angebot' && kartenGeladen && pflegekraftAuswahl.visibleNurses.length > 0 ? (
-            // Runde 28: die Empfehlung steht oben unter der Einleitung, hier die übrigen Vorschläge (MatchCard wie im Portal).
-            <div className="space-y-3">{angebotKarten.rest}</div>
-          ) : KOMPAKT_LOOK === 'angebot' && !kartenGeladen ? null : (
+            // Runde 29: alle Vorschläge unter „Ihre passenden Pflegekräfte", die Empfehlung zuerst (MatchCard wie im Portal).
+            <div className="space-y-3">{angebotKarten.alle}</div>
+          ) : (
             <KompaktePflegekraefte
               eintraege={pflegekraftAuswahl.visibleNurses}
               laedt={listeLaedt}
