@@ -245,9 +245,11 @@ export function AngebotKopfleiste({ datum }: { datum: string | null }) {
  * Angebotsschreiben, ohne Zwischenzeile und ohne „Wort: Satz". Wer kommt und was sie tut, dann was passiert, wenn es
  * hakt. „Bei uns angestellt" und die Abwicklung stehen in der Einleitung, hier nicht noch einmal. Fakten: wohnt im
  * Haushalt; Grundpflege und Haushalt (Mustervertrag Anlage 2); Ersatz „in der Regel innerhalb von 3 Tagen", auch wenn es
- * nicht passt (Mustervertrag § 1 Nr. 4, Martin 01.10.). Eine Pflegekraft auch bei zwei Personen.
+ * nicht passt (Mustervertrag § 1 Nr. 4, Martin 01.10.). Eine Pflegekraft auch bei zwei Personen. OpenAI (mutig20): „zieht
+ * ein" statt „wohnt bei Ihnen" (liest oft die Tochter, betreut wird bei den Eltern; Martins Ortsseiten-Text „zieht … ein"),
+ * „Mahlzeiten" statt „Essen".
  */
-export const BESCHREIBUNG = 'Eine Pflegekraft wohnt bei Ihnen und hilft bei Körperpflege, Essen, Haushalt und Einkauf. Fällt sie aus oder passt die Zusammenarbeit nicht, kommt in der Regel innerhalb von 3 Tagen Ersatz.';
+export const BESCHREIBUNG = 'Eine Pflegekraft zieht ein und hilft bei Körperpflege, Mahlzeiten, Haushalt und Einkauf. Fällt sie aus oder passt die Zusammenarbeit nicht, kommt in der Regel innerhalb von 3 Tagen Ersatz.';
 
 export function AngebotBeschreibung() {
   return <p className="mt-3 text-pretty text-[16px] leading-[1.55] text-pm-body">{BESCHREIBUNG}</p>;
@@ -455,8 +457,8 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
                 <div className="min-w-0">
                   <p className="text-[15.5px] font-semibold leading-[1.3] text-pm-ink">Achtung: Es fehlen noch Angaben zur Pflegesituation</p>
                   <p className="mt-1 text-[14.5px] leading-[1.45] text-pm-muted">
-                    {/* mutig18: „den Einsatz bei Ihnen" statt „Ihren Einsatz" (den Einsatz hat die Pflegekraft, nicht der Kunde). */}
-                    Erst damit kennen die Pflegekräfte den Einsatz bei Ihnen und können sich bewerben. Dauert etwa 2&nbsp;Minuten, vieles ist schon ausgefüllt.
+                    {/* mutig18/20: „den Einsatz" statt „Ihren Einsatz" (den Einsatz hat die Pflegekraft) und ohne „bei Ihnen" (liest oft die Tochter). */}
+                    Erst damit kennen die Pflegekräfte den Einsatz und können sich bewerben. Dauert etwa 2&nbsp;Minuten, vieles ist schon ausgefüllt.
                   </p>
                 </div>
               </div>
