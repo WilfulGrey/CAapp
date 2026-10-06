@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotBeschreibung, AngebotEinleitung, AngebotKopfleiste, AngebotLeistung, AngebotPerson, AngebotSicherheit, AngebotSterne, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { AngebotEinleitung, AngebotKopfleiste, AngebotLeistung, AngebotPerson, AngebotSicherheit, AngebotSterne, AngebotTestsieger, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2730,10 +2730,11 @@ const CustomerPortalPage: FC = () => {
                         <>
                           <AngebotKopfleiste datum={angebotDatum(lead?.created_at)} />
                           <AngebotLeistung fuer={angebotFuer((lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined)} />
-                          <AngebotBeschreibung />
+                          {/* Runde 32 (Martin zu Fassung 26: „nach Rund-um-Betreuung zu Hause muss schon der Preis kommen und
+                              nicht, wie es funktioniert"): kein Beschreibungstext mehr in der Karte, der steht in den Fragen. */}
                         </>
                       )}
-                      <p className={`${angebotLook ? 'mt-5 border-t border-pm-line pt-5 ' : ''}flex items-baseline gap-2 whitespace-nowrap`}>
+                      <p className={`${angebotLook ? 'mt-4 ' : ''}flex items-baseline gap-2 whitespace-nowrap`}>
                         <span className={`text-[44px] ${angebotLook ? 'font-extrabold tracking-[-0.04em]' : 'font-bold tracking-[-0.03em]'} leading-none tabular-nums text-pm-ink`}>{formatEuro(brutto)}</span>
                         <span className="text-[16px] text-pm-muted">im Monat</span>
                       </p>
@@ -3442,7 +3443,9 @@ const CustomerPortalPage: FC = () => {
                   {/* Runde 26: Sterne unter dem Titel, das Siegel steht neben dem Testsieger-Satz der Einleitung. */}
                   <AngebotSterne sterne={sterne} />
                   <AngebotEinleitung />
-                  {/* Runde 30: was der Kunde bekommt, steht jetzt IN der einen Angebotskarte darunter. */}
+                  {/* Runde 32 (Martin zu Fassung 26: „das mit dem Testsieger hätte ich vielleicht hier"): Siegel mit Satz direkt
+                      unter der Einleitung, getrennt von den Sternen über ihr (Martin zu Fassung 20). */}
+                  <AngebotTestsieger className="mt-5" klein />
                 </>
               ) : kompakt && <KompaktEinleitung />}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt

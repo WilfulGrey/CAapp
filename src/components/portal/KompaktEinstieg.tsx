@@ -123,14 +123,13 @@ export function AngebotPerson({ name, kuerzel }: { name: string | null; kuerzel:
 export const EINLEITUNG_ABSATZ = 'Gerne übernehmen wir die Rund-um-Betreuung. Unsere Pflegekräfte sind direkt bei uns angestellt, ohne Vermittler, und wir kümmern uns um die komplette Abwicklung von Anfang bis Ende.';
 export const EINLEITUNG_TESTSIEGER = 'Für unseren Service hat uns DIE WELT nun zum sechsten Mal in Folge als Testsieger ausgezeichnet.';
 /**
- * Runde 31 (Martin 06.10. zu Fassung 25: „Gerne übernehmen wir … Hier sehen Sie, was Sie bekommen. Das hört sich schlecht
- * an, der Satz ist miserabel. Das musst du mit OpenAI besser machen."): zurück zu seinem eigenen Entwurf vom 05.10.
- * („Gerne übernehmen wir die Rund-um-Betreuung. Unsere Pflegekräfte sind bei uns angestellt und wir übernehmen die
- * komplette Abwicklung von Anfang bis Ende."), dazu der Nutzen aus seinem Wort vom 20.09. („Entlastung der Angehörigen").
- * „kümmern uns um" statt des zweiten „übernehmen" (OpenAI 05.10., mutig11). OpenAI 06.10. (mutig19): Nutzen in die
- * Einleitung, keine ankündigenden Sätze („Hier sehen Sie …"). „Ihre Familie" passt auch, wenn der Leser selbst betreut wird.
+ * Runde 32 (Martin 06.10. zu Fassung 26: „die zweite Version finde ich ganz gut, aber … bei uns angestellt. Wir kümmern
+ * uns seit über 20 Jahren um die komplette Abwicklung von Anfang bis Ende." — sein Diktat, wörtlich). Der Testsieger,
+ * den er hier haben möchte, steht als Siegel-Zeile direkt darunter (`AngebotTestsieger`, Satz schon freigegeben), damit
+ * er nicht zweimal auf der Seite steht. „Ihre Familie" passt auch, wenn der Leser selbst betreut wird. OpenAI 06.10.
+ * (mutig21): liest sich natürlich; „seit über 20 Jahren" ist Martins Wort (belegt: seit 2006).
  */
-export const EINLEITUNG = 'Gerne übernehmen wir die Rund-um-Betreuung und entlasten Ihre Familie. Unsere Pflegekräfte sind bei uns angestellt, und wir kümmern uns um die komplette Abwicklung von Anfang bis Ende.';
+export const EINLEITUNG = 'Gerne übernehmen wir die Rund-um-Betreuung und entlasten Ihre Familie. Unsere Pflegekräfte sind bei uns angestellt. Wir kümmern uns seit über 20 Jahren um die komplette Abwicklung von Anfang bis Ende.';
 
 /** „Rund-um-Betreuung" bricht nie am Bindestrich um. */
 function ohneTrennung(text: string) {
@@ -239,22 +238,6 @@ export function AngebotKopfleiste({ datum }: { datum: string | null }) {
   );
 }
 
-/**
- * Leistung in der Angebotskarte (Runde 31, Martin zu Fassung 25: „Das bekommen Sie finde ich total schlecht … bei uns
- * angestellt und plötzlich Anreise und Wechsel organisieren wir, das ist alles Mist"): zwei Sätze wie in einem
- * Angebotsschreiben, ohne Zwischenzeile und ohne „Wort: Satz". Wer kommt und was sie tut, dann was passiert, wenn es
- * hakt. „Bei uns angestellt" und die Abwicklung stehen in der Einleitung, hier nicht noch einmal. Fakten: wohnt im
- * Haushalt; Grundpflege und Haushalt (Mustervertrag Anlage 2); Ersatz „in der Regel innerhalb von 3 Tagen", auch wenn es
- * nicht passt (Mustervertrag § 1 Nr. 4, Martin 01.10.). Eine Pflegekraft auch bei zwei Personen. OpenAI (mutig20): „zieht
- * ein" statt „wohnt bei Ihnen" (liest oft die Tochter, betreut wird bei den Eltern; Martins Ortsseiten-Text „zieht … ein"),
- * „Mahlzeiten" statt „Essen".
- */
-export const BESCHREIBUNG = 'Eine Pflegekraft zieht ein und hilft bei Körperpflege, Mahlzeiten, Haushalt und Einkauf. Fällt sie aus oder passt die Zusammenarbeit nicht, kommt in der Regel innerhalb von 3 Tagen Ersatz.';
-
-export function AngebotBeschreibung() {
-  return <p className="mt-3 text-pretty text-[16px] leading-[1.55] text-pm-body">{BESCHREIBUNG}</p>;
-}
-
 /** Haken-Kachel 20 px wie `AngebotKonditionen` (gemessen: so bleibt „Täglich kündbar, taggenau abgerechnet" bei 390 px einzeilig). */
 function KleinerHaken() {
   return (
@@ -268,7 +251,7 @@ function KleinerHaken() {
 
 /**
  * Abschluss der Angebotskarte (Runde 30): die vier festen Punkte (HERO_PUNKTE + Bestpreisgarantie, Martin 26.09.: „die
- * müssen doch überall gleich sein"), darunter die Auszeichnung klein — ohne eigene Überschrift und ohne zweite Karte.
+ * müssen doch überall gleich sein"). Seit Runde 32 ohne Siegel: Martin will den Testsieger bei der Einleitung.
  */
 export function AngebotSicherheit({ onBestpreis }: { onBestpreis: () => void }) {
   const zeile = 'flex items-start gap-2 text-[14.5px] font-medium leading-[1.4] text-pm-ink';
@@ -290,9 +273,6 @@ export function AngebotSicherheit({ onBestpreis }: { onBestpreis: () => void }) 
           </button>
         </li>
       </ul>
-      <div className="mt-5 border-t border-pm-line pt-5">
-        <AngebotTestsieger className="" klein />
-      </div>
     </div>
   );
 }
