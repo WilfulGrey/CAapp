@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { Kalkulation, generateToken, getTokenExpiry } from './calculation';
 import { abgleichNachAnfrage, pendingNachAbgleich, resyncAufrufen, type MamamiaStatus } from './mamamia-abgleich';
+import { FD_KEYS, norm } from './angaben-diff';
 
 /* Service-Key: leads und lead_events sind für den Anon-Schlüssel per RLS zu.
    Bis 10/2026 lief die Lead-Anlage hier auf dem Anon-Schlüssel und brauchte
@@ -130,8 +131,13 @@ export async function findOrCreateLead(
         message: 'Lead bereits vorhanden, Kalkulation aktualisiert',
         kalkulation_changed: kalkulationChanged,
       });
-      // Registry #113: der Kunde sieht ab jetzt das neue Angebot — Mamamia zieht nach.
-      if (data?.kalkulation) mamamiaImHintergrund(latestLead, data.kalkulation);
+      // Registry #113: Verlauf festhalten (die alte kalkulation ist eben überschrieben
+      // worden, latestLead trägt sie noch) und Mamamia nachziehen — der Kunde sieht
+      // ab jetzt das neue Angebot.
+      if (data?.kalkulation) {
+        await anfrageVerlaufFesthalten(latestLead, data.kalkulation, data.quelle);
+        mamamiaImHintergrund(latestLead, data.kalkulation);
+      }
       return { lead: updatedLead || latestLead, isNew: false, isUpgrade: false, kalkulationChanged };
     }
 
@@ -182,7 +188,10 @@ export async function findOrCreateLead(
         from: latestLead.status,
         to: targetStatus,
       });
-      if (data?.kalkulation) mamamiaImHintergrund(latestLead, data.kalkulation);
+      if (data?.kalkulation) {
+        await anfrageVerlaufFesthalten(latestLead, data.kalkulation, data.quelle);
+        mamamiaImHintergrund(latestLead, data.kalkulation);
+      }
 
       return { lead: updatedLead, isNew: false, isUpgrade: true, kalkulationChanged: false };
     }
@@ -321,6 +330,54 @@ export async function validateToken(token: string): Promise<{
    gebuchter Job wird nicht angefasst. Im Hintergrund (bis 25 s), Lead, Mails
    und Antwort warten nicht darauf. Fehler ⇒ mamamia_sync_pending, der Admin
    wiederholt mit „Mamamia erneut synchronisieren". */
+/* Verlauf der Anfragen (Registry #113, Martin 06.10.2026): „Anfrage erneut gemacht
+   und Angebot aktualisiert — dann klicken wir drauf und sehen, was der Kunde
+   angefragt hat." findOrCreateLead überschreibt leads.kalkulation; ohne dieses
+   Ereignis wären die erste Anfrage und jede Zwischenstufe verloren. Das SA-Portal
+   liest es (mamamia-sadash, PortalIntakeController) und zeigt je Ereignis einen
+   Eintrag in der Historie; `alt` des ersten Ereignisses ist die Ur-Anfrage.
+   Nur wenn sich Angaben oder Preis geändert haben. */
+export type AnfrageStand = { bruttopreis: number | null; eigenanteil: number | null; formularDaten: Record<string, unknown> };
+
+function stand(k: Kalkulation | null | undefined): AnfrageStand {
+  const x = (k ?? {}) as { bruttopreis?: unknown; eigenanteil?: unknown; formularDaten?: unknown };
+  const zahl = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  return {
+    bruttopreis: zahl(x.bruttopreis),
+    eigenanteil: zahl(x.eigenanteil),
+    formularDaten: (x.formularDaten && typeof x.formularDaten === 'object' ? x.formularDaten : {}) as Record<string, unknown>,
+  };
+}
+
+export function erneuteAnfrage(
+  alt: Kalkulation | null | undefined,
+  neu: Kalkulation | null | undefined,
+  quelle?: string,
+): { quelle: string | null; alt: AnfrageStand; neu: AnfrageStand; geaendert: Array<{ key: string; alt: unknown; neu: unknown }>; preis_geaendert: boolean } | null {
+  if (!neu) return null;
+  const a = stand(alt);
+  const n = stand(neu);
+  const geaendert = FD_KEYS
+    .filter((k) => norm(a.formularDaten[k]) !== norm(n.formularDaten[k]))
+    .map((k) => ({ key: k, alt: a.formularDaten[k] ?? null, neu: n.formularDaten[k] ?? null }));
+  const preis_geaendert = a.bruttopreis !== null && n.bruttopreis !== null
+    ? Math.round(a.bruttopreis) !== Math.round(n.bruttopreis)
+    : a.bruttopreis !== n.bruttopreis;
+  if (!geaendert.length && !preis_geaendert) return null;
+  return { quelle: quelle ?? null, alt: a, neu: n, geaendert, preis_geaendert };
+}
+
+async function anfrageVerlaufFesthalten(vorher: Lead, neu: Kalkulation, quelle?: string): Promise<void> {
+  const ereignis = erneuteAnfrage(vorher.kalkulation as Kalkulation | null, neu, quelle);
+  if (!ereignis) return;
+  try {
+    await logEvent(vorher.id, 'anfrage_erneut', ereignis);
+  } catch (e) {
+    // Nie die Anfrage selbst gefährden.
+    console.error(`[anfrage-erneut] lead=${vorher.id} Ereignis nicht gespeichert: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
 function mamamiaImHintergrund(vorher: Lead, neu: Kalkulation): void {
   mamamiaNachAnfrage(vorher, neu).catch((e) =>
     console.error(`[mamamia-nach-anfrage] lead=${vorher.id} threw: ${e instanceof Error ? e.message : String(e)}`));
