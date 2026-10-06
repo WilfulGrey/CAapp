@@ -121,3 +121,32 @@ describe('BookedScreen — Vertrag nachträglich abschließen', () => {
     expect(screen.queryByRole('button', { name: /Vertrag jetzt abschließen/ })).toBeNull();
   });
 });
+
+// Fassung 34 (Martin 06.10.2026: „nur Kleinigkeiten, damit das einfach nur optisch zu dem anderen passt"): Kopf mit Anrede,
+// Abschnitt „Als Nächstes“ als Überschrift, beim beendeten Einsatz „Ihre Unterlagen“, Marta am Ende nur mit `sterne`.
+describe('BookedScreen — Fassung 34', () => {
+  it('Kopf mit Anrede und Überschrift „Als Nächstes“', () => {
+    render(
+      <BookedScreen app={makeApp()} onNurseClick={() => {}} vertragSigned kopf={{ name: 'Frau Müller', kuerzel: 'AM' }} />,
+    );
+    expect(screen.getByText(/Frau Müller/)).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: /Pflegekraft gebucht/ })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: 'Als Nächstes' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Ihre Unterlagen' })).toBeNull();
+  });
+
+  it('einsatzBeendet → Abschnitt heißt „Ihre Unterlagen“', () => {
+    render(<BookedScreen app={makeApp()} onNurseClick={() => {}} vertragSigned einsatzBeendet />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Einsatz beendet' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: 'Ihre Unterlagen' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Als Nächstes' })).toBeNull();
+  });
+
+  it('Marta-Kasten nur, wenn `sterne` übergeben ist (auch null = Stand unbekannt)', () => {
+    const { unmount } = render(<BookedScreen app={makeApp()} onNurseClick={() => {}} vertragSigned />);
+    expect(screen.queryByText('Noch Fragen?')).toBeNull();
+    unmount();
+    render(<BookedScreen app={makeApp()} onNurseClick={() => {}} vertragSigned sterne={null} />);
+    expect(screen.getByText('Noch Fragen?')).toBeTruthy();
+  });
+});
