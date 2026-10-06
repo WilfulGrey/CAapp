@@ -107,9 +107,9 @@ export const BookedScreen: FC<{
         </div>
       )}
 
-      <div className="mt-8">
-        <MonatsAufstellung offer={offer} />
-      </div>
+      <section className="mt-10">
+        <MonatsAufstellung offer={offer} abschnitt />
+      </section>
 
       <section aria-labelledby="als-naechstes" className="mt-10">
         <h2 id="als-naechstes" className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">Als Nächstes</h2>
