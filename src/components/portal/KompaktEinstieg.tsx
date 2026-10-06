@@ -243,11 +243,13 @@ export function AngebotKopfleiste({ datum }: { datum: string | null }) {
  * Haushalt (Mustervertrag Anlage 2); „bei uns angestellt" (Martin 30.09.); Anreise und Wechsel organisieren wir; Ersatz
  * „in der Regel innerhalb von 3 Tagen", auch wenn es nicht passt (Mustervertrag § 1 Nr. 4, Martin 01.10.).
  * OpenAI 06.10. (mutig17): Nutzen zuerst mit fetten Anfangswörtern; kein „1:1" (Angebote für zwei Personen), kein „nachts".
+ * mutig18: „legal und sozialversichert" (Martin 05.10.: „legal, ohne Vermittler"; Mustervertrag § 9), „wenn die Zusammenarbeit
+ * nicht passt" statt „wenn es nicht passt".
  */
 export const ENTHALTEN = [
   { titel: 'Ihre Pflegekraft', text: 'wohnt bei Ihnen und hilft bei Körperpflege, Essen, Haushalt und Einkauf.' },
-  { titel: 'Bei uns angestellt', text: 'Anreise und Wechsel organisieren wir.' },
-  { titel: 'Ersatz', text: 'bei Ausfall oder wenn es nicht passt, in der Regel innerhalb von 3 Tagen.' },
+  { titel: 'Bei uns angestellt', text: 'legal und sozialversichert. Anreise und Wechsel organisieren wir.' },
+  { titel: 'Ersatz', text: 'bei Ausfall oder wenn die Zusammenarbeit nicht passt, in der Regel innerhalb von 3 Tagen.' },
 ] as const;
 const ENTHALTEN_SYMBOL = [Home, BadgeCheck, RefreshCw] as const;
 
@@ -458,7 +460,8 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
                 <div className="min-w-0">
                   <p className="text-[15.5px] font-semibold leading-[1.3] text-pm-ink">Achtung: Es fehlen noch Angaben zur Pflegesituation</p>
                   <p className="mt-1 text-[14.5px] leading-[1.45] text-pm-muted">
-                    Erst damit kennen die Pflegekräfte Ihren Einsatz und können sich bewerben. Dauert etwa 2&nbsp;Minuten, vieles ist schon ausgefüllt.
+                    {/* mutig18: „den Einsatz bei Ihnen" statt „Ihren Einsatz" (den Einsatz hat die Pflegekraft, nicht der Kunde). */}
+                    Erst damit kennen die Pflegekräfte den Einsatz bei Ihnen und können sich bewerben. Dauert etwa 2&nbsp;Minuten, vieles ist schon ausgefüllt.
                   </p>
                 </div>
               </div>
