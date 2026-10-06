@@ -604,6 +604,10 @@ export interface ResyncResult {
   identity_error?: string;
   /* Nur mit `jobPreis` (Registry #113): Ergebnis für den Preis des Jobs. */
   job?: JobPreisErgebnis;
+  /* Nur mit `notiz` (Registry #113): Notiz in den Kunden-Aktivitäten. Best effort —
+     ein Fehler hier macht den Abgleich nicht rückgängig und nicht zum Fehler. */
+  notiz?: "gespeichert" | "fehler";
+  notiz_error?: string;
 }
 
 interface ResyncPatientRow {
@@ -796,6 +800,30 @@ export async function jobPreisNachziehen(args: {
   return { status: "aktualisiert", ...basis };
 }
 
+/* Notiz in den Kunden-Aktivitäten (Registry #113, Martin 06.10.2026: „Anfrage
+   erneut gemacht und Angebot aktualisiert" muss in der SA-Historie stehen — zentral
+   in Mamamia, keine Ablage daneben). Derselbe Weg wie das SA-Portal für Notizen und
+   für „💶 Angebot angepasst" (mamamia-sadash CustomerNoteController::store,
+   OfferAdjustController): StoreCustomerSaContact mit contact "note_only". Der Text
+   kommt vom Kostenrechner, die Zeile zum Job hängt diese Funktion an. */
+const RESYNC_NOTIZ = /* GraphQL */ `
+  mutation StoreCustomerSaContact($customer_id: Int, $contact: String, $message: String) {
+    StoreCustomerSaContact(customer_id: $customer_id, contact: $contact, message: $message) { id }
+  }
+`;
+
+const euroDe = (n: number) => `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 }).format(Math.round(n))} €`;
+
+export function notizJobZeile(job: JobPreisErgebnis | undefined): string {
+  if (!job) return "";
+  switch (job.status) {
+    case "aktualisiert": return ` — Job in Mamamia: ${job.alt != null ? euroDe(job.alt) : "–"} → ${euroDe(job.neu)}`;
+    case "unveraendert": return ` — Job hatte schon ${euroDe(job.neu)}`;
+    case "gebucht": return " — Job ist gebucht, Preis dort nicht geändert";
+    case "ohne_anreise": return " — Job ohne Anreisedatum, Preis dort nicht geändert";
+  }
+}
+
 /* ─── Identitaet eines Vermittler-Falls (Registry #67) ────────────────────
    Beim Vermittler traegt der Mamamia-Kunde bisher den Ansprechpartner der
    Agentur — bei Pflegena acht Mal "Bernd Walde". Diese Mutation setzt den
@@ -930,10 +958,13 @@ export async function resyncCustomerFromLead(args: {
    *  (lead.mamamia_job_offer_id) setzen — Weg wie das SA-Portal, siehe
    *  jobPreisNachziehen. Ohne `budget` wirkungslos. */
   jobPreis?: boolean;
+  /** Registry #113: Text für eine Notiz in den Kunden-Aktivitäten (Weg wie das
+   *  SA-Portal); die Zeile zum Job wird angehängt. Best effort. */
+  notiz?: string;
   secrets: OnboardSecrets;
   fetchFn?: typeof fetch;
 }): Promise<ResyncResult> {
-  const { lead, felder, budget, details, jobPreis, secrets, fetchFn = globalThis.fetch } = args;
+  const { lead, felder, budget, details, jobPreis, notiz, secrets, fetchFn = globalThis.fetch } = args;
   const customerId = lead.mamamia_customer_id;
   if (!customerId) throw new Error("lead not onboarded (no mamamia_customer_id)");
   const fd = lead.kalkulation?.formularDaten;
@@ -1097,6 +1128,23 @@ export async function resyncCustomerFromLead(args: {
       endpoint: secrets.mamamiaEndpoint,
       fetchFn,
     });
+  }
+
+  if (notiz) {
+    try {
+      await mamamiaRequest<{ StoreCustomerSaContact: { id: number } }>({
+        endpoint: secrets.mamamiaEndpoint,
+        token: agencyToken,
+        query: RESYNC_NOTIZ,
+        variables: { customer_id: customerId, contact: "note_only", message: `${notiz}${notizJobZeile(ergebnis.job)}` },
+        fetchFn,
+      });
+      ergebnis.notiz = "gespeichert";
+    } catch (e) {
+      ergebnis.notiz = "fehler";
+      ergebnis.notiz_error = (e as Error).message;
+      console.warn(`[onboard] resync notiz customer=${customerId} failed: ${(e as Error).message}`);
+    }
   }
 
   /* ─── Identitaet (Registry #67) ──────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { Kalkulation, generateToken, getTokenExpiry } from './calculation';
-import { abgleichNachAnfrage, pendingNachAbgleich, resyncAufrufen, type MamamiaStatus } from './mamamia-abgleich';
+import { abgleichNachAnfrage, anfrageNotiz, pendingNachAbgleich, resyncAufrufen, type MamamiaStatus } from './mamamia-abgleich';
 
 /* Service-Key: leads und lead_events sind für den Anon-Schlüssel per RLS zu.
    Bis 10/2026 lief die Lead-Anlage hier auf dem Anon-Schlüssel und brauchte
@@ -318,9 +318,11 @@ export async function validateToken(token: string): Promise<{
    angelegt, laufen die geänderten Angaben und der neue Preis über DENSELBEN
    Weg wie die Admin-Korrektur (#55): onboard-to-mamamia { resync } — Kunde
    per UpdateCustomer, Job-Preis per UpdateJobOffer wie das SA-Portal; ein
-   gebuchter Job wird nicht angefasst. Im Hintergrund (bis 25 s), Lead, Mails
-   und Antwort warten nicht darauf. Fehler ⇒ mamamia_sync_pending, der Admin
-   wiederholt mit „Mamamia erneut synchronisieren". */
+   gebuchter Job wird nicht angefasst. Dazu eine Notiz in den Kunden-Aktivitäten
+   in Mamamia (Weg wie das SA-Portal) — so steht die erneute Anfrage in der
+   SA-Historie, ohne Ablage neben Mamamia (Martin 06.10.2026). Im Hintergrund
+   (bis 25 s), Lead, Mails und Antwort warten nicht darauf. Fehler ⇒
+   mamamia_sync_pending, der Admin wiederholt mit „Mamamia erneut synchronisieren". */
 function mamamiaImHintergrund(vorher: Lead, neu: Kalkulation): void {
   mamamiaNachAnfrage(vorher, neu).catch((e) =>
     console.error(`[mamamia-nach-anfrage] lead=${vorher.id} threw: ${e instanceof Error ? e.message : String(e)}`));
@@ -341,7 +343,8 @@ export async function mamamiaNachAnfrage(
 
   const datenbank = deps.db ?? db();
   const mamamia = await resyncAufrufen({
-    supabaseUrl: url, serviceKey: key, leadId: vorher.id, felder: plan.felder, budget: plan.budget, fetchFn: deps.fetchFn,
+    supabaseUrl: url, serviceKey: key, leadId: vorher.id, felder: plan.felder, budget: plan.budget,
+    notiz: anfrageNotiz(vorher.kalkulation as Kalkulation | null, neu), fetchFn: deps.fetchFn,
   });
 
   // Pending nur schreiben, wenn die Kalkulation noch dieselbe ist — eine
@@ -354,18 +357,6 @@ export async function mamamiaNachAnfrage(
     await datenbank.from('leads').update({ kalkulation: pendingNachAbgleich(k, mamamia, plan.felder, plan.budget) }).eq('id', vorher.id);
   }
 
-  await datenbank.from('lead_events').insert({
-    lead_id: vorher.id,
-    event_type: 'mamamia_abgleich_nach_anfrage',
-    metadata: {
-      felder: plan.felder,
-      alt_preis: (vorher.kalkulation as Kalkulation | null)?.bruttopreis ?? null,
-      neu_preis: neu.bruttopreis ?? null,
-      status: mamamia.status,
-      message: mamamia.message,
-      ...(mamamia.job ? { job: mamamia.job } : {}),
-    },
-  });
   console.log(`[mamamia-nach-anfrage] lead=${vorher.id} ${mamamia.status} felder=${plan.felder.join(',') || '-'} budget=${plan.budget ?? '-'} ${mamamia.message}`);
   return mamamia;
 }

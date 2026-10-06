@@ -1172,3 +1172,35 @@ Deno.test("resync (#113): budget + jobPreis — erst der Kunde (#55), dann der J
   assertEquals(ohne.requests.length, 3);
   assertEquals(r2.job, undefined);
 });
+
+Deno.test("resync (#113): Notiz in den Kunden-Aktivitäten — Weg wie das SA-Portal, Job-Zeile angehängt", async () => {
+  _resetAgencyTokenCache();
+  const NOTE = { data: { StoreCustomerSaContact: { id: 991 } } };
+  const mm = fakeMamamia([LOGIN, readOf([P1]), UPDATED, JOB(), JOB_UPD, NOTE]);
+  const r = await resyncCustomerFromLead({
+    lead: resyncLead({ weitere_personen: "ja" }), felder: ["weitere_personen"], budget: 2800, jobPreis: true,
+    notiz: "🧾 Kunde hat erneut angefragt (Kostenrechner): Angebot 2.600 € → 2.800 € · Weitere Personen im Haushalt: Nein → Ja",
+    secrets: SECRETS, fetchFn: mm.fetch,
+  });
+  const n = mm.requests[5];
+  if (!/StoreCustomerSaContact/.test(n.query)) throw new Error("Notiz nicht über StoreCustomerSaContact");
+  assertEquals(n.variables, {
+    customer_id: 10670,
+    contact: "note_only",
+    message: "🧾 Kunde hat erneut angefragt (Kostenrechner): Angebot 2.600 € → 2.800 € · Weitere Personen im Haushalt: Nein → Ja — Job in Mamamia: 2.600 € → 2.800 €",
+  });
+  assertEquals(r.notiz, "gespeichert");
+});
+
+Deno.test("resync (#113): Notiz schlägt fehl ⇒ Abgleich bleibt gültig, kein Throw", async () => {
+  _resetAgencyTokenCache();
+  const ABGELEHNT = { errors: [{ message: "Unauthorized" }] };
+  const mm = fakeMamamia([LOGIN, readOf([P1]), UPDATED, JOB({ final_confirmation: { id: 5, rejected_at: null } }), ABGELEHNT]);
+  const r = await resyncCustomerFromLead({
+    lead: resyncLead({}), felder: [], budget: 2800, jobPreis: true, notiz: "🧾 Test",
+    secrets: SECRETS, fetchFn: mm.fetch,
+  });
+  assertEquals(r.job?.status, "gebucht");
+  assertEquals(r.notiz, "fehler");
+  assertEquals(mm.requests[4].variables.message, "🧾 Test — Job ist gebucht, Preis dort nicht geändert");
+});

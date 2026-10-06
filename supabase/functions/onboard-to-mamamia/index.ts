@@ -181,7 +181,7 @@ async function handleResync(
   baseHeaders: Record<string, string>,
 ): Promise<Response> {
   const r = (resyncRaw && typeof resyncRaw === "object" ? resyncRaw : {}) as
-    { felder?: unknown; budget?: unknown; details?: unknown; jobPreis?: unknown };
+    { felder?: unknown; budget?: unknown; details?: unknown; jobPreis?: unknown; notiz?: unknown };
   const felder = Array.isArray(r.felder) ? r.felder : null;
   const allowed = new Set<string>(RESYNC_FELDER);
   if (!felder || !felder.every((f) => typeof f === "string" && allowed.has(f))) {
@@ -206,6 +206,11 @@ async function handleResync(
   if (jobPreis && budget === undefined) {
     return jsonError(400, "resync.jobPreis needs resync.budget", baseHeaders);
   }
+  /* Registry #113: Notiz in den Kunden-Aktivitäten (StoreCustomerSaContact note_only). */
+  if (r.notiz !== undefined && !(typeof r.notiz === "string" && r.notiz.trim() !== "" && r.notiz.length <= 1000)) {
+    return jsonError(400, "resync.notiz must be a non-empty string (max 1000)", baseHeaders);
+  }
+  const notiz = typeof r.notiz === "string" ? r.notiz.trim() : undefined;
   if (felder.length === 0 && budget === undefined && !details) {
     return jsonError(400, "resync: nothing to sync (felder empty, no budget, no details)", baseHeaders);
   }
@@ -226,6 +231,7 @@ async function handleResync(
       fetchFn: deps.fetchFn,
       details,
       jobPreis,
+      notiz,
     });
     return json(200, {
       customer_id: lead.mamamia_customer_id,

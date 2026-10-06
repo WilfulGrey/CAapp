@@ -31,7 +31,7 @@ const fakeDb = {
   }),
 } as never;
 
-import { abgleichNachAnfrage, pendingNachAbgleich, resyncAufrufen } from '../../project 3/lib/mamamia-abgleich';
+import { abgleichNachAnfrage, anfrageNotiz, pendingNachAbgleich, resyncAufrufen } from '../../project 3/lib/mamamia-abgleich';
 import { mamamiaNachAnfrage, type Lead } from '../../project 3/lib/lead-management';
 
 const FD = {
@@ -51,7 +51,8 @@ function fetchMit(status: number, body: unknown) {
   });
   return { fn: fn as unknown as typeof fetch, aufrufe };
 }
-const OK_MIT_JOB = { resync: { patients_before: 1, patients_after: 1, removed_ids: [], felder: ['weitere_personen'], job: { status: 'aktualisiert', job_offer_id: 36297, alt: 2600, neu: 2800 } } };
+const OK_MIT_JOB = { resync: { patients_before: 1, patients_after: 1, removed_ids: [], felder: ['weitere_personen'], job: { status: 'aktualisiert', job_offer_id: 36297, alt: 2600, neu: 2800 }, notiz: 'gespeichert' } };
+const NOTIZ_11228 = '🧾 Kunde hat erneut angefragt (Kostenrechner): Angebot 2.600 € → 2.800 € · Weitere Personen im Haushalt: Nein → Ja';
 
 describe('abgleichNachAnfrage', () => {
   it('Kunde 11228: weitere Person dazu ⇒ Feld und neuer Preis', () => {
@@ -79,6 +80,17 @@ describe('abgleichNachAnfrage', () => {
 
   it('ohne neue Kalkulation nichts', () => {
     expect(abgleichNachAnfrage(ERSTE, null)).toBeNull();
+  });
+});
+
+describe('anfrageNotiz (Notiz in den Kunden-Aktivitäten in Mamamia)', () => {
+  it('Kunde 11228: Preis vorher → nachher und die geänderte Angabe, lesbar beschriftet', () => {
+    expect(anfrageNotiz(ERSTE, ZWEITE)).toBe(NOTIZ_11228);
+  });
+  it('Preis gleich ⇒ nur der Preis; nur Preis anders ⇒ ohne Angaben; ohne neue Kalkulation nichts', () => {
+    expect(anfrageNotiz(ERSTE, kalk(2600, { ...FD, erfahrung: 'erfahren' }))).toMatch(/^🧾 Kunde hat erneut angefragt \(Kostenrechner\): Angebot 2\.600 € · Erfahrung: /);
+    expect(anfrageNotiz(kalk(2700), kalk(2800))).toBe('🧾 Kunde hat erneut angefragt (Kostenrechner): Angebot 2.700 € → 2.800 €');
+    expect(anfrageNotiz(ERSTE, null)).toBeNull();
   });
 });
 
@@ -134,17 +146,17 @@ describe('mamamiaNachAnfrage (erneute Anfrage)', () => {
     expect(db.events).toHaveLength(0);
   });
 
-  it('Kunde 11228: Abgleich mit Jobpreis, Ereignis für die Nachvollziehbarkeit, kein unnötiges Schreiben', async () => {
+  it('Kunde 11228: Abgleich mit Jobpreis und Notiz in Mamamia — keine eigene Ablage, kein unnötiges Schreiben', async () => {
     const { fn, aufrufe } = fetchMit(200, OK_MIT_JOB);
     const r = await mamamiaNachAnfrage(lead(), ZWEITE, { fetchFn: fn, env: ENV, db: fakeDb });
     expect(r?.status).toBe('ok');
-    expect(JSON.parse(String(aufrufe[0].init.body))).toEqual({ lead_id: 'lead-11228', resync: { felder: ['weitere_personen'], budget: 2800, jobPreis: true } });
-    expect(db.updates).toHaveLength(0);
-    expect(db.events[0]).toMatchObject({
+    expect(r?.message).toContain('Notiz in Mamamia');
+    expect(JSON.parse(String(aufrufe[0].init.body))).toEqual({
       lead_id: 'lead-11228',
-      event_type: 'mamamia_abgleich_nach_anfrage',
-      metadata: { felder: ['weitere_personen'], alt_preis: 2600, neu_preis: 2800, status: 'ok', job: { status: 'aktualisiert', alt: 2600, neu: 2800 } },
+      resync: { felder: ['weitere_personen'], budget: 2800, jobPreis: true, notiz: NOTIZ_11228 },
     });
+    expect(db.updates).toHaveLength(0);
+    expect(db.events).toHaveLength(0);
   });
 
   it('Fehler ⇒ mamamia_sync_pending (Admin wiederholt), aber nur auf derselben Kalkulation', async () => {

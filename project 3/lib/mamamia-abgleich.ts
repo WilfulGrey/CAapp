@@ -15,7 +15,8 @@
 // testbar (src/__tests__/mamamiaAbgleich.test.ts).
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Kalkulation } from './calculation';
-import { diffAngaben, FD_KEYS, mamamiaFelder } from './angaben-diff';
+import { diffAngaben, FD_KEYS, mamamiaFelder, norm } from './angaben-diff';
+import { angabenLabel, FELD_NAMEN } from './angaben-labels';
 
 export const RESYNC_TIMEOUT_MS = 25_000;
 
@@ -83,6 +84,27 @@ export function abgleichNachAnfrage(
   return budget !== undefined ? { felder, budget } : { felder };
 }
 
+/**
+ * Text der Notiz in den Kunden-Aktivitäten in Mamamia (Registry #113) — erscheint in
+ * der SA-Historie wie „💶 Angebot angepasst" aus dem SA-Portal. Die Zeile zum Job
+ * hängt onboard-to-mamamia an (erst dort steht fest, ob der Job übernommen hat).
+ */
+export function anfrageNotiz(alt: Kalkulation | null | undefined, neu: Kalkulation | null | undefined): string | null {
+  if (!neu) return null;
+  const altFd = ((alt as { formularDaten?: unknown } | null | undefined)?.formularDaten ?? {}) as Record<string, unknown>;
+  const neuFd = ((neu as { formularDaten?: unknown }).formularDaten ?? {}) as Record<string, unknown>;
+  const aenderungen = FD_KEYS
+    .filter((k) => norm(altFd[k]) !== norm(neuFd[k]))
+    .map((k) => `${FELD_NAMEN[k] ?? k}: ${angabenLabel(k, altFd[k])} → ${angabenLabel(k, neuFd[k])}`);
+  const altB = Number(alt?.bruttopreis);
+  const neuB = Number(neu.bruttopreis);
+  if (!Number.isFinite(neuB) || neuB <= 0) return null;
+  const preis = Number.isFinite(altB) && Math.round(altB) !== Math.round(neuB)
+    ? `Angebot ${euro(altB)} → ${euro(neuB)}`
+    : `Angebot ${euro(neuB)}`;
+  return [`🧾 Kunde hat erneut angefragt (Kostenrechner): ${preis}`, ...aenderungen].join(' · ').slice(0, 1000);
+}
+
 /** Ruft den Resync auf (mit Budget immer auch den Jobpreis) und übersetzt die Antwort. */
 export async function resyncAufrufen(args: {
   supabaseUrl: string;
@@ -90,10 +112,16 @@ export async function resyncAufrufen(args: {
   leadId: string;
   felder: string[];
   budget?: number;
+  /** Notiz in den Kunden-Aktivitäten (nur bei erneuter Anfrage, Registry #113). */
+  notiz?: string | null;
   fetchFn?: typeof fetch;
 }): Promise<MamamiaStatus> {
-  const { supabaseUrl, serviceKey, leadId, felder, budget, fetchFn = fetch } = args;
-  const resync = budget !== undefined ? { felder, budget, jobPreis: true } : { felder };
+  const { supabaseUrl, serviceKey, leadId, felder, budget, notiz, fetchFn = fetch } = args;
+  const resync = {
+    felder,
+    ...(budget !== undefined ? { budget, jobPreis: true } : {}),
+    ...(notiz ? { notiz } : {}),
+  };
   try {
     const res = await fetchFn(`${supabaseUrl}/functions/v1/onboard-to-mamamia`, {
       method: 'POST',
@@ -108,13 +136,14 @@ export async function resyncAufrufen(args: {
       const before = Number(r.patients_before);
       const after = Number(r.patients_after);
       const job = (r.job && typeof r.job === 'object' ? r.job : undefined) as MamamiaStatus['job'];
+      const notizText = r.notiz === 'gespeichert' ? ', Notiz in Mamamia' : r.notiz === 'fehler' ? ', Notiz in Mamamia fehlgeschlagen' : '';
       const basis = Number.isFinite(before) && Number.isFinite(after)
         ? `${before} → ${after} Patient${after === 1 ? '' : 'en'}${budget !== undefined ? `, Budget ${budget} €` : ''}`
         : 'synchronisiert';
       return {
         status: 'ok',
         http: res.status,
-        message: `${basis}${jobText(job)}`,
+        message: `${basis}${jobText(job)}${notizText}`,
         patients_before: before,
         patients_after: after,
         removed_ids: Array.isArray(r.removed_ids) ? (r.removed_ids as number[]) : [],
