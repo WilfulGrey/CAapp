@@ -32,7 +32,7 @@ const fakeDb = {
 } as never;
 
 import { abgleichNachAnfrage, pendingNachAbgleich, resyncAufrufen } from '../../project 3/lib/mamamia-abgleich';
-import { erneuteAnfrage, mamamiaNachAnfrage, type Lead } from '../../project 3/lib/lead-management';
+import { mamamiaNachAnfrage, type Lead } from '../../project 3/lib/lead-management';
 
 const FD = {
   betreuung_fuer: '1-person', pflegegrad: 2, weitere_personen: 'nein', mobilitaet: 'rollator',
@@ -158,37 +158,9 @@ describe('mamamiaNachAnfrage (erneute Anfrage)', () => {
     expect(db.updates).toHaveLength(0);
   });
 
-  it('findOrCreateLead hält den Verlauf fest und löst den Abgleich aus (erneute Anfrage + Hochstufen) — Abgleich nicht abgewartet', () => {
+  it('findOrCreateLead löst den Abgleich bei erneuter Anfrage und beim Hochstufen aus — nicht abgewartet', () => {
     const quelle = readFileSync(join(__dirname, '..', '..', 'project 3', 'lib', 'lead-management.ts'), 'utf8');
-    expect(quelle.match(/await anfrageVerlaufFesthalten\(latestLead, data\.kalkulation, data\.quelle\);\n\s+mamamiaImHintergrund\(latestLead, data\.kalkulation\);/g)).toHaveLength(2);
+    expect(quelle.match(/if \(data\?\.kalkulation\) mamamiaImHintergrund\(latestLead, data\.kalkulation\);/g)).toHaveLength(2);
     expect(quelle).not.toMatch(/await\s+mamamiaImHintergrund/);
-  });
-});
-
-describe('erneuteAnfrage (Verlauf für die SA-Historie)', () => {
-  it('Kunde 11228: weitere Person dazu ⇒ Vorher/Nachher mit Preis und geänderter Angabe', () => {
-    expect(erneuteAnfrage(ERSTE, ZWEITE, 'rechner')).toEqual({
-      quelle: 'rechner',
-      alt: { bruttopreis: 2600, eigenanteil: 1625, formularDaten: FD },
-      neu: { bruttopreis: 2800, eigenanteil: 1825, formularDaten: { ...FD, weitere_personen: 'ja' } },
-      geaendert: [{ key: 'weitere_personen', alt: 'nein', neu: 'ja' }],
-      preis_geaendert: true,
-    });
-  });
-
-  it('identische Anfrage ⇒ kein Eintrag; nur Preis oder nur Angabe ⇒ Eintrag', () => {
-    expect(erneuteAnfrage(ERSTE, kalk(2600))).toBeNull();
-    expect(erneuteAnfrage(kalk(2700), kalk(2800))).toMatchObject({ geaendert: [], preis_geaendert: true, quelle: null });
-    expect(erneuteAnfrage(ERSTE, kalk(2600, { ...FD, erfahrung: 'erfahren' }))).toMatchObject({
-      geaendert: [{ key: 'erfahrung', alt: null, neu: 'erfahren' }], preis_geaendert: false,
-    });
-  });
-
-  it('ohne neue Kalkulation nichts; Alt-Lead ohne Kalkulation ⇒ alle Angaben neu', () => {
-    expect(erneuteAnfrage(ERSTE, null)).toBeNull();
-    const r = erneuteAnfrage(null, ZWEITE);
-    expect(r?.alt).toEqual({ bruttopreis: null, eigenanteil: null, formularDaten: {} });
-    expect(r?.geaendert.map((g) => g.key)).toEqual(['betreuung_fuer', 'pflegegrad', 'weitere_personen', 'mobilitaet', 'nachteinsaetze', 'deutschkenntnisse', 'fuehrerschein', 'geschlecht']);
-    expect(r?.preis_geaendert).toBe(true);
   });
 });
