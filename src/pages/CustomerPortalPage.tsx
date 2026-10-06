@@ -3453,7 +3453,7 @@ const CustomerPortalPage: FC = () => {
                       {/* OpenAI 06.10. (mutig15): der erste Knopf klingt nach Arbeit — direkt darunter, was er bringt und
                           was er kostet (sonst steht das erst im Achtung-Kasten weiter unten). */}
                       {!patientSaved && (
-                        <p className="mt-3 text-center text-[14.5px] leading-[1.45] text-pm-muted">
+                        <p className="mt-3 text-balance text-center text-[14.5px] leading-[1.45] text-pm-muted">
                           Kostenlos und unverbindlich. Dauert etwa 2&nbsp;Minuten, dann kann sich {angebotKarten.obenVorname ?? 'die Pflegekraft'} bei Ihnen bewerben.
                         </p>
                       )}
