@@ -301,6 +301,18 @@ Deno.test("resync (#55): felder leer ohne budget ⇒ 400; unbekanntes Feld ⇒ 4
   assertEquals(r2.status, 400);
 });
 
+Deno.test("resync (#113): jobPreis muss boolean sein und braucht budget ⇒ sonst 400 ohne Mamamia-Call", async () => {
+  _resetRateLimit(); _resetAgencyTokenCache();
+  const deps = { secrets: SECRETS, supabase: makeFakeSupabase([ONBOARDED_LEAD()]), fetchFn: NO_MM };
+  const id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+  const r1 = await handleRequest(resyncReq({ lead_id: id, resync: { felder: [], budget: 2800, jobPreis: "ja" } }, "Bearer srv"), deps);
+  assertEquals(r1.status, 400);
+  assertEquals((await r1.json()).error, "resync.jobPreis must be a boolean");
+  const r2 = await handleRequest(resyncReq({ lead_id: id, resync: { felder: ["weitere_personen"], jobPreis: true } }, "Bearer srv"), deps);
+  assertEquals(r2.status, 400);
+  assertEquals((await r2.json()).error, "resync.jobPreis needs resync.budget");
+});
+
 Deno.test("resync (#55): service_role als JWT-Claim passiert das Gate; Rate-Limit wird übersprungen", async () => {
   _resetRateLimit(); _resetAgencyTokenCache();
   // 5 Anon-Calls vom selben IP füllen den Bucket …

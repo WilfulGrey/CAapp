@@ -602,6 +602,8 @@ export interface ResyncResult {
      `undefined` — assertEquals unterscheidet das. */
   identity?: { before: unknown; after?: unknown; hinweis?: string };
   identity_error?: string;
+  /* Nur mit `jobPreis` (Registry #113): Ergebnis für den Preis des Jobs. */
+  job?: JobPreisErgebnis;
 }
 
 interface ResyncPatientRow {
@@ -686,6 +688,113 @@ const RESYNC_CUSTOMER = /* GraphQL */ `
     ) { id customer_id }
   }
 `;
+
+/* ─── Jobpreis nachziehen (Registry #113) ──────────────────────────────────
+   Der Preis, den der Kunde sieht (leads.kalkulation.bruttopreis), muss auch der
+   Preis des Jobs in Mamamia sein — sonst suchen SA-Portal und Pflegekräfte mit
+   dem alten Preis (Martin 06.10.2026, Kunde 11228: Portal 2.800 €, Job 2.600 €).
+   `budget` im Resync setzte bisher nur care_budget/monthly_salary am KUNDEN;
+   das SA-Portal und die Bewerbungen lesen aber JobOffer.salary_offered.
+
+   Weg und Felder 1:1 wie das SA-Portal („Job bearbeiten",
+   mamamia-sadash JobOfferController::update, täglich produktiv):
+   Fetch-Merge — UpdateJobOffer verlangt bei JEDEM Update customer_id + title +
+   salary_offered + arrival_at; visibility und die CGA-Liste MÜSSEN mit, sonst
+   leert Mamamia die Liste (QA 02.09., Job 35894); departure_at nur, wenn
+   gesetzt; description wird nicht gesendet (bleibt). Geändert wird nur
+   salary_offered. Gebuchter Job (final_confirmation ohne rejected_at): nichts
+   anfassen — die Buchung hat ihren eigenen Preis. */
+const RESYNC_JOB_READ = /* GraphQL */ `
+  query ResyncJobRead($id: Int!) {
+    JobOffer(id: $id) {
+      id customer_id title salary_offered salary_commission
+      arrival_at departure_at visibility
+      visible_caregiver_agencies { id }
+      final_confirmation { id rejected_at }
+    }
+  }
+`;
+
+const RESYNC_JOB_PREIS = /* GraphQL */ `
+  mutation ResyncJobPreis(
+    $id: Int!, $customer_id: Int, $title: String,
+    $salary_offered: Float, $salary_commission: Float,
+    $arrival_at: String, $departure_at: String, $visibility: String,
+    $visible_caregiver_agency_ids: [Int]
+  ) {
+    UpdateJobOffer(
+      id: $id, customer_id: $customer_id, title: $title,
+      salary_offered: $salary_offered, salary_commission: $salary_commission,
+      arrival_at: $arrival_at, departure_at: $departure_at, visibility: $visibility,
+      visible_caregiver_agency_ids: $visible_caregiver_agency_ids
+    ) { id salary_offered visibility }
+  }
+`;
+
+interface JobPreisRead {
+  JobOffer: {
+    id: number;
+    customer_id: number;
+    title: string | null;
+    salary_offered: number | null;
+    salary_commission: number | null;
+    arrival_at: string | null;
+    departure_at: string | null;
+    visibility: string | null;
+    visible_caregiver_agencies?: Array<{ id: number }> | null;
+    final_confirmation?: { id: number; rejected_at: string | null } | null;
+  } | null;
+}
+
+export interface JobPreisErgebnis {
+  /** aktualisiert | unveraendert (Preis stimmt schon) | gebucht (nicht angefasst)
+   *  | ohne_anreise (kein arrival_at — Mamamia verlangt es, nicht raten) */
+  status: "aktualisiert" | "unveraendert" | "gebucht" | "ohne_anreise";
+  job_offer_id: number;
+  alt: number | null;
+  neu: number;
+}
+
+const nurDatum = (v: string | null | undefined) => (v ? v.slice(0, 10) : null);
+
+export async function jobPreisNachziehen(args: {
+  jobOfferId: number;
+  preis: number;
+  token: string;
+  endpoint: string;
+  fetchFn: typeof fetch;
+}): Promise<JobPreisErgebnis> {
+  const { jobOfferId, preis, token, endpoint, fetchFn } = args;
+  const job = (await mamamiaRequest<JobPreisRead>({
+    endpoint, token, query: RESYNC_JOB_READ, variables: { id: jobOfferId }, fetchFn,
+  })).JobOffer;
+  if (!job) throw new Error(`JobOffer ${jobOfferId} nicht gefunden`);
+  const alt = job.salary_offered ?? null;
+  const basis = { job_offer_id: jobOfferId, alt, neu: preis };
+  if (job.final_confirmation && !job.final_confirmation.rejected_at) return { status: "gebucht", ...basis };
+  if (alt !== null && Math.round(alt) === Math.round(preis)) return { status: "unveraendert", ...basis };
+  const anreise = nurDatum(job.arrival_at);
+  if (!anreise) return { status: "ohne_anreise", ...basis };
+
+  const vars: Record<string, unknown> = {
+    id: jobOfferId,
+    customer_id: job.customer_id,
+    title: job.title,
+    salary_offered: preis,
+    salary_commission: job.salary_commission,
+    arrival_at: anreise,
+    visibility: job.visibility,
+  };
+  const cga = (job.visible_caregiver_agencies ?? []).map((a) => a.id).filter((id) => Number.isInteger(id) && id > 0);
+  if (cga.length) vars.visible_caregiver_agency_ids = cga;
+  const abreise = nurDatum(job.departure_at);
+  if (abreise) vars.departure_at = abreise;
+
+  await mamamiaRequest<{ UpdateJobOffer: { id: number } }>({
+    endpoint, token, query: RESYNC_JOB_PREIS, variables: vars, fetchFn,
+  });
+  return { status: "aktualisiert", ...basis };
+}
 
 /* ─── Identitaet eines Vermittler-Falls (Registry #67) ────────────────────
    Beim Vermittler traegt der Mamamia-Kunde bisher den Ansprechpartner der
@@ -817,10 +926,14 @@ export async function resyncCustomerFromLead(args: {
    *  `felder`: das sind keine Kalkulator-Angaben und werden nicht gediffed,
    *  sie stehen einfach im Dokument oder eben nicht. */
   details?: boolean;
+  /** Registry #113: `budget` zusätzlich als Preis des Jobs
+   *  (lead.mamamia_job_offer_id) setzen — Weg wie das SA-Portal, siehe
+   *  jobPreisNachziehen. Ohne `budget` wirkungslos. */
+  jobPreis?: boolean;
   secrets: OnboardSecrets;
   fetchFn?: typeof fetch;
 }): Promise<ResyncResult> {
-  const { lead, felder, budget, details, secrets, fetchFn = globalThis.fetch } = args;
+  const { lead, felder, budget, details, jobPreis, secrets, fetchFn = globalThis.fetch } = args;
   const customerId = lead.mamamia_customer_id;
   if (!customerId) throw new Error("lead not onboarded (no mamamia_customer_id)");
   const fd = lead.kalkulation?.formularDaten;
@@ -972,6 +1085,19 @@ export async function resyncCustomerFromLead(args: {
     removed_ids: removed,
     felder: [...felder],
   };
+
+  // Registry #113: Preis des Jobs nach dem Kunden — ein Fehler hier wirft
+  // (502 beim Aufrufer ⇒ mamamia_sync_pending, Retry wiederholt beides; das
+  // UpdateCustomer ist idempotent).
+  if (jobPreis && budget !== undefined && lead.mamamia_job_offer_id) {
+    ergebnis.job = await jobPreisNachziehen({
+      jobOfferId: lead.mamamia_job_offer_id,
+      preis: budget,
+      token: agencyToken,
+      endpoint: secrets.mamamiaEndpoint,
+      fetchFn,
+    });
+  }
 
   /* ─── Identitaet (Registry #67) ──────────────────────────────────────────
      Nur fuer Vermittler-Leads MIT Patientennamen und nur wenn `details`

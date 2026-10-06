@@ -169,7 +169,7 @@ function json(status: number, body: unknown, extraHeaders: Record<string, string
 }
 
 // ─── Admin-Resync (Registry #55) ───────────────────────────────────────────
-// Body { lead_id, resync: { felder: RESYNC_FELD[], budget?: number } } — nur
+// Body { lead_id, resync: { felder: RESYNC_FELD[], budget?: number, jobPreis?: boolean } } — nur
 // service_role (Gate oben). Antworten: 200 { customer_id, job_offer_id, resync }
 // · 400 Kontrakt/nicht onboarded · 404 Lead unbekannt · 409 >2 Patienten
 // (patient_ids) · 500 Adapter ohne fetchLeadById · 502 Mamamia-Klartext (der
@@ -181,7 +181,7 @@ async function handleResync(
   baseHeaders: Record<string, string>,
 ): Promise<Response> {
   const r = (resyncRaw && typeof resyncRaw === "object" ? resyncRaw : {}) as
-    { felder?: unknown; budget?: unknown; details?: unknown };
+    { felder?: unknown; budget?: unknown; details?: unknown; jobPreis?: unknown };
   const felder = Array.isArray(r.felder) ? r.felder : null;
   const allowed = new Set<string>(RESYNC_FELDER);
   if (!felder || !felder.every((f) => typeof f === "string" && allowed.has(f))) {
@@ -197,6 +197,14 @@ async function handleResync(
   const details = r.details === true;
   if (r.details !== undefined && typeof r.details !== "boolean") {
     return jsonError(400, "resync.details must be a boolean", baseHeaders);
+  }
+  /* Registry #113: `jobPreis` setzt `budget` zusätzlich als Preis des Jobs. */
+  if (r.jobPreis !== undefined && typeof r.jobPreis !== "boolean") {
+    return jsonError(400, "resync.jobPreis must be a boolean", baseHeaders);
+  }
+  const jobPreis = r.jobPreis === true;
+  if (jobPreis && budget === undefined) {
+    return jsonError(400, "resync.jobPreis needs resync.budget", baseHeaders);
   }
   if (felder.length === 0 && budget === undefined && !details) {
     return jsonError(400, "resync: nothing to sync (felder empty, no budget, no details)", baseHeaders);
@@ -217,6 +225,7 @@ async function handleResync(
       secrets: deps.secrets,
       fetchFn: deps.fetchFn,
       details,
+      jobPreis,
     });
     return json(200, {
       customer_id: lead.mamamia_customer_id,

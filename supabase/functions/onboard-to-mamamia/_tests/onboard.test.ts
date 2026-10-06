@@ -1094,3 +1094,81 @@ Deno.test("resync (#67): Haushalt ohne Vornamen — first_name: null loescht den
     { first_name: null, last_name: "Maier", istPatient: true },
   );
 });
+
+/* ─── Jobpreis nachziehen (Registry #113) ───────────────────────────────────
+   Martin 06.10.2026, Kunde 11228: Kundenportal 2.800 €, Job in Mamamia 2.600 €.
+   Weg und Felder 1:1 wie das SA-Portal (JobOfferController::update). */
+import { jobPreisNachziehen } from "../onboard.ts";
+
+const JOB = (over: Record<string, unknown> = {}) => ({
+  data: {
+    JobOffer: {
+      id: 36297, customer_id: 10670, title: "24h-Pflege Postau", salary_offered: 2600, salary_commission: 0,
+      arrival_at: "2026-10-20 00:00:00", departure_at: null, visibility: "public_limited",
+      visible_caregiver_agencies: [{ id: 77 }], final_confirmation: null,
+      ...over,
+    },
+  },
+});
+const JOB_UPD = { data: { UpdateJobOffer: { id: 36297, salary_offered: 2800, visibility: "public_limited" } } };
+const jobArgs = (fetchFn: typeof fetch, preis = 2800) =>
+  ({ jobOfferId: 36297, preis, token: "agency-jwt", endpoint: SECRETS.mamamiaEndpoint, fetchFn });
+
+Deno.test("jobPreis (#113): Fetch-Merge wie das SA-Portal — nur salary_offered neu, CGA-Liste und Sichtbarkeit bleiben", async () => {
+  const mm = fakeMamamia([JOB(), JOB_UPD]);
+  const r = await jobPreisNachziehen(jobArgs(mm.fetch));
+  assertEquals(r, { status: "aktualisiert", job_offer_id: 36297, alt: 2600, neu: 2800 });
+  assertEquals(mm.requests.length, 2);
+  assertEquals(mm.requests[1].variables, {
+    id: 36297, customer_id: 10670, title: "24h-Pflege Postau", salary_offered: 2800, salary_commission: 0,
+    arrival_at: "2026-10-20", visibility: "public_limited", visible_caregiver_agency_ids: [77],
+  });
+  // keine Beschreibung, kein departure_at (unbefristet bleibt unbefristet)
+  if (/description/.test(mm.requests[1].query)) throw new Error("description darf nicht gesendet werden");
+});
+
+Deno.test("jobPreis (#113): Abreise wird als Datum mitgeschickt; ohne CGA keine leere Liste", async () => {
+  const mm = fakeMamamia([JOB({ departure_at: "2026-12-10 00:00:00", visible_caregiver_agencies: [], visibility: "public" }), JOB_UPD]);
+  await jobPreisNachziehen(jobArgs(mm.fetch));
+  const v = mm.requests[1].variables;
+  assertEquals(v.departure_at, "2026-12-10");
+  assertEquals(v.visibility, "public");
+  assertEquals("visible_caregiver_agency_ids" in v, false);
+});
+
+Deno.test("jobPreis (#113): gebuchter Job, gleicher Preis, ohne Anreise ⇒ nur gelesen, nichts geschrieben", async () => {
+  const gebucht = fakeMamamia([JOB({ final_confirmation: { id: 5, rejected_at: null } })]);
+  assertEquals((await jobPreisNachziehen(jobArgs(gebucht.fetch))).status, "gebucht");
+  assertEquals(gebucht.requests.length, 1);
+
+  const gleich = fakeMamamia([JOB({ salary_offered: 2800 })]);
+  assertEquals((await jobPreisNachziehen(jobArgs(gleich.fetch))).status, "unveraendert");
+  assertEquals(gleich.requests.length, 1);
+
+  const ohne = fakeMamamia([JOB({ arrival_at: null })]);
+  assertEquals((await jobPreisNachziehen(jobArgs(ohne.fetch))).status, "ohne_anreise");
+  assertEquals(ohne.requests.length, 1);
+
+  // abgelehnte Buchung zählt nicht als gebucht
+  const abgelehnt = fakeMamamia([JOB({ final_confirmation: { id: 5, rejected_at: "2026-10-01 10:00:00" } }), JOB_UPD]);
+  assertEquals((await jobPreisNachziehen(jobArgs(abgelehnt.fetch))).status, "aktualisiert");
+});
+
+Deno.test("resync (#113): budget + jobPreis — erst der Kunde (#55), dann der Job; ohne jobPreis bleibt der Job unberührt", async () => {
+  _resetAgencyTokenCache();
+  const mm = fakeMamamia([LOGIN, readOf([P1]), UPDATED, JOB(), JOB_UPD]);
+  const r = await resyncCustomerFromLead({
+    lead: resyncLead({ weitere_personen: "ja" }), felder: ["weitere_personen"], budget: 2800, jobPreis: true,
+    secrets: SECRETS, fetchFn: mm.fetch,
+  });
+  assertEquals(mm.requests[2].variables.care_budget, 2800);
+  assertEquals(mm.requests[2].variables.other_people_in_house, "yes");
+  assertEquals(mm.requests[4].variables.salary_offered, 2800);
+  assertEquals(r.job, { status: "aktualisiert", job_offer_id: 36297, alt: 2600, neu: 2800 });
+
+  _resetAgencyTokenCache();
+  const ohne = fakeMamamia([LOGIN, readOf([P1]), UPDATED]);
+  const r2 = await resyncCustomerFromLead({ lead: resyncLead({}), felder: [], budget: 2800, secrets: SECRETS, fetchFn: ohne.fetch });
+  assertEquals(ohne.requests.length, 3);
+  assertEquals(r2.job, undefined);
+});
