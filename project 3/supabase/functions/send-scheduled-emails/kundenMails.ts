@@ -225,19 +225,20 @@ function eigenanteilRechnung(e: Eigenanteil): string {
     + " Die vollständige Rechnung sehen Sie im Portal unter „Kosten im Überblick“.";
 }
 
-/* Häufige Fragen der Angebotsmail (Vorschlag 08.10.2026): die Einwände vor dem Klick, in den Worten der Kunden. Antworten nur
-   aus belegten Sätzen — Portal-FAQ (Vertrag, Zuhause: wörtlich), Mustervertrag/Martin 01.10. (Ersatz „schnellstmöglich, in der
-   Regel innerhalb von 3 Tagen“, „ein Anruf genügt“), GARANTIE (Bestpreisgarantie, „Marta antwortet" → Ich-Form der Absenderin).
-   OpenAI angebot8: Reihenfolge Bindung → Preis → Vertrauen → Risiko. */
+/* Häufige Fragen der Angebotsmail (Vorschlag 08.10.2026). Martin 08.10.: was es im Portal schon gibt, wörtlich übernehmen
+   („Warum hast du das nicht übernommen? Darum geht's doch."). Fragen und Antworten 1, 3, 4, 6 = Portal-FAQ (FaqListe.tsx FAQ /
+   FAQ_GRUNDFRAGEN, live); Frage 2 = Wortlaut der Bestpreisgarantie (GARANTIE, „Marta antwortet" in Ich-Form der Absenderin);
+   Frage 5 = die Rechnung aus der Kalkulation des Kunden, gibt es im Portal als Aufstellung „Kosten im Überblick". Bei Änderung
+   der Portal-FAQ hier mitziehen. */
 export function angebotFragen(e: Eigenanteil | null): { frage: string; antwort: string }[] {
   const liste = [
-    { frage: "Schließe ich mit dem Einladen einen Vertrag ab?", antwort: "Nein. Pflegekräfte einladen und Bewerbungen ansehen ist kostenlos und unverbindlich. Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen und im Portal unterschreiben." },
+    { frage: "Gehe ich mit dem Einladen einen Vertrag ein?", antwort: "Nein — das Einladen und Anschauen von Profilen ist vollständig unverbindlich. Ein Vertrag kommt erst zustande, wenn Sie ein konkretes Angebot ausdrücklich annehmen." },
     { frage: "Ich habe ein günstigeres Angebot. Was kann ich tun?", antwort: "Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot. Legen Sie uns das Angebot vor, wir passen unseren Preis an. Ich antworte innerhalb eines Werktags." },
-    { frage: "Ist das legal?", antwort: "Ja. Ihre Pflegekraft ist bei uns angestellt und sozialversichert. Für jeden Einsatz liegt eine A1-Bescheinigung vor." },
-    { frage: "Die Pflegekraft passt nicht. Was passiert dann?", antwort: "Wir sorgen schnellstmöglich für Ersatz, in der Regel innerhalb von 3 Tagen. Sie können täglich kündigen, ein Anruf genügt." },
+    { frage: "Ist das legal?", antwort: "Ja, vollständig. Die Pflegekräfte sind sozialversicherungspflichtig bei uns angestellt und werden von uns nach Deutschland entsandt. Für jeden Einsatz liegt eine offizielle A1-Bescheinigung vor — der Nachweis der Sozialversicherungspflicht im Herkunftsland." },
+    { frage: "Wie läuft die Betreuung ab?", antwort: "Die Pflegekraft wird in der Regel direkt zu Ihnen nach Hause gebracht und bleibt meist 6 bis 8 Wochen. Den Wechsel zur nächsten Pflegekraft organisieren wir. Fällt eine Pflegekraft aus oder passt die Zusammenarbeit nicht, sorgen wir schnellstmöglich für Ersatz, in der Regel innerhalb von 3 Tagen." },
   ];
   if (e) liste.push({ frage: `Wie kommen die ca. ${euro(e.eigen)}&nbsp;€ Eigenanteil zustande?`, antwort: eigenanteilRechnung(e) });
-  liste.push({ frage: "Was brauche ich zu Hause?", antwort: "Ein eigenes, abschließbares Zimmer mit Bett für die Pflegekraft. Küche, Bad und ein Internetanschluss sollten vorhanden sein. Sie stellen Zimmer und Verpflegung. Das ist mit „Kost und Logis“ im Angebot gemeint." });
+  liste.push({ frage: "Was brauche ich zu Hause?", antwort: "Ein eigenes, abschließbares Zimmer mit Bett für die Pflegekraft. Küche, Bad und ein Internetanschluss sollten vorhanden sein. Zimmer und Verpflegung stellen Sie, das ist mit „Kost und Logis“ im Angebot gemeint." });
   return liste;
 }
 
@@ -310,9 +311,18 @@ const SCHRITTE_ANGEBOT = [
   { titel: "Auswählen und starten", text: "Sie wählen Ihre Pflegekraft aus und unterschreiben den Vertrag online. Um den Rest kümmern wir uns. Die Anreise ist schon ab 3 Tagen möglich." },
 ];
 
-/* Satz unter „Pflegekräfte einladen" (Vorschlag 08.10.2026, OpenAI angebot8): sagt ehrlich, was nach dem Klick zuerst kommt,
-   und nimmt die Angst vor Kosten und Bindung. Die Schritte darunter erklären den Rest, deshalb kurz. Ohne Bedingungs-Anfang. */
-const EINLADEN_HINWEIS = "Dafür ergänzen Sie im Portal kurz die Pflegesituation, das dauert etwa 2 Minuten. Kostenlos und unverbindlich.";
+/* Einleitung und Testsieger-Satz wörtlich aus dem Portal (src/components/portal/KompaktEinstieg.tsx EINLEITUNG = Martins
+   Diktat 06.10.2026, EINLEITUNG_TESTSIEGER; live seit Fassung 30). Martin 08.10. zur Mail: „du solltest doch auch die
+   Einleitung machen … gerne übernehmen wir die Betreuung … Warum hast du das nicht übernommen? Darum geht's doch."
+   Das Siegel steht in der Mail schon im Kopf, deshalb hier nur der Satz. Bei Änderung beide Stellen. */
+const EINLEITUNG = "Gerne übernehmen wir die Rund-um-Betreuung und entlasten Ihre Familie. Unsere Pflegekräfte sind bei uns angestellt. Wir kümmern uns seit über 20 Jahren um die komplette Abwicklung von Anfang bis Ende.";
+const EINLEITUNG_TESTSIEGER = "Für unseren Service hat uns DIE WELT nun zum sechsten Mal in Folge als Testsieger ausgezeichnet.";
+
+/* Unter „Pflegekräfte einladen": der Achtung-Hinweis des Portals (KompaktEinstieg.tsx, „Achtung: Es fehlen noch Angaben zur
+   Pflegesituation" + Satz, OpenAI mutig18/20), ohne „Achtung:". Die Zeile über den Pflegekräften ist die des Portals
+   („Echte Profile, ausgewählt nach Ihren Angaben."). */
+const EINLADEN_HINWEIS = "Es fehlen noch Angaben zur Pflegesituation. Erst damit kennen die Pflegekräfte den Einsatz und können sich bewerben. Dauert etwa 2 Minuten, vieles ist schon ausgefüllt.";
+const KRAEFTE_ZEILE = "Echte Profile, ausgewählt nach Ihren Angaben.";
 
 /** „für eine Person mit Pflegegrad 4" — Spiegel von angebotFuer (KompaktEinstieg.tsx); fehlende Angaben entfallen. */
 export function angebotFuer(fd: Record<string, unknown> | null | undefined): string | null {
@@ -337,27 +347,19 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
   // Martin 03.10.2026: wie vor dem 26.09. auf Angebot und Pflegekräfte (Portal oben), nicht direkt ins Formular.
   const start = k.portal({ m: "eb" });
 
-  /* Einstieg (Vorschlag 08.10.2026): Ergebnis zuerst. OpenAI angebot8: „ab sofort verfügbar" als Hauptaussage ist angreifbar
-     (Anreise ab 3 Tagen); angebot9: „jetzt einladen" verspricht zu viel, vorher kommt die Pflegesituation. Der Knopf
-     „Pflegekräfte einladen" sagt darunter, was zuerst kommt. */
-  const kraefteSatz = n === 0 ? ""
-    : n === 1 ? " Eine Pflegekraft passt zu Ihren Angaben, ich stelle sie Ihnen unten vor."
-    : ` ${zahlwort(n, true)} Pflegekräfte passen zu Ihren Angaben, ich stelle sie Ihnen unten vor.`;
+  /* Einstieg wie der Kopf des Portals (Martin 08.10.): „Hier ist Ihr Angebot" mit dem Titel des Portals („Ihr Angebot zur
+     24-Stunden-Betreuung"), danach seine Einleitung und der Testsieger-Satz. Die Pflegekräfte nennen Betreff, Vorschau und
+     ihr eigener Abschnitt. */
   const einstieg = a.herkunft
-    ? `vielen Dank für Ihre Anfrage über ${mb(esc(a.herkunft))}. Hier ist Ihr Angebot.`
+    ? `vielen Dank für Ihre Anfrage über ${mb(esc(a.herkunft))}. Hier ist Ihr Angebot zur 24-Stunden-Betreuung.`
     : a.resubmit
     ? "vielen Dank für Ihre erneute Anfrage. Ich habe Ihre Angaben übernommen und Ihr Angebot angepasst."
-    : "vielen Dank für Ihre Anfrage. Hier ist Ihr Angebot.";
-
-  const siegel = `${k.site.replace(/\/$/, "")}/images/primundus_testsieger-2021.webp`;
-  const siegelZeile = `
-    <table cellpadding="0" cellspacing="0" role="presentation"><tr>
-      <td style="vertical-align:middle;padding-right:12px;"><img src="${siegel}" width="36" alt="Testsieger" style="display:block;width:36px;height:auto;"></td>
-      <td style="vertical-align:middle;"><p style="margin:0;font-size:15.5px;font-weight:700;color:${F.ink};">6× Testsieger DIE WELT</p><p style="margin:2px 0 0;font-size:14px;color:${F.muted};">20 Jahre Erfahrung &middot; 60.000+ Einsätze</p></td>
-    </tr></table>`;
+    : "vielen Dank für Ihre Anfrage. Hier ist Ihr Angebot zur 24-Stunden-Betreuung.";
+  const einleitungHtml = `${EINLEITUNG.replace("Rund-um-Betreuung", '<span style="white-space:nowrap;">Rund-um-Betreuung</span>')} ${EINLEITUNG_TESTSIEGER}`;
   /* Angebotskarte wie im Portal (Fassung 30, live seit 06.10.2026): Kopfleiste „Ihr Angebot vom …", Leistung mit Grundlage,
      Preis „im Monat" mit dem Satz des Portals, darunter Knopf, Sterne, der Eigenanteil (Vorschlag 08.10.: grüner Kasten gegen
-     „zu teuer", unter dem Knopf, damit der Knopf im ersten Bildschirm bleibt), die vier Punkte und das Siegel. */
+     „zu teuer", unter dem Knopf, damit der Knopf möglichst weit oben bleibt) und die vier Punkte. Ohne Siegel-Zeile: Der
+     Testsieger steht wie im Portal (Runde 32) bei der Einleitung. */
   const leistung = angebotFuer(fd);
   const kostenInhalt = `
     <p style="margin:0;font-size:17px;font-weight:700;line-height:1.3;color:${F.ink};">Rund-um-Betreuung zu Hause</p>
@@ -369,9 +371,7 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
     ${eigen ? eigenanteilHtml(eigen, 16) : ""}
     ${mPunkte(null)}
     ${mKlein("Kosten entstehen erst, wenn die Pflegekraft bei Ihnen ist.", 0)}
-    ${!eigen && heim ? `${mTrenner()}${heimHtml(heim, 0)}` : ""}
-    ${mTrenner()}
-    ${siegelZeile}`;
+    ${!eigen && heim ? `${mTrenner()}${heimHtml(heim, 0)}` : ""}`;
   const kosten = mKopfKarte(a.datum ? `Ihr Angebot vom ${a.datum}` : "Ihr Angebot", "neutral", kostenInhalt, 26);
 
   /* Pflegekräfte wie im Portal (Martin 07.10.2026: „die oberste als Empfehlung, die anderen trotzdem zeigen, damit die das
@@ -393,6 +393,7 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
     const weitereKopf = weitere.length === 1 ? "Eine weitere passende Pflegekraft" : `${zahlwort(weitere.length, true)} weitere passende Pflegekräfte`;
     const titel = n === 1 ? "Ihre passende Pflegekraft" : `Ihre ${n} passenden Pflegekräfte`;
     empfHtml = `${mAbschnitt("Für Sie ausgewählt", titel)}
+    ${mKlein(KRAEFTE_ZEILE, 14)}
     ${mKopfKarte("Unsere Empfehlung für Sie", "neutral", `${mProfil(pk, profilUrl(emp.e))}${gruende}`, 14)}
     ${weitere.length ? mKopfKarte(weitereKopf, "neutral", weitere.map((w, i) => a.weitereKompakt
       ? mProfilZeile(pkAusEmpfehlung(w.e, w.cid), profilUrl(w.e), i < weitere.length - 1 ? 8 : 0)
@@ -400,6 +401,7 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
     ${mKnopf(einladen, knopf, 4, 10, { schrift: 16, innen: 12 })}
     ${mKlein(EINLADEN_HINWEIS, 30, true)}`;
     empfText = `FÜR SIE AUSGEWÄHLT: ${titel}
+${KRAEFTE_ZEILE}
 Unsere Empfehlung für Sie: ${pkText(pk)}
 ${emp.e.gruende.map((g) => `✓ ${g}`).join("\n")}
 Profil: ${profilUrl(emp.e)}
@@ -420,13 +422,14 @@ ${EINLADEN_HINWEIS}
       : `. ${n === 1 ? "Eine passende Pflegekraft ist" : `${zahlwort(n, true)} passende Pflegekräfte sind`} für Sie ausgewählt.`}`
     : "Ihr persönliches Angebot zur 24-Stunden-Betreuung.";
 
-  /* Martin 01.10.2026 („täglich 8–20"): Erreichbarkeit wie auf Martas Karte; ohne Bedingungs-Anfang („Wenn Sie Fragen …"). */
-  const kontaktSatz = "Ich bin Ihre persönliche Ansprechpartnerin und täglich von 8 bis 20 Uhr erreichbar. Rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie auf diese E-Mail.";
+  /* Schlusssatz wie in der Mail seit 03.10.2026 (freigegeben); die Erreichbarkeit steht direkt darunter auf Martas Karte. */
+  const kontaktSatz = "Wenn Sie Fragen zum Angebot haben, rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie auf diese E-Mail.";
   const angabenZeile = "Stimmt etwas nicht? Antworten Sie auf diese E-Mail, dann passen wir Ihr Angebot an.";
 
   const html = `${mVorschau(vorschau)}
     ${gruss(k)}
-    ${mp(einstieg + kraefteSatz, 22)}
+    ${mp(einstieg, 14)}
+    ${mp(einleitungHtml, 24)}
     ${kosten}
     ${empfHtml}
     ${mAbschnitt("In drei Schritten", "So geht es weiter")}
@@ -445,7 +448,9 @@ ${EINLADEN_HINWEIS}
 
   const text = `${k.anrede},
 
-${klartext(einstieg + kraefteSatz)}
+${klartext(einstieg)}
+
+${EINLEITUNG} ${EINLEITUNG_TESTSIEGER}
 
 ${a.datum ? `IHR ANGEBOT VOM ${a.datum}` : "IHR ANGEBOT"}
 Rund-um-Betreuung zu Hause${leistung ? ` ${leistung}` : ""}
@@ -456,8 +461,6 @@ ${k.bewertung ? `★★★★★ ${k.bewertung.schnitt} von 5 aus ${k.bewertung.
 ${punkteText()}
 Kosten entstehen erst, wenn die Pflegekraft bei Ihnen ist.
 ${!eigen && heim ? `\n${heimText(heim)}\n` : ""}
-6× Testsieger DIE WELT · 20 Jahre Erfahrung · 60.000+ Einsätze
-
 ${empfText}SO GEHT ES WEITER
 ${SCHRITTE_ANGEBOT.map((s, i) => `${i + 1}. ${s.titel}: ${s.text.replace("‑", "-")}`).join("\n")}
 
