@@ -4,6 +4,7 @@
 import { useState, type ReactNode } from 'react';
 import { ChevronDown, Plus } from 'lucide-react';
 import { SectionHeader } from '../ui/SectionHeader';
+import { GARANTIE_PORTAL } from '../../lib/garantie';
 
 export const FAQ: { q: string; a: ReactNode }[] = [
   /* Reihenfolge (Martin, 13.08.): Sprach-Niveaus ZUERST — die
@@ -39,6 +40,11 @@ export const FAQ: { q: string; a: ReactNode }[] = [
       </div>
     ),
   },
+  /* Bestpreis-Frage (Martin 08.10.2026: „haben wir die gleichen Fragen und Antworten auch im Kundenportal? Das würde ja Sinn
+     machen, dass das sich deckt"): dieselbe Frage wie in der Angebotsmail, Antwort im Wortlaut der Bestpreisgarantie
+     (GARANTIE_PORTAL). In der Mail steht „Ich antworte" in der Ich-Form der Absenderin, hier „Marta antwortet". Im Look
+     „angebot" steht sie direkt nach den drei Grundfragen (erste hinter „weitere Fragen"). */
+  { q: 'Ich habe ein günstigeres Angebot. Was kann ich tun?', a: `${GARANTIE_PORTAL.zusage} ${GARANTIE_PORTAL.ablauf}` },
   { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, laden Sie sie ein, sich bei Ihnen zu bewerben. Dafür müssen Sie nur kurz die Pflegesituation vervollständigen — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Alles unverbindlich; ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.' },
   { q: 'Gehe ich mit dem Einladen einen Vertrag ein?', a: 'Nein — das Einladen und Anschauen von Profilen ist vollständig unverbindlich. Ein Vertrag kommt erst zustande, wenn Sie ein konkretes Angebot ausdrücklich annehmen.' },
   { q: 'Kann ich jederzeit kündigen?', a: 'Ja, täglich kündbar — ohne Mindestlaufzeit und ohne Angabe von Gründen. Kosten entstehen ausschließlich für Tage, an denen die Pflegekraft tatsächlich vor Ort ist.' },
