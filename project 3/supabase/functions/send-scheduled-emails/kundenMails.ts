@@ -168,7 +168,7 @@ const ZUSCHUSS_WORT: Record<string, string> = {
   steuervorteil: "Steuerersparnis",
 };
 export type ZuschussPosten = { name: string; wort: string; monat: number; jahr: number };
-export type Eigenanteil = { brutto: number; eigen: number; posten: ZuschussPosten[]; pflegegrad: number | null };
+export type Eigenanteil = { brutto: number; eigen: number; posten: ZuschussPosten[]; pflegegrad: number | null; ehepaar: boolean };
 
 export function eigenanteilAus(kalk: Record<string, any> | null | undefined): Eigenanteil | null {
   const brutto = typeof kalk?.bruttopreis === "number" ? kalk.bruttopreis : 0;
@@ -184,7 +184,7 @@ export function eigenanteilAus(kalk: Record<string, any> | null | undefined): Ei
   const eigen = brutto - posten.reduce((s: number, p: ZuschussPosten) => s + p.monat, 0);
   if (eigen <= 0 || eigen >= brutto || Math.abs(eigen - kalk.eigenanteil) > 2) return null;
   const pg = Number(kalk?.formularDaten?.pflegegrad);
-  return { brutto, eigen, posten, pflegegrad: Number.isFinite(pg) ? pg : null };
+  return { brutto, eigen, posten, pflegegrad: Number.isFinite(pg) ? pg : null, ehepaar: kalk?.formularDaten?.betreuung_fuer === "ehepaar" };
 }
 
 const aufzaehlung = (w: string[]): string => w.length < 2 ? (w[0] ?? "") : `${w.slice(0, -1).join(", ")} und ${w[w.length - 1]}`;
@@ -196,7 +196,7 @@ function eigenanteilSatz(e: Eigenanteil): string {
     : `${aufzaehlung(w)} können Ihren Eigenanteil auf diesen Betrag senken.`;
 }
 const heimSatz = (e: Eigenanteil): string => e.eigen < HEIM_EIGENANTEIL
-  ? ` Zum Vergleich: Im Pflegeheim liegt der Eigenanteil im ersten Jahr bei durchschnittlich ${euro(HEIM_EIGENANTEIL)}&nbsp;€ im Monat (vdek, Stand 1.&nbsp;Juli&nbsp;2026).`
+  ? ` Zum Vergleich: Im Pflegeheim liegt der Eigenanteil im ersten Jahr bei durchschnittlich ${euro(HEIM_EIGENANTEIL)}&nbsp;€ im Monat pro Person (vdek, Stand 1.&nbsp;Juli&nbsp;2026).`
   : "";
 
 /** Grüner Kasten unter dem Preis: „Nach Zuschüssen ca. 1.622 € im Monat" (Martins Wortlaut der Preisseite, 17.09.). */
@@ -220,8 +220,9 @@ function eigenanteilRechnung(e: Eigenanteil): string {
     : `bis zu ${euro(p.monat)}&nbsp;€ ${p.wort} (${euro(p.jahr)}&nbsp;€ im Jahr)`;
   const hatPflegegeld = e.posten.some((p) => p.name === "pflegegeld");
   return `So rechnen wir: ${euro(e.brutto)}&nbsp;€ im Monat, abzüglich ${aufzaehlung(e.posten.map(teil))}.`
+    + (hatPflegegeld && e.ehepaar ? " Gerechnet ist mit den Zuschüssen für eine Person." : "")
     + (hatPflegegeld ? " Das Pflegegeld können Sie frei für die Betreuung einsetzen." : " Pflegegeld und Entlastungsbudget gibt es ab Pflegegrad&nbsp;2.")
-    + " Die ganze Rechnung sehen Sie im Portal unter „Kosten im Überblick“.";
+    + " Die vollständige Rechnung sehen Sie im Portal unter „Kosten im Überblick“.";
 }
 
 /* Häufige Fragen der Angebotsmail (Vorschlag 08.10.2026): die Einwände vor dem Klick, in den Worten der Kunden. Antworten nur
@@ -236,7 +237,7 @@ export function angebotFragen(e: Eigenanteil | null): { frage: string; antwort: 
     { frage: "Die Pflegekraft passt nicht. Was passiert dann?", antwort: "Wir sorgen schnellstmöglich für Ersatz, in der Regel innerhalb von 3 Tagen. Sie können täglich kündigen, ein Anruf genügt." },
   ];
   if (e) liste.push({ frage: `Wie kommen die ca. ${euro(e.eigen)}&nbsp;€ Eigenanteil zustande?`, antwort: eigenanteilRechnung(e) });
-  liste.push({ frage: "Was brauche ich zu Hause?", antwort: "Ein eigenes, abschließbares Zimmer mit Bett für die Pflegekraft. Küche, Bad und ein Internetanschluss sollten vorhanden sein. Zimmer und Verpflegung stellen Sie, das ist mit „Kost und Logis“ im Angebot gemeint." });
+  liste.push({ frage: "Was brauche ich zu Hause?", antwort: "Ein eigenes, abschließbares Zimmer mit Bett für die Pflegekraft. Küche, Bad und ein Internetanschluss sollten vorhanden sein. Sie stellen Zimmer und Verpflegung. Das ist mit „Kost und Logis“ im Angebot gemeint." });
   return liste;
 }
 
@@ -311,7 +312,7 @@ const SCHRITTE_ANGEBOT = [
 
 /* Satz unter „Pflegekräfte einladen" (Vorschlag 08.10.2026, OpenAI angebot8): sagt ehrlich, was nach dem Klick zuerst kommt,
    und nimmt die Angst vor Kosten und Bindung. Die Schritte darunter erklären den Rest, deshalb kurz. Ohne Bedingungs-Anfang. */
-const EINLADEN_HINWEIS = "Dafür ergänzen Sie im Portal kurz die Pflegesituation, etwa 2 Minuten. Kostenlos und unverbindlich.";
+const EINLADEN_HINWEIS = "Dafür ergänzen Sie im Portal kurz die Pflegesituation, das dauert etwa 2 Minuten. Kostenlos und unverbindlich.";
 
 /** „für eine Person mit Pflegegrad 4" — Spiegel von angebotFuer (KompaktEinstieg.tsx); fehlende Angaben entfallen. */
 export function angebotFuer(fd: Record<string, unknown> | null | undefined): string | null {
@@ -336,11 +337,12 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
   // Martin 03.10.2026: wie vor dem 26.09. auf Angebot und Pflegekräfte (Portal oben), nicht direkt ins Formular.
   const start = k.portal({ m: "eb" });
 
-  /* Einstieg (Vorschlag 08.10.2026): Ergebnis zuerst, dann die Handlung. OpenAI angebot8: „ab sofort verfügbar" als
-     Hauptaussage ist angreifbar (Anreise ab 3 Tagen) → „können Sie jetzt im Portal einladen" (wahr und zeigt den Schritt). */
+  /* Einstieg (Vorschlag 08.10.2026): Ergebnis zuerst. OpenAI angebot8: „ab sofort verfügbar" als Hauptaussage ist angreifbar
+     (Anreise ab 3 Tagen); angebot9: „jetzt einladen" verspricht zu viel, vorher kommt die Pflegesituation. Der Knopf
+     „Pflegekräfte einladen" sagt darunter, was zuerst kommt. */
   const kraefteSatz = n === 0 ? ""
-    : n === 1 ? " Eine Pflegekraft passt zu Ihren Angaben, Sie können sie jetzt im Portal einladen."
-    : ` ${zahlwort(n, true)} Pflegekräfte passen zu Ihren Angaben, alle ${zahlwort(n)} können Sie jetzt im Portal einladen.`;
+    : n === 1 ? " Eine Pflegekraft passt zu Ihren Angaben, ich stelle sie Ihnen unten vor."
+    : ` ${zahlwort(n, true)} Pflegekräfte passen zu Ihren Angaben, ich stelle sie Ihnen unten vor.`;
   const einstieg = a.herkunft
     ? `vielen Dank für Ihre Anfrage über ${mb(esc(a.herkunft))}. Hier ist Ihr Angebot.`
     : a.resubmit
@@ -415,7 +417,7 @@ ${EINLADEN_HINWEIS}
   /* Vorschau (Vorschlag 08.10.2026): Preis, Kündbarkeit und der nächste Schritt; der Betreff nennt schon die Pflegekräfte. */
   const vorschau = brutto
     ? `${euro(brutto)} € im Monat, täglich kündbar${n === 0 ? ", ohne Vermittlungsgebühr."
-      : `. ${n === 1 ? "Eine passende Pflegekraft können" : `${zahlwort(n, true)} passende Pflegekräfte können`} Sie jetzt einladen.`}`
+      : `. ${n === 1 ? "Eine passende Pflegekraft ist" : `${zahlwort(n, true)} passende Pflegekräfte sind`} für Sie ausgewählt.`}`
     : "Ihr persönliches Angebot zur 24-Stunden-Betreuung.";
 
   /* Martin 01.10.2026 („täglich 8–20"): Erreichbarkeit wie auf Martas Karte; ohne Bedingungs-Anfang („Wenn Sie Fragen …"). */
@@ -430,13 +432,14 @@ ${EINLADEN_HINWEIS}
     ${mAbschnitt("In drei Schritten", "So geht es weiter")}
     ${mSchritte(SCHRITTE_ANGEBOT, true)}
     ${mAbstand(26)}
-    ${mAbschnitt("Gut zu wissen", "Häufige Fragen")}
-    ${fragenHtml(fragen)}
     ${mAbschnitt("Ihre Angaben", "Grundlage Ihres Angebots")}
     ${mKlein(angabenZeile, 14)}
     ${hinweisHtml}
     ${angaben.html}
-    ${mKnopf(start, "Angebot &amp; Pflegekräfte ansehen", 18, 22, { schrift: 16, innen: 12 })}
+    ${mAbstand(18)}
+    ${mAbschnitt("Gut zu wissen", "Häufige Fragen")}
+    ${fragenHtml(fragen)}
+    ${mKnopf(start, "Angebot &amp; Pflegekräfte ansehen", 0, 22, { schrift: 16, innen: 12 })}
     ${mp(kontaktSatz, 8)}
     ${k.marta}`;
 
@@ -458,13 +461,13 @@ ${!eigen && heim ? `\n${heimText(heim)}\n` : ""}
 ${empfText}SO GEHT ES WEITER
 ${SCHRITTE_ANGEBOT.map((s, i) => `${i + 1}. ${s.titel}: ${s.text.replace("‑", "-")}`).join("\n")}
 
-HÄUFIGE FRAGEN
-${fragenText(fragen)}
-
 GRUNDLAGE IHRES ANGEBOTS
 ${angabenZeile}
 
 ${a.angabenHinweis ? `${a.angabenHinweis.text}\n\n` : ""}${angaben.text}
+
+HÄUFIGE FRAGEN
+${fragenText(fragen)}
 
 Angebot & Pflegekräfte ansehen: ${start}
 
