@@ -335,14 +335,16 @@ ${zeilen2.map(([l, v]) => `${l}: ${v}`).join("\n")}`;
    („ich habe gar nicht gesehen, ob er in der Mail ist … wenn ich das jetzt gelesen habe, wie geht's weiter? … schauen sich
    die Pflegekräfte an, vervollständigen das Profil, damit sich Pflegekräfte bei Ihnen bewerben können und Sie welche
    einladen können … Dann erhalten Sie Bewerbung, Sie entscheiden und erst dann wird der Vertrag geschlossen und dann
-   organisieren wir alles"; davor: „sie rufen an oder gehen ins Portal … Bis dahin zahlen sie nicht, kündbar"). Schritt 2
-   wörtlich wie im Portal ohne „Danach" und „hier". Fakten: Anreise ab 3 Tagen nach der Zusage, Wechsel und Ersatz bei Ausfall
+   organisieren wir alles"; davor: „sie rufen an oder gehen ins Portal … Bis dahin zahlen sie nicht, kündbar"). Schritt 1
+   und 2 wörtlich wie im Portal (KompaktEinstieg.tsx ABLAUF; Martin 08.10. zu Fassung 4: „der erste Schritt passt nicht mehr
+   so ganz … vereinheitlichen, wie im Kundenportal"), einzige Anpassung „hier im Portal" → „im Portal"; bei Änderung beide
+   Stellen. Schritt 3 und 4 gibt es nur in der Mail. Fakten: Anreise ab 3 Tagen nach der Zusage, Wechsel und Ersatz bei Ausfall
    (Portal-FAQ), Kosten erst, wenn die Pflegekraft da ist, täglich kündbar (vier Punkte), Erreichbarkeit täglich 8–20 Uhr per
-   Telefon und WhatsApp; „Wir sind immer da" ist so nicht belegt. OpenAI angebot11: Anruf erklären, „Favoriten" ersetzt,
-   „Vertretung" → Ersatz bei Ausfall, „ab 3 Tagen nach Ihrer Zusage". */
+   Telefon und WhatsApp; „Wir sind immer da" ist so nicht belegt. OpenAI angebot11: „Vertretung" → Ersatz bei Ausfall,
+   „ab 3 Tagen nach Ihrer Zusage". */
 const SCHRITTE_ANGEBOT = [
-  { titel: "Pflegekräfte ansehen und Pflegesituation ergänzen", text: "Ergänzen Sie kurz die Pflegesituation im Portal, oder rufen Sie mich an, dann nehme ich die Angaben am Telefon auf. Danach können sich Pflegekräfte bei Ihnen bewerben, und Sie können Pflegekräfte einladen, die Ihnen zusagen." },
-  { titel: "Bewerbungen erhalten", text: "Passende Pflegekräfte bewerben sich bei Ihnen, mit Foto und Erfahrung. Jede Bewerbung sehen Sie im Portal und erhalten sie per E\u2011Mail." },
+  { titel: "Pflegesituation ergänzen und Pflegekräfte einladen", text: "Ergänzen Sie kurz die Pflegesituation. Pflegekräfte, die Ihnen zusagen, laden Sie gleich mit ein, kostenlos und unverbindlich." },
+  { titel: "Bewerbungen erhalten", text: "Danach bewerben sich passende Pflegekräfte bei Ihnen, mit Foto und Erfahrung. Jede Bewerbung sehen Sie im Portal und erhalten sie per E\u2011Mail." },
   { titel: "Sie entscheiden", text: "Sie wählen Ihre Pflegekraft aus. Erst dann unterschreiben Sie den Vertrag online. Er ist täglich kündbar, und bis die Pflegekraft bei Ihnen ist, zahlen Sie nichts." },
   { titel: "Wir kümmern uns um alles", text: "Wir organisieren die Anreise, den Wechsel der Pflegekraft und bei einem Ausfall den Ersatz. Anreisen kann die Pflegekraft schon ab 3 Tagen nach Ihrer Zusage. Ich bin täglich von 8 bis 20 Uhr für Sie da, am Telefon und per\u00a0WhatsApp." },
 ];
