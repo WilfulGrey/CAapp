@@ -230,6 +230,36 @@ export function mProfil(pk: PflegekraftDaten, profilUrl: string, unten = 0): str
     </table>`;
 }
 
+/** Kompakte Zeile einer Pflegekraft (Variante B der Angebotsmail, 07.10.2026; Form wie der Vorschlag vom 03.10. und die
+ *  Zeilen im Portal, PflegekraftZeile): Foto 56 px, Name + Alter, darunter Deutsch mit Punkten, dann Erfahrung und Einsätze
+ *  bei uns. Keine Sterne (Bewertungen je Pflegekraft gibt es nicht). Ganze Zeile verlinkt aufs Profil. */
+export function mProfilZeile(pk: PflegekraftDaten, profilUrl: string, unten = 8): string {
+  const a = (inhalt: string, farbe = '#18181B') => `<a href="${profilUrl}" target="_blank" style="color:${farbe};text-decoration:none;">${inhalt}</a>`;
+  const bild = `src="${pk.foto}" alt="${esc(pk.name)}" width="56"`;
+  const foto = pk.foto
+    ? `<!--[if mso]><img ${bild} style="display:block;border:0;" /><![endif]--><!--[if !mso]><!--><img ${bild} height="56" style="display:block;width:56px;height:56px;border-radius:12px;border:0;object-fit:cover;-ms-interpolation-mode:bicubic;outline:none;" /><!--<![endif]-->`
+    : `<div style="width:56px;height:56px;border-radius:12px;background-color:#B5A184;color:#fff;font-size:19px;font-weight:700;line-height:56px;text-align:center;">${initialen(pk.name)}</div>`;
+  const alter = pk.alter && pk.alter > 0 ? `<span style="font-weight:400;color:#71717A;">, ${pk.alter}</span>` : '';
+  const j = pk.jahre ?? 0;
+  const e = pk.einsaetze ?? 0;
+  const deutsch = pk.deutsch ? `${deutschPunkte(pk.deutsch)}Deutsch ${esc(pk.deutsch.toLowerCase())}` : '';
+  // Jede Angabe bleibt zusammen; auf schmalen Handys bricht die Zeile nur am Punkt.
+  const fakten = [j > 0 ? `${j} ${j === 1 ? 'Jahr' : 'Jahre'} Erfahrung` : '', e > 0 ? `${e} ${e === 1 ? 'Einsatz' : 'Einsätze'} bei uns` : '']
+    .filter(Boolean).map((t) => `<span style="white-space:nowrap;">${t}</span>`).join(' · ');
+  return `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 ${unten}px;background:${PROFIL_BEIGE};border-radius:14px;border-collapse:separate;">
+      <tr>
+        <td width="56" style="width:56px;padding:10px 0 10px 10px;vertical-align:middle;">${a(foto)}</td>
+        <td style="padding:10px 12px 10px 12px;vertical-align:middle;">
+          <p style="margin:0;font-size:17px;font-weight:800;line-height:1.25;color:#18181B;">${a(esc(pk.name))}${alter}</p>
+          ${deutsch ? `<p style="margin:4px 0 0;font-size:14px;line-height:1.35;color:${F.muted};">${a(deutsch, F.muted)}</p>` : ''}
+          ${fakten ? `<p style="margin:2px 0 0;font-size:13.5px;line-height:1.35;color:${F.muted};">${a(fakten, F.muted)}</p>` : ''}
+        </td>
+        <td width="22" style="width:22px;padding:0 12px 0 0;vertical-align:middle;text-align:right;font-size:20px;font-weight:700;color:${F.taupeInk};">${a('&rsaquo;', F.taupeInk)}</td>
+      </tr>
+    </table>`;
+}
+
 /** Textfassung des Profils (Nur-Text-Mail), dieselben Angaben wie mProfil. */
 export function mProfilText(pk: PflegekraftDaten): string {
   const kopf = [pk.name + (pk.alter && pk.alter > 0 ? `, ${pk.alter}` : ''), pk.deutsch ? `Deutsch ${pk.deutsch.toLowerCase()}` : ''].filter(Boolean).join(' · ');

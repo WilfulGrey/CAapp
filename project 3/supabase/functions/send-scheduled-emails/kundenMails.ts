@@ -34,6 +34,7 @@ import {
   mKopfKarte,
   mProfil,
   mProfilText,
+  mProfilZeile,
   mPunkte,
   mSchritte,
   mTitel,
@@ -165,8 +166,13 @@ export type AngebotEingabe = {
   /** Hinweis über der Angaben-Tabelle (eingekaufte Leads), HTML und Text. */
   angabenHinweis: { html: string; text: string } | null;
   resubmit: boolean;
-  /** Empfehlung aus mamamia; null/undefined → Abschnitt fällt weg. */
-  empfehlung?: { e: Empfehlung; cid: string | null; sichtbar: number } | null;
+  /** Empfehlung aus mamamia; null/undefined → Abschnitt fällt weg. `weitere` = die übrigen sichtbaren Kräfte in
+   *  Portal-Reihenfolge (Martin 07.10.2026: „die oberste als Empfehlung, die anderen trotzdem zeigen"). */
+  empfehlung?: { e: Empfehlung; cid: string | null; sichtbar: number; weitere?: { e: Empfehlung; cid: string | null }[] } | null;
+  /** „06.10.2026" — Datum des Angebots wie die Kopfleiste im Portal (AngebotKopfleiste, `lead.created_at`). */
+  datum?: string | null;
+  /** Variante B (Vorschlag 07.10.2026, Entscheidung Martin offen): die weiteren Kräfte als kompakte Zeilen statt als volles Profil. */
+  weitereKompakt?: boolean;
 };
 
 function angabenTabelle(fd: Record<string, any>, careStartTiming: string | null | undefined): { html: string; text: string } {
@@ -200,11 +206,28 @@ ${zeilen2.map(([l, v]) => `${l}: ${v}`).join("\n")}`;
   return { html, text };
 }
 
+/* Schritte wörtlich wie „So geht es weiter" im Portal (src/components/portal/KompaktEinstieg.tsx ABLAUF, Fassung 30, live
+   seit 06.10.2026); einzige Anpassung „hier im Portal" → „im Portal". Bei Änderung beide Stellen. */
 const SCHRITTE_ANGEBOT = [
-  { titel: "Pflegesituation vervollständigen", text: "Dauert etwa 2 Minuten, vieles ist schon ausgefüllt." },
-  { titel: "Pflegekräfte einladen und Bewerbungen erhalten", text: "Passende Pflegekräfte bewerben sich bei Ihnen mit Foto, Erfahrung, Anreisedatum und Preis." },
-  { titel: "Auswählen und starten", text: "Wir übernehmen den Rest. Anreise schon ab 3 Tagen möglich." },
+  { titel: "Pflegesituation ergänzen und Pflegekräfte einladen", text: "Ergänzen Sie kurz die Pflegesituation. Pflegekräfte, die Ihnen zusagen, laden Sie gleich mit ein, kostenlos und unverbindlich." },
+  { titel: "Bewerbungen erhalten", text: "Danach bewerben sich passende Pflegekräfte bei Ihnen, mit Foto und Erfahrung. Jede Bewerbung sehen Sie im Portal und erhalten sie per E\u2011Mail." },
+  { titel: "Auswählen und starten", text: "Sie wählen Ihre Pflegekraft aus und unterschreiben den Vertrag online. Um den Rest kümmern wir uns. Die Anreise ist schon ab 3 Tagen möglich." },
 ];
+
+/* Satz unter „Pflegekräfte einladen" (OpenAI 07.10.2026, angebot5): Der Knopf steht vor den Schritten, deshalb sagt er gleich,
+   dass vor dem Einladen die Pflegesituation ergänzt wird und nichts kostet. */
+const EINLADEN_HINWEIS = "Vor dem Einladen ergänzen Sie kurz die Pflegesituation. Kostenlos und unverbindlich.";
+
+/** „für eine Person mit Pflegegrad 4" — Spiegel von angebotFuer (KompaktEinstieg.tsx); fehlende Angaben entfallen. */
+export function angebotFuer(fd: Record<string, unknown> | null | undefined): string | null {
+  const wer = fd?.betreuung_fuer === "1-person" ? "eine Person" : fd?.betreuung_fuer === "ehepaar" ? "zwei Personen" : null;
+  const pg = fd?.pflegegrad;
+  const grad = typeof pg === "number" || (typeof pg === "string" && /^\d$/.test(pg))
+    ? (Number(pg) === 0 ? "ohne Pflegegrad" : `mit Pflegegrad ${pg}`)
+    : null;
+  if (!wer) return null;
+  return grad ? `für ${wer} ${grad}` : `für ${wer}`;
+}
 
 export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
   const kalk = a.kalkulation ?? {};
@@ -231,37 +254,55 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
       <td style="vertical-align:middle;padding-right:12px;"><img src="${siegel}" width="36" alt="Testsieger" style="display:block;width:36px;height:auto;"></td>
       <td style="vertical-align:middle;"><p style="margin:0;font-size:15.5px;font-weight:700;color:${F.ink};">6× Testsieger DIE WELT</p><p style="margin:2px 0 0;font-size:14px;color:${F.muted};">20 Jahre Erfahrung &middot; 60.000+ Einsätze</p></td>
     </tr></table>`;
-  const kosten = mKarte(`
-    ${mEyebrow(brutto ? "Ihre Betreuungskosten" : "Ihre Konditionen", 8)}
-    ${brutto ? `<p style="margin:0 0 8px;font-size:44px;font-weight:800;line-height:1;letter-spacing:-.03em;color:${F.ink};">${euro(brutto)}&nbsp;€</p>
-    ${mKlein("Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125&nbsp;€ pro Fahrt).", 14)}` : ""}
+  /* Angebotskarte wie im Portal (Fassung 30, live seit 06.10.2026): Kopfleiste „Ihr Angebot vom …", Leistung mit Grundlage,
+     Preis „im Monat" mit dem Satz des Portals, darunter Knopf, Sterne, die vier Punkte, Heimvergleich und Siegel. */
+  const leistung = angebotFuer(fd);
+  const kostenInhalt = `
+    <p style="margin:0;font-size:17px;font-weight:700;line-height:1.3;color:${F.ink};">Rund-um-Betreuung zu Hause</p>
+    ${leistung ? `<p style="margin:2px 0 0;font-size:15px;line-height:1.4;color:${F.muted};">${esc(leistung.charAt(0).toUpperCase() + leistung.slice(1))}</p>` : ""}
+    ${brutto ? `<p style="margin:16px 0 0;line-height:1;"><span style="font-size:44px;font-weight:800;letter-spacing:-.03em;color:${F.ink};">${euro(brutto)}&nbsp;€</span><span style="font-size:16px;color:${F.muted};">&nbsp; im Monat</span></p>
+    <p style="margin:10px 0 18px;font-size:14.5px;line-height:1.55;color:${F.muted};">Lohn, Steuern, Gebühren: alles drin. Dazu kommen Kost und Logis, <span style="white-space:nowrap;">125&nbsp;€ Reisekosten</span> pro Fahrt und <span style="white-space:nowrap;">Feiertagszuschläge.</span></p>` : mAbstand(16)}
     ${mKnopf(start, "Angebot &amp; Pflegekräfte ansehen", 2, k.bewertung ? 10 : 18, { schrift: 16, innen: 12 })}
     ${k.bewertung ? mSterneZeile(k.bewertung, 18) : ""}
     ${mPunkte(null)}
     ${mKlein("Kosten entstehen erst, wenn die Pflegekraft bei Ihnen ist.", 0)}
     ${heim ? `${mTrenner()}${heimHtml(heim, 0)}` : ""}
     ${mTrenner()}
-    ${siegelZeile}`);
+    ${siegelZeile}`;
+  const kosten = mKopfKarte(a.datum ? `Ihr Angebot vom ${a.datum}` : "Ihr Angebot", "neutral", kostenInhalt, 26);
 
+  /* Pflegekräfte wie im Portal (Martin 07.10.2026: „die oberste als Empfehlung, die anderen trotzdem zeigen, damit die das
+     sehen, dass wir hier fünf Pflegekräfte ausgesucht haben … damit sie bloß in das Portal gehen"): Empfehlung mit Gründen,
+     darunter die übrigen sichtbaren Kräfte im selben Profil „V", dann EIN Knopf zum Abschnitt „Pflegesituation ergänzen und
+     Pflegekräfte einladen" (`goto=matches`). Jedes Profil öffnet im Portal genau diese Pflegekraft (`cg=`). */
   let empfHtml = "";
   let empfText = "";
   if (emp) {
-    const profil = k.portal({ cg: String(emp.e.caregiverId), m: "eb" });
-    const alle = k.portal({ goto: "matches", m: "eb" });
+    const profilUrl = (e: Empfehlung) => k.portal({ cg: String(e.caregiverId), m: "eb" });
+    const einladen = k.portal({ goto: "matches", m: "eb" });
     const pk = pkAusEmpfehlung(emp.e, emp.cid);
+    const weitere = emp.weitere ?? [];
     const grund = (t: string) => `<tr><td style="width:24px;padding:0 0 7px;color:${F.green};font-weight:800;font-size:15px;line-height:1.45;vertical-align:top;">&#10003;</td><td style="padding:0 0 7px;font-size:15px;line-height:1.45;color:${F.ink};">${esc(t)}</td></tr>`;
     const gruende = emp.e.gruende.length
       ? `<p style="margin:16px 0 8px;font-size:15px;font-weight:700;color:${F.ink};">Passt zu Ihrer Anfrage</p><table role="presentation" cellpadding="0" cellspacing="0">${emp.e.gruende.map(grund).join("")}</table>`
       : "";
-    // „V" (Martin 27.09.2026): Kopfleiste „Unsere Empfehlung", darin das geschlossene Profil.
-    empfHtml = `${mAbschnitt("Für Sie ausgewählt", `${n} passende ${pflegekraefte(n)}`)}
-    ${mKopfKarte("Unsere Empfehlung", "neutral", `${mProfil(pk, profil)}${gruende}`, 12)}
-    ${mKlein(mLink(alle, n === 1 ? "Profil im Portal ansehen" : `Alle ${n} Pflegekräfte ansehen`), 12, true)}`;
-    empfText = `FÜR SIE AUSGEWÄHLT: ${n} passende ${pflegekraefte(n)}
-Unsere Empfehlung: ${pkText(pk)}
+    const knopf = n === 1 ? "Pflegekraft einladen" : "Pflegekräfte einladen";
+    const weitereKopf = weitere.length === 1 ? "Eine weitere passende Pflegekraft" : `${zahlwort(weitere.length, true)} weitere passende Pflegekräfte`;
+    const titel = n === 1 ? "Ihre passende Pflegekraft" : `Ihre ${n} passenden Pflegekräfte`;
+    empfHtml = `${mAbschnitt("Für Sie ausgewählt", titel)}
+    ${mKopfKarte("Unsere Empfehlung für Sie", "neutral", `${mProfil(pk, profilUrl(emp.e))}${gruende}`, 14)}
+    ${weitere.length ? mKopfKarte(weitereKopf, "neutral", weitere.map((w, i) => a.weitereKompakt
+      ? mProfilZeile(pkAusEmpfehlung(w.e, w.cid), profilUrl(w.e), i < weitere.length - 1 ? 8 : 0)
+      : mProfil(pkAusEmpfehlung(w.e, w.cid), profilUrl(w.e), i < weitere.length - 1 ? 12 : 0)).join(""), 14) : ""}
+    ${mKnopf(einladen, knopf, 4, 10, { schrift: 16, innen: 12 })}
+    ${mKlein(EINLADEN_HINWEIS, 30, true)}`;
+    empfText = `FÜR SIE AUSGEWÄHLT: ${titel}
+Unsere Empfehlung für Sie: ${pkText(pk)}
 ${emp.e.gruende.map((g) => `✓ ${g}`).join("\n")}
-Profil: ${profil}
-${n === 1 ? "Im Portal" : `Alle ${n} Pflegekräfte`}: ${alle}
+Profil: ${profilUrl(emp.e)}
+${weitere.length ? `\n${weitereKopf.toUpperCase()}\n${weitere.map((w, i) => `${i + 1}. ${pkText(pkAusEmpfehlung(w.e, null)).replace("\n", " · ")}\n   Profil: ${profilUrl(w.e)}`).join("\n")}\n` : ""}
+${knopf}: ${einladen}
+${EINLADEN_HINWEIS}
 
 `;
   }
@@ -280,7 +321,7 @@ ${n === 1 ? "Im Portal" : `Alle ${n} Pflegekräfte`}: ${alle}
     ${empfHtml}
     ${mAbschnitt("In drei Schritten", "So geht es weiter")}
     ${mSchritte(SCHRITTE_ANGEBOT, true)}
-    ${mAbstand(22)}
+    ${mAbstand(26)}
     ${hinweisHtml}
     ${angaben.html}
     ${mKnopf(start, "Angebot &amp; Pflegekräfte ansehen", 18, 22, { schrift: 16, innen: 12 })}
@@ -291,9 +332,10 @@ ${n === 1 ? "Im Portal" : `Alle ${n} Pflegekräfte`}: ${alle}
 
 ${klartext(einstieg + kraefteSatz)}
 
-${brutto ? `IHRE BETREUUNGSKOSTEN
-${euro(brutto)} € im Monat, inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).
-` : "IHRE KONDITIONEN\n"}
+${a.datum ? `IHR ANGEBOT VOM ${a.datum}` : "IHR ANGEBOT"}
+Rund-um-Betreuung zu Hause${leistung ? ` ${leistung}` : ""}
+${brutto ? `${euro(brutto)} € im Monat. Lohn, Steuern, Gebühren: alles drin. Dazu kommen Kost und Logis, 125 € Reisekosten pro Fahrt und Feiertagszuschläge.
+` : ""}
 Angebot & Pflegekräfte ansehen: ${start}
 ${k.bewertung ? `★★★★★ ${k.bewertung.schnitt} von 5 aus ${k.bewertung.anzahl} Bewertungen: https://primundus.de/erfahrungen\n` : ""}
 ${punkteText()}
@@ -302,7 +344,7 @@ ${heim ? `\n${heimText(heim)}\n` : ""}
 6× Testsieger DIE WELT · 20 Jahre Erfahrung · 60.000+ Einsätze
 
 ${empfText}SO GEHT ES WEITER
-${SCHRITTE_ANGEBOT.map((s, i) => `${i + 1}. ${s.titel}: ${s.text}`).join("\n")}
+${SCHRITTE_ANGEBOT.map((s, i) => `${i + 1}. ${s.titel}: ${s.text.replace("‑", "-")}`).join("\n")}
 
 ${a.angabenHinweis ? `${a.angabenHinweis.text}\n\n` : ""}${angaben.text}
 

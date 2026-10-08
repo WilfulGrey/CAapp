@@ -127,6 +127,9 @@ export interface EmpfehlungErgebnis {
   empfehlung: Empfehlung;
   /** Wie viele Kräfte der Kunde im Portal insgesamt sieht (inkl. Empfehlung), max. 5. */
   sichtbarGesamt: number;
+  /** Alle sichtbaren Kräfte in Portal-Reihenfolge, die Empfehlung zuerst (Angebotsmail, Martin 07.10.2026). Aus derselben
+   *  Matching-Liste, ohne weiteren mamamia-Aufruf; nur die Empfehlung hat die Zusatzfelder aus getCaregiver. */
+  alle?: Empfehlung[];
 }
 
 // ─── Badge / Stufe — Kopie aus src/lib/mamamia/badge.ts ──────────────────
@@ -707,7 +710,9 @@ export async function holeEmpfehlung(deps: HoleDeps): Promise<EmpfehlungErgebnis
       console.warn("[empfehlung] getCaregiver fehlgeschlagen:", e instanceof Error ? e.message : String(e));
     }
 
-    return baueEmpfehlung(fuenf[0], extra, deps.formularDaten, fuenf.length, now);
+    const erg = baueEmpfehlung(fuenf[0], extra, deps.formularDaten, fuenf.length, now);
+    const weitere = fuenf.slice(1).map((m) => baueEmpfehlung(m, null, deps.formularDaten, fuenf.length, now).empfehlung);
+    return { ...erg, alle: [erg.empfehlung, ...weitere] };
   } catch (e) {
     console.warn("[empfehlung] nicht verfügbar:", e instanceof Error ? e.message : String(e));
     return null;
