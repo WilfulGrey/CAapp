@@ -41,7 +41,7 @@ HTML-Dateien in diesem Ordner zeigen noch den alten Stand.
 ### A) Vor dem Absenden der Pflegesituation (Nurture)
 
 ```
-0h     Angebot (Knopf „Angebot & Pflegekräfte ansehen" unter dem Preis + unten, Sterne darunter; Registry #110)
+0h     Angebot (Angebotskarte wie im Portal, „So geht es weiter" in vier Schritten, bis zu fünf Pflegekräfte, Häufige Fragen; Registry #110, #117)
 +4h    Nudge 1  (bis zu fünf passende Pflegekräfte)
 +28h   Nudge 2  („Soll ich die Angaben mit Ihnen zusammen ausfüllen?")
 +48h   Vier Dinge, die Primundus anders macht
@@ -89,7 +89,7 @@ einen dynamischen Wert **verschiebst**, bleibt er dynamisch; wenn du ihn
 
 | Mail | Betreff |
 |------|---------|
-| Angebot | Ihr Angebot zur 24-Stunden-Betreuung – Primundus *(Resubmit: „Ihr aktualisiertes Angebot …"; Portal-Lead: eigener Betreff)* |
+| Angebot | Ihr Angebot und 5 passende Pflegekräfte *(Zahl = sichtbare Kräfte, bei einer „eine passende Pflegekraft"; Resubmit: „Ihr aktualisiertes Angebot und …"; ohne Kräfte: „Ihr Angebot zur 24-Stunden-Betreuung – Primundus"; Portal-Lead: eigener Betreff)* |
 | Nudge 1 | Fünf passende Pflegekräfte – es fehlen nur 2 Minuten *(Zahl aus mamamia)* |
 | Nudge 2 | Soll ich die Angaben mit Ihnen zusammen ausfüllen? |
 | Vier Dinge | Vier Dinge, die Primundus anders macht |

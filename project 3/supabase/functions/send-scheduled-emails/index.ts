@@ -1101,7 +1101,7 @@ type InlineFoto = { filename: string; content: Uint8Array; contentType: string; 
  *  fuenfFuerNudge). Schreibt nichts; der lead_events-Eintrag bleibt beim Versand. */
 async function empfehlungFuerAngebot(
   lead: Lead, supabaseUrl: string, key: string, darfOnboarden: boolean,
-): Promise<{ erg: EmpfehlungErgebnis; inline: InlineFoto | null } | null> {
+): Promise<{ erg: EmpfehlungErgebnis; inline: InlineFoto | null; weitere: (InlineFoto | null)[] } | null> {
   if (!lead.token) return null;
   const erg = await holeEmpfehlung({
     supabaseUrl, key, token: lead.token,
@@ -1110,12 +1110,23 @@ async function empfehlungFuerAngebot(
     darfOnboarden,
   });
   if (!erg) return null;
-  return { erg, inline: await fetchInlinePhotoDeno(erg.empfehlung.fotoUrl) };
+  /* Fotos aller sichtbaren Kräfte (Martin 07.10.2026). Budget wie die Fünf-Liste der Nudge-Mail: die Empfehlung zuerst, was
+     nicht passt, bekommt die Initialen-Kachel. */
+  const [inline, ...roh] = await Promise.all((erg.alle ?? [erg.empfehlung]).map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
+  const darf = fotoBudget(roh.map((r) => r?.content.length ?? null), 300_000, 1_200_000 - (inline?.content.length ?? 0));
+  return { erg, inline, weitere: roh.map((r, i) => (r && darf[i]) ? r : null) };
+}
+
+/** „06.10.2026" (Berliner Zeit) — Datum der Kopfleiste „Ihr Angebot vom …" wie im Portal (lead.created_at). */
+function angebotsDatum(iso: string | null | undefined): string | null {
+  const d = new Date(iso ?? Date.now());
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin" });
 }
 
 /** Eingaben der Angebotsmail aus dem Lead. */
 function angebotEingabe(
-  lead: Lead, resubmit: boolean, empf: { erg: EmpfehlungErgebnis; inline: InlineFoto | null } | null,
+  lead: Lead, resubmit: boolean, empf: { erg: EmpfehlungErgebnis; inline: InlineFoto | null; weitere: (InlineFoto | null)[] } | null,
 ): AngebotEingabe {
   const herkunft = portalHerkunft(lead.source);
   /* Welche Felder WIR gesetzt haben, legt api/portal-lead in der Kalkulation ab. Fehlt die
@@ -1131,7 +1142,16 @@ function angebotEingabe(
       ? { html: portalAngabenHinweisHtml(herkunft, angenommen), text: portalAngabenHinweisText(herkunft, angenommen) }
       : null,
     resubmit,
-    empfehlung: empf ? { e: empf.erg.empfehlung, cid: empf.inline?.cid ?? null, sichtbar: empf.erg.sichtbarGesamt } : null,
+    empfehlung: empf
+      ? {
+        e: empf.erg.empfehlung, cid: empf.inline?.cid ?? null, sichtbar: empf.erg.sichtbarGesamt,
+        weitere: (empf.erg.alle ?? []).slice(1).map((e, i) => ({ e, cid: empf.weitere[i]?.cid ?? null })),
+      }
+      : null,
+    /* Erneute Anfrage = angepasstes Angebot von heute; sonst das Datum der Anfrage. */
+    datum: angebotsDatum(resubmit ? null : (lead as unknown as Record<string, string | null>).created_at),
+    /* Vorschlag B (07.10.2026): die weiteren Kräfte als kompakte Zeilen. */
+    weitereKompakt: true,
   };
 }
 
@@ -1817,7 +1837,9 @@ Deno.serve(async (req: Request) => {
           const subject = item.subjectPrefix ? `${item.subjectPrefix}${m.subject}` : m.subject;
           const html = b ? m.html.replace('<div class="email-content">', `${bannerHtml(b)}<div class="email-content">`) : m.html;
           const text = b ? `(${b})\n\n${m.text}` : m.text;
-          const anhang = (item.email_type === "eingangsbestaetigung" || item.email_type === "vermittler_angebot") && demoInline
+          const anhang = item.email_type === "eingangsbestaetigung" && demoInline
+            ? [demoInline, ...(demoEmpf?.weitere ?? []).filter((r): r is InlineFoto => r !== null)]
+            : item.email_type === "vermittler_angebot" && demoInline
             ? [demoInline]
             : item.email_type === "profil_nudge_1" && demoFuenf?.anhaenge.length
             ? demoFuenf.anhaenge
@@ -2217,6 +2239,8 @@ Deno.serve(async (req: Request) => {
           );
           if (empf) {
             if (empf.inline) (scheduledEmail as any).__reminderInline = empf.inline;
+            const weitereFotos = empf.weitere.filter((r): r is InlineFoto => r !== null);
+            if (weitereFotos.length) (scheduledEmail as any).__inlineAttachments = weitereFotos;
             await supabase.from("lead_events").insert({
               lead_id: scheduledEmail.lead_id,
               event_type: "empfehlung_in_angebotsmail",
@@ -2225,6 +2249,8 @@ Deno.serve(async (req: Request) => {
                 sichtbar_gesamt: empf.erg.sichtbarGesamt,
                 gruende: empf.erg.empfehlung.gruende,
                 foto: empf.inline ? "inline" : "initialen",
+                weitere_ids: (empf.erg.alle ?? []).slice(1).map((e) => e.caregiverId),
+                fotos_inline: (empf.inline ? 1 : 0) + empf.weitere.filter(Boolean).length,
               },
             });
           }

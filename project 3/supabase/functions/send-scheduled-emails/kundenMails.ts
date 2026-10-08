@@ -18,6 +18,7 @@ import {
   TELEFON_HREF,
   TELEFON_TEXT,
   WHATSAPP_HREF,
+  deutschPunkte,
   mAbschnitt,
   mAbstand,
   mb,
@@ -34,6 +35,7 @@ import {
   mKopfKarte,
   mProfil,
   mProfilText,
+  mProfilZeile,
   mPunkte,
   mSchritte,
   mTitel,
@@ -156,6 +158,127 @@ function heimText(h: { eigen: number; diff: number }): string {
   return `Zuhause statt Pflegeheim: rund ${euro(h.diff)} € weniger im Monat. (Heim-Eigenanteil im 1. Jahr ${euro(HEIM_EIGENANTEIL)} €, zuhause mit Primundus nach Zuschüssen etwa ${euro(h.eigen)} €. Quelle: vdek-Auswertung, Stand 1. Juli 2026.)`;
 }
 
+/* Eigenanteil in der Angebotsmail (Vorschlag 08.10.2026, Martin: „maximal conversionsstark mit infos"; einziger belegter
+   Einwand ist „zu teuer"). Posten aus der Kalkulation des Kunden (`zuschüsse.items`, nur `in_kalkulation`) — dieselbe Rechnung
+   wie „Kosten im Überblick" im Portal. Martin 03.10.: „eigenanteil betrachtet immer 3 dinge: geldleistungen,
+   entlastungsbudget und steuerersparnis"; 18.09.: der Preis bleibt Bruttopreis, die Posten senken nur den Eigenanteil.
+   Unbekannter Posten → kein Kasten (lieber der alte Heimvergleich als eine falsche Aufzählung). */
+const ZUSCHUSS_WORT: Record<string, string> = {
+  pflegegeld: "Pflegegeld",
+  entlastungsbudget_neu: "Entlastungsbudget",
+  steuervorteil: "Steuerersparnis",
+};
+export type ZuschussPosten = { name: string; wort: string; monat: number; jahr: number };
+export type Eigenanteil = { brutto: number; eigen: number; posten: ZuschussPosten[]; pflegegrad: number | null; ehepaar: boolean };
+
+export function eigenanteilAus(kalk: Record<string, any> | null | undefined): Eigenanteil | null {
+  const brutto = typeof kalk?.bruttopreis === "number" ? kalk.bruttopreis : 0;
+  const items = kalk?.["zuschüsse"]?.items;
+  if (!brutto || !Array.isArray(items) || typeof kalk?.eigenanteil !== "number") return null;
+  const drin = items.filter((z: any) => z?.in_kalkulation && Number(z.betrag_monatlich) > 0);
+  if (!drin.length || drin.some((z: any) => !ZUSCHUSS_WORT[z.name])) return null;
+  const posten = drin.map((z: any) => ({
+    name: String(z.name), wort: ZUSCHUSS_WORT[z.name], monat: Math.round(Number(z.betrag_monatlich)), jahr: Math.round(Number(z.betrag_jaehrlich)),
+  }));
+  // Angezeigter Eigenanteil = Preis minus die GERUNDETEN Posten, damit die Rechnung in den Fragen aufgeht. Weicht das um
+  // mehr als 2 € von der Kalkulation ab, stimmt etwas nicht → kein Kasten.
+  const eigen = brutto - posten.reduce((s: number, p: ZuschussPosten) => s + p.monat, 0);
+  if (eigen <= 0 || eigen >= brutto || Math.abs(eigen - kalk.eigenanteil) > 2) return null;
+  const pg = Number(kalk?.formularDaten?.pflegegrad);
+  return { brutto, eigen, posten, pflegegrad: Number.isFinite(pg) ? pg : null, ehepaar: kalk?.formularDaten?.betreuung_fuer === "ehepaar" };
+}
+
+const aufzaehlung = (w: string[]): string => w.length < 2 ? (w[0] ?? "") : `${w.slice(0, -1).join(", ")} und ${w[w.length - 1]}`;
+
+function eigenanteilSatz(e: Eigenanteil): string {
+  const w = e.posten.map((p) => p.wort);
+  const satz = w.length === 1
+    ? `Die ${w[0]} kann Ihren Eigenanteil auf diesen Betrag senken.`
+    : `${aufzaehlung(w)} können Ihren Eigenanteil auf diesen Betrag senken.`;
+  // Der Rechner kennt einen Pflegegrad und zieht Pflegegeld/Entlastungsbudget einmal ab (OpenAI angebot10: bei „zwei
+  // Personen" sonst missverständlich) — derselbe Satz steht in der Rechnung der Fragen.
+  return e.ehepaar && e.posten.some((p) => p.name === "pflegegeld") ? `${satz} Gerechnet ist mit den Zuschüssen für eine Person.` : satz;
+}
+const heimSatz = (e: Eigenanteil): string => e.eigen < HEIM_EIGENANTEIL
+  ? ` Zum Vergleich: Im Pflegeheim liegt der Eigenanteil im ersten Jahr bei durchschnittlich ${euro(HEIM_EIGENANTEIL)}&nbsp;€ im Monat pro Person (vdek, Stand 1.&nbsp;Juli&nbsp;2026).`
+  : "";
+
+/** Grüner Kasten unter dem Preis: „Nach Zuschüssen ca. 1.622 € im Monat" (Martins Wortlaut der Preisseite, 17.09.). */
+function eigenanteilHtml(e: Eigenanteil, unten = 18): string {
+  return `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 ${unten}px;border-radius:14px;background:${F.mint};border-collapse:separate;">
+      <tr><td style="padding:14px 16px 15px;">
+        <p style="margin:0;font-size:16.5px;font-weight:800;line-height:1.3;color:${F.greenDeep};">Nach Zuschüssen <span style="white-space:nowrap;">ca. ${euro(e.eigen)}&nbsp;€ im Monat</span></p>
+        <p style="margin:6px 0 0;font-size:14px;line-height:1.55;color:${F.text};">${eigenanteilSatz(e)}${heimSatz(e)}</p>
+      </td></tr>
+    </table>`;
+}
+function eigenanteilText(e: Eigenanteil): string {
+  return `Nach Zuschüssen ca. ${euro(e.eigen)} € im Monat. ${eigenanteilSatz(e)}${heimSatz(e)}`.replace(/&nbsp;/g, " ");
+}
+
+/** „So rechnen wir: 3.050 € im Monat, abzüglich 800 € Pflegegeld bei Pflegegrad 4, …" — Beträge aus der Kalkulation. */
+function eigenanteilRechnung(e: Eigenanteil): string {
+  const teil = (p: ZuschussPosten): string =>
+    p.name === "pflegegeld" ? `${euro(p.monat)}&nbsp;€ Pflegegeld${e.pflegegrad ? ` bei Pflegegrad ${e.pflegegrad}` : ""}`
+    : `bis zu ${euro(p.monat)}&nbsp;€ ${p.wort} (${euro(p.jahr)}&nbsp;€ im Jahr)`;
+  const hatPflegegeld = e.posten.some((p) => p.name === "pflegegeld");
+  return `So rechnen wir: ${euro(e.brutto)}&nbsp;€ im Monat, abzüglich ${aufzaehlung(e.posten.map(teil))}.`
+    + (hatPflegegeld && e.ehepaar ? " Gerechnet ist mit den Zuschüssen für eine Person." : "")
+    + (hatPflegegeld ? " Das Pflegegeld können Sie frei für die Betreuung einsetzen." : " Pflegegeld und Entlastungsbudget gibt es ab Pflegegrad&nbsp;2.")
+    + " Die vollständige Rechnung sehen Sie im Portal unter „Kosten im Überblick“.";
+}
+
+/* Häufige Fragen der Angebotsmail (Vorschlag 08.10.2026). Martin 08.10.: was es im Portal schon gibt, wörtlich übernehmen
+   („Warum hast du das nicht übernommen? Darum geht's doch."). Wörtlich aus der Portal-FAQ (FaqListe.tsx FAQ /
+   FAQ_GRUNDFRAGEN, live): Deutsch-Niveaus, „Ist das legal?", „Wie läuft die Betreuung ab?", „Was brauche ich zu Hause?".
+   Bestpreis-Frage = Wortlaut der Bestpreisgarantie (GARANTIE, „Marta antwortet" in Ich-Form der Absenderin); Eigenanteil-Frage
+   = die Rechnung aus der Kalkulation des Kunden („Kosten im Überblick" im Portal). Martin 08.10. zu Fassung 3: „Das mit dem
+   Einladen ist hier zu früh, das versteht kein Kunde … die erste Frage ist nicht gut … vielleicht Sprache" → „Gehe ich mit
+   dem Einladen einen Vertrag ein?" raus, die Deutsch-Niveaus zuerst wie im Portal. Den Ablauf („Das muss auch nicht in den
+   Fragen sein") tragen die Schritte unter der Angebotskarte. Bei Änderung der Portal-FAQ hier mitziehen. */
+export type Frage = { frage: string; antwort: string; html?: string };
+
+/* Deutsch-Niveaus wörtlich aus dem Portal (FaqListe.tsx FAQ[0]); statt der Balken des Portals die Punkte der Profile in der
+   Mail (deutschPunkte), damit Frage und Profile gleich aussehen. */
+const DEUTSCH_EINSTIEG = "Eine grobe Orientierung — kein Sprach-Zertifikat. Die genaue Kommunikation hängt immer auch vom Tempo, der Mundart und der Geduld beider Seiten ab.";
+const DEUTSCH_STUFEN: { wort: string; text: string }[] = [
+  { wort: "Grund", text: "einzelne Wörter und einfache Sätze. Für eine Verständigung im Alltag braucht es Geduld, Gesten und etwas Vorbereitung; differenzierte Gespräche sind in der Regel nicht möglich." },
+  { wort: "Mittel", text: "einfache Alltagsthemen lassen sich besprechen, gängige Anweisungen werden meist verstanden. Bei komplexeren Themen (Diagnosen, Behörden, Telefonate) kann es zu Rückfragen oder Missverständnissen kommen." },
+  { wort: "Gut", text: "die Verständigung im Alltag und in der Pflege funktioniert in der Regel zuverlässig. Auch ausführlichere Gespräche sind möglich; sehr seltene Fachbegriffe, schnelles Sprechen oder Dialekt können dennoch Nachfragen erfordern." },
+];
+const DEUTSCH_SCHLUSS = "Wenn Sprachsicherheit besonders wichtig ist (z. B. Demenz, schwerhörige oder spracheingeschränkte Patienten), sprechen Sie uns gerne an — wir helfen bei der Einordnung.";
+const DEUTSCH_FRAGE: Frage = {
+  frage: "Was bedeuten die Deutsch-Niveaus (Grund, Mittel, Gut)?",
+  antwort: [DEUTSCH_EINSTIEG, ...DEUTSCH_STUFEN.map((st) => `${st.wort} — ${st.text}`), DEUTSCH_SCHLUSS].join("\n"),
+  html: `<p style="margin:0 0 10px;font-size:15px;line-height:1.6;color:${F.text};">${DEUTSCH_EINSTIEG}</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 2px;">${DEUTSCH_STUFEN.map((st) =>
+        `<tr><td style="width:44px;padding:0 0 8px;vertical-align:top;white-space:nowrap;font-size:15px;line-height:24px;">${deutschPunkte(st.wort)}</td><td style="padding:0 0 8px;font-size:15px;line-height:1.6;color:${F.text};"><strong style="color:${F.ink};">${st.wort}</strong> — ${st.text}</td></tr>`).join("")}</table>
+      <p style="margin:0;font-size:15px;line-height:1.6;color:${F.text};">${DEUTSCH_SCHLUSS}</p>`,
+};
+
+export function angebotFragen(e: Eigenanteil | null): Frage[] {
+  const liste: Frage[] = [
+    DEUTSCH_FRAGE,
+    { frage: "Ich habe ein günstigeres Angebot. Was kann ich tun?", antwort: "Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot. Legen Sie uns das Angebot vor, wir passen unseren Preis an. Ich antworte innerhalb eines Werktags." },
+    { frage: "Ist das legal?", antwort: "Ja, vollständig. Die Pflegekräfte sind sozialversicherungspflichtig bei uns angestellt und werden von uns nach Deutschland entsandt. Für jeden Einsatz liegt eine offizielle A1-Bescheinigung vor — der Nachweis der Sozialversicherungspflicht im Herkunftsland." },
+    { frage: "Wie läuft die Betreuung ab?", antwort: "Die Pflegekraft wird in der Regel direkt zu Ihnen nach Hause gebracht und bleibt meist 6 bis 8 Wochen. Den Wechsel zur nächsten Pflegekraft organisieren wir. Fällt eine Pflegekraft aus oder passt die Zusammenarbeit nicht, sorgen wir schnellstmöglich für Ersatz, in der Regel innerhalb von 3 Tagen." },
+  ];
+  if (e) liste.push({ frage: `Wie kommen die ca. ${euro(e.eigen)}&nbsp;€ Eigenanteil zustande?`, antwort: eigenanteilRechnung(e) });
+  liste.push({ frage: "Was brauche ich zu Hause?", antwort: "Ein eigenes, abschließbares Zimmer mit Bett für die Pflegekraft. Küche, Bad und ein Internetanschluss sollten vorhanden sein. Zimmer und Verpflegung stellen Sie, das ist mit „Kost und Logis“ im Angebot gemeint." });
+  return liste;
+}
+
+function fragenHtml(liste: Frage[]): string {
+  const zeile = (f: Frage, i: number) => `
+      ${i > 0 ? mTrenner(14, 14) : ""}
+      <p style="margin:0 0 5px;font-size:15.5px;font-weight:700;line-height:1.4;color:${F.ink};">${f.frage}</p>
+      ${f.html ?? `<p style="margin:0;font-size:15px;line-height:1.6;color:${F.text};">${f.antwort}</p>`}`;
+  return mKarte(liste.map(zeile).join(""), { unten: 26 });
+}
+const fragenText = (liste: Frage[]): string =>
+  liste.map((f) => `${f.frage}\n${f.antwort}`.replace(/&nbsp;/g, " ")).join("\n\n");
+
 export type AngebotEingabe = {
   kalkulation: Record<string, any> | null | undefined;
   careStartTiming: string | null | undefined;
@@ -165,8 +288,13 @@ export type AngebotEingabe = {
   /** Hinweis über der Angaben-Tabelle (eingekaufte Leads), HTML und Text. */
   angabenHinweis: { html: string; text: string } | null;
   resubmit: boolean;
-  /** Empfehlung aus mamamia; null/undefined → Abschnitt fällt weg. */
-  empfehlung?: { e: Empfehlung; cid: string | null; sichtbar: number } | null;
+  /** Empfehlung aus mamamia; null/undefined → Abschnitt fällt weg. `weitere` = die übrigen sichtbaren Kräfte in
+   *  Portal-Reihenfolge (Martin 07.10.2026: „die oberste als Empfehlung, die anderen trotzdem zeigen"). */
+  empfehlung?: { e: Empfehlung; cid: string | null; sichtbar: number; weitere?: { e: Empfehlung; cid: string | null }[] } | null;
+  /** „06.10.2026" — Datum des Angebots wie die Kopfleiste im Portal (AngebotKopfleiste, `lead.created_at`). */
+  datum?: string | null;
+  /** Variante B (Vorschlag 07.10.2026, Entscheidung Martin offen): die weiteren Kräfte als kompakte Zeilen statt als volles Profil. */
+  weitereKompakt?: boolean;
 };
 
 function angabenTabelle(fd: Record<string, any>, careStartTiming: string | null | undefined): { html: string; text: string } {
@@ -177,8 +305,10 @@ function angabenTabelle(fd: Record<string, any>, careStartTiming: string | null 
     ["Weitere Personen im Haushalt", eingangsLabel("weitere_personen", fd.weitere_personen)],
     ["Mobilität", eingangsLabel("mobilitaet", fd.mobilitaet)],
     ["Nachteinsätze erforderlich", eingangsLabel("nachteinsaetze", fd.nachteinsaetze)],
-    ["Gewünschter Start", eingangsLabel("care_start_timing", careStartTiming)],
   ];
+  /* Der Rechner fragt seit dem Umbau keinen Start mehr ab (care_start_timing = null): ohne Wert keine Zeile, sonst stand bei
+     jedem Kunden „Gewünschter Start: Nicht angegeben". Eingekaufte Anfragen bringen den Wert teils mit. */
+  if (careStartTiming) zeilen1.push(["Gewünschter Start", eingangsLabel("care_start_timing", careStartTiming)]);
   const zeilen2: [string, string][] = [["Deutschkenntnisse", eingangsLabel("deutschkenntnisse", fd.deutschkenntnisse)]];
   if (fd.erfahrung) zeilen2.push(["Erfahrung", eingangsLabel("erfahrung", fd.erfahrung)]);
   if (fd.fuehrerschein) zeilen2.push(["Führerschein", eingangsLabel("fuehrerschein", fd.fuehrerschein)]);
@@ -200,123 +330,205 @@ ${zeilen2.map(([l, v]) => `${l}: ${v}`).join("\n")}`;
   return { html, text };
 }
 
+/* „So geht es weiter" direkt unter der Angebotskarte, wie im Portal (Fassung 30: Karte, dann die Schritte, dann die
+   Pflegekräfte), in einer weißen Karte ohne Trennlinien; Schritt 1 hervorgehoben, darunter der Link des Portals. Martin 08.10. zu Fassung 3
+   („ich habe gar nicht gesehen, ob er in der Mail ist … wenn ich das jetzt gelesen habe, wie geht's weiter? … schauen sich
+   die Pflegekräfte an, vervollständigen das Profil, damit sich Pflegekräfte bei Ihnen bewerben können und Sie welche
+   einladen können … Dann erhalten Sie Bewerbung, Sie entscheiden und erst dann wird der Vertrag geschlossen und dann
+   organisieren wir alles"; davor: „sie rufen an oder gehen ins Portal … Bis dahin zahlen sie nicht, kündbar"). Schritt 1
+   und 2 wörtlich wie im Portal (KompaktEinstieg.tsx ABLAUF; Martin 08.10. zu Fassung 4: „der erste Schritt passt nicht mehr
+   so ganz … vereinheitlichen, wie im Kundenportal"), einzige Anpassung „hier im Portal" → „im Portal"; bei Änderung beide
+   Stellen. Schritt 3 und 4 gibt es nur in der Mail. Fakten: Anreise ab 3 Tagen nach der Zusage, Wechsel und Ersatz bei Ausfall
+   (Portal-FAQ), Kosten erst, wenn die Pflegekraft da ist, täglich kündbar (vier Punkte), Erreichbarkeit täglich 8–20 Uhr per
+   Telefon und WhatsApp; „Wir sind immer da" ist so nicht belegt. OpenAI angebot11: „Vertretung" → Ersatz bei Ausfall,
+   „ab 3 Tagen nach Ihrer Zusage". */
 const SCHRITTE_ANGEBOT = [
-  { titel: "Pflegesituation vervollständigen", text: "Dauert etwa 2 Minuten, vieles ist schon ausgefüllt." },
-  { titel: "Pflegekräfte einladen und Bewerbungen erhalten", text: "Passende Pflegekräfte bewerben sich bei Ihnen mit Foto, Erfahrung, Anreisedatum und Preis." },
-  { titel: "Auswählen und starten", text: "Wir übernehmen den Rest. Anreise schon ab 3 Tagen möglich." },
+  { titel: "Pflegesituation ergänzen und Pflegekräfte einladen", text: "Ergänzen Sie kurz die Pflegesituation. Pflegekräfte, die Ihnen zusagen, laden Sie gleich mit ein, kostenlos und unverbindlich." },
+  { titel: "Bewerbungen erhalten", text: "Danach bewerben sich passende Pflegekräfte bei Ihnen, mit Foto und Erfahrung. Jede Bewerbung sehen Sie im Portal und erhalten sie per E\u2011Mail." },
+  { titel: "Sie entscheiden", text: "Sie wählen Ihre Pflegekraft aus. Erst dann unterschreiben Sie den Vertrag online. Er ist täglich kündbar, und bis die Pflegekraft bei Ihnen ist, zahlen Sie nichts." },
+  { titel: "Wir kümmern uns um alles", text: "Wir organisieren die Anreise, den Wechsel der Pflegekraft und bei einem Ausfall den Ersatz. Anreisen kann die Pflegekraft schon ab 3 Tagen nach Ihrer Zusage. Ich bin täglich von 8 bis 20 Uhr für Sie da, am Telefon und per\u00a0WhatsApp." },
 ];
+const SCHRITT1_LINK = "Jetzt vervollständigen&nbsp;›";
+
+/* Einleitung und Testsieger-Satz wörtlich aus dem Portal (src/components/portal/KompaktEinstieg.tsx EINLEITUNG = Martins
+   Diktat 06.10.2026, EINLEITUNG_TESTSIEGER; live seit Fassung 30). Martin 08.10. zur Mail: „du solltest doch auch die
+   Einleitung machen … gerne übernehmen wir die Betreuung … Warum hast du das nicht übernommen? Darum geht's doch."
+   Das Siegel steht in der Mail schon im Kopf, deshalb hier nur der Satz. Bei Änderung beide Stellen. */
+const EINLEITUNG = "Gerne übernehmen wir die Rund-um-Betreuung und entlasten Ihre Familie. Unsere Pflegekräfte sind bei uns angestellt. Wir kümmern uns seit über 20 Jahren um die komplette Abwicklung von Anfang bis Ende.";
+const EINLEITUNG_TESTSIEGER = "Für unseren Service hat uns DIE WELT nun zum sechsten Mal in Folge als Testsieger ausgezeichnet.";
+
+/* Unter „Pflegekräfte einladen": der Achtung-Hinweis des Portals (KompaktEinstieg.tsx, „Achtung: Es fehlen noch Angaben zur
+   Pflegesituation" + Satz, OpenAI mutig18/20), ohne „Achtung:". Die Zeile über den Pflegekräften ist die des Portals
+   („Echte Profile, ausgewählt nach Ihren Angaben."). */
+const EINLADEN_HINWEIS = "Es fehlen noch Angaben zur Pflegesituation. Erst damit kennen die Pflegekräfte den Einsatz und können sich bewerben. Dauert etwa 2 Minuten, vieles ist schon ausgefüllt.";
+const KRAEFTE_ZEILE = "Echte Profile, ausgewählt nach Ihren Angaben.";
+
+/** „für eine Person mit Pflegegrad 4" — Spiegel von angebotFuer (KompaktEinstieg.tsx); fehlende Angaben entfallen. */
+export function angebotFuer(fd: Record<string, unknown> | null | undefined): string | null {
+  const wer = fd?.betreuung_fuer === "1-person" ? "eine Person" : fd?.betreuung_fuer === "ehepaar" ? "zwei Personen" : null;
+  const pg = fd?.pflegegrad;
+  const grad = typeof pg === "number" || (typeof pg === "string" && /^\d$/.test(pg))
+    ? (Number(pg) === 0 ? "ohne Pflegegrad" : `mit Pflegegrad ${pg}`)
+    : null;
+  if (!wer) return null;
+  return grad ? `für ${wer} ${grad}` : `für ${wer}`;
+}
 
 export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
   const kalk = a.kalkulation ?? {};
   const fd = (kalk.formularDaten ?? {}) as Record<string, any>;
   const brutto = typeof kalk.bruttopreis === "number" && kalk.bruttopreis > 0 ? kalk.bruttopreis : 0;
   const heim = heimVergleich(kalk);
+  // Eigenanteil-Kasten statt Heimvergleich-Zeile; ohne lesbare Posten bleibt der Heimvergleich wie bisher.
+  const eigen = brutto ? eigenanteilAus(kalk) : null;
   const emp = a.empfehlung ?? null;
   const n = emp ? Math.max(1, Math.min(5, emp.sichtbar || 1)) : 0;
   // Martin 03.10.2026: wie vor dem 26.09. auf Angebot und Pflegekräfte (Portal oben), nicht direkt ins Formular.
   const start = k.portal({ m: "eb" });
 
-  const kraefteSatz = n === 0 ? ""
-    : n === 1 ? " Eine Pflegekraft passt schon zu Ihren Angaben, Sie finden sie weiter unten."
-    : ` ${zahlwort(n, true)} Pflegekräfte passen schon zu Ihren Angaben, Sie finden sie weiter unten.`;
+  /* Einstieg wie der Kopf des Portals (Martin 08.10.): „Hier ist Ihr Angebot" mit dem Titel des Portals („Ihr Angebot zur
+     24-Stunden-Betreuung"), danach seine Einleitung und der Testsieger-Satz. Die Pflegekräfte nennen Betreff, Vorschau und
+     ihr eigener Abschnitt. */
   const einstieg = a.herkunft
-    ? `vielen Dank für Ihre Anfrage über ${mb(esc(a.herkunft))}. Hier ist Ihr persönliches Angebot.`
+    ? `vielen Dank für Ihre Anfrage über ${mb(esc(a.herkunft))}. Hier ist Ihr Angebot zur 24-Stunden-Betreuung.`
     : a.resubmit
     ? "vielen Dank für Ihre erneute Anfrage. Ich habe Ihre Angaben übernommen und Ihr Angebot angepasst."
-    : "vielen Dank für Ihre Anfrage. Hier ist Ihr persönliches Angebot.";
-
-  const siegel = `${k.site.replace(/\/$/, "")}/images/primundus_testsieger-2021.webp`;
-  const siegelZeile = `
-    <table cellpadding="0" cellspacing="0" role="presentation"><tr>
-      <td style="vertical-align:middle;padding-right:12px;"><img src="${siegel}" width="36" alt="Testsieger" style="display:block;width:36px;height:auto;"></td>
-      <td style="vertical-align:middle;"><p style="margin:0;font-size:15.5px;font-weight:700;color:${F.ink};">6× Testsieger DIE WELT</p><p style="margin:2px 0 0;font-size:14px;color:${F.muted};">20 Jahre Erfahrung &middot; 60.000+ Einsätze</p></td>
-    </tr></table>`;
-  const kosten = mKarte(`
-    ${mEyebrow(brutto ? "Ihre Betreuungskosten" : "Ihre Konditionen", 8)}
-    ${brutto ? `<p style="margin:0 0 8px;font-size:44px;font-weight:800;line-height:1;letter-spacing:-.03em;color:${F.ink};">${euro(brutto)}&nbsp;€</p>
-    ${mKlein("Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125&nbsp;€ pro Fahrt).", 14)}` : ""}
+    : "vielen Dank für Ihre Anfrage. Hier ist Ihr Angebot zur 24-Stunden-Betreuung.";
+  const einleitungHtml = `${EINLEITUNG.replace("Rund-um-Betreuung", '<span style="white-space:nowrap;">Rund-um-Betreuung</span>')} ${EINLEITUNG_TESTSIEGER}`;
+  /* Angebotskarte wie im Portal (Fassung 30, live seit 06.10.2026): Kopfleiste „Ihr Angebot vom …", Leistung mit Grundlage,
+     Preis „im Monat" mit dem Satz des Portals, darunter Knopf, Sterne, die vier Punkte und zuletzt der Eigenanteil (grüner
+     Kasten gegen „zu teuer"; Martin 08.10. zu Fassung 3: „trotzdem die vier Vorteile machen und dann nach den Zuschüssen, so
+     wie im Portal"). Ohne Siegel-Zeile: Der Testsieger steht wie im Portal (Runde 32) bei der Einleitung. */
+  const leistung = angebotFuer(fd);
+  const kostenInhalt = `
+    <p style="margin:0;font-size:17px;font-weight:700;line-height:1.3;color:${F.ink};">Rund-um-Betreuung zu Hause</p>
+    ${leistung ? `<p style="margin:2px 0 0;font-size:15px;line-height:1.4;color:${F.muted};">${esc(leistung.charAt(0).toUpperCase() + leistung.slice(1))}</p>` : ""}
+    ${brutto ? `<p style="margin:16px 0 0;line-height:1;"><span style="font-size:44px;font-weight:800;letter-spacing:-.03em;color:${F.ink};">${euro(brutto)}&nbsp;€</span><span style="font-size:16px;color:${F.muted};">&nbsp; im Monat</span></p>
+    <p style="margin:10px 0 18px;font-size:14.5px;line-height:1.55;color:${F.muted};">Lohn, Steuern, Gebühren: alles drin. Dazu kommen Kost und Logis, <span style="white-space:nowrap;">125&nbsp;€ Reisekosten</span> pro Fahrt und <span style="white-space:nowrap;">Feiertagszuschläge.</span></p>` : mAbstand(16)}
     ${mKnopf(start, "Angebot &amp; Pflegekräfte ansehen", 2, k.bewertung ? 10 : 18, { schrift: 16, innen: 12 })}
     ${k.bewertung ? mSterneZeile(k.bewertung, 18) : ""}
     ${mPunkte(null)}
-    ${mKlein("Kosten entstehen erst, wenn die Pflegekraft bei Ihnen ist.", 0)}
-    ${heim ? `${mTrenner()}${heimHtml(heim, 0)}` : ""}
-    ${mTrenner()}
-    ${siegelZeile}`);
+    ${mKlein("Kosten entstehen erst, wenn die Pflegekraft bei Ihnen ist.", eigen ? 16 : 0)}
+    ${eigen ? eigenanteilHtml(eigen, 0) : ""}
+    ${!eigen && heim ? `${mTrenner()}${heimHtml(heim, 0)}` : ""}`;
+  const kosten = mKopfKarte(a.datum ? `Ihr Angebot vom ${a.datum}` : "Ihr Angebot", "neutral", kostenInhalt, 26);
 
+  /* Pflegekräfte wie im Portal (Martin 07.10.2026: „die oberste als Empfehlung, die anderen trotzdem zeigen, damit die das
+     sehen, dass wir hier fünf Pflegekräfte ausgesucht haben … damit sie bloß in das Portal gehen"): Empfehlung mit Gründen,
+     darunter die übrigen sichtbaren Kräfte im selben Profil „V", dann EIN Knopf zum Abschnitt „Pflegesituation ergänzen und
+     Pflegekräfte einladen" (`goto=matches`). Jedes Profil öffnet im Portal genau diese Pflegekraft (`cg=`). */
   let empfHtml = "";
   let empfText = "";
   if (emp) {
-    const profil = k.portal({ cg: String(emp.e.caregiverId), m: "eb" });
-    const alle = k.portal({ goto: "matches", m: "eb" });
+    const profilUrl = (e: Empfehlung) => k.portal({ cg: String(e.caregiverId), m: "eb" });
+    const einladen = k.portal({ goto: "matches", m: "eb" });
     const pk = pkAusEmpfehlung(emp.e, emp.cid);
+    const weitere = emp.weitere ?? [];
     const grund = (t: string) => `<tr><td style="width:24px;padding:0 0 7px;color:${F.green};font-weight:800;font-size:15px;line-height:1.45;vertical-align:top;">&#10003;</td><td style="padding:0 0 7px;font-size:15px;line-height:1.45;color:${F.ink};">${esc(t)}</td></tr>`;
     const gruende = emp.e.gruende.length
       ? `<p style="margin:16px 0 8px;font-size:15px;font-weight:700;color:${F.ink};">Passt zu Ihrer Anfrage</p><table role="presentation" cellpadding="0" cellspacing="0">${emp.e.gruende.map(grund).join("")}</table>`
       : "";
-    // „V" (Martin 27.09.2026): Kopfleiste „Unsere Empfehlung", darin das geschlossene Profil.
-    empfHtml = `${mAbschnitt("Für Sie ausgewählt", `${n} passende ${pflegekraefte(n)}`)}
-    ${mKopfKarte("Unsere Empfehlung", "neutral", `${mProfil(pk, profil)}${gruende}`, 12)}
-    ${mKlein(mLink(alle, n === 1 ? "Profil im Portal ansehen" : `Alle ${n} Pflegekräfte ansehen`), 12, true)}`;
-    empfText = `FÜR SIE AUSGEWÄHLT: ${n} passende ${pflegekraefte(n)}
-Unsere Empfehlung: ${pkText(pk)}
+    const knopf = n === 1 ? "Pflegekraft einladen" : "Pflegekräfte einladen";
+    const weitereKopf = weitere.length === 1 ? "Eine weitere passende Pflegekraft" : `${zahlwort(weitere.length, true)} weitere passende Pflegekräfte`;
+    const titel = n === 1 ? "Ihre passende Pflegekraft" : `Ihre ${n} passenden Pflegekräfte`;
+    empfHtml = `${mAbschnitt("Für Sie ausgewählt", titel)}
+    ${mKlein(KRAEFTE_ZEILE, 14)}
+    ${mKopfKarte("Unsere Empfehlung für Sie", "neutral", `${mProfil(pk, profilUrl(emp.e))}${gruende}`, 14)}
+    ${weitere.length ? mKopfKarte(weitereKopf, "neutral", weitere.map((w, i) => a.weitereKompakt
+      ? mProfilZeile(pkAusEmpfehlung(w.e, w.cid), profilUrl(w.e), i < weitere.length - 1 ? 8 : 0)
+      : mProfil(pkAusEmpfehlung(w.e, w.cid), profilUrl(w.e), i < weitere.length - 1 ? 12 : 0)).join(""), 14) : ""}
+    ${mKnopf(einladen, knopf, 4, 10, { schrift: 16, innen: 12 })}
+    ${mKlein(EINLADEN_HINWEIS, 30, true)}`;
+    empfText = `FÜR SIE AUSGEWÄHLT: ${titel}
+${KRAEFTE_ZEILE}
+Unsere Empfehlung für Sie: ${pkText(pk)}
 ${emp.e.gruende.map((g) => `✓ ${g}`).join("\n")}
-Profil: ${profil}
-${n === 1 ? "Im Portal" : `Alle ${n} Pflegekräfte`}: ${alle}
+Profil: ${profilUrl(emp.e)}
+${weitere.length ? `\n${weitereKopf.toUpperCase()}\n${weitere.map((w, i) => `${i + 1}. ${pkText(pkAusEmpfehlung(w.e, null)).replace("\n", " · ")}\n   Profil: ${profilUrl(w.e)}`).join("\n")}\n` : ""}
+${knopf}: ${einladen}
+${EINLADEN_HINWEIS}
 
 `;
   }
 
+  const schrittLink = k.portal({ goto: "matches", m: "eb" });
+  const schritte = SCHRITTE_ANGEBOT.map((st, i) => i === 0
+    ? { ...st, zustand: "jetzt" as const, text: `${st.text}<br><span style="display:inline-block;margin-top:6px;">${mLink(schrittLink, SCHRITT1_LINK)}</span>` }
+    : st);
   const angaben = angabenTabelle(fd, a.careStartTiming);
   const hinweisHtml = a.angabenHinweis ? a.angabenHinweis.html : "";
+  const fragen = angebotFragen(eigen);
 
+  /* Vorschau (Vorschlag 08.10.2026): Preis, Kündbarkeit und der nächste Schritt; der Betreff nennt schon die Pflegekräfte. */
   const vorschau = brutto
-    ? `${euro(brutto)} € im Monat.${n ? ` ${n === 1 ? "Eine passende Pflegekraft ist" : `${zahlwort(n, true)} passende Pflegekräfte sind`} für Sie ausgewählt.` : " Ihr persönliches Angebot zur 24-Stunden-Betreuung."}`
+    ? `${euro(brutto)} € im Monat, täglich kündbar${n === 0 ? ", ohne Vermittlungsgebühr."
+      : `. ${n === 1 ? "Eine passende Pflegekraft ist" : `${zahlwort(n, true)} passende Pflegekräfte sind`} für Sie ausgewählt.`}`
     : "Ihr persönliches Angebot zur 24-Stunden-Betreuung.";
+
+  /* Schlusssatz wie in der Mail seit 03.10.2026 (freigegeben); die Erreichbarkeit steht direkt darunter auf Martas Karte. */
+  const kontaktSatz = "Wenn Sie Fragen zum Angebot haben, rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie auf diese E-Mail.";
+  const angabenZeile = "Stimmt etwas nicht? Antworten Sie auf diese E-Mail, dann passen wir Ihr Angebot an.";
 
   const html = `${mVorschau(vorschau)}
     ${gruss(k)}
-    ${mp(einstieg + kraefteSatz, 22)}
+    ${mp(einstieg, 14)}
+    ${mp(einleitungHtml, 24)}
     ${kosten}
+    ${mAbschnitt("In vier Schritten", "So geht es weiter")}
+    ${mKarte(mSchritte(schritte), { unten: 26 })}
     ${empfHtml}
-    ${mAbschnitt("In drei Schritten", "So geht es weiter")}
-    ${mSchritte(SCHRITTE_ANGEBOT, true)}
-    ${mAbstand(22)}
+    ${mAbschnitt("Ihre Angaben", "Grundlage Ihres Angebots")}
+    ${mKlein(angabenZeile, 14)}
     ${hinweisHtml}
     ${angaben.html}
-    ${mKnopf(start, "Angebot &amp; Pflegekräfte ansehen", 18, 22, { schrift: 16, innen: 12 })}
-    ${mp("Wenn Sie Fragen zum Angebot haben, rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie auf diese E-Mail.", 8)}
+    ${mAbstand(18)}
+    ${mAbschnitt("Gut zu wissen", "Häufige Fragen")}
+    ${fragenHtml(fragen)}
+    ${mKnopf(start, "Angebot &amp; Pflegekräfte ansehen", 0, 22, { schrift: 16, innen: 12 })}
+    ${mp(kontaktSatz, 8)}
     ${k.marta}`;
 
   const text = `${k.anrede},
 
-${klartext(einstieg + kraefteSatz)}
+${klartext(einstieg)}
 
-${brutto ? `IHRE BETREUUNGSKOSTEN
-${euro(brutto)} € im Monat, inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).
-` : "IHRE KONDITIONEN\n"}
+${EINLEITUNG} ${EINLEITUNG_TESTSIEGER}
+
+${a.datum ? `IHR ANGEBOT VOM ${a.datum}` : "IHR ANGEBOT"}
+Rund-um-Betreuung zu Hause${leistung ? ` ${leistung}` : ""}
+${brutto ? `${euro(brutto)} € im Monat. Lohn, Steuern, Gebühren: alles drin. Dazu kommen Kost und Logis, 125 € Reisekosten pro Fahrt und Feiertagszuschläge.
+` : ""}
 Angebot & Pflegekräfte ansehen: ${start}
 ${k.bewertung ? `★★★★★ ${k.bewertung.schnitt} von 5 aus ${k.bewertung.anzahl} Bewertungen: https://primundus.de/erfahrungen\n` : ""}
 ${punkteText()}
 Kosten entstehen erst, wenn die Pflegekraft bei Ihnen ist.
-${heim ? `\n${heimText(heim)}\n` : ""}
-6× Testsieger DIE WELT · 20 Jahre Erfahrung · 60.000+ Einsätze
+${eigen ? `\n${eigenanteilText(eigen)}\n` : ""}${!eigen && heim ? `\n${heimText(heim)}\n` : ""}
+SO GEHT ES WEITER
+${SCHRITTE_ANGEBOT.map((st, i) => `${i + 1}. ${st.titel}: ${st.text.replace("\u2011", "-")}`).join("\n")}
+Jetzt vervollständigen: ${schrittLink}
 
-${empfText}SO GEHT ES WEITER
-${SCHRITTE_ANGEBOT.map((s, i) => `${i + 1}. ${s.titel}: ${s.text}`).join("\n")}
+${empfText}
+GRUNDLAGE IHRES ANGEBOTS
+${angabenZeile}
 
 ${a.angabenHinweis ? `${a.angabenHinweis.text}\n\n` : ""}${angaben.text}
 
+HÄUFIGE FRAGEN
+${fragenText(fragen)}
+
 Angebot & Pflegekräfte ansehen: ${start}
 
-Wenn Sie Fragen zum Angebot haben, rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie auf diese E-Mail.
+${kontaktSatz}
 
 ${MARTA_TEXT}`;
 
+  /* Betreff (Vorschlag 08.10.2026): nennt, was in der Mail steckt — Angebot UND Pflegekräfte. Ohne „– Primundus", der
+     Absender heißt schon „Primundus 24h-Pflege". Eingekaufte Anfragen behalten ihren Betreff. */
   const betreff = a.herkunft
     ? a.portalBetreff
-    : a.resubmit
-    ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung – Primundus"
-    : "Ihr Angebot zur 24-Stunden-Betreuung – Primundus";
+    : n === 0
+    ? (a.resubmit ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung – Primundus" : "Ihr Angebot zur 24-Stunden-Betreuung – Primundus")
+    : `${a.resubmit ? "Ihr aktualisiertes Angebot" : "Ihr Angebot"} und ${n === 1 ? "eine passende Pflegekraft" : `${n} passende Pflegekräfte`}`;
   return { betreff, vorschau, html, text };
 }
 
