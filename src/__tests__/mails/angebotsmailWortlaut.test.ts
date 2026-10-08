@@ -58,6 +58,16 @@ describe('Angebotsmail: Texte wie im Kundenportal', () => {
     expect(flach(KOMPAKT)).toContain(konst(MAIL, 'KRAEFTE_ZEILE'));
   });
 
+  it('Bestpreis-Frage in Mail und Portal, Antwort im Wortlaut der Bestpreisgarantie', () => {
+    const garantie = lies('src/lib/garantie.ts');
+    const zusage = garantie.match(/zusage: '([^']+)'/)?.[1];
+    const ablauf = garantie.match(/ablauf: '([^']+)'/)?.[1];
+    expect(zusage && ablauf).toBeTruthy();
+    // Mail in der Ich-Form der Absenderin, Portal mit „Marta antwortet" (Martin 08.10.2026: „dass das sich deckt").
+    expect(mailAntwort('Ich habe ein günstigeres Angebot. Was kann ich tun?')).toBe(`${zusage} ${ablauf!.replace('Marta antwortet', 'Ich antworte')}`);
+    expect(FAQ).toContain("{ q: 'Ich habe ein günstigeres Angebot. Was kann ich tun?', a: `${GARANTIE_PORTAL.zusage} ${GARANTIE_PORTAL.ablauf}` }");
+  });
+
   it('Antworten der Häufigen Fragen aus der Portal-FAQ', () => {
     for (const frage of ['Ist das legal?', 'Wie läuft die Betreuung ab?', 'Was brauche ich zu Hause?']) {
       expect(FAQ).toContain(`q: '${frage}', a: '${mailAntwort(frage)}'`);
