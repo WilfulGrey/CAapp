@@ -191,9 +191,12 @@ const aufzaehlung = (w: string[]): string => w.length < 2 ? (w[0] ?? "") : `${w.
 
 function eigenanteilSatz(e: Eigenanteil): string {
   const w = e.posten.map((p) => p.wort);
-  return w.length === 1
+  const satz = w.length === 1
     ? `Die ${w[0]} kann Ihren Eigenanteil auf diesen Betrag senken.`
     : `${aufzaehlung(w)} können Ihren Eigenanteil auf diesen Betrag senken.`;
+  // Der Rechner kennt einen Pflegegrad und zieht Pflegegeld/Entlastungsbudget einmal ab (OpenAI angebot10: bei „zwei
+  // Personen" sonst missverständlich) — derselbe Satz steht in der Rechnung der Fragen.
+  return e.ehepaar && e.posten.some((p) => p.name === "pflegegeld") ? `${satz} Gerechnet ist mit den Zuschüssen für eine Person.` : satz;
 }
 const heimSatz = (e: Eigenanteil): string => e.eigen < HEIM_EIGENANTEIL
   ? ` Zum Vergleich: Im Pflegeheim liegt der Eigenanteil im ersten Jahr bei durchschnittlich ${euro(HEIM_EIGENANTEIL)}&nbsp;€ im Monat pro Person (vdek, Stand 1.&nbsp;Juli&nbsp;2026).`
