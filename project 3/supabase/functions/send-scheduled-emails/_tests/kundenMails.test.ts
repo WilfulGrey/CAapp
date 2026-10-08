@@ -2,7 +2,9 @@
 // richtiger Knopf und Link, keine Platzhalter, Textfassung vorhanden, klein genug für Gmail.
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import {
+  angebotFragen,
   angebotMail,
+  eigenanteilAus,
   eingangsLabel,
   erinnerungMail,
   heimVergleich,
@@ -43,7 +45,7 @@ const empf: Empfehlung = {
 };
 const sichtbar = (html: string) => html.replace(/<div style="display:none[^>]*>[^<]*<\/div>/, "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
 
-function pruefe(name: string, m: KundenMail, knopf: string, link: string) {
+function pruefe(name: string, m: KundenMail, knopf: string, link: string, o: { gedankenstrich?: boolean } = {}) {
   assertStringIncludes(m.html, "Guten Tag Frau Müller,", `${name}: Anrede`);
   assertStringIncludes(m.text, "Guten Tag Frau Müller,", `${name}: Anrede Text`);
   assertStringIncludes(m.html, `>${knopf}</a>`, `${name}: Knopf`);
@@ -54,7 +56,9 @@ function pruefe(name: string, m: KundenMail, knopf: string, link: string) {
   }
   const s = sichtbar(m.html);
   // „vervollständigen" ist seit dem Portal-Rückbau (02.10.2026) wieder Portal-Wortlaut („Pflegesituation vervollständigen").
-  for (const wort of ["Kostenrechner", "Betreuungskräfte", "4–7", "in Ruhe", "vorbereitet", "Hallo ", "—", "Bewerbungen anfragen"]) {
+  // Gedankenstrich nur dort erlaubt, wo Portal-Texte wörtlich stehen (Angebotsmail: Portal-FAQ, Martin 08.10.2026).
+  const verboten = ["Kostenrechner", "Betreuungskräfte", "4–7", "in Ruhe", "vorbereitet", "Hallo ", "Bewerbungen anfragen", ...(o.gedankenstrich ? [] : ["—"])];
+  for (const wort of verboten) {
     assert(!s.includes(wort) && !m.text.includes(wort), `${name}: enthält „${wort}"`);
   }
   assert(m.html.length < 60_000, `${name}: ${m.html.length} Zeichen`);
@@ -67,32 +71,96 @@ Deno.test("Portal-Link: Token + Parameter, leere fallen weg, ohne Token die Webs
   assertEquals(portalLink(PORTAL, null, SITE, { goto: "anfragen" }), SITE);
 });
 
-Deno.test("01 Angebot: Preis, Knopf oben und unten, Empfehlung, Schritte, Angaben", () => {
+/* Kalkulation mit Zuschuss-Posten wie aus lib/calculation.ts (Ehepaar, Pflegegrad 4): 3.050 − 800 − 295 − 333 = 1.622 €. */
+const kalkPosten = {
+  ...kalk,
+  "zuschüsse": { items: [
+    { name: "pflegegeld", label: "Pflegegeld", betrag_monatlich: 800, betrag_jaehrlich: 9600, in_kalkulation: true },
+    { name: "entlastungsbudget_neu", label: "Entlastungsbudget", betrag_monatlich: 294.92, betrag_jaehrlich: 3539, in_kalkulation: true },
+    { name: "steuervorteil", label: "Steuervorteil", betrag_monatlich: 333.33, betrag_jaehrlich: 4000, in_kalkulation: true },
+  ] },
+};
+
+Deno.test("01 Angebot: Preis, Knopf oben und unten, Schritte vor den Pflegekräften, Angaben, Fragen", () => {
   const m = angebotMail(k(), {
     kalkulation: kalk, careStartTiming: "sofort", herkunft: null, portalBetreff: "X", angabenHinweis: null,
-    resubmit: false, empfehlung: { e: empf, cid: "c1@primundus.de", sichtbar: 5 },
+    resubmit: false, empfehlung: { e: empf, cid: "c1@primundus.de", sichtbar: 5 }, datum: "08.10.2026",
   });
   // Martin 03.10.2026: Knopf unter dem Preis und unten, beide auf Angebot und Pflegekräfte (Portal oben, kein goto).
   const start = `${PORTAL}/?token=tok123&m=eb`;
-  pruefe("01", m, "Angebot &amp; Pflegekräfte ansehen", start);
+  pruefe("01", m, "Angebot &amp; Pflegekräfte ansehen", start, { gedankenstrich: true });
   assertEquals(m.html.split(`href="${start}"`).length - 1, 2, "zwei Knöpfe aufs Portal");
   assertEquals(m.text.split(`Angebot & Pflegekräfte ansehen: ${start}`).length - 1, 2, "zwei Links im Text");
   const s = sichtbar(m.html);
-  for (const t of ["3.050 €", "Keine Vermittlungsgebühr", "Kein Vertrag vor Ihrer Auswahl", "Täglich kündbar, taggenau abgerechnet",
-    "Bestpreisgarantie", "5 passende Pflegekräfte", "Fünf Pflegekräfte passen", "Maria K.", "Erfahrung mit Demenz",
-    "Alle 5 Pflegekräfte ansehen", "So geht es weiter", "Pflegesituation vervollständigen", "Pflegekräfte einladen und Bewerbungen erhalten",
-    "Anreise schon ab 3 Tagen", "1.742 € weniger", "Gewünschter Start Sofort"]) {
+  for (const t of ["Ihr Angebot vom 08.10.2026", "Gerne übernehmen wir die Rund-um-Betreuung", "zum sechsten Mal in Folge als Testsieger",
+    "Für zwei Personen mit Pflegegrad 4", "3.050 €", "Lohn, Steuern, Gebühren: alles drin", "Keine Vermittlungsgebühr",
+    "Kein Vertrag vor Ihrer Auswahl", "Täglich kündbar, taggenau abgerechnet", "Bestpreisgarantie", "1.742 € weniger",
+    "So geht es weiter", "Pflegesituation ergänzen und Pflegekräfte einladen", "Jetzt vervollständigen", "Bewerbungen erhalten",
+    "Sie entscheiden", "Wir kümmern uns um alles", "ab 3 Tagen nach Ihrer Zusage", "Ihre 5 passenden Pflegekräfte",
+    "Echte Profile, ausgewählt nach Ihren Angaben.", "Maria K.", "Erfahrung mit Demenz", "Pflegekräfte einladen",
+    "Es fehlen noch Angaben zur Pflegesituation.", "Grundlage Ihres Angebots", "Gewünschter Start Sofort", "Häufige Fragen",
+    "Was bedeuten die Deutsch-Niveaus (Grund, Mittel, Gut)?", "Ich habe ein günstigeres Angebot. Was kann ich tun?"]) {
     assertStringIncludes(s, t, t);
   }
-  for (const weg of ["Passt Ihnen das Angebot?", "Ja, Bewerbungen erhalten", "72 Stunden", "goto=anfragen"]) {
+  for (const weg of ["Passt Ihnen das Angebot?", "Ja, Bewerbungen erhalten", "72 Stunden", "goto=anfragen", "Gehe ich mit dem Einladen",
+    "Alle 5 Pflegekräfte ansehen", "Wie kommen die ca."]) {
     assert(!m.html.includes(weg) && !m.text.includes(weg), `enthält noch „${weg}"`);
   }
+  // Reihenfolge wie im Portal: Karte, Schritte, Pflegekräfte, Einladen-Knopf, Angaben, Fragen.
+  const pos = (t: string) => s.indexOf(t);
   assert(m.html.indexOf(start) < m.html.indexOf("Keine Vermittlungsgebühr"), "erster Knopf steht über den Punkten");
+  assert(pos("Bestpreisgarantie") < pos("So geht es weiter"), "Schritte nach der Karte");
+  assert(pos("So geht es weiter") < pos("Ihre 5 passenden Pflegekräfte"), "Schritte vor den Pflegekräften");
+  assert(pos("Maria K.") < pos("Es fehlen noch Angaben"), "Hinweis unter den Pflegekräften");
+  assert(pos("Es fehlen noch Angaben") < pos("Grundlage Ihres Angebots") && pos("Grundlage Ihres Angebots") < pos("Häufige Fragen"));
+  assert(pos("Was bedeuten die Deutsch-Niveaus") < pos("Ich habe ein günstigeres Angebot"), "Deutsch-Niveaus zuerst");
   assert(!s.includes("von 5 aus"), "ohne Bewertungsstand keine Sterne");
+  assertStringIncludes(m.html, `${PORTAL}/?token=tok123&goto=matches&m=eb`);
   assertStringIncludes(m.html, "cid:c1@primundus.de");
   assertStringIncludes(m.html, `${PORTAL}/?token=tok123&cg=7&m=eb`);
+  assertEquals(m.betreff, "Ihr Angebot und 5 passende Pflegekräfte");
+  assertEquals(m.vorschau, "3.050 € im Monat, täglich kündbar. Fünf passende Pflegekräfte sind für Sie ausgewählt.");
+});
+
+Deno.test("01 Angebot: Karte mit Zuschüssen — erst die vier Punkte, dann der Kasten; Rechnung in den Fragen", () => {
+  const m = angebotMail(k(), { kalkulation: kalkPosten, careStartTiming: null, herkunft: null, portalBetreff: "X", angabenHinweis: null, resubmit: false, empfehlung: null });
+  const s = sichtbar(m.html);
+  assertStringIncludes(s, "Nach Zuschüssen ca. 1.622 € im Monat");
+  assertStringIncludes(s, "Pflegegeld, Entlastungsbudget und Steuerersparnis können Ihren Eigenanteil auf diesen Betrag senken. Gerechnet ist mit den Zuschüssen für eine Person.");
+  assert(s.indexOf("Täglich kündbar, taggenau abgerechnet") < s.indexOf("Nach Zuschüssen"), "Martin 08.10.: erst die Vorteile, dann die Zuschüsse");
+  assert(s.indexOf("Kosten entstehen erst") < s.indexOf("Nach Zuschüssen"));
+  assert(m.text.indexOf("Täglich kündbar, taggenau abgerechnet") < m.text.indexOf("Nach Zuschüssen"), "Textfassung in derselben Reihenfolge");
+  assert(!s.includes("1.742 € weniger"), "Kasten ersetzt den Heimvergleich");
+  assertStringIncludes(s, "Wie kommen die ca. 1.622 € Eigenanteil zustande?");
+  assertStringIncludes(s, "So rechnen wir: 3.050 € im Monat, abzüglich 800 € Pflegegeld bei Pflegegrad 4, bis zu 295 € Entlastungsbudget (3.539 € im Jahr) und bis zu 333 € Steuerersparnis (4.000 € im Jahr).");
+  // ohne Empfehlung: alter Betreff, Vorschau ohne Pflegekräfte
   assertEquals(m.betreff, "Ihr Angebot zur 24-Stunden-Betreuung – Primundus");
-  assertEquals(m.vorschau, "3.050 € im Monat. Fünf passende Pflegekräfte sind für Sie ausgewählt.");
+  assertEquals(m.vorschau, "3.050 € im Monat, täglich kündbar, ohne Vermittlungsgebühr.");
+});
+
+Deno.test("Eigenanteil: nur mit lesbaren Posten und aufgehender Rechnung", () => {
+  const e = eigenanteilAus(kalkPosten);
+  assertEquals(e?.eigen, 1622);
+  assertEquals(e?.posten.map((p) => p.wort), ["Pflegegeld", "Entlastungsbudget", "Steuerersparnis"]);
+  assertEquals(e?.ehepaar, true);
+  assertEquals(eigenanteilAus(kalk), null, "ohne Posten");
+  assertEquals(eigenanteilAus({ ...kalkPosten, eigenanteil: 1700 }), null, "Abweichung über 2 €");
+  const fremd = { ...kalkPosten, "zuschüsse": { items: [...kalkPosten["zuschüsse"].items, { name: "unbekannt", betrag_monatlich: 50, betrag_jaehrlich: 600, in_kalkulation: true }] } };
+  assertEquals(eigenanteilAus(fremd), null, "unbekannter Posten");
+  const ohnePg = { bruttopreis: 3050, eigenanteil: 2716.67, formularDaten: { betreuung_fuer: "1-person", pflegegrad: 0 }, "zuschüsse": { items: [
+    { name: "steuervorteil", betrag_monatlich: 333.33, betrag_jaehrlich: 4000, in_kalkulation: true },
+    { name: "pflegegeld", betrag_monatlich: 0, betrag_jaehrlich: 0, in_kalkulation: false },
+  ] } };
+  assertEquals(eigenanteilAus(ohnePg)?.posten.map((p) => p.name), ["steuervorteil"]);
+});
+
+Deno.test("Fragen: Deutsch-Niveaus zuerst, keine Einladen-Frage, Eigenanteil nur mit Kasten", () => {
+  const ohne = angebotFragen(null).map((f) => f.frage);
+  assertEquals(ohne, ["Was bedeuten die Deutsch-Niveaus (Grund, Mittel, Gut)?", "Ich habe ein günstigeres Angebot. Was kann ich tun?",
+    "Ist das legal?", "Wie läuft die Betreuung ab?", "Was brauche ich zu Hause?"]);
+  const mit = angebotFragen(eigenanteilAus(kalkPosten)).map((f) => f.frage);
+  assertEquals(mit[4], "Wie kommen die ca. 1.622&nbsp;€ Eigenanteil zustande?");
+  assertEquals(mit.length, 6);
 });
 
 Deno.test("01 Angebot: Sterne unter dem oberen Knopf, wie auf primundus.de", () => {
@@ -104,13 +172,15 @@ Deno.test("01 Angebot: Sterne unter dem oberen Knopf, wie auf primundus.de", () 
   assertStringIncludes(m.html, 'href="https://primundus.de/erfahrungen"');
   assert(m.html.indexOf("von 5 aus") < m.html.indexOf("Keine Vermittlungsgebühr"), "Sterne direkt unter dem Knopf");
   assertStringIncludes(m.text, "★★★★★ 4,9 von 5 aus 126 Bewertungen: https://primundus.de/erfahrungen");
-  assertEquals(m.vorschau, "3.050 € im Monat. Ihr persönliches Angebot zur 24-Stunden-Betreuung.");
+  assertEquals(m.vorschau, "3.050 € im Monat, täglich kündbar, ohne Vermittlungsgebühr.");
 });
 
 Deno.test("01 Angebot: ohne Empfehlung, Resubmit, eingekaufter Lead", () => {
   const ohne = angebotMail(k(), { kalkulation: kalk, careStartTiming: null, herkunft: null, portalBetreff: "X", angabenHinweis: null, resubmit: true, empfehlung: null });
   assert(!sichtbar(ohne.html).includes("passende Pflegekräfte passen"));
   assert(!sichtbar(ohne.html).includes("Für Sie ausgewählt"));
+  assertStringIncludes(sichtbar(ohne.html), "vielen Dank für Ihre erneute Anfrage. Ich habe Ihre Angaben übernommen und Ihr Angebot angepasst.");
+  assertStringIncludes(sichtbar(ohne.html), "So geht es weiter");
   assertStringIncludes(ohne.betreff, "aktualisiertes Angebot");
   const portal = angebotMail(k(), {
     kalkulation: kalk, careStartTiming: null, herkunft: "Pflegehilfe", portalBetreff: "Portal-Betreff", resubmit: true, empfehlung: null,
@@ -123,6 +193,7 @@ Deno.test("01 Angebot: ohne Empfehlung, Resubmit, eingekaufter Lead", () => {
   const leer = angebotMail(k(), { kalkulation: null, careStartTiming: null, herkunft: null, portalBetreff: "X", angabenHinweis: null, resubmit: false, empfehlung: null });
   assert(!/€ im Monat|weniger/.test(sichtbar(leer.html)));
   assertStringIncludes(sichtbar(leer.html), "Keine Vermittlungsgebühr");
+  assertEquals(leer.vorschau, "Ihr persönliches Angebot zur 24-Stunden-Betreuung.");
 });
 
 Deno.test("Heim-Vergleich nur mit echter Kalkulation unter dem Heim-Schnitt", () => {
