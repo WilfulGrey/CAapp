@@ -183,8 +183,10 @@ function angabenTabelle(fd: Record<string, any>, careStartTiming: string | null 
     ["Weitere Personen im Haushalt", eingangsLabel("weitere_personen", fd.weitere_personen)],
     ["Mobilität", eingangsLabel("mobilitaet", fd.mobilitaet)],
     ["Nachteinsätze erforderlich", eingangsLabel("nachteinsaetze", fd.nachteinsaetze)],
-    ["Gewünschter Start", eingangsLabel("care_start_timing", careStartTiming)],
   ];
+  /* Der Rechner fragt seit dem Umbau keinen Start mehr ab (care_start_timing = null): ohne Wert keine Zeile, sonst stand bei
+     jedem Kunden „Gewünschter Start: Nicht angegeben". Eingekaufte Anfragen bringen den Wert teils mit. */
+  if (careStartTiming) zeilen1.push(["Gewünschter Start", eingangsLabel("care_start_timing", careStartTiming)]);
   const zeilen2: [string, string][] = [["Deutschkenntnisse", eingangsLabel("deutschkenntnisse", fd.deutschkenntnisse)]];
   if (fd.erfahrung) zeilen2.push(["Erfahrung", eingangsLabel("erfahrung", fd.erfahrung)]);
   if (fd.fuehrerschein) zeilen2.push(["Führerschein", eingangsLabel("fuehrerschein", fd.fuehrerschein)]);
