@@ -190,7 +190,8 @@ export const PROFIL_BEIGE = '#F6EFE4';
 export const PROFIL_LINIE = '#E4D8C6';
 const STERN = '#D39B2A';
 
-function deutschPunkte(wort: string): string {
+/** Drei Punkte wie im Profil („●●● Deutsch gut“); auch in den Fragen der Angebotsmail. */
+export function deutschPunkte(wort: string): string {
   const n = wort === 'Gut' ? 3 : wort === 'Mittel' ? 2 : wort === 'Grund' ? 1 : 0;
   if (n === 0) return '';
   return [1, 2, 3].map((i) => `<span style="display:inline-block;width:9px;height:9px;border-radius:5px;background:${i <= n ? F.taupe : PROFIL_LINIE};margin-right:3px;vertical-align:middle;"></span>`).join('') + '&nbsp;';

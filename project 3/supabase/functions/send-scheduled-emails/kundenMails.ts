@@ -18,6 +18,7 @@ import {
   TELEFON_HREF,
   TELEFON_TEXT,
   WHATSAPP_HREF,
+  deutschPunkte,
   mAbschnitt,
   mAbstand,
   mb,
@@ -229,13 +230,36 @@ function eigenanteilRechnung(e: Eigenanteil): string {
 }
 
 /* Häufige Fragen der Angebotsmail (Vorschlag 08.10.2026). Martin 08.10.: was es im Portal schon gibt, wörtlich übernehmen
-   („Warum hast du das nicht übernommen? Darum geht's doch."). Fragen und Antworten 1, 3, 4, 6 = Portal-FAQ (FaqListe.tsx FAQ /
-   FAQ_GRUNDFRAGEN, live); Frage 2 = Wortlaut der Bestpreisgarantie (GARANTIE, „Marta antwortet" in Ich-Form der Absenderin);
-   Frage 5 = die Rechnung aus der Kalkulation des Kunden, gibt es im Portal als Aufstellung „Kosten im Überblick". Bei Änderung
-   der Portal-FAQ hier mitziehen. */
-export function angebotFragen(e: Eigenanteil | null): { frage: string; antwort: string }[] {
-  const liste = [
-    { frage: "Gehe ich mit dem Einladen einen Vertrag ein?", antwort: "Nein — das Einladen und Anschauen von Profilen ist vollständig unverbindlich. Ein Vertrag kommt erst zustande, wenn Sie ein konkretes Angebot ausdrücklich annehmen." },
+   („Warum hast du das nicht übernommen? Darum geht's doch."). Wörtlich aus der Portal-FAQ (FaqListe.tsx FAQ /
+   FAQ_GRUNDFRAGEN, live): Deutsch-Niveaus, „Ist das legal?", „Wie läuft die Betreuung ab?", „Was brauche ich zu Hause?".
+   Bestpreis-Frage = Wortlaut der Bestpreisgarantie (GARANTIE, „Marta antwortet" in Ich-Form der Absenderin); Eigenanteil-Frage
+   = die Rechnung aus der Kalkulation des Kunden („Kosten im Überblick" im Portal). Martin 08.10. zu Fassung 3: „Das mit dem
+   Einladen ist hier zu früh, das versteht kein Kunde … die erste Frage ist nicht gut … vielleicht Sprache" → „Gehe ich mit
+   dem Einladen einen Vertrag ein?" raus, die Deutsch-Niveaus zuerst wie im Portal. Den Ablauf („Das muss auch nicht in den
+   Fragen sein") tragen die Schritte unter der Angebotskarte. Bei Änderung der Portal-FAQ hier mitziehen. */
+export type Frage = { frage: string; antwort: string; html?: string };
+
+/* Deutsch-Niveaus wörtlich aus dem Portal (FaqListe.tsx FAQ[0]); statt der Balken des Portals die Punkte der Profile in der
+   Mail (deutschPunkte), damit Frage und Profile gleich aussehen. */
+const DEUTSCH_EINSTIEG = "Eine grobe Orientierung — kein Sprach-Zertifikat. Die genaue Kommunikation hängt immer auch vom Tempo, der Mundart und der Geduld beider Seiten ab.";
+const DEUTSCH_STUFEN: { wort: string; text: string }[] = [
+  { wort: "Grund", text: "einzelne Wörter und einfache Sätze. Für eine Verständigung im Alltag braucht es Geduld, Gesten und etwas Vorbereitung; differenzierte Gespräche sind in der Regel nicht möglich." },
+  { wort: "Mittel", text: "einfache Alltagsthemen lassen sich besprechen, gängige Anweisungen werden meist verstanden. Bei komplexeren Themen (Diagnosen, Behörden, Telefonate) kann es zu Rückfragen oder Missverständnissen kommen." },
+  { wort: "Gut", text: "die Verständigung im Alltag und in der Pflege funktioniert in der Regel zuverlässig. Auch ausführlichere Gespräche sind möglich; sehr seltene Fachbegriffe, schnelles Sprechen oder Dialekt können dennoch Nachfragen erfordern." },
+];
+const DEUTSCH_SCHLUSS = "Wenn Sprachsicherheit besonders wichtig ist (z. B. Demenz, schwerhörige oder spracheingeschränkte Patienten), sprechen Sie uns gerne an — wir helfen bei der Einordnung.";
+const DEUTSCH_FRAGE: Frage = {
+  frage: "Was bedeuten die Deutsch-Niveaus (Grund, Mittel, Gut)?",
+  antwort: [DEUTSCH_EINSTIEG, ...DEUTSCH_STUFEN.map((st) => `${st.wort} — ${st.text}`), DEUTSCH_SCHLUSS].join("\n"),
+  html: `<p style="margin:0 0 10px;font-size:15px;line-height:1.6;color:${F.text};">${DEUTSCH_EINSTIEG}</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 2px;">${DEUTSCH_STUFEN.map((st) =>
+        `<tr><td style="width:44px;padding:0 0 8px;vertical-align:top;white-space:nowrap;font-size:15px;line-height:24px;">${deutschPunkte(st.wort)}</td><td style="padding:0 0 8px;font-size:15px;line-height:1.6;color:${F.text};"><strong style="color:${F.ink};">${st.wort}</strong> — ${st.text}</td></tr>`).join("")}</table>
+      <p style="margin:0;font-size:15px;line-height:1.6;color:${F.text};">${DEUTSCH_SCHLUSS}</p>`,
+};
+
+export function angebotFragen(e: Eigenanteil | null): Frage[] {
+  const liste: Frage[] = [
+    DEUTSCH_FRAGE,
     { frage: "Ich habe ein günstigeres Angebot. Was kann ich tun?", antwort: "Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot. Legen Sie uns das Angebot vor, wir passen unseren Preis an. Ich antworte innerhalb eines Werktags." },
     { frage: "Ist das legal?", antwort: "Ja, vollständig. Die Pflegekräfte sind sozialversicherungspflichtig bei uns angestellt und werden von uns nach Deutschland entsandt. Für jeden Einsatz liegt eine offizielle A1-Bescheinigung vor — der Nachweis der Sozialversicherungspflicht im Herkunftsland." },
     { frage: "Wie läuft die Betreuung ab?", antwort: "Die Pflegekraft wird in der Regel direkt zu Ihnen nach Hause gebracht und bleibt meist 6 bis 8 Wochen. Den Wechsel zur nächsten Pflegekraft organisieren wir. Fällt eine Pflegekraft aus oder passt die Zusammenarbeit nicht, sorgen wir schnellstmöglich für Ersatz, in der Regel innerhalb von 3 Tagen." },
@@ -245,14 +269,14 @@ export function angebotFragen(e: Eigenanteil | null): { frage: string; antwort: 
   return liste;
 }
 
-function fragenHtml(liste: { frage: string; antwort: string }[]): string {
-  const zeile = (f: { frage: string; antwort: string }, i: number) => `
+function fragenHtml(liste: Frage[]): string {
+  const zeile = (f: Frage, i: number) => `
       ${i > 0 ? mTrenner(14, 14) : ""}
       <p style="margin:0 0 5px;font-size:15.5px;font-weight:700;line-height:1.4;color:${F.ink};">${f.frage}</p>
-      <p style="margin:0;font-size:15px;line-height:1.6;color:${F.text};">${f.antwort}</p>`;
+      ${f.html ?? `<p style="margin:0;font-size:15px;line-height:1.6;color:${F.text};">${f.antwort}</p>`}`;
   return mKarte(liste.map(zeile).join(""), { unten: 26 });
 }
-const fragenText = (liste: { frage: string; antwort: string }[]): string =>
+const fragenText = (liste: Frage[]): string =>
   liste.map((f) => `${f.frage}\n${f.antwort}`.replace(/&nbsp;/g, " ")).join("\n\n");
 
 export type AngebotEingabe = {
@@ -306,13 +330,23 @@ ${zeilen2.map(([l, v]) => `${l}: ${v}`).join("\n")}`;
   return { html, text };
 }
 
-/* Schritte wörtlich wie „So geht es weiter" im Portal (src/components/portal/KompaktEinstieg.tsx ABLAUF, Fassung 30, live
-   seit 06.10.2026); einzige Anpassung „hier im Portal" → „im Portal". Bei Änderung beide Stellen. */
+/* „So geht es weiter" direkt unter der Angebotskarte, wie im Portal (Fassung 30: Karte, dann die Schritte, dann die
+   Pflegekräfte), in einer weißen Karte ohne Trennlinien; Schritt 1 hervorgehoben, darunter der Link des Portals. Martin 08.10. zu Fassung 3
+   („ich habe gar nicht gesehen, ob er in der Mail ist … wenn ich das jetzt gelesen habe, wie geht's weiter? … schauen sich
+   die Pflegekräfte an, vervollständigen das Profil, damit sich Pflegekräfte bei Ihnen bewerben können und Sie welche
+   einladen können … Dann erhalten Sie Bewerbung, Sie entscheiden und erst dann wird der Vertrag geschlossen und dann
+   organisieren wir alles"; davor: „sie rufen an oder gehen ins Portal … Bis dahin zahlen sie nicht, kündbar"). Schritt 2
+   wörtlich wie im Portal ohne „Danach" und „hier". Fakten: Anreise ab 3 Tagen nach der Zusage, Wechsel und Ersatz bei Ausfall
+   (Portal-FAQ), Kosten erst, wenn die Pflegekraft da ist, täglich kündbar (vier Punkte), Erreichbarkeit täglich 8–20 Uhr per
+   Telefon und WhatsApp; „Wir sind immer da" ist so nicht belegt. OpenAI angebot11: Anruf erklären, „Favoriten" ersetzt,
+   „Vertretung" → Ersatz bei Ausfall, „ab 3 Tagen nach Ihrer Zusage". */
 const SCHRITTE_ANGEBOT = [
-  { titel: "Pflegesituation ergänzen und Pflegekräfte einladen", text: "Ergänzen Sie kurz die Pflegesituation. Pflegekräfte, die Ihnen zusagen, laden Sie gleich mit ein, kostenlos und unverbindlich." },
-  { titel: "Bewerbungen erhalten", text: "Danach bewerben sich passende Pflegekräfte bei Ihnen, mit Foto und Erfahrung. Jede Bewerbung sehen Sie im Portal und erhalten sie per E\u2011Mail." },
-  { titel: "Auswählen und starten", text: "Sie wählen Ihre Pflegekraft aus und unterschreiben den Vertrag online. Um den Rest kümmern wir uns. Die Anreise ist schon ab 3 Tagen möglich." },
+  { titel: "Pflegekräfte ansehen und Pflegesituation ergänzen", text: "Ergänzen Sie kurz die Pflegesituation im Portal, oder rufen Sie mich an, dann nehme ich die Angaben am Telefon auf. Danach können sich Pflegekräfte bei Ihnen bewerben, und Sie können Pflegekräfte einladen, die Ihnen zusagen." },
+  { titel: "Bewerbungen erhalten", text: "Passende Pflegekräfte bewerben sich bei Ihnen, mit Foto und Erfahrung. Jede Bewerbung sehen Sie im Portal und erhalten sie per E\u2011Mail." },
+  { titel: "Sie entscheiden", text: "Sie wählen Ihre Pflegekraft aus. Erst dann unterschreiben Sie den Vertrag online. Er ist täglich kündbar, und bis die Pflegekraft bei Ihnen ist, zahlen Sie nichts." },
+  { titel: "Wir kümmern uns um alles", text: "Wir organisieren die Anreise, den Wechsel der Pflegekraft und bei einem Ausfall den Ersatz. Anreisen kann die Pflegekraft schon ab 3 Tagen nach Ihrer Zusage. Ich bin täglich von 8 bis 20 Uhr für Sie da, am Telefon und per\u00a0WhatsApp." },
 ];
+const SCHRITT1_LINK = "Jetzt vervollständigen&nbsp;›";
 
 /* Einleitung und Testsieger-Satz wörtlich aus dem Portal (src/components/portal/KompaktEinstieg.tsx EINLEITUNG = Martins
    Diktat 06.10.2026, EINLEITUNG_TESTSIEGER; live seit Fassung 30). Martin 08.10. zur Mail: „du solltest doch auch die
@@ -360,9 +394,9 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
     : "vielen Dank für Ihre Anfrage. Hier ist Ihr Angebot zur 24-Stunden-Betreuung.";
   const einleitungHtml = `${EINLEITUNG.replace("Rund-um-Betreuung", '<span style="white-space:nowrap;">Rund-um-Betreuung</span>')} ${EINLEITUNG_TESTSIEGER}`;
   /* Angebotskarte wie im Portal (Fassung 30, live seit 06.10.2026): Kopfleiste „Ihr Angebot vom …", Leistung mit Grundlage,
-     Preis „im Monat" mit dem Satz des Portals, darunter Knopf, Sterne, der Eigenanteil (Vorschlag 08.10.: grüner Kasten gegen
-     „zu teuer", unter dem Knopf, damit der Knopf möglichst weit oben bleibt) und die vier Punkte. Ohne Siegel-Zeile: Der
-     Testsieger steht wie im Portal (Runde 32) bei der Einleitung. */
+     Preis „im Monat" mit dem Satz des Portals, darunter Knopf, Sterne, die vier Punkte und zuletzt der Eigenanteil (grüner
+     Kasten gegen „zu teuer"; Martin 08.10. zu Fassung 3: „trotzdem die vier Vorteile machen und dann nach den Zuschüssen, so
+     wie im Portal"). Ohne Siegel-Zeile: Der Testsieger steht wie im Portal (Runde 32) bei der Einleitung. */
   const leistung = angebotFuer(fd);
   const kostenInhalt = `
     <p style="margin:0;font-size:17px;font-weight:700;line-height:1.3;color:${F.ink};">Rund-um-Betreuung zu Hause</p>
@@ -371,9 +405,9 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
     <p style="margin:10px 0 18px;font-size:14.5px;line-height:1.55;color:${F.muted};">Lohn, Steuern, Gebühren: alles drin. Dazu kommen Kost und Logis, <span style="white-space:nowrap;">125&nbsp;€ Reisekosten</span> pro Fahrt und <span style="white-space:nowrap;">Feiertagszuschläge.</span></p>` : mAbstand(16)}
     ${mKnopf(start, "Angebot &amp; Pflegekräfte ansehen", 2, k.bewertung ? 10 : 18, { schrift: 16, innen: 12 })}
     ${k.bewertung ? mSterneZeile(k.bewertung, 18) : ""}
-    ${eigen ? eigenanteilHtml(eigen, 16) : ""}
     ${mPunkte(null)}
-    ${mKlein("Kosten entstehen erst, wenn die Pflegekraft bei Ihnen ist.", 0)}
+    ${mKlein("Kosten entstehen erst, wenn die Pflegekraft bei Ihnen ist.", eigen ? 16 : 0)}
+    ${eigen ? eigenanteilHtml(eigen, 0) : ""}
     ${!eigen && heim ? `${mTrenner()}${heimHtml(heim, 0)}` : ""}`;
   const kosten = mKopfKarte(a.datum ? `Ihr Angebot vom ${a.datum}` : "Ihr Angebot", "neutral", kostenInhalt, 26);
 
@@ -415,6 +449,10 @@ ${EINLADEN_HINWEIS}
 `;
   }
 
+  const schrittLink = k.portal({ goto: "matches", m: "eb" });
+  const schritte = SCHRITTE_ANGEBOT.map((st, i) => i === 0
+    ? { ...st, zustand: "jetzt" as const, text: `${st.text}<br><span style="display:inline-block;margin-top:6px;">${mLink(schrittLink, SCHRITT1_LINK)}</span>` }
+    : st);
   const angaben = angabenTabelle(fd, a.careStartTiming);
   const hinweisHtml = a.angabenHinweis ? a.angabenHinweis.html : "";
   const fragen = angebotFragen(eigen);
@@ -434,10 +472,9 @@ ${EINLADEN_HINWEIS}
     ${mp(einstieg, 14)}
     ${mp(einleitungHtml, 24)}
     ${kosten}
+    ${mAbschnitt("In vier Schritten", "So geht es weiter")}
+    ${mKarte(mSchritte(schritte), { unten: 26 })}
     ${empfHtml}
-    ${mAbschnitt("In drei Schritten", "So geht es weiter")}
-    ${mSchritte(SCHRITTE_ANGEBOT, true)}
-    ${mAbstand(26)}
     ${mAbschnitt("Ihre Angaben", "Grundlage Ihres Angebots")}
     ${mKlein(angabenZeile, 14)}
     ${hinweisHtml}
@@ -460,13 +497,15 @@ Rund-um-Betreuung zu Hause${leistung ? ` ${leistung}` : ""}
 ${brutto ? `${euro(brutto)} € im Monat. Lohn, Steuern, Gebühren: alles drin. Dazu kommen Kost und Logis, 125 € Reisekosten pro Fahrt und Feiertagszuschläge.
 ` : ""}
 Angebot & Pflegekräfte ansehen: ${start}
-${k.bewertung ? `★★★★★ ${k.bewertung.schnitt} von 5 aus ${k.bewertung.anzahl} Bewertungen: https://primundus.de/erfahrungen\n` : ""}${eigen ? `\n${eigenanteilText(eigen)}\n` : ""}
+${k.bewertung ? `★★★★★ ${k.bewertung.schnitt} von 5 aus ${k.bewertung.anzahl} Bewertungen: https://primundus.de/erfahrungen\n` : ""}
 ${punkteText()}
 Kosten entstehen erst, wenn die Pflegekraft bei Ihnen ist.
-${!eigen && heim ? `\n${heimText(heim)}\n` : ""}
-${empfText}SO GEHT ES WEITER
-${SCHRITTE_ANGEBOT.map((s, i) => `${i + 1}. ${s.titel}: ${s.text.replace("‑", "-")}`).join("\n")}
+${eigen ? `\n${eigenanteilText(eigen)}\n` : ""}${!eigen && heim ? `\n${heimText(heim)}\n` : ""}
+SO GEHT ES WEITER
+${SCHRITTE_ANGEBOT.map((st, i) => `${i + 1}. ${st.titel}: ${st.text.replace("\u2011", "-")}`).join("\n")}
+Jetzt vervollständigen: ${schrittLink}
 
+${empfText}
 GRUNDLAGE IHRES ANGEBOTS
 ${angabenZeile}
 
