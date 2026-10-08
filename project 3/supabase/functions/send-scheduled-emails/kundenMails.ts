@@ -216,9 +216,10 @@ const SCHRITTE_ANGEBOT = [
   { titel: "Auswählen und starten", text: "Sie wählen Ihre Pflegekraft aus und unterschreiben den Vertrag online. Um den Rest kümmern wir uns. Die Anreise ist schon ab 3 Tagen möglich." },
 ];
 
-/* Satz unter „Pflegekräfte einladen" (OpenAI 07.10.2026, angebot5): Der Knopf steht vor den Schritten, deshalb sagt er gleich,
-   dass vor dem Einladen die Pflegesituation ergänzt wird und nichts kostet. */
-const EINLADEN_HINWEIS = "Vor dem Einladen ergänzen Sie kurz die Pflegesituation. Kostenlos und unverbindlich.";
+/* Satz unter „Pflegekräfte einladen" (OpenAI 07.10.2026, angebot5–7): Der Knopf steht vor den Schritten, deshalb sagt der Satz
+   gleich, was im Portal zuerst kommt und dass es nichts kostet. Ohne Bedingungs-Anfang („Vor dem …“), „die Ihnen zusagen" ist
+   Martins Wort aus Schritt 1 des Portals. */
+const EINLADEN_HINWEIS = "In etwa 2 Minuten ergänzen Sie die Pflegesituation. Danach laden Sie die Pflegekräfte ein, die Ihnen zusagen. Kostenlos und unverbindlich.";
 
 /** „für eine Person mit Pflegegrad 4" — Spiegel von angebotFuer (KompaktEinstieg.tsx); fehlende Angaben entfallen. */
 export function angebotFuer(fd: Record<string, unknown> | null | undefined): string | null {
