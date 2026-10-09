@@ -924,7 +924,7 @@ export function anreiseZeit(von: string, bis: string | null): string {
 }
 
 export type AnreiseEingabe = {
-  /** Voller Name, z. B. „Ewa Lis“ (nach der Buchung, nicht „Ewa L.“) */
+  /** Vor- + Nachname aus mamamia. Die API maskiert den Nachnamen heute zum Initial („Ewa L.“). */
   name: string;
   fotoCid: string | null;
   /** YYYY-MM-DD */

@@ -605,8 +605,9 @@ async function postAnreise(
   };
   const metadata: Record<string, unknown> = {
     ...buildCaregiverMetadata(node.id, node),
-    // Voller Name statt „Ewa L.": nach der Buchung weiß der Kunde, wer kommt,
-    // und wen er an der Tür erwartet (Michał 09.10.). Nur diese Mail.
+    // Vor- + Nachname statt Kurzname (Michał 09.10.: nach der Buchung soll der
+    // Kunde wissen, wer kommt). Die API maskiert last_name heute zum Initial
+    // („H.") — sobald mamamia entmaskiert, steht hier der volle Name.
     caregiver_name: [cg.first_name, cg.last_name].map((x) => (x ?? "").trim()).filter(Boolean).join(" "),
     ...d,
     mamamia_job_offer_id: k.mamamia_job_offer_id,
