@@ -1810,7 +1810,7 @@ Deno.serve(async (req: Request) => {
           // Beispieldaten der Vorlage; `anreise: {…}` im Body überschreibt (z. B. geaendert, Own transport).
           case "anreise": return R(anreiseMail(dk, {
             name: "Ewa Lis", fotoCid: null, datum: "2026-10-12", von: "14:00", bis: "18:00", verkehrsmittel: "Minibus",
-            hinweis: "Ewa reist mit einem Koffer und einer Reisetasche an.", strasse: "Musterstraße 12",
+            strasse: "Musterstraße 12",
             plzOrt: "80687 München", geaendert: false, ...(demoBody.anreise ?? {}),
           }));
           case "profil_nudge_3": return { subject: "Können wir Sie bei etwas unterstützen?", html: buildProfilNudge3Html(lead as Lead, site, portalBase), text: buildProfilNudge3Text(lead as Lead, site, portalBase) };
@@ -2677,7 +2677,6 @@ Deno.serve(async (req: Request) => {
             von: String(meta.anreise_von),
             bis: meta.anreise_bis ?? null,
             verkehrsmittel: String(meta.verkehrsmittel),
-            hinweis: meta.hinweis ?? null,
             strasse: meta.einsatzort_strasse ?? null,
             plzOrt: meta.einsatzort_plz_ort ?? null,
             geaendert: meta.geaendert === true,

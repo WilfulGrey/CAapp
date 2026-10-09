@@ -899,6 +899,10 @@ ${MARTA_TEXT}`;
 // (detect-caregiver-events, Modus „anreise"). Wortlaut und Aufbau 1:1 nach der
 // Vorlage mail-templates/20-anreise.html. Ändern sich Datum, Uhrzeit oder
 // Verkehrsmittel, kommt dieselbe Mail als „Geänderte Anreisedaten".
+// OHNE die Zeile „Hinweis" der Vorlage (Michał 09.10.): die Agenturen tragen dort
+// Busunternehmen + polnische Disponenten-Nummer ein („Osobus +48 …") oder
+// Arbeitsnotizen („Uhrzeitänderung / …") — nichts für den Kunden. Die Notiz
+// liegt weiter in der Queue-Zeile (metadata.hinweis) für das Team.
 
 /** Wörter für die drei Verkehrsmittel aus mamamia (ArrivalTypes, gemessen 2026-08-19).
  *  Unbekannte Werte erscheinen so, wie mamamia sie liefert — nichts geraten. */
@@ -934,7 +938,6 @@ export type AnreiseEingabe = {
   bis: string | null;
   /** Rohwert aus mamamia */
   verkehrsmittel: string;
-  hinweis: string | null;
   strasse: string | null;
   plzOrt: string | null;
   geaendert: boolean;
@@ -963,9 +966,6 @@ export function anreiseMail(k: Kontext, a: AnreiseEingabe): KundenMail {
   }
   zeilen.push(["Verkehrsmittel", esc(mittel)]);
   zeilen.push(["Ankunft", `<span style="white-space:nowrap;">${esc(datum)},</span> <span style="white-space:nowrap;">${esc(zeit)}</span>`]);
-  if (a.hinweis) {
-    zeilen.push(["Hinweis", `<span style="font-weight:400;color:${F.text};">${esc(a.hinweis).replace(/\r?\n/g, "<br>")}</span>`]);
-  }
   const rand = (i: number) => (i === 0 ? "" : "border-top:1px solid #EFEBE5;");
   const tabelle = `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 14px;border:1.5px solid ${F.line};border-radius:20px;background:#ffffff;border-collapse:separate;">
@@ -995,7 +995,6 @@ export function anreiseMail(k: Kontext, a: AnreiseEingabe): KundenMail {
     ...(adresse.length > 0 ? [`Adresse: ${adresse.join(", ")}${hierhin ? ` (${hierhin})` : ""}`] : []),
     `Verkehrsmittel: ${mittel}`,
     `Ankunft: ${datum}, ${zeit}`,
-    ...(a.hinweis ? [`Hinweis: ${a.hinweis}`] : []),
   ];
   const text = `${k.anrede},
 
