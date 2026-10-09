@@ -142,3 +142,39 @@ export interface RejectApplicationResponse {
     reject_message: string | null;
   } | null;
 }
+
+// Anreise-Mail (Registry #119): Anreise-Datensatz der Agentur am gebuchten
+// Job. BEWUSST eigene Abfrage pro Job statt Felder in GET_CUSTOMER_JOB_OFFERS
+// (Lehre vom 11.07.: ein Feld, das prod ablehnt, bricht die ganze Abfrage) —
+// so legt ein Fehler hier nur die Anreise-Mails lahm, nicht den Scan.
+// Felder auf prod gemessen vom CGA-Portal (JobQueries::einsatz, 2026-08-20).
+// caregiver bewusst schmal: die Mail braucht nur Name und Foto.
+export const GET_JOB_OFFER_ARRIVAL = /* GraphQL */ `
+  query DetectJobOfferArrival($id: Int!) {
+    JobOffer(id: $id) {
+      id
+      final_confirmation {
+        id
+        rejected_at
+        arrival_date
+        caregiver {
+          id
+          first_name
+          last_name
+          avatar_retouched_promo { aws_url }
+          avatar_retouched { aws_url }
+          avatar { aws_url }
+        }
+        contract_patient { street_number zip_code city }
+        arrival {
+          arrival_date
+          arrival_time_from
+          arrival_time_to
+          note
+          updated_at
+          arrival_type { id type }
+        }
+      }
+    }
+  }
+`;

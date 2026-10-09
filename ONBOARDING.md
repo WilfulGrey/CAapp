@@ -340,6 +340,10 @@ i `mamamia-proxy` wymagają dodatkowo `MAMAMIA_AGENCY_ID` (prod `3`, staging `18
 tenanty, osobne hasła; Registry #53) — nigdy konto osobiste. Sprawdzenie:
 `npx supabase secrets list --project-ref <REF>`.
 
+Opcjonalny przełącznik **`ANREISE_MAILS`** (`aus` = brak / `test` / `live`, Registry #119):
+mail o przyjeździe opiekunki. Brak sekretu = `aus` (tylko log w `detect-caregiver-events`),
+`test` = mail do zespołu zamiast do klienta, `live` = do klientów. Działa bez redeployu.
+
 **Local manual deploy** (NIE rób tego dla prod — patrz CLAUDE.md §"Emergency hotfix"):
 
 ```bash

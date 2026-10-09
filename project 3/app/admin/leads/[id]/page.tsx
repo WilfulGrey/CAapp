@@ -1718,6 +1718,11 @@ export default function LeadDetailPage() {
                     application_received: { label: 'Bewerbung eingegangen (Mail B)', color: 'bg-[#E76F63]' },
                     application_rejected: { label: 'Bewerbung abgelehnt (Kunde)', color: 'bg-gray-500' },
                     application_accepted_internal: { label: 'Pflegekraft gebucht (Mail C)', color: 'bg-green-700' },
+                    // Registry #119 — metadata.test = nur ans Team (ANREISE_MAILS=test).
+                    caregiver_arrival_scheduled: { label: 'Anreisedaten aus Mamamia (Mail eingeplant)', color: 'bg-green-600' },
+                    email_anreise_sent: { label: 'Anreise-Mail gesendet', color: 'bg-green-600' },
+                    email_anreise_failed: { label: 'Anreise-Mail fehlgeschlagen', color: 'bg-red-500' },
+                    email_anreise_cancelled: { label: 'Anreise-Mail abgebrochen', color: 'bg-gray-400' },
                     offer_updated: { label: 'Angebot angepasst', color: 'bg-amber-500' },
                     acceptance_sync_alarm: { label: '🚨 Mamamia-Sync-Alarm (Team-Mail)', color: 'bg-red-600' },
                     acceptance_contact_alarm: { label: '⚠️ Kontaktdaten nicht in Mamamia (Team-Mail)', color: 'bg-amber-500' },

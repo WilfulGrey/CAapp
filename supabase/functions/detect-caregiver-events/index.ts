@@ -38,7 +38,15 @@ import {
   type ListInterestsResponse,
   REJECT_APPLICATION,
   type RejectApplicationResponse,
+  GET_JOB_OFFER_ARRIVAL,
 } from "./queries.ts";
+import {
+  type AnreiseDaten,
+  anreiseAusConfirmation,
+  anreiseModus,
+  type ArrivalConfirmation,
+  berlinDatumMinus,
+} from "./anreise.ts";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -164,6 +172,26 @@ export interface DetectSupabase {
   fetchDiscoveryLeads?(recheckHours: number, batchSize: number): Promise<Array<LeadRow & { status?: string | null }>>;
   stampLeadJobsChecked?(leadId: string): Promise<void>;
   markLeadFolgeEinsatz?(leadId: string, mamamiaJobOfferId: number): Promise<void>;
+  // Anreise-Mail (Registry #119): gebuchte Jobs mit Anreise ab `abDatum`
+  // (lead_jobs-Spiegel) + bisher gemeldete Anreise-Stände dieser Leads.
+  // Optional — fehlen sie, macht der Modus "anreise" nichts.
+  fetchAnreiseKandidaten?(abDatum: string, limit: number): Promise<AnreiseKandidat[]>;
+  fetchAnreiseStand?(leadIds: string[]): Promise<AnreiseStandRow[]>;
+}
+
+export interface AnreiseKandidat {
+  lead_id: string;
+  token: string;
+  mamamia_job_offer_id: number;
+}
+
+// Ein gemeldeter Anreise-Stand (lead_events caregiver_arrival_scheduled),
+// neueste zuerst. test=true stammt aus ANREISE_MAILS=test und zählt nur dort.
+export interface AnreiseStandRow {
+  mamamia_job_offer_id: number | null;
+  confirmation_id: number | null;
+  arrival_key: string | null;
+  test: boolean;
 }
 
 // Pending-Row inkl. Lead-Anker (Join) — alles, was syncAcceptance braucht.
@@ -235,13 +263,22 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
   if (req.method !== "POST") return jsonError(405, "method not allowed");
 
   // Empty/{} body = batch mode (cron path). { lead_id } = single-lead path
-  // (manual curl, useful for testing or one-off triggers).
-  let body: { lead_id?: unknown } = {};
+  // (manual curl, useful for testing or one-off triggers). { mode: "anreise" }
+  // = Anreise-Mails (eigener Cron-Aufruf: der Batch braucht schon ~110 s von
+  // ~150 s, Registry #119).
+  let body: { lead_id?: unknown; mode?: unknown } = {};
   try {
     const raw = await req.text();
     if (raw.trim()) body = JSON.parse(raw);
   } catch {
     return jsonError(400, "invalid json body");
+  }
+
+  if (body.mode === "anreise") {
+    return new Response(JSON.stringify(await meldeAnreisen(deps)), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   if (body.lead_id != null) {
@@ -421,6 +458,174 @@ export async function discoverFolgeEinsaetze(
     }
   }
   return out;
+}
+
+// ─── Anreise-Mail (Registry #119) ──────────────────────────────────────────
+// Die Agentur trägt die Anreise der Pflegekraft in mamamia ein
+// (final_confirmation.arrival). Dieser Modus ({ mode: "anreise" }, eigener
+// Cron-Aufruf) findet vollständige Einträge an gebuchten Jobs und meldet sie
+// der Bridge — die legt die Kundenmail in die Warteschlange (Muster
+// reservierung_beendet, route.ts planeAnreise). Neuer Schlüssel (Datum,
+// Uhrzeit, Verkehrsmittel) ⇒ neue Meldung ⇒ Mail „Geänderte Anreisedaten".
+//
+// ANREISE_MAILS (Supabase-Secret, wirkt ohne Redeploy):
+//   aus  (Standard) — nichts an die Bridge, nur Log (ohne Personendaten, #68)
+//   test — ganze Kette, die Mail geht aber ans Team (metadata.test)
+//   live — an die Kunden
+// test- und live-Stände zählen getrennt: der Wechsel test → live schickt
+// jedem Kunden seine Mail, auch wenn das Team sie schon gesehen hat.
+const ANREISE_FENSTER_TAGE = 30;
+// ponytail: höchstens 60 Jobs je Lauf (Okt. 2026: 46) — wird es mehr, die
+// weit in der Zukunft liegenden abschneiden (Sortierung ist schon aufsteigend).
+const ANREISE_KANDIDATEN_LIMIT = 60;
+
+export interface AnreiseResult {
+  mode: "anreise";
+  modus: "aus" | "test" | "live";
+  kandidaten: number;
+  gemeldet: number;
+  bekannt: number;
+  uebersprungen: number;
+  fehler: number;
+}
+
+export async function meldeAnreisen(deps: HandlerDeps, jetzt: Date = new Date()): Promise<AnreiseResult> {
+  const modus = anreiseModus(Deno.env.get("ANREISE_MAILS"));
+  const out: AnreiseResult = { mode: "anreise", modus, kandidaten: 0, gemeldet: 0, bekannt: 0, uebersprungen: 0, fehler: 0 };
+  const supa = deps.supabase;
+  if (!supa.fetchAnreiseKandidaten || !supa.fetchAnreiseStand) return out;
+  const fetcher = deps.fetchFn ?? globalThis.fetch;
+
+  try {
+    const kandidaten = await supa.fetchAnreiseKandidaten(
+      berlinDatumMinus(jetzt, ANREISE_FENSTER_TAGE),
+      ANREISE_KANDIDATEN_LIMIT,
+    );
+    out.kandidaten = kandidaten.length;
+    if (kandidaten.length > 0) {
+      // Letzter gemeldeter Schlüssel je (Job, Confirmation) in DIESEM Modus.
+      // Zeilen kommen neueste zuerst → der erste Treffer gewinnt.
+      const stand = new Map<string, string>();
+      for (const r of await supa.fetchAnreiseStand([...new Set(kandidaten.map((k) => k.lead_id))])) {
+        if (r.test !== (modus === "test") || !r.arrival_key) continue;
+        const k = `${r.mamamia_job_offer_id}:${r.confirmation_id}`;
+        if (!stand.has(k)) stand.set(k, r.arrival_key);
+      }
+
+      const agencyToken = await getOrRefreshAgencyToken({
+        authEndpoint: deps.secrets.mamamiaAuthEndpoint,
+        email: deps.secrets.mamamiaAgencyEmail,
+        password: deps.secrets.mamamiaAgencyPassword,
+        fetchFn: fetcher,
+      });
+
+      for (const k of kandidaten) {
+        const job = k.mamamia_job_offer_id;
+        try {
+          const r = await mamamiaRequest<{ JobOffer: { final_confirmation?: ArrivalConfirmation | null } | null }>({
+            endpoint: deps.secrets.mamamiaEndpoint,
+            token: agencyToken,
+            query: GET_JOB_OFFER_ARRIVAL,
+            variables: { id: job },
+            fetchFn: fetcher,
+          });
+          const fc = r.JobOffer?.final_confirmation ?? null;
+          const e = anreiseAusConfirmation(job, fc, jetzt);
+          if (modus === "aus") {
+            const d = "daten" in e ? e.daten : null;
+            console.log(
+              `[anreise][aus] lead=${k.lead_id} job=${job} conf=${fc?.id ?? "-"} arrival=${fc?.arrival ? "set" : "null"} ` +
+                (d
+                  ? `datum=${d.anreise_datum} von=${d.anreise_von} bis=${d.anreise_bis ?? "-"} typ=${d.verkehrsmittel} ` +
+                    `hinweis_zeichen=${d.hinweis?.length ?? 0} strasse=${d.einsatzort_strasse ? "ja" : "nein"} ` +
+                    `bekannt=${stand.get(`${job}:${d.confirmation_id}`) === d.arrival_key ? "ja" : "nein"}`
+                  : `grund=${"grund" in e ? e.grund : "-"}`),
+            );
+          }
+          if ("grund" in e) {
+            out.uebersprungen += 1;
+            // Häufige, erwartbare Gründe nicht loggen — nur die, bei denen
+            // jemand in mamamia nachsehen sollte.
+            if (modus !== "aus" && ["format", "datum_konflikt", "unvollstaendig", "keine_pflegekraft"].includes(e.grund)) {
+              console.warn(`[anreise] lead=${k.lead_id} job=${job} conf=${fc?.id ?? "-"} grund=${e.grund}`);
+            }
+            continue;
+          }
+          if (stand.get(`${job}:${e.daten.confirmation_id}`) === e.daten.arrival_key) {
+            out.bekannt += 1;
+            continue;
+          }
+          if (modus === "aus") continue;
+          if (await postAnreise(deps, k, fc!, e.daten, modus === "test")) out.gemeldet += 1;
+          else out.fehler += 1;
+        } catch (err) {
+          out.fehler += 1;
+          console.error(`[anreise] lead=${k.lead_id} job=${job} failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
+  } catch (err) {
+    out.fehler += 1;
+    console.error(`[anreise] scan failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // pg_net speichert die Antwort nicht — diese Zeile ist der Beleg des Laufs.
+  console.log(
+    `[anreise] modus=${out.modus} kandidaten=${out.kandidaten} gemeldet=${out.gemeldet} ` +
+      `bekannt=${out.bekannt} uebersprungen=${out.uebersprungen} fehler=${out.fehler}`,
+  );
+  return out;
+}
+
+// Meldung an die Bridge (Muster postAcceptanceAlarm). Pflegekraft-Name und
+// Foto kommen wie bei allen Kundenmails aus buildCaregiverMetadata.
+async function postAnreise(
+  deps: HandlerDeps,
+  k: AnreiseKandidat,
+  fc: ArrivalConfirmation,
+  d: AnreiseDaten,
+  test: boolean,
+): Promise<boolean> {
+  const cg = fc.caregiver!;
+  const node: CaregiverNode = {
+    id: cg.id as number,
+    first_name: cg.first_name ?? null,
+    last_name: cg.last_name ?? null,
+    year_of_birth: null,
+    care_experience: null,
+    germany_skill: null,
+    hp_caregiver_id: null,
+    hp_total_jobs: null,
+    hp_total_days: null,
+    hp_avg_mission_days: null,
+    avatar_retouched_promo: cg.avatar_retouched_promo ?? null,
+    avatar_retouched: cg.avatar_retouched ?? null,
+    avatar: cg.avatar ?? null,
+    about_de: null,
+  };
+  const metadata: Record<string, unknown> = {
+    ...buildCaregiverMetadata(node.id, node),
+    ...d,
+    mamamia_job_offer_id: k.mamamia_job_offer_id,
+    ...(test ? { test: true } : {}),
+  };
+  const fetcher = deps.fetchFn ?? globalThis.fetch;
+  try {
+    const res = await fetcher(`${deps.secrets.kostenrechnerUrl.replace(/\/$/, "")}/api/lead-event`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: k.token, event: "caregiver_arrival_scheduled", notify: true, metadata }),
+    });
+    if (!res.ok) {
+      console.error(`[anreise] bridge HTTP ${res.status} (lead=${k.lead_id}, job=${k.mamamia_job_offer_id})`);
+      return false;
+    }
+    console.log(`[anreise] gemeldet lead=${k.lead_id} job=${k.mamamia_job_offer_id} conf=${d.confirmation_id}${test ? " (test)" : ""}`);
+    return true;
+  } catch (err) {
+    console.error(`[anreise] bridge threw (lead=${k.lead_id}): ${err instanceof Error ? err.message : String(err)}`);
+    return false;
+  }
 }
 
 // ─── Acceptance-Sync-Retry ─────────────────────────────────────────────────
@@ -1706,6 +1911,41 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
         cancelled += 1;
       }
       return cancelled;
+    },
+    // ── Anreise-Mail (Registry #119) ──
+    async fetchAnreiseKandidaten(abDatum: string, limit: number) {
+      const { data, error } = await client
+        .from("lead_jobs")
+        .select("lead_id, mamamia_job_offer_id, leads!inner(token)")
+        .eq("status", "gebucht")
+        .gte("anreise", abDatum)
+        .order("anreise", { ascending: true })
+        .limit(limit);
+      if (error) throw new Error(`supabase fetchAnreiseKandidaten: ${error.message}`);
+      const out: AnreiseKandidat[] = [];
+      for (const r of (data ?? []) as Array<{ lead_id: string; mamamia_job_offer_id: number; leads: { token?: string | null } | null }>) {
+        if (r.leads?.token) out.push({ lead_id: r.lead_id, token: r.leads.token, mamamia_job_offer_id: r.mamamia_job_offer_id });
+      }
+      return out;
+    },
+    async fetchAnreiseStand(leadIds: string[]) {
+      if (leadIds.length === 0) return [];
+      const { data, error } = await client
+        .from("lead_events")
+        .select("mamamia_job_offer_id, metadata")
+        .in("lead_id", leadIds)
+        .eq("event_type", "caregiver_arrival_scheduled")
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(`supabase fetchAnreiseStand: ${error.message}`);
+      return (data ?? []).map((row: { mamamia_job_offer_id: number | null; metadata: unknown }) => {
+        const md = (row.metadata ?? {}) as Record<string, unknown>;
+        return {
+          mamamia_job_offer_id: row.mamamia_job_offer_id ?? extractMetadataInt(md, "mamamia_job_offer_id"),
+          confirmation_id: extractMetadataInt(md, "confirmation_id"),
+          arrival_key: typeof md.arrival_key === "string" ? md.arrival_key : null,
+          test: md.test === true,
+        };
+      });
     },
     async upsertLeadJobs(leadId, jobs) {
       if (jobs.length === 0) return;

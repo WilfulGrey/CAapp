@@ -2,6 +2,9 @@
 // richtiger Knopf und Link, keine Platzhalter, Textfassung vorhanden, klein genug für Gmail.
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import {
+  anreiseDatum,
+  anreiseMail,
+  anreiseZeit,
   angebotFragen,
   angebotMail,
   eigenanteilAus,
@@ -264,4 +267,73 @@ Deno.test("16 Reservierung beendet: eine oder mehrere Pflegekräfte", () => {
   assertStringIncludes(sichtbar(zwei.html), "Bewerbungen von Maria und Ewa sind abgelaufen");
   const niemand = reservierungBeendetMail(k(), []);
   assertEquals(niemand.betreff, "Reservierung abgelaufen – Ihre Suche läuft weiter");
+});
+
+// ── Anreise (Registry #119) ─────────────────────────────────────────────────
+const anreise = {
+  name: "Ewa L.", fotoCid: "foto-1", datum: "2026-10-12", von: "14:00", bis: "18:00", verkehrsmittel: "Minibus",
+  hinweis: "Ewa reist mit einem Koffer an.", strasse: "Musterstraße 12", plzOrt: "80687 München", geaendert: false,
+};
+
+function ohnePlatzhalter(name: string, m: KundenMail) {
+  for (const f of [m.html, m.text, m.betreff, m.vorschau]) assert(!/undefined|NaN|\[object Object\]|null/.test(f), `${name}: Platzhalter`);
+  assert(new TextEncoder().encode(m.html).length < 90_000, `${name}: zu groß`);
+}
+
+Deno.test("Anreise: Datum mit Wochentag, Zeitfenster", () => {
+  assertEquals(anreiseDatum("2026-10-12"), "Montag, 12.10.2026");
+  assertEquals(anreiseDatum("2026-10-18"), "Sonntag, 18.10.2026");
+  assertEquals(anreiseZeit("14:00", "18:00"), "14–18 Uhr");
+  assertEquals(anreiseZeit("09:30", "12:00"), "9:30–12 Uhr");
+  assertEquals(anreiseZeit("14:00", null), "ab 14 Uhr");
+  assertEquals(anreiseZeit("14:00", "14:00"), "14 Uhr");
+});
+
+Deno.test("Anreise: Mail wie die Vorlage", () => {
+  const m = anreiseMail(k(), anreise);
+  ohnePlatzhalter("anreise", m);
+  assertEquals(m.betreff, "Anreisedaten Ihrer Pflegekraft – Montag, 12.10.2026");
+  assertEquals(m.vorschau, "Ihre Anreisedaten: Montag, 12.10.2026, 14–18 Uhr.");
+  const s = sichtbar(m.html);
+  for (const t of [
+    "Guten Tag Frau Müller,", "wir haben die Anreise Ihrer Pflegekraft organisiert.", "Ihre Anreisedaten", "Ewa L.",
+    "Musterstraße 12", "80687 München", "Hierhin wird Ewa gebracht.", "Minibus", "Montag, 12.10.2026,", "14–18 Uhr",
+    "Ewa reist mit einem Koffer an.", "089 200 000 830", "Ansonsten melde ich mich nach der Anreise",
+    "Ich wünsche Ihnen und Ewa einen guten Start.", "Marta Kapcio",
+  ]) assertStringIncludes(s, t);
+  assertStringIncludes(m.html, 'src="cid:foto-1"');
+  for (const t of ["Guten Tag Frau Müller,", "Verkehrsmittel: Minibus", "Ankunft: Montag, 12.10.2026, 14–18 Uhr", "Hinweis: Ewa reist", "Mit freundlichen Grüßen"]) {
+    assertStringIncludes(m.text, t);
+  }
+});
+
+Deno.test("Anreise: geänderte Daten → anderer Betreff und Einstieg", () => {
+  const m = anreiseMail(k(), { ...anreise, geaendert: true });
+  assertEquals(m.betreff, "Geänderte Anreisedaten Ihrer Pflegekraft – Montag, 12.10.2026");
+  assertStringIncludes(m.vorschau, "Geänderte Anreisedaten:");
+  assertStringIncludes(sichtbar(m.html), "die Anreisedaten Ihrer Pflegekraft haben sich geändert.");
+});
+
+Deno.test("Anreise: Verkehrsmittel auf Deutsch, Unbekanntes wie geliefert", () => {
+  assertStringIncludes(sichtbar(anreiseMail(k(), { ...anreise, verkehrsmittel: "Sindbad" }).html), "Reisebus (Sindbad)");
+  const selbst = sichtbar(anreiseMail(k(), { ...anreise, verkehrsmittel: "Own transport" }).html);
+  assertStringIncludes(selbst, "Eigene Anreise");
+  assertStringIncludes(selbst, "Hierhin reist Ewa selbst an.");
+  assert(!selbst.includes("gebracht"));
+  assertStringIncludes(sichtbar(anreiseMail(k(), { ...anreise, verkehrsmittel: "Zug" }).html), "Zug");
+});
+
+Deno.test("Anreise: ohne Hinweis, Adresse und Foto fallen die Zeilen weg", () => {
+  const m = anreiseMail(k(), { ...anreise, hinweis: null, strasse: null, plzOrt: null, fotoCid: null });
+  ohnePlatzhalter("anreise-leer", m);
+  const s = sichtbar(m.html);
+  for (const t of ["Hinweis", "Adresse", "Hierhin"]) assert(!s.includes(t), t);
+  assert(!m.html.includes("cid:"));
+  assert(!m.text.includes("Hinweis:") && !m.text.includes("Adresse:"));
+});
+
+Deno.test("Anreise: Text aus mamamia wird maskiert, Zeilenumbrüche bleiben", () => {
+  const m = anreiseMail(k(), { ...anreise, hinweis: "Fahrer <ruft> an\nab 13 Uhr" });
+  assertStringIncludes(m.html, "Fahrer &lt;ruft&gt; an<br>ab 13 Uhr");
+  assert(!m.html.includes("<ruft>"));
 });

@@ -51,6 +51,7 @@ import {
   nudge1Mail,
   nudge2Mail,
   portalLink,
+  anreiseMail,
   reservierungBeendetMail,
   sucheStandMail,
   vierDingeMail,
@@ -67,7 +68,7 @@ import {
   vorAbsendenStopp,
 } from "./stopRegeln.ts";
 import { deutschStufe } from "./deutschStufe.ts";
-import { testphaseUmleitung } from "./testphase.ts";
+import { anreiseTestUmleitung, testphaseUmleitung } from "./testphase.ts";
 // Empfehlung fuer die Angebotsmail (Martin, 31.08.2026): echte gematchte
 // Pflegekraft statt der Behauptung "im Portal warten Pflegekraefte".
 // Reihenfolge + Trichter sind Kopien der Portal-Logik — siehe empfehlung.ts.
@@ -402,6 +403,11 @@ function buildMartaSig(siteUrl: string, fuer: "kunde" | "vermittler" = "kunde"):
     ${karte}`;
 }
  
+// Mails zur gebuchten Leistung (Mail C geht aus demselben Grund über die
+// Bridge ohne Abmelde-Prüfung): gehen trotz Abmelde-Link und trotz Pause.
+// Registry #119, Entscheidung Michał 09.10.2026.
+const TRANSAKTIONALE_MAILS: ReadonlySet<string> = new Set(["anreise"]);
+
 // ── Portal-Link + Lead-Meilenstein ────────────────────────────────────────
 // Der kostenrechner-Lead erfährt vom CA-App-Portal über `lead_events`, die
 // per /api/lead-event reingeschrieben werden (token-authentifiziert).
@@ -1801,6 +1807,12 @@ Deno.serve(async (req: Request) => {
           case "neue_pflegekraefte_verfuegbar": return R(neuePflegekraefteMail(dk));
           case "suche_stand_2tage": return R(sucheStandMail(dk));
           case "reservierung_beendet": return R(reservierungBeendetMail(dk, [String(demoBewerbung?.meta.caregiver_name ?? "").split(/\s+/)[0]]));
+          // Beispieldaten der Vorlage; `anreise: {…}` im Body überschreibt (z. B. geaendert, Own transport).
+          case "anreise": return R(anreiseMail(dk, {
+            name: "Ewa L.", fotoCid: null, datum: "2026-10-12", von: "14:00", bis: "18:00", verkehrsmittel: "Minibus",
+            hinweis: "Ewa reist mit einem Koffer und einer Reisetasche an.", strasse: "Musterstraße 12",
+            plzOrt: "80687 München", geaendert: false, ...(demoBody.anreise ?? {}),
+          }));
           case "profil_nudge_3": return { subject: "Können wir Sie bei etwas unterstützen?", html: buildProfilNudge3Html(lead as Lead, site, portalBase), text: buildProfilNudge3Text(lead as Lead, site, portalBase) };
           case "reaktivierung_wechsel": return { subject: "Steht bei Ihnen ein Pflegekraft-Wechsel an?", html: buildReaktivierungWechselHtml(lead as Lead, site, portalBase), text: buildReaktivierungWechselText(lead as Lead, site, portalBase) };
           case "vermittler_angebot": {
@@ -1941,15 +1953,17 @@ Deno.serve(async (req: Request) => {
           continue;
         }
  
-        // Abmeldung (Abmelde-Link): gilt für ALLE Mail-Typen — der Kunde hat
-        // dem weiteren E-Mail-Versand widersprochen (Art. 21 DSGVO). Mail
-        // canceln, NICHT senden.
-        const { data: unsubEvt } = await supabase
-          .from("lead_events")
-          .select("id")
-          .eq("lead_id", scheduledEmail.lead_id)
-          .eq("event_type", "email_unsubscribed")
-          .limit(1);
+        // Abmeldung (Abmelde-Link): gilt für alle Mail-Typen außer den
+        // transaktionalen (TRANSAKTIONALE_MAILS) — der Kunde hat dem weiteren
+        // E-Mail-Versand widersprochen (Art. 21 DSGVO). Mail canceln, NICHT senden.
+        const { data: unsubEvt } = TRANSAKTIONALE_MAILS.has(scheduledEmail.email_type)
+          ? { data: [] }
+          : await supabase
+            .from("lead_events")
+            .select("id")
+            .eq("lead_id", scheduledEmail.lead_id)
+            .eq("event_type", "email_unsubscribed")
+            .limit(1);
         if (Array.isArray(unsubEvt) && unsubEvt.length > 0) {
           await supabase
             .from("scheduled_emails")
@@ -1968,7 +1982,7 @@ Deno.serve(async (req: Request) => {
         // bis dahin keine Mails aus der Warteschlange, außer der Nachfrage selbst
         // und Mails, die der Kunde durch eine neue Anfrage selbst auslöst.
         // Meldet sich der Kunde vorher selbst (AKTIVITAET_NACH_PAUSE), ist die Pause vorbei.
-        if (!["wiedervorlage", "eingangsbestaetigung", "angebot"].includes(scheduledEmail.email_type)) {
+        if (!["wiedervorlage", "eingangsbestaetigung", "angebot", ...TRANSAKTIONALE_MAILS].includes(scheduledEmail.email_type)) {
           const pause = await pauseStand(supabase, scheduledEmail.lead_id);
           if (pause && pauseAktiv(pause.bis, new Date(), pause.aktivSeitPause)) {
             await supabase
@@ -2018,6 +2032,8 @@ Deno.serve(async (req: Request) => {
           { source: (lead as Record<string, unknown>).source as string | null, email: recipient },
           Deno.env.get("PORTAL_TESTPHASE"),
           Deno.env.get("PORTAL_TESTPHASE_EMPFAENGER"),
+        ) ?? anreiseTestUmleitung(
+          scheduledEmail.email_type, scheduledEmail.metadata, recipient, Deno.env.get("PORTAL_TESTPHASE_EMPFAENGER"),
         );
 
         let isBeauftragt = lead.status === "vertrag_abgeschlossen" || lead.status === "betreuung_beauftragt" || lead.order_confirmed === true;
@@ -2648,6 +2664,26 @@ Deno.serve(async (req: Request) => {
           neu(reservierungBeendetMail(k, namen));
           eventTypeSent = "email_reservierung_beendet_sent";
           eventTypeFailed = "email_reservierung_beendet_failed";
+        } else if (scheduledEmail.email_type === "anreise") {
+          // Registry #119: Anreise-Daten der Agentur (detect, Modus „anreise"). Das
+          // Foto wird beim Versand frisch geholt — die mamamia-URL hält 30 Minuten.
+          const meta = (scheduledEmail.metadata ?? {}) as Record<string, any>;
+          const inline = await fetchInlinePhotoDeno(meta.caregiver_photo_url);
+          (scheduledEmail as any).__reminderInline = inline;
+          neu(anreiseMail(k, {
+            name: String(meta.caregiver_name ?? ""),
+            fotoCid: inline?.cid ?? null,
+            datum: String(meta.anreise_datum),
+            von: String(meta.anreise_von),
+            bis: meta.anreise_bis ?? null,
+            verkehrsmittel: String(meta.verkehrsmittel),
+            hinweis: meta.hinweis ?? null,
+            strasse: meta.einsatzort_strasse ?? null,
+            plzOrt: meta.einsatzort_plz_ort ?? null,
+            geaendert: meta.geaendert === true,
+          }));
+          eventTypeSent = "email_anreise_sent";
+          eventTypeFailed = "email_anreise_failed";
         } else {
           await supabase
             .from("scheduled_emails")

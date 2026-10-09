@@ -1193,6 +1193,32 @@ warunkiem że Customer ma `status='active'` ORAZ JobOffer też jest active
 | `inviteCaregiver` | write | **`/backend/graphql`** | **panel/Sanctum** |
 | `generateCaregiverGermanDescription` | write (LLM) | `/graphql` | agency-jwt |
 
+### Mail o przyjeździe opiekunki (Registry #119)
+
+Po bookingu agencja wpisuje w MM dane dojazdu (`final_confirmation.arrival`:
+`arrival_date`, `arrival_time_from/to`, `arrival_type { id type }` = Minibus /
+Sindbad / Own transport, `note`). Ścieżka = wzorzec `reservierung_beendet`:
+
+1. **`detect-caregiver-events` z body `{ "mode": "anreise" }`** (własny cron
+   `7-59/15`, osobno od batcha — batch zjada już ~110 s z ~150 s). Kandydaci:
+   `lead_jobs` `gebucht` z `anreise ≥ dziś−30` (max 60). Per job osobne zapytanie
+   `DetectJobOfferArrival` (NIE w `GET_CUSTOMER_JOB_OFFERS`). Czysta funkcja
+   `anreise.ts:anreiseAusConfirmation` odrzuca: storno (`rejected_at`), brak
+   daty/godziny/typu, format ≠ `YYYY-MM-DD` / `HH:MM`, przyjazd już był (czas
+   berliński), wpis młodszy niż 30 min, konflikt daty z `final_confirmation.arrival_date`.
+   Klucz `job|conf|datum|von|bis|type_id` — zmiana notatki go nie zmienia.
+2. **Bridge** `/api/lead-event` event `caregiver_arrival_scheduled` (własna gałąź,
+   `planeAnreise`): ten sam klucz co ostatni dla (job, confirmation) ⇒ nic; Vermittler /
+   brak e-maila ⇒ tylko event `seeded`; inaczej wiersz `scheduled_emails`
+   `email_type='anreise'` (`sendezeitIso` — noc → 08:00), potem event.
+3. **`send-scheduled-emails`** `anreiseMail` (`kundenMails.ts`): zdjęcie pobierane
+   świeżo przy wysyłce (CID), „Geänderte Anreisedaten“ gdy dla tej pary był już
+   wysłany wiersz. Typ transakcyjny (`TRANSAKTIONALE_MAILS`): idzie mimo wypisu i pauzy.
+
+Przełącznik `ANREISE_MAILS` (sekret Supabase, czyta tylko detect): `aus` (domyślnie,
+tylko log), `test` (cały łańcuch, mail do zespołu przez `anreiseTestUmleitung`),
+`live`. Stany `test` i `live` liczą się osobno — `test → live` wysyła klientom od nowa.
+
 ---
 
 ## Round-tripy do mamamii — sumarycznie
