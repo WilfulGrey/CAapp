@@ -1809,7 +1809,7 @@ Deno.serve(async (req: Request) => {
           case "reservierung_beendet": return R(reservierungBeendetMail(dk, [String(demoBewerbung?.meta.caregiver_name ?? "").split(/\s+/)[0]]));
           // Beispieldaten der Vorlage; `anreise: {…}` im Body überschreibt (z. B. geaendert, Own transport).
           case "anreise": return R(anreiseMail(dk, {
-            name: "Ewa L.", fotoCid: null, datum: "2026-10-12", von: "14:00", bis: "18:00", verkehrsmittel: "Minibus",
+            name: "Ewa Lis", fotoCid: null, datum: "2026-10-12", von: "14:00", bis: "18:00", verkehrsmittel: "Minibus",
             hinweis: "Ewa reist mit einem Koffer und einer Reisetasche an.", strasse: "Musterstraße 12",
             plzOrt: "80687 München", geaendert: false, ...(demoBody.anreise ?? {}),
           }));
