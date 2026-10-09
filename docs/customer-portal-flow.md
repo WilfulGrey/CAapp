@@ -1205,7 +1205,7 @@ Sindbad / Own transport, `note`). Ścieżka = wzorzec `reservierung_beendet`:
    `DetectJobOfferArrival` (NIE w `GET_CUSTOMER_JOB_OFFERS`). Czysta funkcja
    `anreise.ts:anreiseAusConfirmation` odrzuca: storno (`rejected_at`), brak
    daty/godziny/typu, format ≠ `YYYY-MM-DD` / `HH:MM`, przyjazd już był (czas
-   berliński), wpis młodszy niż 30 min, konflikt daty z `final_confirmation.arrival_date`.
+   berliński), wpis młodszy niż 10 min, konflikt daty z `final_confirmation.arrival_date`.
    Klucz `job|conf|datum|von|bis|type_id` — zmiana notatki go nie zmienia.
 2. **Bridge** `/api/lead-event` event `caregiver_arrival_scheduled` (własna gałąź,
    `planeAnreise`): ten sam klucz co ostatni dla (job, confirmation) ⇒ nic; Vermittler /

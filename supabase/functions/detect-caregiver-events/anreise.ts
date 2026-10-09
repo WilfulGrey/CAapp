@@ -51,7 +51,7 @@ export interface AnreiseDaten {
 
 // Die Agentur speichert oft und korrigiert kurz danach — erst wenn der
 // Datensatz so lange ruht, geht die Mail raus (sonst Mail + "Geänderte…").
-export const ANREISE_RUHE_MS = 30 * 60 * 1000;
+export const ANREISE_RUHE_MS = 10 * 60 * 1000;
 
 const DATUM = /^(\d{4}-\d{2}-\d{2})/;
 const ZEIT = /^(\d{2}:\d{2})/;

@@ -99,7 +99,7 @@ Deno.test("Ablehnungsgründe", () => {
   assertEquals(grund(anreiseAusConfirmation(1, fc({}, { arrival_date: "12.10.2026" }), JETZT)), "format");
   assertEquals(grund(anreiseAusConfirmation(1, fc({}, { arrival_time_from: "14 Uhr" }), JETZT)), "format");
   assertEquals(grund(anreiseAusConfirmation(1, fc({ arrival_date: "2026-10-13" }), JETZT)), "datum_konflikt");
-  assertEquals(grund(anreiseAusConfirmation(1, fc({}, { updated_at: "2026-10-07T09:50:00Z" }), JETZT)), "frisch");
+  assertEquals(grund(anreiseAusConfirmation(1, fc({}, { updated_at: "2026-10-07T09:55:00Z" }), JETZT)), "frisch");
 });
 
 Deno.test("vorbei: gestern, oder heute nach Beginn des Zeitfensters (Berliner Zeit)", () => {

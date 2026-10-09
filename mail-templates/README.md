@@ -70,7 +70,7 @@ Anreise in mamamia        → „Anreisedaten Ihrer Pflegekraft" (bei Änderung 
 Ende der Reservierung = frühester echter Eingang + 72 h, abgerundet (wie Portal und
 Server). Die Anreise-Mail (Registry #119, Vorlage `20-anreise`) kommt aus
 `detect-caregiver-events` (Modus `anreise`, eigener Cron): erst wenn die Agentur Datum,
-Uhrzeit und Verkehrsmittel eingetragen hat und der Eintrag 30 Minuten unverändert ist.
+Uhrzeit und Verkehrsmittel eingetragen hat und der Eintrag 10 Minuten unverändert ist.
 Sie geht auch an abgemeldete Kunden (gebuchte Leistung, wie Mail C), nie an Vermittler.
 Schalter `ANREISE_MAILS`: `aus` (Standard) / `test` (ans Team) / `live`. Erinnerungen nie nachts, die letzte sicher vor dem Ende; sie stoppen bei Zu-
 oder Absage, gebucht, weniger als 1 h Rest oder weniger als 6 h nach der letzten Mail
