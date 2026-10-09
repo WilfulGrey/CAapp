@@ -2,7 +2,7 @@
   # Cron für die Anreise-Mail (Registry #119)
 
   Ruft detect-caregiver-events mit { "mode": "anreise" } alle 15 Minuten auf,
-  versetzt um 7 Minuten zum Batch-Cron 'detect-caregiver-events' (*/15) — der
+  versetzt um 7 Minuten zum Batch-Cron detect-caregiver-events (alle 15 Min) — der
   Batch braucht allein ~110 s von ~150 s, deshalb ein eigener Aufruf.
   Muster: 20260519080000_setup_detect_caregiver_events_cron.sql.
 
