@@ -172,7 +172,7 @@ Beispielwert → Bedeutung (Token beim Zurückbauen):
 | `12-mailB-bewerbung` | ANREDE, NAME, VORNAME, FOTO, BADGE, ERFAHRUNG, BIO, PORTAL_URL |
 | `13-mailC-buchung` | ANREDE, NAME, VORNAME, FOTO, PORTAL_URL |
 | `14-mailD-profil-erfasst` | ANREDE, PORTAL_URL (keine Pflegekraft) |
-| `20-anreise` | ANREDE, NAME (hier VOLLER Name, z. B. „Ewa Lis“ — der Kunde ist gebucht), VORNAME, FOTO, STRASSE, PLZ_ORT, VERKEHRSMITTEL, ANKUNFT_DATUM, ANKUNFT_ZEIT, HINWEIS (Zeilen Adresse/Hinweis fallen ohne Daten weg; bei „Eigene Anreise": „Hierhin reist {VORNAME} selbst an.") |
+| `20-anreise` | ANREDE, NAME (Vor- + Nachname aus mamamia; die API liefert den Nachnamen heute nur als Initial, also „Ewa L.“ — Entmaskieren mit MM in Klärung), VORNAME, FOTO, STRASSE, PLZ_ORT, VERKEHRSMITTEL, ANKUNFT_DATUM, ANKUNFT_ZEIT, HINWEIS (Zeilen Adresse/Hinweis fallen ohne Daten weg; bei „Eigene Anreise": „Hierhin reist {VORNAME} selbst an.") |
 
 ## Wo es im Code lebt (für mich)
 
