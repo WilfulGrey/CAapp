@@ -271,7 +271,7 @@ Deno.test("16 Reservierung beendet: eine oder mehrere Pflegekräfte", () => {
 
 // ── Anreise (Registry #119) ─────────────────────────────────────────────────
 const anreise = {
-  name: "Ewa L.", fotoCid: "foto-1", datum: "2026-10-12", von: "14:00", bis: "18:00", verkehrsmittel: "Minibus",
+  name: "Ewa Lis", fotoCid: "foto-1", datum: "2026-10-12", von: "14:00", bis: "18:00", verkehrsmittel: "Minibus",
   hinweis: "Ewa reist mit einem Koffer an.", strasse: "Musterstraße 12", plzOrt: "80687 München", geaendert: false,
 };
 
@@ -296,7 +296,7 @@ Deno.test("Anreise: Mail wie die Vorlage", () => {
   assertEquals(m.vorschau, "Ihre Anreisedaten: Montag, 12.10.2026, 14–18 Uhr.");
   const s = sichtbar(m.html);
   for (const t of [
-    "Guten Tag Frau Müller,", "wir haben die Anreise Ihrer Pflegekraft organisiert.", "Ihre Anreisedaten", "Ewa L.",
+    "Guten Tag Frau Müller,", "wir haben die Anreise Ihrer Pflegekraft organisiert.", "Ihre Anreisedaten", "Ewa Lis",
     "Musterstraße 12", "80687 München", "Hierhin wird Ewa gebracht.", "Minibus", "Montag, 12.10.2026,", "14–18 Uhr",
     "Ewa reist mit einem Koffer an.", "089 200 000 830", "Ansonsten melde ich mich nach der Anreise",
     "Ich wünsche Ihnen und Ewa einen guten Start.", "Marta Kapcio",

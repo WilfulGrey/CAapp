@@ -605,6 +605,9 @@ async function postAnreise(
   };
   const metadata: Record<string, unknown> = {
     ...buildCaregiverMetadata(node.id, node),
+    // Voller Name statt „Ewa L.": nach der Buchung weiß der Kunde, wer kommt,
+    // und wen er an der Tür erwartet (Michał 09.10.). Nur diese Mail.
+    caregiver_name: [cg.first_name, cg.last_name].map((x) => (x ?? "").trim()).filter(Boolean).join(" "),
     ...d,
     mamamia_job_offer_id: k.mamamia_job_offer_id,
     ...(test ? { test: true } : {}),

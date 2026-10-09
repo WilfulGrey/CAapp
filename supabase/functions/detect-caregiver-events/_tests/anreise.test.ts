@@ -217,7 +217,7 @@ Deno.test("Modus anreise: live meldet mit Pflegekraft, Anreise und Job", async (
   assertEquals(f.lauf.bridge.length, 1);
   const { event, metadata } = f.lauf.bridge[0];
   assertEquals(event, "caregiver_arrival_scheduled");
-  assertEquals(metadata.caregiver_name, "Ewa L.");
+  assertEquals(metadata.caregiver_name, "Ewa Lis");
   assertEquals(metadata.caregiver_photo_url, "https://cdn.test/e.jpg");
   assertEquals(metadata.mamamia_job_offer_id, 33001);
   assertEquals(metadata.confirmation_id, 4711);
