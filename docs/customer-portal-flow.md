@@ -149,6 +149,11 @@ Wizard-Events:
   Messung: `step_view` feuert beim Wiederöffnen für die aktuelle Frage erneut
   (der Trichter zählt Sitzungen), `wizard_opened` je Öffnen wie bisher, der
   anonyme Zähler `schritt_N` bleibt bei einmal je Seitenaufruf.
+- **Einstieg auf primundus.de (Registry #120):** primundus.de hängt beim Klick in den Rechner `ein` (erste Seite
+  des Besuchs) und `her` (Klasse der Herkunft, nie die Adresse) an. `lib/website-einstieg.ts` liest beide beim ersten
+  Aufruf (`AnalyticsProvider`) in den Arbeitsspeicher — kein sessionStorage, kein Cookie —, das Formular schickt sie als
+  `websiteEinstieg` mit, die Absende-Route schreibt nach Prüfung `lead_events` `website_einstieg {pfad, herkunft, art,
+  quelle}` zu jeder Absendung. Nicht an `analytics_sessions` (bräuchte eine Migration).
 - **Ad-Parameter:** `gclid`/`wbraid`/`gbraid`/`utm_term`/`utm_content` aus
   der Landing-URL landen per best-effort Update auf `analytics_sessions`
   (utm_source/medium/campaign standen schon im Insert) + in sessionStorage
@@ -236,6 +241,8 @@ Content-Type: application/json
    testu znika, gdy zadna ze stron czatu nie miala ruchu. To INNY wymiar niż `wizardOpenedBySource` w tym samym
    raporcie: tamto to PRZYCISK otwierający wizard, to jest STRONA, z której
    przyszło zapytanie.
+   Ereignis `website_einstieg` (Registry #120): direkt nach dem Klick-ID-Update, wenn der Body einen gültigen
+   `websiteEinstieg` trägt — auch beim Duplikat; best-effort.
 5. Build `portalUrl = ${NEXT_PUBLIC_PORTAL_URL}/?token=<lead.token>`
 
 ### Preis zuerst (Registry #77, 2026-09-17)

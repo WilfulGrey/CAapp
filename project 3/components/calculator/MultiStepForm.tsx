@@ -5,6 +5,7 @@ import { useCalculator, formatEuro } from "@/lib/calculator-context";
 import { CircleCheck as CheckCircle2, Phone } from "lucide-react";
 import Image from "next/image";
 import { analytics, variantenSeite, websiteHerkunft } from "@/lib/analytics";
+import { websiteEinstieg } from "@/lib/website-einstieg";
 import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
@@ -734,6 +735,8 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
           return seite === '/' ? 'rechner' : `rechner:${seite.replace(/^\//, '')}`;
         })(),
         websitePfad: websiteHerkunft()?.pfad ?? null,
+        // Erste Seite und Herkunft des Besuchs auf primundus.de (Registry #120); ohne Werte null
+        websiteEinstieg: websiteEinstieg(),
         kalkulation: {
           ...kalkulation,
           formularDaten,
