@@ -149,6 +149,16 @@ Wizard-Events:
   Messung: `step_view` feuert beim Wiederöffnen für die aktuelle Frage erneut
   (der Trichter zählt Sitzungen), `wizard_opened` je Öffnen wie bisher, der
   anonyme Zähler `schritt_N` bleibt bei einmal je Seitenaufruf.
+- **Kontaktschritt B2 (Registry #121, 2026-10-09):** Frage „Für wen dürfen wir Ihre
+  Preisberechnung ausstellen?“, darunter vier Gesichter + `SCHRANKE.lohn` („Danach sehen
+  Sie sofort Ihren Preis und 5 passende Profile.“) statt grünem Kasten (der bleibt nur bei
+  `?kontakt=stufen`), Namensfeld „Ihr Name“. Der Absende-Knopf ist nur beim Senden gesperrt:
+  ein Tipp bei fehlenden Angaben ruft `kontaktUnvollstaendig` (zeigt die Hinweise am Feld,
+  Fokus ins erste offene Feld über `KONTAKT_FELD_ID`). Direkt unter dem Knopf die Sterne
+  (`SterneText`, ohne Stand keine Zeile), darunter „100 % kostenfrei & unverbindlich“ und der
+  Datenschutz-Satz. Anonyme Zähler neu, je Seitenaufruf einmal: `feld_angetippt` (erster
+  Fokus auf Name/E-Mail/Telefon) und `knopf_unvollstaendig` (Tipp, solange etwas fehlt).
+  Gemessen vorher (09.10.): Knopf auf dem iPhone SE (553 px sichtbar) bei 619–675 px.
 - **Ad-Parameter:** `gclid`/`wbraid`/`gbraid`/`utm_term`/`utm_content` aus
   der Landing-URL landen per best-effort Update auf `analytics_sessions`
   (utm_source/medium/campaign standen schon im Insert) + in sessionStorage
