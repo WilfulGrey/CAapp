@@ -893,3 +893,127 @@ ${MARTA_TEXT}`;
     : "Reservierung abgelaufen – Ihre Suche läuft weiter";
   return { betreff, vorschau, html, text };
 }
+
+// ── Anreise (Registry #119) ───────────────────────────────────────────────
+// Die Agentur hat die Anreise der Pflegekraft in mamamia eingetragen
+// (detect-caregiver-events, Modus „anreise"). Wortlaut und Aufbau 1:1 nach der
+// Vorlage mail-templates/20-anreise.html. Ändern sich Datum, Uhrzeit oder
+// Verkehrsmittel, kommt dieselbe Mail als „Geänderte Anreisedaten".
+
+/** Wörter für die drei Verkehrsmittel aus mamamia (ArrivalTypes, gemessen 2026-08-19).
+ *  Unbekannte Werte erscheinen so, wie mamamia sie liefert — nichts geraten. */
+export const VERKEHRSMITTEL: Record<string, string> = {
+  "Minibus": "Minibus",
+  "Sindbad": "Reisebus (Sindbad)",
+  "Own transport": "Eigene Anreise",
+};
+
+/** „2026-10-12" → „Montag, 12.10.2026" (Wochentag aus dem Kalendertag, nicht aus einer Uhrzeit). */
+export function anreiseDatum(iso: string): string {
+  const [j, m, t] = iso.slice(0, 10).split("-").map(Number);
+  const tag = new Intl.DateTimeFormat("de-DE", { weekday: "long", timeZone: "UTC" }).format(new Date(Date.UTC(j, m - 1, t)));
+  return `${tag}, ${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
+}
+
+/** „14:00"/„18:00" → „14–18 Uhr", „14:30" bleibt, ohne Ende „ab 14 Uhr". */
+export function anreiseZeit(von: string, bis: string | null): string {
+  const u = (t: string) => (t.slice(3, 5) === "00" ? String(Number(t.slice(0, 2))) : `${Number(t.slice(0, 2))}:${t.slice(3, 5)}`);
+  if (!bis) return `ab ${u(von)} Uhr`;
+  if (bis === von) return `${u(von)} Uhr`;
+  return `${u(von)}–${u(bis)} Uhr`;
+}
+
+export type AnreiseEingabe = {
+  /** „Ewa L." */
+  name: string;
+  fotoCid: string | null;
+  /** YYYY-MM-DD */
+  datum: string;
+  /** HH:MM */
+  von: string;
+  bis: string | null;
+  /** Rohwert aus mamamia */
+  verkehrsmittel: string;
+  hinweis: string | null;
+  strasse: string | null;
+  plzOrt: string | null;
+  geaendert: boolean;
+};
+
+export function anreiseMail(k: Kontext, a: AnreiseEingabe): KundenMail {
+  const vorname = a.name.trim().split(/\s+/)[0] ?? "";
+  const datum = anreiseDatum(a.datum);
+  const zeit = anreiseZeit(a.von, a.bis);
+  const mittel = VERKEHRSMITTEL[a.verkehrsmittel] ?? a.verkehrsmittel;
+  const selbst = a.verkehrsmittel === "Own transport";
+  const einleitung = a.geaendert
+    ? "die Anreisedaten Ihrer Pflegekraft haben sich geändert. Nachfolgend finden Sie die aktuellen Anreisedaten:"
+    : "wir haben die Anreise Ihrer Pflegekraft organisiert. Nachfolgend finden Sie die Anreisedaten:";
+  const vorschau = `${a.geaendert ? "Geänderte Anreisedaten" : "Ihre Anreisedaten"}: ${datum}, ${zeit}.`;
+  const adresse = [a.strasse, a.plzOrt].filter((x): x is string => !!x);
+  const hierhin = a.strasse ? (selbst ? `Hierhin reist ${vorname} selbst an.` : `Hierhin wird ${vorname} gebracht.`) : "";
+
+  const zeilen: [string, string][] = [];
+  const foto = a.fotoCid
+    ? `<td style="padding:0 10px 0 0;vertical-align:middle;"><!--[if mso]><img src="cid:${a.fotoCid}" alt="" width="36" style="display:block;border:0;" /><![endif]--><!--[if !mso]><!--><img src="cid:${a.fotoCid}" alt="" width="36" height="36" style="display:block;width:36px;height:36px;border-radius:18px;object-fit:cover;border:0;outline:none;" /><!--<![endif]--></td>`
+    : "";
+  zeilen.push(["Pflegekraft", `<table cellpadding="0" cellspacing="0" role="presentation"><tr>${foto}<td style="vertical-align:middle;font-size:15.5px;line-height:1.3;font-weight:700;color:${F.ink};">${esc(a.name)}</td></tr></table>`]);
+  if (adresse.length > 0) {
+    zeilen.push(["Adresse", adresse.map(esc).join("<br>") + (hierhin ? `<br><span style="font-weight:400;font-size:14px;color:${F.muted};">${esc(hierhin)}</span>` : "")]);
+  }
+  zeilen.push(["Verkehrsmittel", esc(mittel)]);
+  zeilen.push(["Ankunft", `<span style="white-space:nowrap;">${esc(datum)},</span> <span style="white-space:nowrap;">${esc(zeit)}</span>`]);
+  if (a.hinweis) {
+    zeilen.push(["Hinweis", `<span style="font-weight:400;color:${F.text};">${esc(a.hinweis).replace(/\r?\n/g, "<br>")}</span>`]);
+  }
+  const rand = (i: number) => (i === 0 ? "" : "border-top:1px solid #EFEBE5;");
+  const tabelle = `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 14px;border:1.5px solid ${F.line};border-radius:20px;background:#ffffff;border-collapse:separate;">
+      <tr><td style="background:${F.shell};color:${F.taupeInk};border-radius:18px 18px 0 0;padding:12px 18px;font-size:15.5px;font-weight:800;line-height:1.3;">Ihre Anreisedaten</td></tr>
+      <tr><td style="padding:4px 18px 4px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation">${zeilen.map(([l, w], i) => `
+          <tr>
+            <td width="112" style="width:112px;padding:12px 12px 12px 0;vertical-align:top;font-size:14.5px;line-height:1.45;color:${F.muted};${rand(i)}">${l}</td>
+            <td style="padding:12px 0;vertical-align:top;font-size:15.5px;line-height:1.45;color:${F.ink};font-weight:700;overflow-wrap:anywhere;${rand(i)}">${w}</td>
+          </tr>`).join("")}
+        </table>
+      </td></tr>
+    </table>`;
+  const melden = `Sollte etwas nicht stimmen, melden Sie sich bitte bei mir unter <a href="${TELEFON_HREF}" style="color:${F.taupeInk};font-weight:700;text-decoration:none;white-space:nowrap;">${TELEFON_TEXT}</a> (auch per WhatsApp) oder antworten Sie auf diese E-Mail. Ansonsten melde ich mich nach der Anreise bei Ihnen und frage nach, ob alles gut klappt.`;
+  const start = `Ich wünsche Ihnen und ${esc(vorname)} einen guten Start.`;
+
+  const html = `${mVorschau(vorschau)}
+    ${gruss(k)}
+    ${mp(einleitung, 22)}
+    ${tabelle}
+    <p style="font-size:16px;line-height:1.65;color:${F.text};margin:8px 0 14px;">${melden}</p>
+    ${mp(start, 0)}
+    ${k.marta}`;
+
+  const textZeilen = [
+    `Pflegekraft: ${a.name}`,
+    ...(adresse.length > 0 ? [`Adresse: ${adresse.join(", ")}${hierhin ? ` (${hierhin})` : ""}`] : []),
+    `Verkehrsmittel: ${mittel}`,
+    `Ankunft: ${datum}, ${zeit}`,
+    ...(a.hinweis ? [`Hinweis: ${a.hinweis}`] : []),
+  ];
+  const text = `${k.anrede},
+
+${einleitung}
+
+Ihre Anreisedaten
+${textZeilen.join("\n")}
+
+${klartext(melden)}
+
+Ich wünsche Ihnen und ${vorname} einen guten Start.
+
+${MARTA_TEXT}`;
+
+  return {
+    betreff: `${a.geaendert ? "Geänderte Anreisedaten" : "Anreisedaten"} Ihrer Pflegekraft – ${datum}`,
+    vorschau,
+    html,
+    text,
+  };
+}

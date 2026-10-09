@@ -94,6 +94,11 @@ const ALLOWED_EVENTS = [
   // Alarm für immer). Kein Stempel mamamia_sync_alerted_at (gehört dem roten
   // Buchungs-Alarm). TEAM-MAIL-ONLY.
   'acceptance_contact_alarm',
+  // Registry #119: detect-caregiver-events ({ mode: "anreise" }) meldet einen
+  // vollständigen Anreise-Eintrag der Agentur in mamamia. Eigener Zweig in
+  // handlePost (planeAnreise): Kundenmail über die Warteschlange, keine Team-Mail
+  // (die Kopie geht per BCC an info@).
+  'caregiver_arrival_scheduled',
 ];
 const TEAM_NOTIFY_EVENTS = [
   'patient_data_saved',
@@ -744,6 +749,42 @@ async function planeReservierungBeendet(
   });
 }
 
+/** Anreise-Mail (Registry #119): Zeile in der Warteschlange, send-scheduled-emails baut die
+ *  Mail. Ein Stand = Job + Confirmation + test/live. Offene Zeilen desselben Stands werden
+ *  gecancelt (die Agentur hat vor dem Versand noch einmal geändert); „Geänderte Anreisedaten"
+ *  heißt es nur, wenn zu diesem Stand schon eine Mail RAUS ist. Liefert die Fehlermeldung
+ *  oder null. */
+async function planeAnreise(
+  supabaseAdmin: any, lead: { id: string; email: string }, jobOfferId: number, m: Record<string, unknown>, test: boolean,
+): Promise<string | null> {
+  const { data: zeilen, error } = await supabaseAdmin
+    .from('scheduled_emails')
+    .select('id, status, metadata')
+    .eq('lead_id', lead.id)
+    .eq('email_type', 'anreise')
+    .filter('metadata->>confirmation_id', 'eq', String(m.confirmation_id));
+  if (error) return error.message;
+  const eigene = ((zeilen ?? []) as { id: string; status: string; metadata?: Record<string, unknown> | null }[])
+    .filter((z) => Number(z.metadata?.mamamia_job_offer_id) === jobOfferId && (z.metadata?.test === true) === test);
+  const offen = eigene.filter((z) => z.status === 'pending').map((z) => z.id);
+  if (offen.length > 0) {
+    await supabaseAdmin
+      .from('scheduled_emails')
+      .update({ status: 'cancelled', error_message: 'neuere Anreisedaten', updated_at: new Date().toISOString() })
+      .in('id', offen)
+      .eq('status', 'pending');
+  }
+  const { error: insErr } = await supabaseAdmin.from('scheduled_emails').insert({
+    lead_id: lead.id,
+    email_type: 'anreise',
+    recipient_email: lead.email,
+    scheduled_for: sendezeitIso(new Date()),
+    status: 'pending',
+    metadata: { ...m, geaendert: eigene.some((z) => z.status === 'sent') },
+  });
+  return insErr ? insErr.message : null;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -1108,6 +1149,61 @@ async function handlePost(request: NextRequest) {
         metadata: { source: 'acceptance-sync', ...m, application_id: appId },
       });
       return NextResponse.json({ ok: true }, { headers: corsHeaders });
+    }
+
+    // 🚐 Anreise-Mail (Registry #119) — eigener Zweig VOR dem generischen Dedupe:
+    // Stand = (Job, Confirmation, arrival_key), test und live getrennt. Gleicher
+    // Stand wie zuletzt ⇒ nichts. Sonst Mail einplanen, DANACH das Ereignis —
+    // scheitert das Einplanen, fehlt das Ereignis und detect meldet im nächsten
+    // Lauf erneut (planeAnreise räumt dann die alte offene Zeile ab, kein Doppel).
+    // Vermittler (Registry #59) und Leads ohne Adresse bekommen keine Mail, aber
+    // das Ereignis (seeded) — sonst fragt detect jede Viertelstunde wieder.
+    if (event === 'caregiver_arrival_scheduled') {
+      const m = (metadata ?? {}) as Record<string, unknown>;
+      const confId = Number(m.confirmation_id);
+      const key = typeof m.arrival_key === 'string' ? m.arrival_key : '';
+      if (!Number.isFinite(confId) || !key || mamamiaJobOfferId == null) {
+        return NextResponse.json(
+          { error: 'confirmation_id, arrival_key, mamamia_job_offer_id required' },
+          { status: 400, headers: corsHeaders },
+        );
+      }
+      const test = m.test === true;
+      const { data: vorher, error: vorherErr } = await supabase
+        .from('lead_events')
+        .select('metadata')
+        .eq('lead_id', lead.id)
+        .eq('event_type', event)
+        .eq('mamamia_job_offer_id', mamamiaJobOfferId)
+        .filter('metadata->>confirmation_id', 'eq', String(confId))
+        .order('created_at', { ascending: false });
+      if (vorherErr) {
+        return NextResponse.json({ error: vorherErr.message }, { status: 500, headers: corsHeaders });
+      }
+      const letzter = ((vorher ?? []) as { metadata?: Record<string, unknown> | null }[])
+        .find((v) => (v.metadata?.test === true) === test);
+      if (letzter?.metadata?.arrival_key === key) {
+        return NextResponse.json({ ok: true, deduped: true }, { headers: corsHeaders });
+      }
+      const ohneMail = lead.vermittler ? 'vermittler' : !lead.email ? 'keine_email' : null;
+      if (!ohneMail) {
+        const fehler = await planeAnreise(supabase, lead, mamamiaJobOfferId, m, test);
+        if (fehler) {
+          console.error(`anreise schedule failed (lead=${lead.id}, job=${mamamiaJobOfferId}):`, fehler);
+          return NextResponse.json({ error: 'schedule failed' }, { status: 500, headers: corsHeaders });
+        }
+      }
+      const { error: evErr } = await supabase.from('lead_events').insert({
+        lead_id: lead.id,
+        event_type: event,
+        mamamia_job_offer_id: mamamiaJobOfferId,
+        metadata: { source: 'detect', ...m, ...(ohneMail ? { seeded: true, skipped: ohneMail } : {}) },
+      });
+      if (evErr) {
+        console.error(`anreise event insert failed (lead=${lead.id}):`, evErr.message);
+        return NextResponse.json({ error: 'event insert failed' }, { status: 500, headers: corsHeaders });
+      }
+      return NextResponse.json({ ok: true, ...(ohneMail ? { skipped: ohneMail } : {}) }, { headers: corsHeaders });
     }
 
     // Dedupe rule per event:

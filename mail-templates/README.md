@@ -64,9 +64,15 @@ application_received      → Mail B „Neue Bewerbung – 72 Stunden reserviert
                              + Erinnerungen Ende − 52 h / − 24 h / − 8 h
 auto_timeout_72h          → „Reservierung abgelaufen – Ihre Suche läuft weiter"
 application_accepted      → Mail C „Buchung bestätigt"
+Anreise in mamamia        → „Anreisedaten Ihrer Pflegekraft" (bei Änderung von Datum,
+                             Uhrzeit oder Verkehrsmittel noch einmal als „Geänderte …")
 ```
 Ende der Reservierung = frühester echter Eingang + 72 h, abgerundet (wie Portal und
-Server). Erinnerungen nie nachts, die letzte sicher vor dem Ende; sie stoppen bei Zu-
+Server). Die Anreise-Mail (Registry #119, Vorlage `20-anreise`) kommt aus
+`detect-caregiver-events` (Modus `anreise`, eigener Cron): erst wenn die Agentur Datum,
+Uhrzeit und Verkehrsmittel eingetragen hat und der Eintrag 30 Minuten unverändert ist.
+Sie geht auch an abgemeldete Kunden (gebuchte Leistung, wie Mail C), nie an Vermittler.
+Schalter `ANREISE_MAILS`: `aus` (Standard) / `test` (ans Team) / `live`. Erinnerungen nie nachts, die letzte sicher vor dem Ende; sie stoppen bei Zu-
 oder Absage, gebucht, weniger als 1 h Rest oder weniger als 6 h nach der letzten Mail
 zu derselben Bewerbung. „Noch keine Bewerbung?" entfällt mit Bewerbung oder Interesse.
 
@@ -105,6 +111,7 @@ einen dynamischen Wert **verschiebst**, bleibt er dynamisch; wenn du ihn
 | Letzte Erinnerung | Nur noch 8 Stunden reserviert: `{VORNAME}`s Bewerbung |
 | Reservierung abgelaufen | `{VORNAME}`s Reservierung ist abgelaufen – Ihre Suche läuft weiter |
 | Mail C | Buchung bestätigt – so geht es jetzt weiter |
+| Anreise | Anreisedaten Ihrer Pflegekraft – `{DATUM}` *(geändert: „Geänderte Anreisedaten Ihrer Pflegekraft – {DATUM}"; im Test „[TEST Anreise → kunde@…]" davor)* |
 
 ## Feste Bausteine (überall gleich, am besten nicht pro Mail einzeln ändern)
 
@@ -165,11 +172,14 @@ Beispielwert → Bedeutung (Token beim Zurückbauen):
 | `12-mailB-bewerbung` | ANREDE, NAME, VORNAME, FOTO, BADGE, ERFAHRUNG, BIO, PORTAL_URL |
 | `13-mailC-buchung` | ANREDE, NAME, VORNAME, FOTO, PORTAL_URL |
 | `14-mailD-profil-erfasst` | ANREDE, PORTAL_URL (keine Pflegekraft) |
+| `20-anreise` | ANREDE, NAME, VORNAME, FOTO, STRASSE, PLZ_ORT, VERKEHRSMITTEL, ANKUNFT_DATUM, ANKUNFT_ZEIT, HINWEIS (Zeilen Adresse/Hinweis fallen ohne Daten weg; bei „Eigene Anreise": „Hierhin reist {VORNAME} selbst an.") |
 
 ## Wo es im Code lebt (für mich)
 
 - **Reminder, Interesse-Reminder, Eingangsbestätigung, Nachfass 1–3,
   „Warum Primundus"** → `project 3/supabase/functions/send-scheduled-emails/index.ts`
+- **Anreise** → `anreiseMail` in `project 3/supabase/functions/send-scheduled-emails/kundenMails.ts`
+  (eingeplant von `/api/lead-event`, gemeldet von `supabase/functions/detect-caregiver-events`)
 - **Mail A (Interesse), B (Bewerbung), C (Buchung), D (Profil erfasst)** →
   `project 3/lib/email.ts`
 
