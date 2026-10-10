@@ -1685,6 +1685,7 @@ export default function LeadDetailPage() {
                   const eventLabels: Record<string, { label: string; color: string }> = {
                     angebot_requested: { label: 'Anfrage eingegangen', color: 'bg-blue-600' },
                     angebot_requested_duplicate: { label: 'Erneute Anfrage (Duplikat)', color: 'bg-gray-400' },
+                    website_einstieg: { label: 'Einstieg auf primundus.de', color: 'bg-gray-400' },
                     info_requested: { label: 'Info angefordert', color: 'bg-blue-400' },
                     info_requested_duplicate: { label: 'Info erneut angefordert (Duplikat)', color: 'bg-gray-400' },
                     email_eingangsbestaetigung_sent: { label: 'Eingangsbestätigung gesendet', color: 'bg-green-600' },

@@ -54,6 +54,7 @@ async function handlePost(request: NextRequest) {
       adParams,
       quelle,
       websitePfad,
+      websiteEinstieg,
       telefonSpaeter,
       kontaktVariante,
       ablauf,
@@ -79,11 +80,14 @@ async function handlePost(request: NextRequest) {
       quelle?: string;
       /* Pfad der verweisenden Website-Seite (nur bei quelle website:…). */
       websitePfad?: string | null;
+      /* Erste Seite und Herkunft des Besuchs auf primundus.de (Registry #120), vom Server geprüft. */
+      websiteEinstieg?: unknown;
     } = body;
     /* Der Client schickt die Quelle, der Server entscheidet, was gültig ist —
        sonst landet beliebiger Text in leads.source (Martin, 04.09.2026). */
     const quelleSicher = quelleBereinigen(quelle) ?? 'rechner';
     const websitePfadSicher = typeof websitePfad === 'string' && /^\/[a-z0-9\-\/]{0,80}$/i.test(websitePfad) ? websitePfad : null;
+    const einstiegSicher = websiteEinstiegBereinigen(websiteEinstieg);
 
     // Google-Klick-IDs für den späteren Offline-Conversion-Import
     // (docs/google-ads-tracking.md). Strikt allowlisted + gekappt — der
@@ -190,6 +194,16 @@ async function handlePost(request: NextRequest) {
         }
       } catch (e) {
         console.error('Klick-IDs nicht gespeichert (Lead existiert trotzdem):', e instanceof Error ? e.message : String(e));
+      }
+    }
+
+    // Einstieg auf primundus.de (Registry #120): erste Seite und Herkunft des Besuchs, zu JEDER Absendung —
+    // auch beim Duplikat, dessen Lead die erste Quelle behält. Best-effort: darf die Anfrage nie blockieren.
+    if (einstiegSicher) {
+      try {
+        await logEvent(lead.id, 'website_einstieg', websiteEinstiegEreignis(einstiegSicher, { isNew, isUpgrade }, quelleSicher));
+      } catch (e) {
+        console.error('website_einstieg nicht gespeichert (Lead existiert trotzdem):', e instanceof Error ? e.message : String(e));
       }
     }
 
@@ -396,6 +410,7 @@ async function handleSendAngebotsEmailOnly(leadId: string) {
 import { withMem } from '@/lib/memlog';
 import { PORTAL_BASIS } from '@/lib/portal-url';
 import { kundenEmpfaenger } from '@/lib/empfaenger';
+import { websiteEinstiegBereinigen, websiteEinstiegEreignis } from '@/lib/website-einstieg';
 
 /* Was vom Client-`adParams` (sessionStorage `_prim_ad_params`) den Lead
    erreichen darf: Google-Klick-IDs für den Offline-Import, die
