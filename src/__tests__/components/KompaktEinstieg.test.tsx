@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ABLAUF, AngebotAblaufStand, EINLADEN_TITEL, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, PflegekraftZeile, STAND_TEXT_1, STAND_TITEL_1, VERTRAUEN, interesseText, standSchritt2 } from '../../components/portal/KompaktEinstieg';
+import { ABLAUF, AngebotAblaufStand, AngebotSterne, EINLADEN_TITEL, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, PflegekraftZeile, STAND_TEXT_1, STAND_TITEL_1, VERTRAUEN, interesseText, standSchritt2 } from '../../components/portal/KompaktEinstieg';
 import type { Nurse } from '../../types';
+import { BewertungsZeile } from '../../components/portal/BewertungsZeile';
 
 const basis: Nurse = {
   caregiverId: 50002,
@@ -294,5 +295,40 @@ describe('interesseText', () => {
     for (const t of [interesseText(1), interesseText(3)]) {
       expect(t).not.toMatch(/—|stößt/);
     }
+  });
+});
+
+// Martin 10.10.2026 zur Sternezeile im Kopf: „Das muss aber nicht unterstrichen sein, damit man da das nicht draufklickt."
+describe('Sternezeile im Kopf (AngebotSterne) ohne Link', () => {
+  const stand = { schnitt: '4,9', wert: 4.9, anzahl: 126 };
+
+  it('reine Anzeige: kein Link, nichts unterstrichen, nicht antippbar, Wortlaut und Sterne wie bisher', () => {
+    const { container } = render(<AngebotSterne sterne={stand} />);
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(container.querySelector('a, button, [tabindex]')).toBeNull();
+    const zeile = screen.getByText((_, el) => el?.tagName === 'P' && el.textContent === '4,9 von 5 aus 126 Bewertungen');
+    // Keine Unterstreichung, keine Tippfläche, kein Hover/Fokus, kein Hand-Zeiger.
+    for (const el of [zeile, ...zeile.querySelectorAll('*')]) {
+      const klasse = el.getAttribute('class') ?? '';
+      expect(klasse).not.toMatch(/underline|min-h-\[44px\]|hover:|focus|cursor-pointer/);
+    }
+    // Fünf Sterne, für Screenreader verborgen; die Höhe der Zeile bleibt reserviert (h-7).
+    expect(zeile.querySelectorAll('svg')).toHaveLength(5);
+    expect(zeile.querySelector('[aria-hidden="true"]')).not.toBeNull();
+    expect((container.firstElementChild as HTMLElement).className).toContain('h-7');
+  });
+
+  it('ohne Stand keine Zeile, die Höhe bleibt frei', () => {
+    const { container } = render(<AngebotSterne sterne={null} />);
+    const huelle = container.firstElementChild as HTMLElement;
+    expect(huelle.className).toContain('h-7');
+    expect(huelle.childElementCount).toBe(0);
+  });
+
+  it('BewertungsZeile ohne `link` bleibt der Link zu den Erfahrungen (Bewerbungskarte, Kostenkarte „ruhig")', () => {
+    render(<BewertungsZeile stand={stand} />);
+    const link = screen.getByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ });
+    expect(link.getAttribute('href')).toBe('https://primundus.de/erfahrungen');
+    expect(within(link).getByText('126 Bewertungen').className).toContain('underline');
   });
 });

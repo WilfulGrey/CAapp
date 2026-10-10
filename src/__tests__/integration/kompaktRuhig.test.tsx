@@ -1,6 +1,8 @@
 /** @vitest-environment jsdom */
 // Der ältere Kompakt-Entwurf („ruhig", Runde 13–15) bleibt per `?look=ruhig` erreichbar und wird hier weiter geprüft. Der
 // Schalter `KOMPAKT_LOOK` wird beim Laden des Moduls aus der Adresse gelesen, darum steht sie VOR dem Import (vi.hoisted).
+// Seit dem Rückbau Registry #122 zeigt das Portal vor dem ersten Speichern den Stand 75b8df8; den Kompakt-Einstieg gibt es
+// dort nur noch mit `?einstieg=kompakt` (Vergleich, Rückweg) — `setLocation` hängt den Schalter an.
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -67,7 +69,7 @@ beforeAll(() => {
 
 function setLocation(search: string) {
   // jsdom allows assigning to window.location.search via setter trick
-  window.history.replaceState({}, '', `/${search}`);
+  window.history.replaceState({}, '', `/${search}&einstieg=kompakt`);
 }
 
 describe('Kompakt-Einstieg, älterer Entwurf „ruhig“ (`?look=ruhig`)', () => {

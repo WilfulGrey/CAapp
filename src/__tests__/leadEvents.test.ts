@@ -121,3 +121,22 @@ describe('patient_form_location_unresolved dedupe (Registry #65)', () => {
     expect(bodyOf(1).notify).not.toBe(false);
   });
 });
+
+describe('patient_form_step: der Schritt gehört in den Schlüssel (Registry #122)', () => {
+  // Bis Registry #122 lautete der Sitzungs-Schlüssel `${token}:patient_form_step` — der erste erreichte Schritt
+  // besetzte ihn, jeder weitere Schritt derselben Sitzung wurde verschluckt. Der Server speichert seit Registry #109
+  // jeden Schritt, bekam aber nur den ersten zu sehen.
+  it('meldet jeden erreichten Schritt einmal', () => {
+    reportLeadEvent('tok-1', 'patient_form_step', { step: 1 });
+    reportLeadEvent('tok-1', 'patient_form_step', { step: 2 });
+    reportLeadEvent('tok-1', 'patient_form_step', { step: 3 });
+    expect(calls()).toHaveLength(3);
+    expect([0, 1, 2].map((i) => bodyOf(i).metadata.step)).toEqual([1, 2, 3]);
+  });
+
+  it('derselbe Schritt zweimal in einer Sitzung (Zurück und wieder Weiter) bleibt EIN Ereignis', () => {
+    reportLeadEvent('tok-1', 'patient_form_step', { step: 1 });
+    reportLeadEvent('tok-1', 'patient_form_step', { step: 1 });
+    expect(calls()).toHaveLength(1);
+  });
+});

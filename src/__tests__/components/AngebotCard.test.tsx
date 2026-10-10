@@ -273,3 +273,35 @@ describe('AngebotCard – Angaben ändern nach dem Absenden', () => {
     expect(onAbgesendet).toHaveBeenCalledWith(true);
   });
 });
+
+// Rückbau Registry #122: vor dem ersten Speichern (EinstiegVorSpeichern) Formularschluss und Wortlaut wie im Stand 75b8df8.
+describe('AngebotCard – Stand 75b8df8 (stand75b8df8)', () => {
+  it('letzter Schritt: „Speichern“ mit „Zurück“ als Knopf daneben, kein Satz darüber, Ladetext „Speichern…“', async () => {
+    entwurf(VOLL);
+    let fertig: () => void = () => {};
+    const onSave = vi.fn(() => new Promise<void>((r) => { fertig = r; }));
+    render(<AngebotCard lead={lead} stand75b8df8 mamamiaEnabled onSaveToMamamia={onSave} />);
+    for (let i = 0; i < 3; i++) await weiter();
+    schritt(4);
+    const speichern = screen.getByRole('button', { name: 'Speichern' });
+    const zurueck = screen.getByRole('button', { name: 'Zurück' });
+    expect(zurueck.parentElement).toBe(speichern.parentElement);
+    expect(speichern.className).not.toMatch(/whitespace-nowrap|\bpx-2\b/);
+    expect(screen.queryByRole('button', { name: 'Bewerbungen erhalten' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Zurück zu Schritt 3' })).toBeNull();
+    expect(screen.queryByText(/Kostenlos und unverbindlich/)).toBeNull();
+    await userEvent.click(speichern);
+    expect(await screen.findByRole('button', { name: 'Speichern…' })).toBeDisabled();
+    fertig();
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+  });
+
+  it('fester Wert aus der Anfrage: „Aus Ihrem Kostenrechner übernommen“ (heute „Aus Ihrer Anfrage übernommen“)', () => {
+    const { unmount } = render(<AngebotCard lead={lead} stand75b8df8 />);
+    expect(screen.getAllByText('Aus Ihrem Kostenrechner übernommen').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Aus Ihrer Anfrage übernommen')).toBeNull();
+    unmount();
+    render(<AngebotCard lead={lead} />);
+    expect(screen.getAllByText('Aus Ihrer Anfrage übernommen').length).toBeGreaterThan(0);
+  });
+});
