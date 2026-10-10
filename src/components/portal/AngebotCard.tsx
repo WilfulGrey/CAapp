@@ -85,7 +85,11 @@ export const AngebotCard: FC<{
   onImBlick?: (imBlick: boolean) => void;
   /** Im Kasten „So geht es weiter" (Kompakt-Einstieg): ohne eigene Karte, der Kasten ist der Rahmen. */
   eingebettet?: boolean;
-}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet, gewaehlterStart, schonAbgesendet, onImBlick, eingebettet = false }) => {
+  /** Rückbau Registry #122 (vor dem ersten Speichern, EinstiegVorSpeichern): Formularschluss und Wortlaut wie im Stand
+   *  75b8df8 — letzter Knopf „Speichern" mit „Zurück" daneben, kein Satz darüber, Ladetext „Speichern…", beim
+   *  festen Wert „Aus Ihrem Kostenrechner übernommen". Datenfluss, Prüfungen und Speichern bleiben wie heute. */
+  stand75b8df8?: boolean;
+}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet, gewaehlterStart, schonAbgesendet, onImBlick, eingebettet = false, stand75b8df8 = false }) => {
   // Offen, sobald die Karte gerendert wird: Seit dem Wegfall des
   // Zwischenkopfs (11.08.) steuert allein der Abschnittskopf in
   // CustomerPortalPage, ob dieser Block überhaupt erscheint.
@@ -721,7 +725,7 @@ export const AngebotCard: FC<{
       <p className="mt-2 text-[13.5px] leading-snug text-pm-muted">
         {priceInfo === key
           ? 'Diese Angabe bestimmt den Preis. Ändern kann sie Ihre Beraterin, dann schicken wir Ihnen ein neues Angebot.'
-          : 'Aus Ihrer Anfrage übernommen'}
+          : stand75b8df8 ? 'Aus Ihrem Kostenrechner übernommen' : 'Aus Ihrer Anfrage übernommen'}
       </p>
     </>
   );
@@ -1086,7 +1090,8 @@ export const AngebotCard: FC<{
                     unverbindlich, Vertrag erst mit Annahme und Unterschrift (Registry #109,
                     Martin 02.10.). Vorher stand hier die 72-h-Reservierung (Registry #90);
                     die steht weiter in „Stand heute“ und an der Bewerbung. */}
-                {!nurAenderung && (
+                {/* Rückbau Registry #122: im Stand 75b8df8 stand hier kein Satz. */}
+                {!nurAenderung && !stand75b8df8 && (
                   <p className="mt-2 pt-4 border-t border-pm-line-soft text-[14.5px] leading-[1.5] text-pm-body">
                     Kostenlos und unverbindlich. Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen und im Portal unterschreiben.
                   </p>
@@ -1097,14 +1102,16 @@ export const AngebotCard: FC<{
 
           <FormNav
             ruhig={eingebettet}
+            stand75b8df8={stand75b8df8}
             onZurueck={step > 0 ? zurueck : undefined}
             onWeiter={letzterSchritt ? () => { void speichern(); } : weiter}
             // „Bewerbungen erhalten" statt „Speichern" (Martin 25./26.09.): Der Kunde hat
             // unter der Kostenkarte „Ja" gesagt; der Knopf nennt, was er jetzt bekommt.
-            weiterText={letzterSchritt ? (nurAenderung ? 'Änderungen speichern' : 'Bewerbungen erhalten') : 'Weiter →'}
-            zurueckAlsLink={letzterSchritt ? `Zurück zu Schritt ${step}` : undefined}
+            // Rückbau Registry #122: vor dem ersten Speichern wieder „Speichern", „Zurück" als Knopf daneben (Stand 75b8df8).
+            weiterText={letzterSchritt ? (nurAenderung ? 'Änderungen speichern' : stand75b8df8 ? 'Speichern' : 'Bewerbungen erhalten') : 'Weiter →'}
+            zurueckAlsLink={letzterSchritt && !stand75b8df8 ? `Zurück zu Schritt ${step}` : undefined}
             laedt={isSaving}
-            ladeText={nurAenderung ? 'Speichern…' : 'Wird gesendet…'}
+            ladeText={nurAenderung || stand75b8df8 ? 'Speichern…' : 'Wird gesendet…'}
             hinweis={navHinweis && (
               <button
                 type="button"

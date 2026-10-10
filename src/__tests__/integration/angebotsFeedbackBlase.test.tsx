@@ -4,6 +4,10 @@
 // Befund 06.10.2026: Seit dem 12.08. kam von echten Kunden keine einzige Antwort über die schwebende Frage. Beim
 // ersten Render steht „Ihr Angebot wird geladen…“ da, der Abschnitt #patientendaten fehlt noch; der Beobachter gab
 // dann auf und versuchte es nie wieder. In der Vorschau startet die Frage „reif“, deshalb fiel es dort nie auf.
+//
+// Rückbau Registry #122 (10.10.2026): Vor dem ersten Speichern zeigt das Portal wieder den Stand 75b8df8 — und dort war
+// die Frage wegen genau dieses Fehlers bei echten Kunden nie sichtbar. Damit Kunden erleben, was sie damals erlebt haben,
+// erscheint sie im Rückbau nicht. Mit `?einstieg=kompakt` (Kompakt-Einstieg #780, Vergleich/Rückweg) weiter wie bisher.
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { server } from '../../../test/mocks/server';
@@ -51,7 +55,11 @@ afterAll(() => {
 });
 
 describe('Schwebende Frage „Was sagen Sie zum Angebot?“ bei echten Kunden', () => {
-  it.each([['heutiger Einstieg', ''], ['Angebots-Look (Fassung 30)', '&look=angebot']])('%s: wartet, bis der Abschnitt Pflegesituation nach dem Laden dasteht, und erscheint nach 45 s, wenn er ins Bild kam', async (_name, look) => {
+  it.each([
+    ['Kompakt-Einstieg per ?einstieg=kompakt', '&einstieg=kompakt', true],
+    ['Kompakt-Einstieg im Angebots-Look (Fassung 30)', '&einstieg=kompakt&look=angebot', true],
+    ['Rückbau vor dem Speichern (Stand 75b8df8, Registry #122)', '', false],
+  ] as const)('%s: der Beobachter hängt am Abschnitt Pflegesituation, sobald er nach dem Laden dasteht; nach 45 s im Bild erscheint die Frage nur, wenn sie soll', async (_name, look, erscheint) => {
     vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] });
     try {
       server.use(
@@ -78,7 +86,14 @@ describe('Schwebende Frage „Was sagen Sie zum Angebot?“ bei echten Kunden', 
         }
       });
       act(() => { vi.advanceTimersByTime(45_000); });
-      expect(await screen.findByText('Was sagen Sie zum Angebot?')).toBeInTheDocument();
+      if (erscheint) {
+        expect(await screen.findByText('Was sagen Sie zum Angebot?')).toBeInTheDocument();
+      } else {
+        // Der Rückbau ist wirklich da (Kasten von 75b8df8) — und die Frage bleibt weg.
+        expect(await screen.findByText('Noch 2 Minuten bis zu Ihren Bewerbungen', {}, { timeout: 5000 })).toBeInTheDocument();
+        await new Promise((r) => setTimeout(r, 200));
+        expect(screen.queryByText('Was sagen Sie zum Angebot?')).toBeNull();
+      }
     } finally {
       vi.useRealTimers();
     }

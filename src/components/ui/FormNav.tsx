@@ -6,8 +6,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from './Button';
 
 export function FormNav({
-  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, zurueckAlsLink, ruhig = false,
+  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, zurueckAlsLink, ruhig = false, stand75b8df8 = false,
 }: {
+  /** Rückbau Registry #122: vor dem ersten Speichern der Hauptknopf wie im Stand 75b8df8 (ohne die
+   *  späteren Klassen `px-2 whitespace-nowrap`). Sonst unverändert. */
+  stand75b8df8?: boolean;
   /** Kompakt-Einstieg (Runde 15): im Hinweis-Kasten mit 24 px Innenabstand — Leiste bündig bis an den
    *  Rand (-mx-6), Hauptknopf in 600 wie alle Knöpfe dort. Sonst unverändert. */
   ruhig?: boolean;
@@ -42,7 +45,7 @@ export function FormNav({
             Zurück
           </Button>
         )}
-        <Button onClick={onWeiter} laedt={laedt} ladeText={ladeText} breit className={`px-2 whitespace-nowrap${ruhig ? ' !font-semibold' : ''}`}>
+        <Button onClick={onWeiter} laedt={laedt} ladeText={ladeText} breit className={stand75b8df8 ? undefined : `px-2 whitespace-nowrap${ruhig ? ' !font-semibold' : ''}`}>
           {weiterText}
         </Button>
       </div>

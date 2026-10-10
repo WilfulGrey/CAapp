@@ -60,6 +60,10 @@ import { kalenderTag } from '../components/portal/DateField';
 import { reserviertBis as berechneReservierung, RESERVIERUNG_STUNDEN, nochReserviertText } from '../lib/reservierung';
 import type { FetchedLeadEvent } from '../lib/leadEvents';
 import { MatchCard } from '../components/portal/MatchCard';
+// Rückbau Registry #122: vor dem ersten Speichern wieder der Einstieg aus Stand 75b8df8 (Kopf, Kostenkarte, Kasten
+// „Noch 2 Minuten“, Karten mit „Einladen“ + Schloss, offenes Formular mit „Speichern“).
+import { EinstiegVorSpeichern, WarumSheetVorSpeichern } from '../components/portal/EinstiegVorSpeichern';
+import { MatchCardVorSpeichern } from '../components/portal/MatchCardVorSpeichern';
 import { MatchCardDone } from '../components/portal/MatchCardDone';
 import { InterestCard, type InterestActionStatus } from '../components/portal/InterestCard';
 import { ExpiredLinkScreen } from '../components/portal/ExpiredLinkScreen';
@@ -672,6 +676,14 @@ const CustomerPortalPage: FC = () => {
   // Pop-up der Angebotsseite (Portal-Redesign Teil 3). Das zweite, „Warum erst die
   // Pflegesituation?", ist seit Registry #109 weg: Jeder Knopf springt direkt ins Formular.
   const [bestpreisOffen, setBestpreisOffen] = useState(false);
+  // Rückbau Registry #122: „Warum erst die Pflegesituation?" (Stand 75b8df8) — hinter „Warum? Mehr" und dem Einladen-Knopf
+  // mit Schloss, nur vor dem ersten Speichern.
+  const [warumOffen, setWarumOffen] = useState(false);
+  // `?einstieg=kompakt`: vor dem Speichern der Kompakt-Einstieg (#780) statt des Rückbaus — nur zum Vergleich und als
+  // Rückweg, kein Kunde bekommt den Schalter. Einmal beim Laden gelesen.
+  const [einstiegKompakt] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('einstieg') === 'kompakt'; } catch { return false; }
+  });
   const sterne = useSterneStand();
   // Manual override for the "Ihr Angebot" expand/collapse. null = follow
   // the auto rule below (expanded only in initial state). Toggling sets
@@ -1313,6 +1325,11 @@ const CustomerPortalPage: FC = () => {
   // Kompakt-Einstieg (KompaktEinstieg.tsx): nur VOR dem ersten Absenden der Pflegesituation, ohne
   // offene Bewerbung. Nie für Kunden, die schon abgesendet haben — auch nicht kurz (`schonAbgesendet`).
   const kompakt = !hasPending && !patientSaved && !schonAbgesendet && !lokalAbgesendet;
+  // Rückbau Registry #122 (Martin 10.10.: „wir wollen ändern dass wieder mehr patientenprofil machen“): In genau diesem
+  // Zustand — vor dem ersten Speichern — zeigt das Portal wieder den Stand 75b8df8 (EinstiegVorSpeichern) statt des
+  // Kompakt-Einstiegs. Seit #748 speicherten Google-Kunden in Stunde 1 nur noch 2 von 48 (vorher 42 von 151).
+  // Alles nach dem ersten Speichern bleibt wie bisher. Zurück zum Kompakt-Einstieg: hier `false` (oder `?einstieg=kompakt`).
+  const rueckbau = kompakt && !einstiegKompakt;
   // Fassung 31 (Martin 06.10.: „alle 4 ja, aber die anderen screens will ich vorher absegnen"): die Ansicht NACH dem Absenden
   // im Aufbau von Fassung 30 — Kopf wie dort, „So geht es weiter" mit Stand, Pflegekräfte zum Einladen, Angebot und
   // Pflegesituation zugeklappt. Vorerst nur mit `?look=angebot`; ohne Schalter bleibt die heutige Ansicht.
@@ -1905,11 +1922,12 @@ const CustomerPortalPage: FC = () => {
     // aufklappen — das Formular kommt so unter dem oberen Bildrand dazu. Weich gescrollt bricht WebKit
     // ab, sobald oberhalb Inhalt dazukommt (wie Registry #102): Vom Hinweis bei den Pflegekräften aus
     // landete die Seite einmal 2.326 px unter dem Ziel.
-    if (kompakt) {
+    if (kompakt && !rueckbau) {
       ziel?.scrollIntoView({ block: 'start' });
       setFormImKasten(true);
       return;
     }
+    // Rückbau (Stand 75b8df8): Das Formular steht offen unter dem Abschnittskopf, weich dorthin wie damals.
     ziel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
@@ -1938,10 +1956,13 @@ const CustomerPortalPage: FC = () => {
       : !schonAbgesendet ? document.getElementById('patientendaten')
       : document.getElementById('stand');
     if (!ziel) return;
+    // Rückbau (Registry #122): Das Formular steht UNTER den Pflegekräften. Erst springen, wenn die Liste steht (oder
+    // mamamia hakt) — sonst schieben die nachgeladenen Karten das Formular nach dem Sprung um ca. 1.000 px nach unten.
+    if (rueckbau && listeLaedt && !mmMatchingsError) return;
     anfragenErledigtRef.current = true;
     // Kompakt-Einstieg: Formular im Hinweis öffnen und EINMAL ohne Animation zum Hinweis. Er steht über
     // den Zeilen, spät geladene Zeilen schieben ihn also nicht mehr weg.
-    if (kompakt) {
+    if (kompakt && !rueckbau) {
       setFormImKasten(true);
       setTimeout(() => ziel.scrollIntoView({ block: 'start' }), 60);
       return;
@@ -1951,12 +1972,18 @@ const CustomerPortalPage: FC = () => {
       else ziel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lead, mmCustomer, mmReady, hasPending, schonAbgesendet, sucheLaeuft, pendingApps.length]);
+  }, [lead, mmCustomer, mmReady, hasPending, schonAbgesendet, sucheLaeuft, pendingApps.length, listeLaedt]);
 
   const canInviteNurse = (_idx: number): boolean => {
     // Strict gate: no invitations until patient profile is complete.
     // Without it, the caregiver can't prepare a meaningful application
     // and we get back-and-forth queries that frustrate both sides.
+    if (!patientSaved && rueckbau) {
+      // Rückbau Registry #122 (Stand 75b8df8): „Einladen" mit Schloss öffnet „Warum erst die Pflegesituation?" mit dem
+      // Knopf zum Formular (Teil 3 des Redesigns, Martin 24.09.).
+      setWarumOffen(true);
+      return false;
+    }
     if (!patientSaved) {
       // „Profil vervollständigen & einladen" springt direkt ins Formular, wie bis
       // 24.09. (Registry #109, Martin 02.10.). Das Fenster „Warum erst die
@@ -2632,9 +2659,11 @@ const CustomerPortalPage: FC = () => {
 
       // Fassung 33: das Formular der Pflegesituation an EINER Stelle gebaut. Vor dem Absenden steht es wie bisher im Hinweis
       // bzw. unter „Pflegesituation", nach dem Absenden (Look „angebot") in der Karte „Angebot und Pflegesituation".
-      const patientFormular = (eingebettet: boolean) => (
+      // `stand75b8df8` (Rückbau Registry #122): Formularschluss und Wortlaut wie im Stand 75b8df8 — nur vor dem ersten Speichern.
+      const patientFormular = (eingebettet: boolean, stand75b8df8 = false) => (
         <AngebotCard
           eingebettet={eingebettet}
+          stand75b8df8={stand75b8df8}
           lead={lead}
           mmCustomer={mmCustomer}
           onPatientSaved={(saved) => {
@@ -3452,6 +3481,35 @@ const CustomerPortalPage: FC = () => {
     };
   })();
 
+  // Rückbau Registry #122: die Karten vor dem ersten Speichern wie im Stand 75b8df8 (MatchCardVorSpeichern) — dieselbe
+  // Auswahl wie oben (Batch-Reveal, Empfehlung zuerst), genau EINE „Unsere Empfehlung für Sie": die mit der höchsten
+  // Badge-Bewertung (Erfahrungsjahre + Einsätze).
+  const kartenVorSpeichern = !rueckbau ? [] : (() => {
+    const { visibleNurses } = pflegekraftAuswahl;
+    let recIdx = -1;
+    let recBest = -Infinity;
+    visibleNurses.forEach(({ nurse, status }, idx) => {
+      if (status !== 'pending') return;
+      const sc = nurseBadgeScore(nurse.history?.assignments);
+      if (sc > recBest) { recBest = sc; recIdx = idx; }
+    });
+    return visibleNurses.map(({ nurse, i, status }, idx) => (
+      <MatchCardVorSpeichern
+        profilFehlt={!patientSaved}
+        key={`m-${i}`}
+        nurse={nurse}
+        status={status}
+        isRecommended={idx === recIdx}
+        onNurseClick={() => openNurseFromMatch(nurse, i)}
+        onStufeClick={() => { setNurseModalStufe(true); openNurseFromMatch(nurse, i); }}
+        onInvite={() => canInviteNurse(i)}
+        onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
+        onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
+        globalInviteLocked={inviteInFlight}
+      />
+    ));
+  })();
+
   // ── SECTION: Bereits bearbeitet ──
   // Immer unten sichtbar wenn doneApps ODER bearbeitete Matchings
   // existieren. Bewusst gedämpft (MatchCardDone: kompakt, grau) +
@@ -3502,7 +3560,7 @@ const CustomerPortalPage: FC = () => {
     const moreCount = allDone.length - shownDone.length;
     return (
       <div className="space-y-2">
-        <p className={kompakt ? 'px-1 text-[15px] font-semibold text-pm-ink' : 'text-[11.5px] font-bold uppercase tracking-[.15em] text-pm-mute px-1'}>Bereits bearbeitet</p>
+        <p className={kompakt && !rueckbau ? 'px-1 text-[15px] font-semibold text-pm-ink' : 'text-[11.5px] font-bold uppercase tracking-[.15em] text-pm-mute px-1'}>Bereits bearbeitet</p>
         {doneApps.map((app) => (
           <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
         ))}
@@ -3689,6 +3747,24 @@ const CustomerPortalPage: FC = () => {
             </div>
           );
         })()
+      ) : rueckbau ? (
+        // Rückbau Registry #122: vor dem ersten Speichern die Seite aus Stand 75b8df8 (EinstiegVorSpeichern.tsx).
+        <EinstiegVorSpeichern
+          anrede={lead ? customerSalutation(lead) : 'Herr Mustermann'}
+          lead={lead}
+          onBestpreis={() => setBestpreisOffen(true)}
+          heimEigenanteil={HEIM_EIGENANTEIL}
+          heimQuelle={HEIM_QUELLE}
+          onWarum={() => setWarumOffen(true)}
+          onVervollstaendigen={zurPflegesituation}
+          laedt={listeLaedt}
+          karten={kartenVorSpeichern}
+          gehalteneEinladungen={pflegekraftAuswahl.heldInvites}
+          vorschlaegeVorhanden={pflegekraftAuswahl.allVisible.length > 0}
+          bereitsBearbeitet={bereitsBearbeitet}
+          formular={patientFormular(false, true)}
+          sterne={sterne}
+        />
       ) : (
       // Angebotsseite auf „paper" wie primundus.de; Karten weiß (Teil 3 des Redesigns).
       <div className="bg-pm-paper">
@@ -4446,6 +4522,8 @@ const CustomerPortalPage: FC = () => {
 
       {/* Pop-up der Angebotsseite (Teil 3 des Redesigns). */}
       <BestpreisSheet offen={bestpreisOffen} onClose={() => setBestpreisOffen(false)} />
+      {/* Rückbau Registry #122: „Warum erst die Pflegesituation?" nur vor dem ersten Speichern (Stand 75b8df8). */}
+      <WarumSheetVorSpeichern offen={rueckbau && warumOffen} onClose={() => setWarumOffen(false)} onVervollstaendigen={zurPflegesituation} />
 
       {/* ── Rückmeldung zum Angebot (schwebend, unten rechts), zurück seit Registry #102 ────────────
            Als Kasten im Fluss saß sie ~3000 px weit unten und wurde kaum gesehen (Martin, 12.08.).
@@ -4453,7 +4531,9 @@ const CustomerPortalPage: FC = () => {
            auf, wenn der Kunde am Angebot und an den Pflegekräften vorbei ist (`feedbackReif`) und 45 s da war.
            Nur solange das Profil offen ist (nie nach dem Absenden, auch nicht kurz: `schonAbgesendet`), nicht
            bei offenen Bewerbungen, nicht über dem Formular. Chat und Modale liegen auf z-[60]+. */}
-      {!hasPending && !patientSaved && !schonAbgesendet && !feedbackWeg && feedbackReif && feedbackVerweilt && !formularImBlick && !chatNurse && !selectedApp && !selectedNurse && (
+      {/* Rückbau Registry #122: vor dem ersten Speichern NICHT — im Stand 75b8df8 war sie wegen eines Fehlers bei echten
+          Kunden nie sichtbar (Registry #114); die Kunden sollen erleben, was sie damals erlebt haben. */}
+      {!rueckbau && !hasPending && !patientSaved && !schonAbgesendet && !feedbackWeg && feedbackReif && feedbackVerweilt && !formularImBlick && !chatNurse && !selectedApp && !selectedNurse && (
         <AngebotsFeedback
           onDismiss={feedbackErledigt}
           onGoToForm={zurPflegesituation}

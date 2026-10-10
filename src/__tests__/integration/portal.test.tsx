@@ -31,6 +31,10 @@ vi.mock('../../lib/supabase', async () => {
       if (token === 'token-ohne-zuschuesse') {
         return { lead: { ...defaultLead, token, kalkulation: { ...defaultLead.kalkulation, 'zuschüsse': { gesamt: 0, items: [] } } } as unknown as import('../../lib/supabase').Lead, error: null };
       }
+      // Rückbau Registry #122: eigener Token, damit der Sitzungs-Schlüssel der Schritt-Meldungen frisch ist.
+      if (token === 'token-rueckbau') {
+        return { lead: { ...defaultLead, token } as unknown as import('../../lib/supabase').Lead, error: null };
+      }
       if (token === 'token-abgesendet') {
         return { lead: { ...defaultLead, token, patient_form_at: '2026-09-24T10:00:00Z', patient_form: { startDate: '2099-11-15' } } as unknown as import('../../lib/supabase').Lead, error: null };
       }
@@ -318,12 +322,12 @@ describe('Portal integration: golden paths', () => {
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
 
-    // Fassung 30: Das Formular klappt im Achtung-Hinweis auf.
-    await user.click(await screen.findByRole('button', { name: 'Jetzt vervollständigen' }, { timeout: 5000 }));
+    // Rückbau Registry #122 (Stand 75b8df8): Das Formular steht vor dem Speichern offen auf der Seite, der letzte
+    // Knopf heißt „Speichern".
     for (let i = 0; i < 3; i++) {
       await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
     }
-    await user.click(await screen.findByRole('button', { name: /^Bewerbungen erhalten$/ }, { timeout: 5000 }));
+    await user.click(await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 }));
     expect(await screen.findByText('Ihre Suche läuft', {}, { timeout: 5000 })).toBeInTheDocument();
 
     // Fassung 33: Angaben im Bereich „Angebot und Pflegesituation" öffnen und eine Angabe ändern.
@@ -333,11 +337,12 @@ describe('Portal integration: golden paths', () => {
     expect(screen.queryByText('Ihr persönliches Angebot')).toBeNull();
     expect(screen.queryByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' })).toBeNull();
 
-    // Letzter Schritt: nur noch „Änderungen speichern", kein zweites Anfragen.
+    // Letzter Schritt: nur noch „Änderungen speichern", kein zweites Anfragen (und nicht der Knopf von vor dem Speichern).
     for (let i = 0; i < 3; i++) {
       await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
     }
     expect(screen.queryByRole('button', { name: /^Bewerbungen erhalten$/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Speichern$/ })).toBeNull();
     expect(screen.getByRole('button', { name: /^Änderungen speichern$/ })).toBeInTheDocument();
   }, 20_000);
 
@@ -369,6 +374,8 @@ describe('Portal integration: golden paths', () => {
     expect(titel.some((t) => t.includes('Noch 2 Minuten bis zum Einladen'))).toBe(false);
     // …und der Kompakt-Einstieg auch nicht (Einleitung, Pflegekräfte-Bereich).
     expect(titel.some((t) => t.includes('Rund-um-Betreuung zu Hause') || t.includes('Ihre passenden Pflegekräfte') || t.includes('Ihre Pflegesituation ist noch nicht vollständig') || t.includes('Es fehlen noch Angaben zur Pflegesituation'))).toBe(false);
+    // …und der Einstieg vor dem Speichern (Rückbau Registry #122, Stand 75b8df8) auch nicht.
+    expect(titel.some((t) => t.includes('Noch 2 Minuten bis zu Ihren Bewerbungen') || t.includes('Pflegesituation unvollständig') || t.includes('Warum? Mehr'))).toBe(false);
     // Wunschstart aus dem gespeicherten Formular, nicht aus mamamia `arrival_at`.
     expect(screen.getByText(/Wunschstart:? 15\.11\./)).toBeInTheDocument();
   }, 15_000);
@@ -402,33 +409,46 @@ describe('Portal integration: golden paths', () => {
 
   // ─── Startseiten-Punkte + Sprunglink goto=anfragen (Martin 26.09.) ───────
 
-  it('Kostenblock zeigt die vier Punkte der Startseite, nicht mehr die alte Liste', async () => {
+  it('vor dem Speichern (Rückbau Registry #122): Kostenkarte mit den vier Haken aus Stand 75b8df8, nicht den Startseiten-Punkten', async () => {
     server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
+    localStorage.removeItem(`patient_${TEST_LEAD_TOKEN}`);
     setLocation(`?token=${TEST_LEAD_TOKEN}`);
     render(<CustomerPortalPage />);
-    expect(await screen.findByText('Kein Vertrag vor Ihrer Auswahl', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText('Erst auswählen, dann buchen', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText('Täglich kündbar')).toBeInTheDocument();
+    expect(screen.getByText('Tagesgenaue Abrechnung')).toBeInTheDocument();
     expect(screen.getByText('Keine Vermittlungsgebühr')).toBeInTheDocument();
-    expect(screen.getByText('Täglich kündbar, taggenau abgerechnet')).toBeInTheDocument();
-    expect(screen.queryByText('Erst auswählen, dann buchen')).toBeNull();
-    expect(screen.queryByText('Tagesgenaue Abrechnung')).toBeNull();
+    expect(screen.queryByText('Kein Vertrag vor Ihrer Auswahl')).toBeNull();
+    expect(screen.queryByText('Täglich kündbar, taggenau abgerechnet')).toBeNull();
   }, 15_000);
 
   const gescrollt = () => (Element.prototype.scrollIntoView as unknown as { mock: { contexts: Element[] } }).mock.contexts.map((e) => e.id);
 
-  it('goto=anfragen, noch nicht abgesendet: öffnet die Pflegesituation', async () => {
-    (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
-    server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
-    setLocation(`?token=${TEST_LEAD_TOKEN}&goto=anfragen`);
-    render(<CustomerPortalPage />);
-    await waitFor(() => expect(gescrollt()).toContain('patientendaten'), { timeout: 5000 });
-    // Fassung 30: Das Formular steht offen im Achtung-Hinweis …
-    const hinweis = document.getElementById('patientendaten')!;
-    expect(within(hinweis).getByText('Achtung: Es fehlen noch Angaben zur Pflegesituation')).toBeInTheDocument();
-    expect(await within(hinweis).findByText(/Schritt 1 von 4/, {}, { timeout: 5000 })).toBeInTheDocument();
-    expect(within(hinweis).queryByRole('button', { name: 'Jetzt vervollständigen' })).toBeNull();
-    // … und gesprungen wird genau einmal.
-    await new Promise((r) => setTimeout(r, 300));
-    expect(gescrollt().filter((id) => id === 'patientendaten')).toHaveLength(1);
+  it('goto=anfragen, noch nicht abgesendet (Rückbau Registry #122): springt einmal zur Pflegesituation, erst wenn die Pflegekräfte stehen', async () => {
+    const sprung = Element.prototype.scrollIntoView as unknown as { mockClear: () => void; mockImplementation: (f: (this: Element) => void) => void };
+    sprung.mockClear();
+    // Beim Sprung festhalten, ob die Liste noch lädt: Die Karten stehen ÜBER dem Formular und würden es sonst nach dem
+    // Sprung nach unten schieben.
+    const laedtBeimSprung: boolean[] = [];
+    sprung.mockImplementation(function (this: Element) {
+      if (this.id === 'patientendaten') laedtBeimSprung.push((document.body.textContent ?? '').includes('Wir laden Ihre Pflegekräfte'));
+    });
+    try {
+      server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
+      localStorage.removeItem(`patient_${TEST_LEAD_TOKEN}`);
+      setLocation(`?token=${TEST_LEAD_TOKEN}&goto=anfragen`);
+      render(<CustomerPortalPage />);
+      await waitFor(() => expect(gescrollt()).toContain('patientendaten'), { timeout: 5000 });
+      expect(laedtBeimSprung).toEqual([false]);
+      // Stand 75b8df8: Abschnittskopf „Pflegesituation · Unvollständig", das Formular steht offen darunter.
+      expect(screen.getByRole('heading', { level: 2, name: 'Pflegesituation' })).toBeInTheDocument();
+      expect(await screen.findByText(/Schritt 1 von 4/, {}, { timeout: 5000 })).toBeInTheDocument();
+      // … und gesprungen wird genau einmal.
+      await new Promise((r) => setTimeout(r, 300));
+      expect(gescrollt().filter((id) => id === 'patientendaten')).toHaveLength(1);
+    } finally {
+      sprung.mockImplementation(() => {});
+    }
   }, 15_000);
 
   it('goto=anfragen, schon abgesendet: springt zum Stand, Formular bleibt zu', async () => {
@@ -448,18 +468,19 @@ describe('Portal integration: golden paths', () => {
   // Text ohne geschütztes Leerzeichen (vor dem „·“ der Zeile 3 steht eins).
   const text = (el: Element) => (el.textContent ?? '').replace(/ /g, ' ');
 
-  // ─── Einstieg vor dem ersten Absenden: Fassung 30 (Standard seit dem Livegang 06.10.2026) ────────
-  // Kopf mit Person, Titel, Sternen, Einleitung und Testsieger; Angebotskarte (Kopfleiste, Leistung, Preis, vier Punkte);
-  // „So geht es weiter"; Abschnitt „1 Pflegesituation ergänzen und Pflegekräfte einladen" mit Achtung-Hinweis und Karten.
-  // Der ältere Entwurf („ruhig", per `?look=ruhig`) wird in kompaktRuhig.test.tsx geprüft.
+  // ─── Kompakt-Einstieg vor dem ersten Absenden: Fassung 30 (live 06.10. bis zum Rückbau Registry #122) ────────
+  // Seit dem Rückbau nur noch per `?einstieg=kompakt` (Vergleich, Rückweg). Kopf mit Person, Titel, Sternen, Einleitung und
+  // Testsieger; Angebotskarte (Kopfleiste, Leistung, Preis, vier Punkte); „So geht es weiter"; Abschnitt „1 Pflegesituation
+  // ergänzen und Pflegekräfte einladen" mit Achtung-Hinweis und Karten. Der ältere Entwurf („ruhig") steht in kompaktRuhig.test.tsx.
 
-  it('Neukunde (Fassung 30): Kopf, Angebotskarte, „So geht es weiter“, Abschnitt 1 mit Achtung-Hinweis; „Jetzt vervollständigen“ öffnet das Formular im Hinweis', async () => {
+  it('?einstieg=kompakt (Fassung 30): Kopf, Angebotskarte, „So geht es weiter“, Abschnitt 1 mit Achtung-Hinweis; „Jetzt vervollständigen“ öffnet das Formular im Hinweis', async () => {
     (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
     server.use(
       ...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }),
       http.get('https://primundus.de/api/bewertungen-stand', () => HttpResponse.json({ schnitt: '4,9', wert: 4.9, anzahl: 126 })),
     );
-    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    localStorage.removeItem(`patient_${TEST_LEAD_TOKEN}`);
+    setLocation(`?token=${TEST_LEAD_TOKEN}&einstieg=kompakt`);
     render(<CustomerPortalPage />);
     const titel = await screen.findByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' }, { timeout: 5000 });
     expect(screen.getByText(/^Gerne übernehmen wir/)).toBeInTheDocument();
@@ -486,10 +507,11 @@ describe('Portal integration: golden paths', () => {
     expect(gescrollt()).not.toContain('patientendaten');
   }, 15_000);
 
-  it('Neukunde (Fassung 30): „Kosten im Überblick ›“ öffnet die Aufstellung mit „Was bleibt für Sie übrig“', async () => {
+  it('?einstieg=kompakt (Fassung 30): „Kosten im Überblick ›“ öffnet die Aufstellung mit „Was bleibt für Sie übrig“', async () => {
     (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
     server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
-    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    localStorage.removeItem(`patient_${TEST_LEAD_TOKEN}`);
+    setLocation(`?token=${TEST_LEAD_TOKEN}&einstieg=kompakt`);
     render(<CustomerPortalPage />);
     await userEvent.click(await screen.findByRole('button', { name: 'Kosten im Überblick ›' }, { timeout: 5000 }));
     const ueberblick = document.getElementById('kosten-ueberblick')!;
@@ -498,7 +520,7 @@ describe('Portal integration: golden paths', () => {
     expect(text(within(screen.getByText('Was bleibt für Sie übrig').parentElement!).getByText('Ihr Eigenanteil').parentElement!)).toBe('Ihr Eigenanteil2.453 €');
   }, 15_000);
 
-  it('Neukunde: die Zeile öffnet das Profil, „Einladen“ dort führt in den Hinweis zum Formular, ohne Einladung', async () => {
+  it('?einstieg=kompakt: die Zeile öffnet das Profil, „Einladen“ dort führt in den Hinweis zum Formular, ohne Einladung', async () => {
     (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
     let einladungen = 0;
     server.use(...defaultHandlers({
@@ -507,7 +529,8 @@ describe('Portal integration: golden paths', () => {
         inviteCaregiver: () => { einladungen += 1; return { SendInvitationCaregiver: true }; },
       },
     }));
-    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    localStorage.removeItem(`patient_${TEST_LEAD_TOKEN}`);
+    setLocation(`?token=${TEST_LEAD_TOKEN}&einstieg=kompakt`);
     render(<CustomerPortalPage />);
     await userEvent.click(await screen.findByRole('button', { name: 'Profil von Helena K. ansehen' }, { timeout: 5000 }));
     const einladen = await screen.findByRole('button', { name: 'Einladen' }, { timeout: 5000 });
@@ -584,13 +607,12 @@ describe('Portal integration: golden paths', () => {
 
     // Durch die vier Schritte — der Entwurf ist vollständig, also lässt jeder
     // „Weiter" durch; der Einsatzort fällt erst beim Speichern auf.
-    // Fassung 30: zuerst das Formular im Achtung-Hinweis öffnen.
-    await user.click(await screen.findByRole('button', { name: 'Jetzt vervollständigen' }, { timeout: 5000 }));
+    // Rückbau Registry #122: Das Formular steht vor dem Speichern offen, der letzte Knopf heißt „Speichern".
     for (let i = 0; i < 3; i++) {
       const weiter = await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 });
       await user.click(weiter);
     }
-    const speichern = await screen.findByRole('button', { name: /^Bewerbungen erhalten$/ }, { timeout: 5000 });
+    const speichern = await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 });
     await user.click(speichern);
 
     // Der Kunde bekommt den Satz zu sehen — und zwar auf Schritt 3, wo das Feld
@@ -609,4 +631,157 @@ describe('Portal integration: golden paths', () => {
     expect(JSON.parse(localStorage.getItem(`patient_${TEST_LEAD_TOKEN}`) || '{}')._isDraft)
       .not.toBe(false);
   }, 15_000);
+});
+
+// ─── Rückbau Registry #122: vor dem ersten Speichern die Seite aus Stand 75b8df8 (EinstiegVorSpeichern.tsx) ──────────
+// Seit #748 (25.09. 16:35) speicherten Google-Kunden in Stunde 1 nur noch 2 von 48 die Pflegesituation (vorher 42 von 151).
+// Vor dem Speichern zeigt das Portal wieder genau den damaligen Stand; danach bleibt alles wie heute.
+describe('Einstieg vor dem ersten Speichern wie Stand 75b8df8 (Rückbau Registry #122)', () => {
+  const ohneBewerbung = (proxy: Parameters<typeof defaultHandlers>[0] extends infer O ? O extends { proxy?: infer P } ? P : never : never = {}) =>
+    defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }), ...proxy } });
+  const text = (el: Element) => (el.textContent ?? '').replace(/ /g, ' ');
+  const gescrollt = () => (Element.prototype.scrollIntoView as unknown as { mock: { contexts: Element[] } }).mock.contexts.map((e) => e.id);
+
+  it('Kopf, Kostenkarte, „Passende Pflegekräfte“ mit dem Kasten „Noch 2 Minuten bis zu Ihren Bewerbungen“, Karten mit „Einladen“ + Schloss, offenes Formular, „So geht es weiter“, Fragen und Marta wie damals', async () => {
+    server.use(...ohneBewerbung());
+    localStorage.removeItem(`patient_${TEST_LEAD_TOKEN}`);
+    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    render(<CustomerPortalPage />);
+    const h1 = await screen.findByRole('heading', { level: 1, name: 'Ihr persönliches Angebot' }, { timeout: 5000 });
+    expect(h1.previousElementSibling!.textContent).toMatch(/^Guten Tag, .+\.$/);
+    // Kostenkarte (75b8df8): Preis, Satz, Bestpreisgarantie, vier Haken, „Kosten erst …“, Heimvergleich, Testsieger, Umschalter.
+    expect(screen.getByText('Ihre Betreuungskosten')).toBeInTheDocument();
+    expect(screen.getByText('2.800 €')).toBeInTheDocument();
+    expect(screen.getByText('Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).')).toBeInTheDocument();
+    expect(screen.getByText('Bestpreisgarantie')).toBeInTheDocument();
+    expect(screen.getByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeInTheDocument();
+    expect(text(screen.getByText(/^Heim-Eigenanteil im 1\. Jahr/))).toBe('Heim-Eigenanteil im 1. Jahr 3.364 €, bei Ihnen nach Zuschüssen etwa 2.453 €. Quelle: vdek-Auswertung, Stand 1. Juli 2026.');
+    expect(screen.getByRole('button', { name: 'Alle Kosten im Überblick' })).toBeInTheDocument();
+    // „Passende Pflegekräfte“ mit „Warum? Mehr“ (Sprungziel goto=matches).
+    expect(document.getElementById('pflegekraefte')!.textContent).toContain('Passende Pflegekräfte');
+    expect(text(screen.getByText(/^Laden Sie ein, wer Ihnen gefällt\./))).toBe('Laden Sie ein, wer Ihnen gefällt. Wir bereiten die Bewerbungen vor. Das geht, sobald Ihre Pflegesituation vollständig ist. Warum? Mehr');
+    // Kasten über den Karten.
+    const kasten = (await screen.findByText('Noch 2 Minuten bis zu Ihren Bewerbungen', {}, { timeout: 5000 })).parentElement!;
+    expect(within(kasten).getByText('Pflegesituation unvollständig')).toBeInTheDocument();
+    expect(within(kasten).getByText('Vieles ist schon aus Ihrem Kostenrechner übernommen.')).toBeInTheDocument();
+    expect(within(kasten).getByRole('button', { name: 'Pflegesituation vervollständigen' })).toBeInTheDocument();
+    // Karten wie damals: Empfehlung als Zeile über der Karte, „Einladen“ mit Schloss.
+    expect(screen.getByText('Unsere Empfehlung für Sie')).toBeInTheDocument();
+    const einladen = screen.getAllByRole('button', { name: 'Einladen' });
+    expect(einladen[0].querySelector('svg.lucide-lock')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Profil vervollständigen & einladen' })).toBeNull();
+    // Abschnittskopf und das Formular OFFEN darunter, ohne Tipp.
+    const kopf = document.getElementById('patientendaten')!;
+    expect(within(kopf).getByRole('heading', { level: 2, name: 'Pflegesituation' })).toBeInTheDocument();
+    expect(within(kopf).getByText('Für Ihre Bewerbungen')).toBeInTheDocument();
+    expect(within(kopf).getByText('Unvollständig')).toBeInTheDocument();
+    expect(within(kopf).getByText('Damit sich Pflegekräfte bewerben können. Vieles ist schon ausgefüllt.')).toBeInTheDocument();
+    const schritt = screen.getByText(/Schritt 1 von 4/);
+    expect(kopf.compareDocumentPosition(schritt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('Ihre Eingaben bleiben auf diesem Gerät gespeichert.')).toBeInTheDocument();
+    // „So geht es weiter“ wie damals, ohne Knopf.
+    expect(screen.getByRole('heading', { level: 2, name: 'So geht es weiter' })).toBeInTheDocument();
+    expect(screen.getByText('2 Minuten. Vieles ist schon ausgefüllt.')).toBeInTheDocument();
+    expect(screen.getByText('Passende Pflegekräfte bewerben sich bei Ihnen. Gerne können Sie Ihre Favoriten einladen, sich zu bewerben.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Jetzt vervollständigen →' })).toBeNull();
+    // Häufige Fragen ohne die Bestpreis-Frage (#118), vier sichtbar + „8 weitere Fragen“; Marta mit Siegel.
+    expect(screen.getByRole('button', { name: '8 weitere Fragen' })).toBeInTheDocument();
+    expect(screen.queryByText('Ich habe ein günstigeres Angebot. Was kann ich tun?')).toBeNull();
+    expect(screen.getByText('Noch Fragen?')).toBeInTheDocument();
+    // Nicht da: Kompakt-Einstieg (#780), Wortlaut #109, Satz über dem Knopf.
+    expect(screen.queryByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' })).toBeNull();
+    expect(screen.queryByText('Achtung: Es fehlen noch Angaben zur Pflegesituation')).toBeNull();
+    expect(screen.queryByText('Noch 2 Minuten bis zum Einladen')).toBeNull();
+    expect(screen.queryByText('Jetzt konkrete Bewerbungen erhalten')).toBeNull();
+    expect(screen.queryByText(/^Kostenlos und unverbindlich\. Ein Vertrag entsteht erst/)).toBeNull();
+  }, 15_000);
+
+  it('letzter Schritt: „Speichern“ mit „Zurück“ daneben, kein Satz darüber; jeder Schritt kommt beim Server an; nach dem Speichern der heutige Zustand', async () => {
+    const schritte: number[] = [];
+    let gespeichert = 0;
+    server.use(
+      bridgeHandler((b) => {
+        if (b.event === 'patient_form_step') schritte.push((b.metadata as { step: number }).step);
+        if (b.event === 'patient_data_saved') gespeichert += 1;
+      }),
+      ...ohneBewerbung({ searchLocations: () => ({ LocationsWithPagination: { data: [{ id: 4711, location: 'München', zip_code: '80331', country_code: 'DE' }] } }) }),
+    );
+    localStorage.setItem('patient_token-rueckbau', JSON.stringify({
+      _isDraft: true,
+      anzahl: '1', geschlecht: 'Weiblich',
+      mobilitaet: 'Rollatorfähig', heben: 'Nein', demenz: 'Nein', nacht: 'Nein',
+      plz: '80331', ort: 'München',
+      wohnungstyp: 'Einfamilienhaus', urbanisierung: 'Großstadt', startDate: '2099-12-01',
+      wunschGeschlecht: 'Weiblich', fuehrerschein: 'Nein',
+    }));
+    setLocation('?token=token-rueckbau');
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    expect(await screen.findByText(/Schritt 1 von 4/, {}, { timeout: 5000 })).toBeInTheDocument();
+    for (let i = 0; i < 3; i++) {
+      await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
+    }
+    const speichern = await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 });
+    const zurueck = screen.getByRole('button', { name: /^Zurück$/ });
+    expect(zurueck.parentElement).toBe(speichern.parentElement);
+    expect(speichern.parentElement!.className).toContain('grid-cols-[auto_1fr]');
+    expect(speichern.className).not.toContain('whitespace-nowrap');
+    // Kein Textlink „Zurück zu Schritt 3“ (die Fortschrittsbalken heißen „Zurück zu Schritt 1: …“).
+    expect(screen.queryByRole('button', { name: /^Zurück zu Schritt \d$/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Bewerbungen erhalten$/ })).toBeNull();
+    expect(screen.queryByText(/^Kostenlos und unverbindlich/)).toBeNull();
+    // Messung (Registry #122): jeder erreichte Schritt einmal, nicht nur der erste.
+    await waitFor(() => expect(schritte).toEqual([1, 2, 3]));
+
+    await user.click(speichern);
+    expect(await screen.findByText('Ihre Suche läuft', {}, { timeout: 5000 })).toBeInTheDocument();
+    await waitFor(() => expect(gespeichert).toBe(1));
+    // Nach dem Speichern der heutige Zustand (Fassung 33), nichts mehr vom Stand 75b8df8.
+    expect(screen.getByRole('heading', { level: 2, name: 'So geht es weiter' })).toBeInTheDocument();
+    expect(screen.getByText('Pflegesituation vollständig')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Angebot und Pflegesituation' })).toBeInTheDocument();
+    expect(screen.queryByText('Noch 2 Minuten bis zu Ihren Bewerbungen')).toBeNull();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Ihr persönliches Angebot' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Warum? Mehr' })).toBeNull();
+    expect(screen.queryByText('Für Ihre Bewerbungen')).toBeNull();
+    // Die Karten sind wieder die von heute („V“): „Einladen“ ohne Schloss.
+    expect(screen.queryAllByRole('button', { name: 'Einladen' }).some((b) => b.querySelector('svg.lucide-lock'))).toBe(false);
+  }, 20_000);
+
+  it('„Einladen“ mit Schloss, „Warum? Mehr“ und „Einladen“ im Profil öffnen „Warum erst die Pflegesituation?“ — keine Einladung; der Knopf darin springt zum Formular', async () => {
+    (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
+    let einladungen = 0;
+    server.use(...ohneBewerbung({ inviteCaregiver: () => { einladungen += 1; return { SendInvitationCaregiver: true }; } }));
+    localStorage.removeItem(`patient_${TEST_LEAD_TOKEN}`);
+    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+
+    // 1) „Einladen“ mit Schloss auf der Karte.
+    await user.click((await screen.findAllByRole('button', { name: 'Einladen' }, { timeout: 5000 }))[0]);
+    let sheet = await screen.findByRole('dialog', { name: 'Warum erst die Pflegesituation?' });
+    expect(within(sheet).getByText('Die Pflegekräfte entscheiden anhand Ihrer Angaben, ob sie zu Ihnen passen und wann sie anreisen können. Zum Beispiel:')).toBeInTheDocument();
+    expect(within(sheet).getByText('Pflegegrad, Mobilität und Demenz')).toBeInTheDocument();
+    expect(within(sheet).getByText('Einsätze in der Nacht')).toBeInTheDocument();
+    expect(within(sheet).getByText('Wohnort, Unterbringung und Startdatum')).toBeInTheDocument();
+    expect(within(sheet).getByText('Ohne diese Angaben kann sich niemand bewerben. Das Ausfüllen dauert etwa 2 Minuten.')).toBeInTheDocument();
+    await user.click(within(sheet).getAllByRole('button', { name: 'Schließen' })[0]);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+    // 2) „Warum? Mehr“ → dasselbe Pop-up; „Pflegesituation vervollständigen“ darin schließt es und springt zum Formular.
+    await user.click(screen.getByRole('button', { name: 'Warum? Mehr' }));
+    sheet = await screen.findByRole('dialog', { name: 'Warum erst die Pflegesituation?' });
+    await user.click(within(sheet).getByRole('button', { name: 'Pflegesituation vervollständigen' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(gescrollt()).toContain('patientendaten');
+
+    // 3) Profil über die Karte, „Einladen“ dort → wieder das Pop-up, das Profil geht zu.
+    await user.click(screen.getByText('Helena K.'));
+    await screen.findByRole('button', { name: 'Nein danke' }, { timeout: 5000 });
+    const imProfil = screen.getAllByRole('button', { name: 'Einladen' });
+    await user.click(imProfil[imProfil.length - 1]);
+    expect(await screen.findByRole('dialog', { name: 'Warum erst die Pflegesituation?' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nein danke' })).toBeNull();
+    expect(einladungen).toBe(0);
+  }, 20_000);
 });
