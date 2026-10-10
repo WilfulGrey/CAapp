@@ -77,6 +77,22 @@ describe('Kontakt-Schritt B2 (Registry #121)', () => {
     expect(block).toContain('{bewertung && (');
   });
 
+  it('„100 % kostenfrei & unverbindlich“ steht mit Haken wie in der Leiste, die Leiste lässt den Punkt dann weg', () => {
+    // Martin 10.10.: „prominenter, so wie das vorher da drunter war“.
+    const block = absendeBlock();
+    const fussnote = block.indexOf('<span className="text-[#3D3D3D] font-medium">{SCHRANKE.fussnote}</span>');
+    expect(fussnote, 'Fußzeile nicht im Stil der Leiste').toBeGreaterThan(-1);
+    expect(block.slice(fussnote - 200, fussnote)).toContain('<CheckCircle2');
+    // Dieselbe Bedingung wie der Absendeblock blendet den Punkt in der Leiste aus,
+    // sonst stünde der Satz zweimal in der Karte.
+    expect(quelle).toContain(
+      'const kontaktAbsendeblock = currentStep === totalSteps && (!ergebnisModus || kontaktOffen) && !stufenAktiv && !preisModus;',
+    );
+    const leiste = quelle.indexOf('100&nbsp;% kostenfrei &amp; unverbindlich</span>');
+    expect(leiste).toBeGreaterThan(-1);
+    expect(quelle.slice(leiste - 500, leiste)).toContain('{!kontaktAbsendeblock && (');
+  });
+
   it('der grüne Kasten erscheint nur noch in den drei Teilschritten', () => {
     const kasten = quelle.indexOf('bg-[#F0F7F1] px-5 py-4 mb-1');
     expect(kasten).toBeGreaterThan(-1);

@@ -153,10 +153,11 @@ Wizard-Events:
   Preisberechnung ausstellen?“, darunter vier Gesichter + `SCHRANKE.lohn` („Danach sehen
   Sie sofort Ihren Preis und 5 passende Profile.“) statt grünem Kasten (der bleibt nur bei
   `?kontakt=stufen`), Namensfeld „Ihr Name“. Der Absende-Knopf ist nur beim Senden gesperrt:
-  ein Tipp bei fehlenden Angaben ruft `kontaktUnvollstaendig` (zeigt die Hinweise am Feld,
-  Fokus ins erste offene Feld über `KONTAKT_FELD_ID`). Direkt unter dem Knopf die Sterne
-  (`SterneText`, ohne Stand keine Zeile), darunter „100 % kostenfrei & unverbindlich“ und der
-  Datenschutz-Satz. Anonyme Zähler neu, je Seitenaufruf einmal: `feld_angetippt` (erster
+  ein Tipp bei fehlenden Angaben ruft `kontaktUnvollstaendig` (Hinweis nur am ersten offenen
+  Feld, Fokus dorthin über `KONTAKT_FELD_ID`). Direkt unter dem Knopf die Sterne
+  (`SterneText`, ohne Stand keine Zeile), darunter „100 % kostenfrei & unverbindlich“ mit Haken
+  wie in der Leiste am Kartenfuß (Martin 10.10.) und der Datenschutz-Satz; die Leiste lässt den
+  Punkt weg, solange dieser Absendeblock steht (`kontaktAbsendeblock`). Anonyme Zähler neu, je Seitenaufruf einmal: `feld_angetippt` (erster
   Fokus auf Name/E-Mail/Telefon) und `knopf_unvollstaendig` (Tipp, solange etwas fehlt).
   Gemessen vorher (09.10.): Knopf auf dem iPhone SE (553 px sichtbar) bei 619–675 px.
 - **Ad-Parameter:** `gclid`/`wbraid`/`gbraid`/`utm_term`/`utm_content` aus

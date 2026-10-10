@@ -351,6 +351,9 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                         // entfernt — das konkrete Startdatum wird jetzt im
                         // CA-App-Patientenformular abgefragt (PatientForm.startDate).
                         // Getriebe lebt auch im CA-app patient form, nicht hier.
+  // Registry #121 (Martin 10.10.): Absendeblock des Kontakt-Schritts sichtbar (Knopf, Sterne,
+  // „100 % kostenfrei & unverbindlich“). Dann lässt die Leiste am Kartenfuß denselben Punkt weg.
+  const kontaktAbsendeblock = currentStep === totalSteps && (!ergebnisModus || kontaktOffen) && !stufenAktiv && !preisModus;
   const stepStartRef = useRef<number>(Date.now());
   // Scroll target for step changes. page.tsx renders TWO MultiStepForm
   // instances (mobile + desktop layout), both with id="calculator-form" —
@@ -2058,12 +2061,20 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                     <span aria-label={`${bewertung.schnitt} von 5 Sternen`}><SterneText stand={bewertung} /></span>
                   </div>
                 )}
-                <p className="text-center text-xs text-[#8B8B8B] leading-snug">
-                  {SCHRANKE.fussnote}<br />Mit dem Absenden stimmen Sie unserer{' '}
-                  <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
-                    Datenschutzerklärung
-                  </a>{' '}zu.
-                </p>
+                {/* Registry #121 (Martin 10.10.: „prominenter, so wie das vorher da drunter
+                    war"): Haken und Schrift wie der Punkt in der Leiste am Kartenfuß. */}
+                <div className="flex flex-col items-center gap-1">
+                  <p className="flex items-center justify-center gap-1.5 text-xs">
+                    <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" aria-hidden="true" />
+                    <span className="text-[#3D3D3D] font-medium">{SCHRANKE.fussnote}</span>
+                  </p>
+                  <p className="text-center text-xs text-[#8B8B8B] leading-snug">
+                    Mit dem Absenden stimmen Sie unserer{' '}
+                    <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
+                      Datenschutzerklärung
+                    </a>{' '}zu.
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="flex items-center">
@@ -2088,13 +2099,17 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
             <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
             <span className="text-[#3D3D3D] font-medium">DSGVO-Konform</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
-            {/* War "Keine Werbeanrufe" (Martin 16.08. geaendert). Passt
-                zusaetzlich zur Leitplanke des SEA-Laufs: keine Aussagen
-                ueber Anrufe — das Gespraech ist Teil des Modells. */}
-            <span className="text-[#3D3D3D] font-medium">100&nbsp;% kostenfrei &amp; unverbindlich</span>
-          </div>
+          {/* Registry #121 (Martin 10.10.): Im Absendeblock steht der Satz schon
+              unter den Sternen, dort nicht doppelt in der Karte. */}
+          {!kontaktAbsendeblock && (
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
+              {/* War "Keine Werbeanrufe" (Martin 16.08. geaendert). Passt
+                  zusaetzlich zur Leitplanke des SEA-Laufs: keine Aussagen
+                  ueber Anrufe — das Gespraech ist Teil des Modells. */}
+              <span className="text-[#3D3D3D] font-medium">100&nbsp;% kostenfrei &amp; unverbindlich</span>
+            </div>
+          )}
         </div>
       </div>
       </div>
