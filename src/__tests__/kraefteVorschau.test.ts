@@ -64,10 +64,13 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(VERLAUF.hinweis).toBe('Dafür benötigen wir nur noch Ihre Kontaktdaten.');
     expect(SCHRANKE.kopf).toBe('Ihr Preis ist berechnet');
     expect(SCHRANKE.auszeichnung).toBe('6× Preis-Leistungssieger');
-    expect(SCHRANKE.frage).toBe('Für wen dürfen wir Ihre persönliche Preisberechnung ausstellen?');
+    // Registry #121 (Martin 09.10.): ohne „persönliche“, damit der Knopf auf dem iPhone SE im ersten Bild steht.
+    expect(SCHRANKE.frage).toBe('Für wen dürfen wir Ihre Preisberechnung ausstellen?');
     expect(SCHRANKE.text).toBe('Ihren Preis sehen Sie direkt im nächsten Schritt.');
+    // Registry #121: Lohnzeile neben vier Beispielgesichtern — „passende Profile“, nicht „Ihre 5 Pflegekräfte“.
+    expect(SCHRANKE.lohn).toBe('Danach sehen Sie sofort Ihren Preis und 5\u00A0passende Profile.');
     // Martin 12.09.: nicht „senden" für den Preis (Sofortpreis wird gezeigt), nicht „brauchen wir", nicht „speichern".
-    expect(SCHRANKE.frage + ' ' + SCHRANKE.text).not.toMatch(/senden|brauchen|speichern/);
+    expect(SCHRANKE.frage + ' ' + SCHRANKE.text + ' ' + SCHRANKE.lohn).not.toMatch(/senden|brauchen|speichern/);
     expect(SCHRANKE.telefonHinweis).toBe('Nur bei Rückfragen');
     // Bestpreisgarantie (Martin 12.09.): greifbar (100 € im Monat), Bedingungen
     // ausbuchstabiert, kein „vermitteln", keine Prozentzahl.
@@ -88,7 +91,8 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(JSON.stringify(GARANTIE)).not.toContain('Verstanden');
     const garantieText = JSON.stringify(GARANTIE).toLowerCase();
     expect(garantieText).not.toMatch(/vermitteln|%/);
-    expect(SCHRANKE.fussnote).toBe('Sofort sichtbar · kostenlos · unverbindlich');
+    // Martin 09.10. (Registry #121): unter den Sternen.
+    expect(SCHRANKE.fussnote).toBe('100\u00A0% kostenfrei & unverbindlich');
   });
 
   it('Vorschau und Kontakt tragen DENSELBEN Knopf, und er passt in eine Zeile', () => {

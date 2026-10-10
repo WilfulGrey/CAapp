@@ -29,6 +29,11 @@ export const ZAEHLER_EREIGNISSE = [
   // Kontaktabfrage geklickt, Preisberechnung gescheitert (dann läuft der
   // Besucher den heutigen Weg).
   'preis_gesehen', 'kontakt_geoeffnet', 'preis_fehler',
+  // Kontakt-Schritt (Registry #121, 09.10.2026): erstes Antippen eines Feldes und
+  // ein Tipp auf den Knopf, solange Angaben fehlen. Je Seitenaufruf einmal, also
+  // ungefähr je Person: Der Verlust liegt vor dem ersten Tastendruck, und das
+  // sahen wir bisher nur bei den ca. 2 Einwilligenden am Tag.
+  'feld_angetippt', 'knopf_unvollstaendig',
 ] as const;
 export type ZaehlerEreignis = (typeof ZAEHLER_EREIGNISSE)[number];
 
