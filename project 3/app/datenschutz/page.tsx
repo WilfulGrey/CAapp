@@ -73,6 +73,11 @@ export default function DatenschutzPage() {
               <li>Kontaktdaten (Name, E-Mail-Adresse, Telefonnummer) - nur wenn Sie ein Angebot anfordern</li>
               <li>Berechnete Kostenkalkulation</li>
             </ul>
+            {/* 10.10.2026, Martin („alles ja“ zur Abnahme vom 09.10., Punkt 2): Einstieg und Herkunft je Anfrage (Registry #120).
+                Wortlaut gleich wie auf primundus.de/datenschutz, Abschnitt 2.2. */}
+            <p className="text-gray-700 leading-relaxed mb-4">
+              <strong className="text-gray-900">Herkunft Ihrer Anfrage:</strong> Wenn Sie von primundus.de in den Kostenrechner wechseln, geben wir zwei Angaben mit: die erste Seite, die Sie bei uns aufgerufen haben, und die Art der Seite, von der Sie kamen, zum Beispiel Google, eine Anzeige, eine andere Suchmaschine, ein KI-Assistent oder kein Verweis. Die genaue Adresse der Seite, von der Sie kamen, speichern wir nicht. Die beiden Angaben stehen in der Adresse des Kostenrechners und damit auch in Ihrem Browserverlauf. Haben Sie der Statistik zugestimmt, merkt sich Ihr Browser die Angaben außerdem, bis Sie den Tab schließen. Senden Sie im Kostenrechner eine Anfrage ab, speichern wir beide Angaben zusammen mit Ihrer Anfrage und löschen sie mit ihr. So sehen wir, welche Seiten zu Anfragen führen. Rechtsgrundlage ist unser berechtigtes Interesse (Art. 6 Abs. 1 lit. f DSGVO). Sie können jederzeit widersprechen, zum Beispiel per E-Mail an info@primundus.de.
+            </p>
           </section>
 
           <section>
@@ -205,7 +210,7 @@ export default function DatenschutzPage() {
           <section>
             <h2 className="text-2xl font-bold mb-4 text-gray-900">10. Aktualität und Änderung dieser Datenschutzerklärung</h2>
             <p className="text-gray-700 leading-relaxed">
-              Diese Datenschutzerklärung ist aktuell gültig und hat den Stand August 2026.
+              Diese Datenschutzerklärung ist aktuell gültig und hat den Stand Oktober 2026.
               Durch die Weiterentwicklung unserer Website oder aufgrund geänderter gesetzlicher
               Vorgaben kann es notwendig werden, diese Datenschutzerklärung zu ändern.
             </p>
