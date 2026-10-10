@@ -172,11 +172,13 @@ export function AngebotTestsieger({ className = 'mt-6', klein = false }: { class
  * Runde 26 (Martin zu Fassung 20: „die Sterne passen da nicht dazu … als würde das zusammengehören. Das macht gar keinen
  * Sinn."): die Bewertungen unserer Kunden als eigene Zeile direkt unter dem Titel, getrennt vom Siegel der Auszeichnung.
  * Ohne Stand keine Sterne (kein Ersatzwert); die Höhe bleibt reserviert, damit nichts springt.
+ * Martin 10.10.2026 („Das muss aber nicht unterstrichen sein, damit man da das nicht draufklickt"): im Kopf reine Anzeige,
+ * kein Link (`link={false}`). Gilt überall, wo diese Zeile im Kopf steht (Kompakt-Einstieg, Einstieg vor dem Speichern).
  */
 export function AngebotSterne({ sterne }: { sterne: SterneStand | null }) {
   return (
     <div className="mt-2 flex h-7 items-center">
-      <BewertungsZeile stand={sterne} className="-my-2" />
+      <BewertungsZeile stand={sterne} link={false} />
     </div>
   );
 }

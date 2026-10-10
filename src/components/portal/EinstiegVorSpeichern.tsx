@@ -6,11 +6,17 @@
 // (#761 Einstieg, #770 Wortlaut) und der Kompakt-Einstieg (#780) brachten nichts zurück. Martin 10.10.: „wir wollen
 // ändern dass wieder mehr patientenprofil machen. das war doch schon besser“.
 //
-// Deshalb sehen Kunden ohne gespeicherte Pflegesituation (`kompakt` in CustomerPortalPage) die Seite wieder genau wie im
-// Stand 75b8df8: Kopf „Ihr persönliches Angebot“, Kostenkarte „Ihre Betreuungskosten“, „Passende Pflegekräfte“ mit dem
-// Kasten „Noch 2 Minuten bis zu Ihren Bewerbungen“ und den damaligen Karten (MatchCardVorSpeichern), Abschnittskopf
-// „Pflegesituation“ mit dem OFFENEN Formular, „So geht es weiter“, Häufige Fragen, Marta. Alle sichtbaren Texte und
-// Klassen 1:1 aus 75b8df8:src/pages/CustomerPortalPage.tsx bzw. den damaligen Komponenten — keine neuen Formulierungen.
+// Deshalb sehen Kunden ohne gespeicherte Pflegesituation (`kompakt` in CustomerPortalPage) die Seite wieder wie im
+// Stand 75b8df8: Kostenkarte „Ihre Betreuungskosten“, „Passende Pflegekräfte“ mit dem Kasten „Noch 2 Minuten bis zu Ihren
+// Bewerbungen“ und den damaligen Karten (MatchCardVorSpeichern), Abschnittskopf „Pflegesituation“ mit dem OFFENEN
+// Formular, „So geht es weiter“, Marta. Alle sichtbaren Texte und Klassen dieser Teile 1:1 aus
+// 75b8df8:src/pages/CustomerPortalPage.tsx bzw. den damaligen Komponenten — keine neuen Formulierungen.
+// Zwei Teile sind wie heute (Martin 10.10.: „oben den neuen Teil besser, ‚Ihr Angebot zur 24-Stunden-Betreuung‘ und die
+// Sterne … Und wie die Fragen ganz unten dargestellt sind, das finde ich bei dem neuen auch besser“): der Kopf aus dem
+// Kompakt-Einstieg (Initialen, „Guten Tag, …“, „Ihr persönlicher Bereich“, „Ihr Angebot zur 24-Stunden-Betreuung“,
+// Sternezeile ohne Link) statt „Ihr persönliches Angebot“, und die Häufigen Fragen als Karte mit dem heutigen Bestand
+// (FaqListe `karte`, mit der Bestpreis-Frage #118). Einleitung, Testsieger-Block und Angebotskarte des Kompakt-Einstiegs
+// stehen hier NICHT.
 // Die schwebende Frage „Was sagen Sie zum Angebot?“ erscheint hier nicht: Im Stand 75b8df8 war sie wegen eines Fehlers
 // bei echten Kunden nie sichtbar (Registry #114).
 //
@@ -19,8 +25,8 @@
 // Speichern bleibt wie heute im Trunk.
 //
 // Rückweg: `?einstieg=kompakt` zeigt den Kompakt-Einstieg (#780) zum Vergleich; dauerhaft zurück = `rueckbau` in
-// CustomerPortalPage auf false. Bereinigung nach der Entscheidung: diese Datei, MatchCardVorSpeichern.tsx,
-// FAQ_STAND_75B8DF8 und die Props `stand75b8df8` (AngebotCard, FormNav) entfernen.
+// CustomerPortalPage auf false. Bereinigung nach der Entscheidung: diese Datei, MatchCardVorSpeichern.tsx und die Props
+// `stand75b8df8` (AngebotCard, FormNav) entfernen.
 import { useState, type ReactNode } from 'react';
 import { Check, ChevronDown, ShieldCheck } from 'lucide-react';
 import { formatEuro, type Lead } from '../../lib/supabase';
@@ -31,23 +37,29 @@ import { Sheet } from '../ui/Sheet';
 import { SectionHeader, EYEBROW } from '../ui/SectionHeader';
 import { StatusBadge } from '../ui/StatusBadge';
 import { zeigtSommerzuschlag } from './konditionen';
-import { FaqListe, FAQ_STAND_75B8DF8 } from './FaqListe';
+import { FaqListe } from './FaqListe';
 import { MartaBox } from './MartaBox';
+import { AngebotPerson, AngebotSterne } from './KompaktEinstieg';
 
-// ── Kopf (Stand 75b8df8: Ausgangszustand ohne Unterzeile und ohne Status-Zeile) ──────────────────────────────────────
-// Look wie primundus.de (Teil 3 des Redesigns): Fläche „shell", Begrüßung in Taupe, Titel in 800. Im Ausgangszustand
-// liegt die Kostenkarte leicht über der Unterkante (pb-10 + -mt-6 an der Karte).
-export function KopfVorSpeichern({ anrede }: { anrede: string | null }) {
+// ── Kopf (wie heute im Kompakt-Einstieg, Martin 10.10.2026) ──────────────────────────────────────────────────────────────
+// Dieselben Bausteine wie der Kopf des Kompakt-Einstiegs in CustomerPortalPage (Look „angebot“): Initialen-Kreis mit
+// „Guten Tag, …“ und „Ihr persönlicher Bereich“ (AngebotPerson), Titel „Ihr Angebot zur 24-Stunden-Betreuung“ (Klassen wie
+// dort), Sternezeile ohne Link (AngebotSterne, ohne Stand bleibt die Höhe frei). Ohne Einleitung und Testsieger-Block.
+// Steht wie dort auf dem Seitengrund (paper), nicht mehr auf der Fläche „shell“; Rand 18 px wie die Abschnittsköpfe
+// darunter („Passende Pflegekräfte“, „Pflegesituation“) und der Kopf aus 75b8df8.
+export function KopfVorSpeichern({ anrede, kuerzel, sterne }: {
+  anrede: string | null;
+  kuerzel: string | null;
+  sterne: SterneStand | null;
+}) {
   return (
-    <div className="bg-pm-shell">
-      <div className="max-w-3xl mx-auto px-[18px] pt-6 pb-10">
-        <p className="text-[16px] text-pm-taupe-ink">
-          Guten Tag{anrede ? `, ${anrede}` : ''}.
-        </p>
-        <h1 className="mt-1 text-[31px] font-extrabold leading-[1.08] tracking-[-0.035em] text-pm-ink">
-          Ihr persönliches Angebot
-        </h1>
-      </div>
+    <div className="max-w-3xl mx-auto px-[18px] pt-6">
+      <AngebotPerson name={anrede} kuerzel={kuerzel} />
+      {/* „24-Stunden-Betreuung“ bricht nicht um (sonst „24-“ allein am Zeilenende). */}
+      <h1 className="mt-6 text-[28px] min-[376px]:text-[31px] font-extrabold leading-[1.1] tracking-[-0.035em] text-pm-ink">
+        Ihr Angebot zur <span className="whitespace-nowrap">24-Stunden-Betreuung</span>
+      </h1>
+      <AngebotSterne sterne={sterne} />
     </div>
   );
 }
@@ -55,6 +67,9 @@ export function KopfVorSpeichern({ anrede }: { anrede: string | null }) {
 // ── Kostenkarte (Stand 75b8df8, `angebotSection` vor dem Speichern) ────────────────────────────────────────────────────
 // Der Kopf-Chevron klappt die ganze Karte zu, „Alle Kosten im Überblick" klappt die Aufstellung IN der Karte auf. Vor dem
 // Speichern ist die Karte offen (damals: `offerExpandedManual ?? (!hasPending && (offerFirstVisit || !patientSaved))`).
+// Karte unverändert. Nur der Abstand ist neu: Damals lag sie mit -mt-6 über der Unterkante des Kopfs auf der Fläche
+// „shell“; der Kopf steht jetzt auf dem Seitengrund, die Karte folgt mit 28 px Luft (wie die Angebotskarte im
+// Kompakt-Einstieg, pt-7), statt die Sternezeile zu überdecken.
 export function KostenkarteVorSpeichern({ lead, onBestpreis, heimEigenanteil, heimQuelle }: {
   lead: Lead | null;
   onBestpreis: () => void;
@@ -82,7 +97,7 @@ export function KostenkarteVorSpeichern({ lead, onBestpreis, heimEigenanteil, he
     : null;
   const heimErsparnis = eigenanteil !== null ? heimEigenanteil - eigenanteil : 0;
   return (
-    <div className="max-w-3xl mx-auto px-3.5 -mt-6">
+    <div className="max-w-3xl mx-auto px-3.5 pt-7">
       <Card className="relative px-5 pt-3 pb-4 shadow-lift">
         <button
           type="button"
@@ -311,15 +326,17 @@ export function WarumSheetVorSpeichern({ offen, onClose, onVervollstaendigen }: 
 }
 
 // ── Die Seite vor dem Speichern (Stand 75b8df8) ────────────────────────────────────────────────────────────────────────
-// Reihenfolge: Kopf → Kostenkarte → Passende Pflegekräfte (Kasten, Karten, Bereits bearbeitet) → Pflegesituation mit
-// offenem Formular → So geht es weiter → Häufige Fragen → Marta. Die Karten, „Bereits bearbeitet" und das Formular baut
-// CustomerPortalPage (Handler, Daten), die Seite hier nur Anordnung und Wortlaut.
+// Reihenfolge: Kopf (wie heute) → Kostenkarte → Passende Pflegekräfte (Kasten, Karten, Bereits bearbeitet) →
+// Pflegesituation mit offenem Formular → So geht es weiter → Häufige Fragen (wie heute) → Marta. Die Karten, „Bereits
+// bearbeitet" und das Formular baut CustomerPortalPage (Handler, Daten), die Seite hier nur Anordnung und Wortlaut.
 export function EinstiegVorSpeichern({
-  anrede, lead, onBestpreis, heimEigenanteil, heimQuelle, onWarum, onVervollstaendigen,
+  anrede, kuerzel, lead, onBestpreis, heimEigenanteil, heimQuelle, onWarum, onVervollstaendigen,
   laedt, karten, gehalteneEinladungen, vorschlaegeVorhanden, bereitsBearbeitet, formular, sterne,
 }: {
-  /** Anrede für „Guten Tag, …." (customerSalutation), ohne Anrede nur „Guten Tag." */
+  /** Anrede für „Guten Tag, …" (customerSalutation), ohne Anrede nur „Guten Tag". */
   anrede: string | null;
+  /** Initialen im Kreis des Kopfs (wie im Kompakt-Einstieg); ohne Namen ein neutrales Zeichen. */
+  kuerzel: string | null;
   lead: Lead | null;
   onBestpreis: () => void;
   heimEigenanteil: number;
@@ -344,7 +361,7 @@ export function EinstiegVorSpeichern({
   const hasAnyCard = karten.length > 0;
   return (
     <div className="bg-pm-paper">
-      <KopfVorSpeichern anrede={anrede} />
+      <KopfVorSpeichern anrede={anrede} kuerzel={kuerzel} sterne={sterne} />
 
       <KostenkarteVorSpeichern lead={lead} onBestpreis={onBestpreis} heimEigenanteil={heimEigenanteil} heimQuelle={heimQuelle} />
 
@@ -446,8 +463,10 @@ export function EinstiegVorSpeichern({
         <div className="pt-6">
           <SoGehtEsWeiterVorSpeichern />
         </div>
+        {/* Häufige Fragen wie heute im Kompakt-Einstieg (Martin 10.10.2026): Karte mit den drei Grundfragen und
+            „N weitere Fragen“, heutiger Bestand (auch die Bestpreis-Frage, #118). */}
         <div className="pt-6">
-          <FaqListe fragen={FAQ_STAND_75B8DF8} />
+          <FaqListe ruhig karte />
         </div>
         <div className="pt-4">
           <MartaBox sterne={sterne} />

@@ -485,6 +485,10 @@ describe('Portal integration: golden paths', () => {
     const titel = await screen.findByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' }, { timeout: 5000 });
     expect(screen.getByText(/^Gerne übernehmen wir/)).toBeInTheDocument();
     expect(screen.getByText(/6× in Folge Testsieger/)).toBeInTheDocument();
+    // Sternezeile im Kopf ohne Link, auch hier (Martin 10.10.: „nicht unterstrichen, damit man da nicht draufklickt").
+    const kopfKompakt = titel.parentElement!;
+    expect(await within(kopfKompakt).findByText((_, el) => el?.tagName === 'P' && el.textContent === '4,9 von 5 aus 126 Bewertungen', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(within(kopfKompakt).queryByRole('link', { name: /Bewertungen/ })).toBeNull();
     // Angebotskarte: Kopfleiste, Leistung, Preis, „Kosten im Überblick ›", vier Punkte.
     const karte = document.getElementById('angebot')!;
     expect(titel.compareDocumentPosition(karte) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -635,20 +639,45 @@ describe('Portal integration: golden paths', () => {
 
 // ─── Rückbau Registry #122: vor dem ersten Speichern die Seite aus Stand 75b8df8 (EinstiegVorSpeichern.tsx) ──────────
 // Seit #748 (25.09. 16:35) speicherten Google-Kunden in Stunde 1 nur noch 2 von 48 die Pflegesituation (vorher 42 von 151).
-// Vor dem Speichern zeigt das Portal wieder genau den damaligen Stand; danach bleibt alles wie heute.
+// Vor dem Speichern zeigt das Portal wieder den damaligen Stand, Kopf und Häufige Fragen wie heute (Martin 10.10.:
+// „oben den neuen Teil besser … die Sterne … nicht unterstrichen … wie die Fragen ganz unten dargestellt sind … auch besser");
+// danach bleibt alles wie heute.
 describe('Einstieg vor dem ersten Speichern wie Stand 75b8df8 (Rückbau Registry #122)', () => {
   const ohneBewerbung = (proxy: Parameters<typeof defaultHandlers>[0] extends infer O ? O extends { proxy?: infer P } ? P : never : never = {}) =>
     defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }), ...proxy } });
   const text = (el: Element) => (el.textContent ?? '').replace(/ /g, ' ');
   const gescrollt = () => (Element.prototype.scrollIntoView as unknown as { mock: { contexts: Element[] } }).mock.contexts.map((e) => e.id);
 
-  it('Kopf, Kostenkarte, „Passende Pflegekräfte“ mit dem Kasten „Noch 2 Minuten bis zu Ihren Bewerbungen“, Karten mit „Einladen“ + Schloss, offenes Formular, „So geht es weiter“, Fragen und Marta wie damals', async () => {
-    server.use(...ohneBewerbung());
+  it('Kopf wie heute (Sterne ohne Link), Kostenkarte, „Passende Pflegekräfte“ mit dem Kasten „Noch 2 Minuten bis zu Ihren Bewerbungen“, Karten mit „Einladen“ + Schloss, offenes Formular, „So geht es weiter“ und Marta wie damals, Häufige Fragen wie heute', async () => {
+    server.use(
+      ...ohneBewerbung(),
+      http.get('https://primundus.de/api/bewertungen-stand', () => HttpResponse.json({ schnitt: '4,9', wert: 4.9, anzahl: 126 })),
+    );
     localStorage.removeItem(`patient_${TEST_LEAD_TOKEN}`);
     setLocation(`?token=${TEST_LEAD_TOKEN}`);
     render(<CustomerPortalPage />);
-    const h1 = await screen.findByRole('heading', { level: 1, name: 'Ihr persönliches Angebot' }, { timeout: 5000 });
-    expect(h1.previousElementSibling!.textContent).toMatch(/^Guten Tag, .+\.$/);
+    // Kopf wie im Kompakt-Einstieg: Initialen, „Guten Tag, …“, „Ihr persönlicher Bereich“, Titel, Sternezeile.
+    const h1 = await screen.findByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' }, { timeout: 5000 });
+    const kopfOben = h1.parentElement!;
+    expect(within(kopfOben).getByText(/^Guten Tag, Frau .+$/).textContent).not.toMatch(/\.$/);
+    expect(within(kopfOben).getByText('Ihr persönlicher Bereich')).toBeInTheDocument();
+    expect(within(kopfOben).getByText('AT')).toBeInTheDocument();
+    // Sternezeile ohne Link: nichts unterstrichen, nicht antippbar (Martin 10.10.).
+    const sterne = await within(kopfOben).findByText((_, el) => el?.tagName === 'P' && el.textContent === '4,9 von 5 aus 126 Bewertungen', {}, { timeout: 5000 });
+    expect(h1.compareDocumentPosition(sterne) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(kopfOben).queryByRole('link')).toBeNull();
+    expect(sterne.closest('a, button')).toBeNull();
+    expect(sterne.innerHTML).not.toContain('underline');
+    // Nicht übernommen: Einleitung, Testsieger-Block und Angebotskarte des Kompakt-Einstiegs; der alte Kopf ist weg.
+    expect(screen.queryByText('Ihr persönliches Angebot')).toBeNull();
+    expect(screen.queryByText(/^Gerne übernehmen wir/)).toBeNull();
+    expect(screen.queryByText(/6× in Folge Testsieger/)).toBeNull();
+    expect(screen.queryByText(/^Ihr Angebot vom /)).toBeNull();
+    expect(screen.queryByText('Rund-um-Betreuung zu Hause')).toBeNull();
+    // Kostenkarte (75b8df8) direkt nach dem Kopf, ohne über ihm zu liegen (kein -mt-6 mehr).
+    const kostenkarte = screen.getByText('Ihre Betreuungskosten').closest('.shadow-lift')!;
+    expect(kopfOben.compareDocumentPosition(kostenkarte) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(kostenkarte.parentElement!.className).not.toContain('-mt-6');
     // Kostenkarte (75b8df8): Preis, Satz, Bestpreisgarantie, vier Haken, „Kosten erst …“, Heimvergleich, Testsieger, Umschalter.
     expect(screen.getByText('Ihre Betreuungskosten')).toBeInTheDocument();
     expect(screen.getByText('2.800 €')).toBeInTheDocument();
@@ -684,12 +713,25 @@ describe('Einstieg vor dem ersten Speichern wie Stand 75b8df8 (Rückbau Registry
     expect(screen.getByText('2 Minuten. Vieles ist schon ausgefüllt.')).toBeInTheDocument();
     expect(screen.getByText('Passende Pflegekräfte bewerben sich bei Ihnen. Gerne können Sie Ihre Favoriten einladen, sich zu bewerben.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Jetzt vervollständigen →' })).toBeNull();
-    // Häufige Fragen ohne die Bestpreis-Frage (#118), vier sichtbar + „8 weitere Fragen“; Marta mit Siegel.
-    expect(screen.getByRole('button', { name: '8 weitere Fragen' })).toBeInTheDocument();
-    expect(screen.queryByText('Ich habe ein günstigeres Angebot. Was kann ich tun?')).toBeNull();
+    // Häufige Fragen wie heute im Kompakt-Einstieg: Karte mit Deutsch-Niveaus und den drei Grundfragen, „10 weitere Fragen“,
+    // dahinter zuerst die Bestpreis-Frage (#118). Kein Eyebrow „Gut zu wissen“ mehr.
+    const faq = screen.getByRole('heading', { level: 2, name: 'Häufige Fragen' });
+    expect(faq.id).toBe('faq-titel');
+    expect(screen.queryByText('Gut zu wissen')).toBeNull();
+    const faqKarte = faq.nextElementSibling as HTMLElement;
+    expect(faqKarte.className).toContain('rounded-card');
+    expect(within(faqKarte).getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'Was bedeuten die Deutsch-Niveaus (Grund, Mittel, Gut)?',
+      'Was übernimmt die Pflegekraft, was ein Pflegedienst?',
+      'Was brauche ich zu Hause?',
+      'Wie läuft die Betreuung ab?',
+      '10 weitere Fragen',
+    ]);
+    await userEvent.click(within(faqKarte).getByRole('button', { name: '10 weitere Fragen' }));
+    expect(within(faqKarte).getAllByRole('button')[4].textContent).toBe('Ich habe ein günstigeres Angebot. Was kann ich tun?');
+    // Marta mit Siegel wie damals.
     expect(screen.getByText('Noch Fragen?')).toBeInTheDocument();
-    // Nicht da: Kompakt-Einstieg (#780), Wortlaut #109, Satz über dem Knopf.
-    expect(screen.queryByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' })).toBeNull();
+    // Nicht da: Kompakt-Einstieg (#780) ohne seinen Kopf, Wortlaut #109, Satz über dem Knopf.
     expect(screen.queryByText('Achtung: Es fehlen noch Angaben zur Pflegesituation')).toBeNull();
     expect(screen.queryByText('Noch 2 Minuten bis zum Einladen')).toBeNull();
     expect(screen.queryByText('Jetzt konkrete Bewerbungen erhalten')).toBeNull();
@@ -741,7 +783,7 @@ describe('Einstieg vor dem ersten Speichern wie Stand 75b8df8 (Rückbau Registry
     expect(screen.getByText('Pflegesituation vollständig')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Angebot und Pflegesituation' })).toBeInTheDocument();
     expect(screen.queryByText('Noch 2 Minuten bis zu Ihren Bewerbungen')).toBeNull();
-    expect(screen.queryByRole('heading', { level: 1, name: 'Ihr persönliches Angebot' })).toBeNull();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Warum? Mehr' })).toBeNull();
     expect(screen.queryByText('Für Ihre Bewerbungen')).toBeNull();
     // Die Karten sind wieder die von heute („V“): „Einladen“ ohne Schloss.

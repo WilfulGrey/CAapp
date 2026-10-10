@@ -60,8 +60,8 @@ import { kalenderTag } from '../components/portal/DateField';
 import { reserviertBis as berechneReservierung, RESERVIERUNG_STUNDEN, nochReserviertText } from '../lib/reservierung';
 import type { FetchedLeadEvent } from '../lib/leadEvents';
 import { MatchCard } from '../components/portal/MatchCard';
-// Rückbau Registry #122: vor dem ersten Speichern wieder der Einstieg aus Stand 75b8df8 (Kopf, Kostenkarte, Kasten
-// „Noch 2 Minuten“, Karten mit „Einladen“ + Schloss, offenes Formular mit „Speichern“).
+// Rückbau Registry #122: vor dem ersten Speichern wieder der Einstieg aus Stand 75b8df8 (Kostenkarte, Kasten
+// „Noch 2 Minuten“, Karten mit „Einladen“ + Schloss, offenes Formular mit „Speichern“); Kopf und Häufige Fragen wie heute.
 import { EinstiegVorSpeichern, WarumSheetVorSpeichern } from '../components/portal/EinstiegVorSpeichern';
 import { MatchCardVorSpeichern } from '../components/portal/MatchCardVorSpeichern';
 import { MatchCardDone } from '../components/portal/MatchCardDone';
@@ -3748,9 +3748,13 @@ const CustomerPortalPage: FC = () => {
           );
         })()
       ) : rueckbau ? (
-        // Rückbau Registry #122: vor dem ersten Speichern die Seite aus Stand 75b8df8 (EinstiegVorSpeichern.tsx).
+        // Rückbau Registry #122: vor dem ersten Speichern die Seite aus Stand 75b8df8 (EinstiegVorSpeichern.tsx), Kopf und
+        // Häufige Fragen wie heute (Martin 10.10.); Initialen wie im Kopf des Kompakt-Einstiegs.
         <EinstiegVorSpeichern
           anrede={lead ? customerSalutation(lead) : 'Herr Mustermann'}
+          kuerzel={lead && (lead.vorname || lead.nachname)
+            ? initials([lead.vorname, lead.nachname].filter(Boolean).join(' ').trim()).toUpperCase().slice(0, 2)
+            : null}
           lead={lead}
           onBestpreis={() => setBestpreisOffen(true)}
           heimEigenanteil={HEIM_EIGENANTEIL}

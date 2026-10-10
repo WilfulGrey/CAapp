@@ -44,7 +44,7 @@ export const FAQ: { q: string; a: ReactNode }[] = [
      machen, dass das sich deckt"): dieselbe Frage wie in der Angebotsmail, Antwort im Wortlaut der Bestpreisgarantie
      (GARANTIE_PORTAL). In der Mail steht „Ich antworte" in der Ich-Form der Absenderin, hier „Marta antwortet". Im Look
      „angebot" steht sie direkt nach den drei Grundfragen (erste hinter „weitere Fragen"). */
-  { q: 'Ich habe ein günstigeres Angebot. Was kann ich tun?', a: `${GARANTIE_PORTAL.zusage} ${GARANTIE_PORTAL.ablauf}` }, // = FAQ_BESTPREIS_FRAGE
+  { q: 'Ich habe ein günstigeres Angebot. Was kann ich tun?', a: `${GARANTIE_PORTAL.zusage} ${GARANTIE_PORTAL.ablauf}` },
   { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, laden Sie sie ein, sich bei Ihnen zu bewerben. Dafür müssen Sie nur kurz die Pflegesituation vervollständigen — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Alles unverbindlich; ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.' },
   { q: 'Gehe ich mit dem Einladen einen Vertrag ein?', a: 'Nein — das Einladen und Anschauen von Profilen ist vollständig unverbindlich. Ein Vertrag kommt erst zustande, wenn Sie ein konkretes Angebot ausdrücklich annehmen.' },
   { q: 'Kann ich jederzeit kündigen?', a: 'Ja, täglich kündbar — ohne Mindestlaufzeit und ohne Angabe von Gründen. Kosten entstehen ausschließlich für Tage, an denen die Pflegekraft tatsächlich vor Ort ist.' },
@@ -84,21 +84,15 @@ export const FAQ_GRUNDFRAGEN: { q: string; a: string }[] = [
 const ERSETZT = ['Wie lange bleibt die Pflegekraft — und wie läuft der Wechsel?', 'Was passiert, wenn die Pflegekraft ausfällt?'];
 export const FAQ_ANGEBOT = [FAQ[0], ...FAQ_GRUNDFRAGEN, ...FAQ.slice(1).filter((x) => !ERSETZT.includes(x.q))];
 
-/** Rückbau Registry #122: die Fragen wie im Stand 75b8df8 (vor dem ersten Speichern, EinstiegVorSpeichern) — dieselbe Liste
- *  ohne die Bestpreis-Frage (#118, kam am 08.10. dazu). Alle übrigen Fragen und Antworten sind seit 75b8df8 unverändert. */
-export const FAQ_BESTPREIS_FRAGE = 'Ich habe ein günstigeres Angebot. Was kann ich tun?';
-export const FAQ_STAND_75B8DF8 = FAQ.filter((x) => x.q !== FAQ_BESTPREIS_FRAGE);
-
 const SICHTBAR = 4;
 
 /** `ruhig` (Kompakt-Einstieg, Runde 15): Kopf ohne Eyebrow im ruhigen H2-Stil; sonst unverändert.
  *  `karte` (Look „angebot", Runde 27 — Martin zu Fassung 21: „die häufig gestellten Fragen sehen nicht gut aus … alles mit
- *  diesem komischen Hintergrund"): die Fragen in einer weißen Karte mit Zeilen wie die Karten darüber, Pfeil statt Plus.
- *  `fragen` (Rückbau Registry #122): eigene Liste, z. B. `FAQ_STAND_75B8DF8`; ohne Angabe wie bisher. */
-export function FaqListe({ ruhig = false, karte = false, fragen }: { ruhig?: boolean; karte?: boolean; fragen?: { q: string; a: ReactNode }[] } = {}) {
+ *  diesem komischen Hintergrund"): die Fragen in einer weißen Karte mit Zeilen wie die Karten darüber, Pfeil statt Plus. */
+export function FaqListe({ ruhig = false, karte = false }: { ruhig?: boolean; karte?: boolean } = {}) {
   const [offen, setOffen] = useState<number | null>(null);
   const [alle, setAlle] = useState(false);
-  const quelle = fragen ?? (karte ? FAQ_ANGEBOT : FAQ);
+  const quelle = karte ? FAQ_ANGEBOT : FAQ;
   const liste = alle ? quelle : quelle.slice(0, SICHTBAR);
   if (karte) {
     // OpenAI 05.10. (mutig14): die Fragen leiser als die Karten darüber — mittleres Gewicht, kompaktere Zeilen.
@@ -164,13 +158,13 @@ export function FaqListe({ ruhig = false, karte = false, fragen }: { ruhig?: boo
             </div>
           );
         })}
-        {!alle && quelle.length > SICHTBAR && (
+        {!alle && FAQ.length > SICHTBAR && (
           <button
             type="button"
             onClick={() => setAlle(true)}
             className="w-full min-h-[56px] flex items-center justify-between gap-3.5 py-4 border-t border-pm-line text-left text-[15.5px] font-semibold text-pm-taupe-ink"
           >
-            {quelle.length - SICHTBAR} weitere Fragen
+            {FAQ.length - SICHTBAR} weitere Fragen
             <span className="w-7 h-7 rounded-full border border-pm-line bg-white flex items-center justify-center flex-none text-pm-taupe">
               <ChevronDown className="w-4 h-4" aria-hidden="true" />
             </span>

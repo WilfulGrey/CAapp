@@ -8,16 +8,19 @@ const STERN = 'M10 1.6l2.47 5.2 5.7.72-4.2 3.93 1.08 5.64L10 14.3l-5.05 2.79 1.0
 // Text 12,5 / 13,5 / 14 px (360 / 375 / ab 390 px) — so bleibt die Zeile bei 24 px Innenabstand einzeilig.
 // Fassung 31: ohne `whitespace-nowrap` — wo die Zeile nicht passt (Bewerbungskarte bei 360 px mit 20 px Seitenrand), bricht
 // der Text neben den Sternen um, statt über den Rand zu stehen. Wo sie passt, bleibt sie einzeilig.
-export function BewertungsZeile({ stand, className = '', klein = false }: { stand: SterneStand | null; className?: string; klein?: boolean }) {
+// `link={false}` (Martin 10.10.2026 zur Zeile im Kopf: „Das muss aber nicht unterstrichen sein, damit man da das nicht
+// draufklickt"): reine Anzeige — kein Link, nichts unterstrichen, kein Tipp-, Hover- oder Fokuszustand. Sterne und
+// Wortlaut wie beim Link.
+export function BewertungsZeile({ stand, className = '', klein = false, link = true }: {
+  stand: SterneStand | null;
+  className?: string;
+  klein?: boolean;
+  link?: boolean;
+}) {
   if (!stand) return null;
   const stern = klein ? 12 : 16;
-  return (
-    <a
-      href={ERFAHRUNGEN_URL}
-      target="_blank"
-      rel="noreferrer"
-      className={`inline-flex min-h-[44px] items-center ${klein ? 'gap-1' : 'gap-2'} ${className}`}
-    >
+  const inhalt = (
+    <>
       <span className="inline-flex items-center gap-[2px]" aria-hidden="true">
         {[0, 1, 2, 3, 4].map((i) => {
           const fuellung = sternFuellung(stand.wert, i);
@@ -33,8 +36,23 @@ export function BewertungsZeile({ stand, className = '', klein = false }: { stan
       </span>
       <span className={`${klein ? 'text-[12.5px] min-[375px]:text-[13.5px] min-[390px]:text-[14px]' : 'text-[15px]'} leading-snug text-pm-muted`}>
         <strong className="font-semibold text-pm-ink">{stand.schnitt}</strong> von 5 aus{' '}
-        <span className="underline decoration-[#C9C4BC] underline-offset-[3px]">{anzahlText(stand.anzahl)}</span>
+        {link
+          ? <span className="underline decoration-[#C9C4BC] underline-offset-[3px]">{anzahlText(stand.anzahl)}</span>
+          : anzahlText(stand.anzahl)}
       </span>
+    </>
+  );
+  if (!link) {
+    return <p className={`inline-flex items-center ${klein ? 'gap-1' : 'gap-2'} ${className}`}>{inhalt}</p>;
+  }
+  return (
+    <a
+      href={ERFAHRUNGEN_URL}
+      target="_blank"
+      rel="noreferrer"
+      className={`inline-flex min-h-[44px] items-center ${klein ? 'gap-1' : 'gap-2'} ${className}`}
+    >
+      {inhalt}
     </a>
   );
 }
