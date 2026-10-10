@@ -199,11 +199,21 @@ export const SCHRANKE = {
   // hier ab (Zähler 11.09.), Baseline 44 %.
   // Martins Wortlaut (12.09.): Die Frage gibt dem Namensfeld einen Grund,
   // „ausstellen" passt zu „Ihr Preis ist berechnet" — nichts wird gesendet.
-  frage: 'Für wen dürfen wir Ihre persönliche Preisberechnung ausstellen?',
+  // 09.10. (Registry #121, Martin „1 ja“): ohne „persönliche“ — eine Zeile
+  // weniger, damit Knopf, Gesichter und Sterne auch auf dem iPhone SE (553 px)
+  // im ersten Bild stehen.
+  frage: 'Für wen dürfen wir Ihre Preisberechnung ausstellen?',
+  // Nur noch in der Karten-Seite (?kraefte=1); im Kontakt-Schritt steht `lohn`.
   text: 'Ihren Preis sehen Sie direkt im nächsten Schritt.',
+  // Registry #121: neben vier Gesichtern statt grünem Kasten. „passende Profile“
+  // statt „Ihre 5 Pflegekräfte“: die Fotos sind Beispiele aus dem eigenen
+  // Bestand, nicht die späteren fünf (OpenAI-Gegencheck 09.10.); „Profile“ wie
+  // in den Anzeigen („Preis & Profile sofort“).
+  lohn: `Danach sehen Sie sofort Ihren Preis und ${PORTAL_ANZAHL}\u00A0passende Profile.`,
   telefonHinweis: 'Nur bei Rückfragen',
   knopf: KNOPF,
-  fussnote: 'Sofort sichtbar · kostenlos · unverbindlich',
+  // Martin 09.10.: „unter den Sternen … 100% kostenfrei & unverbindlich“.
+  fussnote: '100\u00A0% kostenfrei & unverbindlich',
   // Zeile unter „Ihr Preis ist berechnet", neben dem Siegel im grünen Kopf
   // (Martin 11.09., Wortlaut von ihm).
   auszeichnung: '6× Preis-Leistungssieger',

@@ -154,6 +154,17 @@ Wizard-Events:
   Aufruf (`AnalyticsProvider`) in den Arbeitsspeicher — kein sessionStorage, kein Cookie —, das Formular schickt sie als
   `websiteEinstieg` mit, die Absende-Route schreibt nach Prüfung `lead_events` `website_einstieg {pfad, herkunft, art,
   quelle}` zu jeder Absendung. Nicht an `analytics_sessions` (bräuchte eine Migration).
+- **Kontaktschritt B2 (Registry #121, 2026-10-09):** Frage „Für wen dürfen wir Ihre
+  Preisberechnung ausstellen?“, darunter vier Gesichter + `SCHRANKE.lohn` („Danach sehen
+  Sie sofort Ihren Preis und 5 passende Profile.“) statt grünem Kasten (der bleibt nur bei
+  `?kontakt=stufen`), Namensfeld „Ihr Name“. Der Absende-Knopf ist nur beim Senden gesperrt:
+  ein Tipp bei fehlenden Angaben ruft `kontaktUnvollstaendig` (Hinweis nur am ersten offenen
+  Feld, Fokus dorthin über `KONTAKT_FELD_ID`). Direkt unter dem Knopf die Sterne
+  (`SterneText`, ohne Stand keine Zeile), darunter „100 % kostenfrei & unverbindlich“ mit Haken
+  wie in der Leiste am Kartenfuß (Martin 10.10.) und der Datenschutz-Satz; die Leiste lässt den
+  Punkt weg, solange dieser Absendeblock steht (`kontaktAbsendeblock`). Anonyme Zähler neu, je Seitenaufruf einmal: `feld_angetippt` (erster
+  Fokus auf Name/E-Mail/Telefon) und `knopf_unvollstaendig` (Tipp, solange etwas fehlt).
+  Gemessen vorher (09.10.): Knopf auf dem iPhone SE (553 px sichtbar) bei 619–675 px.
 - **Ad-Parameter:** `gclid`/`wbraid`/`gbraid`/`utm_term`/`utm_content` aus
   der Landing-URL landen per best-effort Update auf `analytics_sessions`
   (utm_source/medium/campaign standen schon im Insert) + in sessionStorage

@@ -14,6 +14,7 @@ import { BestpreisDialog } from "@/components/calculator/BestpreisDialog";
 import { PreisSeite, type PreisDaten } from "@/components/calculator/PreisSeite";
 import { HERO_PUNKTE } from "@/lib/hero-punkte";
 import type { SterneStand } from "@/lib/sterne-zeile";
+import { SterneText } from "@/components/calculator/BewertungsZeile";
 import { KontaktSeite, KONTAKT_FELD_ID, type KontaktFeld } from "@/components/calculator/KontaktSeite";
 import { ablaufVariante, KONTAKT_NACH_PREIS, KONTAKT_SEITE, WARTE_KURZ_ENDE_MS, WARTE_KURZ_MS, type Ablauf } from "@/lib/preis-zuerst";
 import { GARANTIE_OEFFNEN_EVENT } from "@/components/calculator/BestpreisSiegelLink";
@@ -351,6 +352,9 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                         // entfernt — das konkrete Startdatum wird jetzt im
                         // CA-App-Patientenformular abgefragt (PatientForm.startDate).
                         // Getriebe lebt auch im CA-app patient form, nicht hier.
+  // Registry #121 (Martin 10.10.): Absendeblock des Kontakt-Schritts sichtbar (Knopf, Sterne,
+  // „100 % kostenfrei & unverbindlich“). Dann lässt die Leiste am Kartenfuß denselben Punkt weg.
+  const kontaktAbsendeblock = currentStep === totalSteps && (!ergebnisModus || kontaktOffen) && !stufenAktiv && !preisModus;
   const stepStartRef = useRef<number>(Date.now());
   // Scroll target for step changes. page.tsx renders TWO MultiStepForm
   // instances (mobile + desktop layout), both with id="calculator-form" —
@@ -610,39 +614,52 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
     }
   };
 
+  // Hinweise des Kontaktformulars, eine Regel für Absenden und Knopf-Tipp.
+  // Name + E-Mail + Telefon wieder alle drei Pflicht (Rückrollung der
+  // Änderung vom 06.06.2026). Begründung 14.06.2026: Tel-Quote ist seit
+  // 06.06. von 67 % auf 34 % gefallen, ohne Conversion-Vorteil — der
+  // Lead-Wert leidet, weil das Sales-Team ohne Telefonnummer nicht
+  // nachhaken kann. Daten ohne Telefon können nicht zu Mamamia weiter,
+  // d.h. Pflegekräfte sehen den Lead nicht.
+  // Telefon: 8–15 Ziffern, nur Ziffern/+/Trennzeichen (lib/telefon.ts,
+  // Maßstab 284 echte Anfragen). Der Server prüft weiter mild (≥6), damit
+  // Pria- und Portal-Wege nicht an der strengeren Regel scheitern.
+  const kontaktFehlerAlt = (): Record<KontaktFeld, string> => ({
+    name: formData.name.trim() ? '' : 'Bitte geben Sie Ihren Namen ein',
+    email: !formData.email.trim()
+      ? 'Bitte geben Sie Ihre E-Mail-Adresse ein'
+      : EMAIL_MUSTER.test(formData.email.trim()) ? '' : 'Bitte geben Sie eine gültige E-Mail-Adresse ein',
+    phone: telefonFehler(formData.phone ?? ''),
+  });
+
   const validateForm = () => {
-    const newErrors = {
-      name: '',
-      email: '',
-      phone: '',
-      acceptPrivacy: '',
-    };
-
-    // Name + E-Mail + Telefon wieder alle drei Pflicht (Rückrollung der
-    // Änderung vom 06.06.2026). Begründung 14.06.2026: Tel-Quote ist seit
-    // 06.06. von 67 % auf 34 % gefallen, ohne Conversion-Vorteil — der
-    // Lead-Wert leidet, weil das Sales-Team ohne Telefonnummer nicht
-    // nachhaken kann. Daten ohne Telefon können nicht zu Mamamia weiter,
-    // d.h. Pflegekräfte sehen den Lead nicht.
-    if (!formData.name.trim()) {
-      newErrors.name = 'Bitte geben Sie Ihren Namen ein';
-    }
-    if (!formData.email.trim()) {
-      newErrors.email = 'Bitte geben Sie Ihre E-Mail-Adresse ein';
-    } else if (!EMAIL_MUSTER.test(formData.email.trim())) {
-      newErrors.email = 'Bitte geben Sie eine gültige E-Mail-Adresse ein';
-    }
-    // Telefon: 8–15 Ziffern, nur Ziffern/+/Trennzeichen (lib/telefon.ts,
-    // Maßstab 284 echte Anfragen). Der Server prüft weiter mild (≥6), damit
-    // Pria- und Portal-Wege nicht an der strengeren Regel scheitern.
-    newErrors.phone = telefonFehler(formData.phone ?? '');
-
     // Datenschutz-Einwilligung wurde durch Soft-Consent ersetzt (Hinweistext
     // unter dem CTA, das Absenden gilt als Zustimmung) — kein explizites
     // Checkbox-Validation mehr nötig.
-
+    const newErrors = { ...kontaktFehlerAlt(), acceptPrivacy: '' };
     setErrors(newErrors);
     return !newErrors.name && !newErrors.email && !newErrors.phone;
+  };
+
+  // Registry #121 (Martin 09.10.): Der Knopf im Kontakt-Schritt ist nie blass.
+  // Fehlt etwas, zeigt der Tipp den Hinweis am ERSTEN offenen Feld und setzt den
+  // Cursor dorthin (so abgenommen; drei rote Zeilen auf einmal wirken wie eine
+  // Strafe für jemanden, der nur den Preis sehen wollte). Ein echter Tipp darf
+  // fokussieren, auf dem Handy geht dann die Tastatur auf.
+  const kontaktUnvollstaendig = () => {
+    zaehle('knopf_unvollstaendig', zaehlVariante());
+    const fehler = kontaktFehlerAlt();
+    const erstes = (['name', 'email', 'phone'] as const).find((k) => fehler[k]);
+    if (!erstes) return;
+    setErrors((alt) => ({ ...alt, [erstes]: fehler[erstes] }));
+    document.getElementById(KONTAKT_FELD_ID[erstes])?.focus();
+  };
+
+  // Registry #121: erstes Antippen eines Kontaktfeldes. Der Zähler zählt je
+  // Seitenaufruf einmal; der Verlust am Kontakt-Schritt liegt vor diesem Tipp.
+  const kontaktFeldFokus = (feld: KontaktFeld) => {
+    trackFieldFocus(feld);
+    zaehle('feld_angetippt', zaehlVariante());
   };
 
   // Lead anlegen: Preis serverseitig rechnen, dann /api/angebot-anfordern.
@@ -1402,7 +1419,8 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
         {/* Step 9 zeigt die Headline „✅ Ihr Angebot ist fertig" jetzt direkt
             im Titel-Block (getStepTitle); separate Pill ist redundant. */}
 
-        <div id="calc-step-content" className={`px-3 sm:px-6 lg:px-8 pt-3 ${fullscreen && currentStep === 1 ? 'pb-8' : 'pb-5'}`}>
+        {/* Registry #121: im Kontakt-Schritt rückt der Knopf an die Felder (36 → 16 px). */}
+        <div id="calc-step-content" className={`px-3 sm:px-6 lg:px-8 pt-3 ${fullscreen && currentStep === 1 ? 'pb-8' : currentStep === totalSteps && !stufenAktiv && !preisModus && (!ergebnisModus || kontaktOffen) ? 'pb-2' : 'pb-5'}`}>
           <div className="w-full">
             {/* Step 9: kleine grüne „fertig"-Pill über dem Titel, dann die
                 Frage als reguläre Step-Headline + Erklärung als italic
@@ -1779,6 +1797,10 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                           die Zahl ist verpixelt (Dummy! Die echte Kalkulation
                           läuft erst nach dem Absenden serverseitig und darf hier
                           nie im Quelltext stehen). */}
+                      {/* Registry #121: der grüne Kasten nur noch in den drei Teilschritten
+                          (?kontakt=stufen). Das Formular für alle zeigt Gesichter + Lohnzeile
+                          unter der Frage (Aufbau der Kontaktseite vom 17.09.). */}
+                      {stufenAktiv && (
                       <div className="flex items-center gap-3 rounded-2xl border border-[#C4E3CB] bg-[#F0F7F1] px-5 py-4 mb-1">
                         <div className="flex flex-shrink-0">
                           {/* Echte Pflegekräfte aus dem eigenen Bestand (leicht verpixelt
@@ -1798,11 +1820,12 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                         </div>
                         <p className="text-[14px] leading-snug text-[#2F5A38]"><span className="font-semibold">5 passende Pflegekräfte</span> für Sie gefunden</p>
                       </div>
+                      )}
                       {/* CRO 15.08.: Preisspanne steht im HERO (app/page.tsx),
                           nicht hier — auf diesem Schritt sagen wir „Ihr Angebot
                           ist fertig", eine generische Spanne daneben wirkte
                           widersprüchlich (Martins Einwand 15.08.). */}
-                      <div className="pt-1">
+                      <div className={stufenAktiv ? 'pt-1' : 'pt-0.5'}>
                         {stufenAktiv ? (
                           <>
                             {stufe === 'telefon' && (
@@ -1816,8 +1839,23 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                           </>
                         ) : (
                           <>
-                            <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{SCHRANKE.frage}</p>
-                            <p className="text-[15px] leading-snug text-[#555] mt-1">{SCHRANKE.text}</p>
+                            {/* Registry #121 (Martin 09.10.): Frage, darunter vier Gesichter und
+                                die Lohnzeile statt grünem Kasten und Extrazeile. Vier statt fünf
+                                Fotos: neben „5 passende Profile“ sähen fünf Beispielgesichter wie
+                                genau diese fünf aus (OpenAI-Gegencheck). So stehen Knopf und Sterne
+                                auch auf dem iPhone SE (553 px) im ersten Bild. */}
+                            <p className="text-[20px] font-bold leading-tight text-[#1a1a1a] [text-wrap:balance]">{SCHRANKE.frage}</p>
+                            <div className="mt-2.5 flex items-center gap-2.5">
+                              <div className="flex flex-shrink-0" aria-hidden="true">
+                                {['pk-1', 'pk-2', 'pk-3', 'pk-4'].map((n, i) => (
+                                  <span key={n} className={`relative w-7 h-7 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2' : ''}`}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={`/images/caregivers/${n}.jpg`} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                                  </span>
+                                ))}
+                              </div>
+                              <p className="text-[14px] leading-[1.35] text-[#5A5A5A] [text-wrap:balance]">{SCHRANKE.lohn}</p>
+                            </div>
                           </>
                         )}
                       </div>
@@ -1913,26 +1951,29 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                         setFormData({ ...formData, name: e.target.value });
                         setErrors({ ...errors, name: '' });
                       }}
-                      onFocus={() => trackFieldFocus('name')}
+                      onFocus={() => kontaktFeldFokus('name')}
                       onBlur={() => trackFieldBlur('name')}
                       className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                         errors.name ? 'border-red-500' : 'border-[#CFC6B8]'
                       }`}
-                      placeholder="Name"
+                      // Registry #121: „Ihr Name“ (Wortlaut der Kontaktseite 17.09.) — die
+                      // Frage „Für wen …?“ ließ offen, ob der Name der Mutter gemeint ist.
+                      placeholder="Ihr Name"
                       autoComplete="name"
                     />
-                    {errors.name && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.name}</p>}
+                    {errors.name && <p className="text-[13px] text-red-600 mt-1.5 px-3">{errors.name}</p>}
                   </div>
 
                   <div>
                     <input
+                      id="kontakt-email"
                       type="email"
                       value={formData.email}
                       onChange={(e) => {
                         setFormData({ ...formData, email: e.target.value });
                         setErrors({ ...errors, email: '' });
                       }}
-                      onFocus={() => trackFieldFocus('email')}
+                      onFocus={() => kontaktFeldFokus('email')}
                       onBlur={(e) => {
                         trackFieldBlur('email');
                         if (e.target.value.trim() && !EMAIL_MUSTER.test(e.target.value.trim())) {
@@ -1945,11 +1986,12 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                       placeholder="E-Mail-Adresse"
                       autoComplete="email"
                     />
-                    {errors.email && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.email}</p>}
+                    {errors.email && <p className="text-[13px] text-red-600 mt-1.5 px-3">{errors.email}</p>}
                   </div>
 
                   <div>
                     <input
+                      id="kontakt-telefon"
                       type="tel"
                       value={formData.phone}
                       inputMode="tel"
@@ -1957,7 +1999,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                         setFormData({ ...formData, phone: telefonBereinigen(e.target.value) });
                         setErrors({ ...errors, phone: '' });
                       }}
-                      onFocus={() => trackFieldFocus('phone')}
+                      onFocus={() => kontaktFeldFokus('phone')}
                       onBlur={(e) => {
                         trackFieldBlur('phone');
                         // Hinweis erst nach dem Tippen, nie auf ein leeres Feld.
@@ -1970,7 +2012,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                       autoComplete="tel"
                     />
                     {errors.phone
-                      ? <p className="text-[11px] text-red-500 mt-1 px-3">{errors.phone}</p>
+                      ? <p className="text-[13px] text-red-600 mt-1.5 px-3">{errors.phone}</p>
                       : <p className="text-[12px] text-[#8B8B8B] mt-1 px-3">{SCHRANKE.telefonHinweis}</p>}
                   </div>
                   </>)}
@@ -1986,22 +2028,23 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
         {currentStep > 1 && !(currentStep === totalSteps && ergebnisModus && !kontaktOffen) && !(currentStep === totalSteps && stufenAktiv) && !(currentStep === totalSteps && preisModus) && (
           // Nur-Zurück-Zeile eng an die Antworten (Martin 11.09.: „zurück hat
           // zu viel Luft"); der Absendeblock behält seinen Abstand.
-          <div className={`px-3 sm:px-6 lg:px-8 bg-white ${currentStep === totalSteps && (!ergebnisModus || kontaktOffen) ? 'pt-4 pb-5' : 'pt-0 pb-3'}`}>
+          <div className={`px-3 sm:px-6 lg:px-8 bg-white ${currentStep === totalSteps && (!ergebnisModus || kontaktOffen) ? 'pt-2 pb-5' : 'pt-0 pb-3'}`}>
             {currentStep === totalSteps && (!ergebnisModus || kontaktOffen) ? (
               <div className="flex flex-col gap-2.5">
                 <button
-                  onClick={() => handleNext()}
-                  disabled={!canProceed() || isSubmitting}
-                  // Disabled: heller Coral-Ton mit weißer Schrift, damit die
-                  // Botschaft auch ohne Eingabe lesbar bleibt (vorher
-                  // #8B8B8B auf #E5E3DF war kaum lesbar). Inline-Style statt
-                  // Tailwind-Slash-Alpha, weil bg-[#E76F63]/55 vom JIT nicht
-                  // konsistent gerendert wird.
-                  style={!canProceed() || isSubmitting ? { backgroundColor: '#F2B5AE' } : undefined}
+                  onClick={() => (canProceed() ? handleNext() : kontaktUnvollstaendig())}
+                  disabled={isSubmitting}
+                  // Registry #121 (Martin 09.10.): nie blass. Bis dahin blieb der
+                  // Knopf hellrosa und ohne Wirkung, bis alle drei Felder stimmten;
+                  // ein Tipp war eine Sackgasse. Jetzt prüft der Tipp und zeigt, was
+                  // fehlt (kontaktUnvollstaendig). Hell nur noch während des Sendens.
+                  // Inline-Style statt Tailwind-Slash-Alpha, weil bg-[#E76F63]/55 vom
+                  // JIT nicht konsistent gerendert wird.
+                  style={isSubmitting ? { backgroundColor: '#F2B5AE' } : undefined}
                   className={`w-full py-4 font-bold text-base rounded-xl transition-all duration-200 ${
-                    canProceed() && !isSubmitting
+                    !isSubmitting
                       ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl cursor-pointer'
-                      : 'text-white shadow-md cursor-not-allowed'
+                      : 'text-white shadow-md cursor-wait'
                   }`}
                 >
                   {isSubmitting ? (
@@ -2013,12 +2056,28 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                     <span className={vorschauModus ? 'whitespace-nowrap text-[15px]' : undefined}>{vorschauModus ? SCHRANKE.knopf : KNOPF_KONTAKT}</span>
                   )}
                 </button>
-                <p className="text-center text-xs text-[#8B8B8B] leading-snug">
-                  {SCHRANKE.fussnote}<br />Mit dem Absenden stimmen Sie unserer{' '}
-                  <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
-                    Datenschutzerklärung
-                  </a>{' '}zu.
-                </p>
+                {/* Registry #121: Sterne direkt unter dem Knopf, damit Knopf, Gesichter
+                    und Sterne als ein Paket im ersten Bild stehen (Martin 23.09.). Ohne
+                    Stand keine Zeile; ohne Sprungziel, niemand soll den Schritt verlassen. */}
+                {bewertung && (
+                  <div className="mt-0.5 flex justify-center">
+                    <span aria-label={`${bewertung.schnitt} von 5 Sternen`}><SterneText stand={bewertung} /></span>
+                  </div>
+                )}
+                {/* Registry #121 (Martin 10.10.: „prominenter, so wie das vorher da drunter
+                    war"): Haken und Schrift wie der Punkt in der Leiste am Kartenfuß. */}
+                <div className="flex flex-col items-center gap-1">
+                  <p className="flex items-center justify-center gap-1.5 text-xs">
+                    <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" aria-hidden="true" />
+                    <span className="text-[#3D3D3D] font-medium">{SCHRANKE.fussnote}</span>
+                  </p>
+                  <p className="text-center text-xs text-[#8B8B8B] leading-snug">
+                    Mit dem Absenden stimmen Sie unserer{' '}
+                    <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
+                      Datenschutzerklärung
+                    </a>{' '}zu.
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="flex items-center">
@@ -2043,13 +2102,17 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
             <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
             <span className="text-[#3D3D3D] font-medium">DSGVO-Konform</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
-            {/* War "Keine Werbeanrufe" (Martin 16.08. geaendert). Passt
-                zusaetzlich zur Leitplanke des SEA-Laufs: keine Aussagen
-                ueber Anrufe — das Gespraech ist Teil des Modells. */}
-            <span className="text-[#3D3D3D] font-medium">100&nbsp;% kostenfrei &amp; unverbindlich</span>
-          </div>
+          {/* Registry #121 (Martin 10.10.): Im Absendeblock steht der Satz schon
+              unter den Sternen, dort nicht doppelt in der Karte. */}
+          {!kontaktAbsendeblock && (
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
+              {/* War "Keine Werbeanrufe" (Martin 16.08. geaendert). Passt
+                  zusaetzlich zur Leitplanke des SEA-Laufs: keine Aussagen
+                  ueber Anrufe — das Gespraech ist Teil des Modells. */}
+              <span className="text-[#3D3D3D] font-medium">100&nbsp;% kostenfrei &amp; unverbindlich</span>
+            </div>
+          )}
         </div>
       </div>
       </div>
