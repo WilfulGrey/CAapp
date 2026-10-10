@@ -18,7 +18,7 @@ export type LeadEvent =
   | 'caregiver_declined'           // customer hat eine Pflegekraft abgelehnt (matching ODER interest)
   | 'caregiver_declined_undone'    // customer hat die Ablehnung rückgängig gemacht (Undo)
   | 'application_rejected'        // customer Bewerbung abgelehnt
-  | 'patient_form_step'           // Patientenbogen: Schritt erreicht (metadata.step) — Abbruch-Analyse; Server speichert jeden (nicht dedupliziert, Registry #109)
+  | 'patient_form_step'           // Patientenbogen: Schritt erreicht (metadata.step) — Abbruch-Analyse; Server speichert jeden (nicht dedupliziert, Registry #109), Sitzungs-Schlüssel mit Schritt (Registry #122)
   | 'patient_form_save_failed'    // Patientenbogen: Server-Save gescheitert (metadata.error)
   | 'patient_form_location_unresolved' // Einsatzort nicht auf einen Mamamia-location_id auflösbar → Speichern abgelehnt (Registry #65); Team-Mail
   | 'angebots_feedback';          // Rückmeldung zum Angebot: ein Tap + optionales Detail
@@ -104,6 +104,7 @@ export interface LeadEventMetadata {
 // Session-level dedupe so a re-render or repeated save doesn't spam the
 // endpoint. For caregiver_invited we include the caregiver id in the key so
 // inviting different caregivers in the same session each produces an event.
+// For patient_form_step the step is part of the key (Registry #122).
 // For patient_data_saved we include phone so a re-save with an edited
 // number actually reaches the server (where leads.telefon gets refreshed).
 const sent = new Set<string>();
@@ -129,6 +130,12 @@ function dedupeKey(token: string, event: LeadEvent, metadata?: LeadEventMetadata
   // die das Team-Ereignis existiert (Registry #65).
   if (event === 'patient_form_location_unresolved') {
     return `${token}:${event}:${metadata?.plz ?? ''}:${metadata?.lookup_down ?? ''}`;
+  }
+  // Patientenbogen: der erreichte Schritt gehört in den Schlüssel (Registry #122). Ohne ihn besetzte der erste Schritt
+  // den Schlüssel, und je Seitenaufruf kam nur er beim Server an — obwohl der Server seit Registry #109 jeden Schritt
+  // speichert. Wo im Bogen abgebrochen wird, war deshalb nicht messbar.
+  if (event === 'patient_form_step') {
+    return `${token}:${event}:${metadata?.step ?? ''}`;
   }
   return `${token}:${event}`;
 }
