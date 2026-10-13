@@ -74,7 +74,20 @@ const klebt = (el: Element) => {
   return pos === 'sticky' || pos === 'fixed';
 };
 
-function kalenderEinblenden(feld: HTMLElement, kalender: HTMLElement) {
+/** Wie viel Höhe ein Monat mit sechs Wochenzeilen mehr braucht als der angezeigte (4 oder 5 Zeilen). Beim Öffnen
+ *  gleich mit eingeplant, damit Blättern nie scrollen muss (Gegenprüfung 13.10.: scrollte der Kalender beim
+ *  Wechsel Oktober → November nach, rutschte „Nächster Monat“ unter dem Daumen 46 px nach oben). */
+function platzFuerSechsZeilen(tage: HTMLElement): number {
+  const zeilen = Math.ceil(tage.children.length / 7); // Leerfelder vor dem 1. + Tage
+  if (zeilen <= 0 || zeilen >= 6) return 0;
+  const luecke = parseFloat(getComputedStyle(tage).rowGap) || 0;
+  const zeile = (tage.getBoundingClientRect().height + luecke) / zeilen;
+  return Math.round((6 - zeilen) * zeile);
+}
+
+/** Scrollt, falls nötig, und gibt zurück, um wie viele Pixel (0 = gar nicht). `platzUnten` = zusätzliche Höhe,
+ *  die unter dem Kalender frei bleiben soll. */
+function kalenderEinblenden(feld: HTMLElement, kalender: HTMLElement, platzUnten = 0): number {
   const scroller = scrollerVon(feld);
   // Sichtbarer Bereich: visualViewport (iOS mit Tastatur oder Zoom), sonst das Fenster;
   // am Desktop zusätzlich auf den Rahmen beschnitten.
@@ -102,19 +115,31 @@ function kalenderEinblenden(feld: HTMLElement, kalender: HTMLElement) {
     if (r.bottom > oben && r.top < grenzeUnten) grenzeUnten = r.top;
   });
   const um = kalenderNachschub({
-    kalenderUnten: kalender.getBoundingClientRect().bottom,
+    kalenderUnten: kalender.getBoundingClientRect().bottom + platzUnten,
     feldOben: feld.getBoundingClientRect().top,
     kopfUnten,
     grenzeUnten,
   });
-  if (um <= 0) return;
+  if (um <= 0) return 0;
   if (scroller) {
     if (typeof scroller.scrollBy === 'function') scroller.scrollBy({ top: um, behavior: 'smooth' });
     else scroller.scrollTop += um;
   } else {
     window.scrollBy({ top: um, behavior: 'smooth' });
   }
+  return um;
 }
+
+// ── Tipps, die begannen, während der Kalender noch ins Bild glitt, zählen im Kalender nicht. Gegenprüfung 13.10.:
+// Ein schneller zweiter Tipp (oder Doppelklick) aufs Feld in der unteren Bildhälfte traf nach dem Einblend-Scroll
+// einen Tag und setzte still ein Datum. Maßgeblich ist der Moment des Aufsetzens, nicht der des click.
+
+/** Gesperrt mindestens so lange nach dem Start des Einblend-Scrolls … */
+export const EINBLEND_SPERRE_MS = 450;
+/** … und, solange noch gescrollt wird, bis so lange nach dem letzten Scroll-Ereignis … */
+export const SCROLL_RUHE_MS = 80;
+/** … höchstens aber so lange nach dem Start. */
+export const EINBLEND_SPERRE_MAX_MS = 1000;
 
 /** Ab so viel Bewegung zwischen Aufsetzen und Loslassen ist es ein Wisch, kein Tipp. */
 const TIPP_TOLERANZ = 10;
@@ -134,6 +159,13 @@ export const DateField: FC<{
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
   const rootRef = useRef<HTMLDivElement>(null);
   const kalenderRef = useRef<HTMLDivElement>(null);
+  const tageRef = useRef<HTMLDivElement>(null);
+  // Bis wann (performance.now) Tipps im Kalender nicht zählen, und ob der letzte begann, solange das galt.
+  const sperreBis = useRef(0);
+  const druckInSperre = useRef(false);
+  const merkeDruck = () => { druckInSperre.current = performance.now() < sperreBis.current; };
+  /** Tipp im Kalender nur ausführen, wenn er nicht während des Einblend-Scrolls begann. */
+  const nurNachSperre = (aktion: () => void) => () => { if (!druckInSperre.current) aktion(); };
 
   // Schließen bei Berührung außerhalb nur bei einem echten Tipp. Bis 13.10. schloss jedes
   // touchstart außerhalb: Ein Wisch, der auf der Knopfleiste begann, klappte den Kalender ohne
@@ -191,15 +223,36 @@ export const DateField: FC<{
     return () => meldeFeldAufgeklappt(false);
   }, [open]);
 
-  // Nach dem Öffnen (und beim Monatswechsel, 5 oder 6 Wochenzeilen) den Kalender ganz ins Bild
-  // holen. rAF: erst wenn auch die Knopfleiste umgestellt ist.
+  // Nur nach dem Öffnen den Kalender ganz ins Bild holen, mit Platz für einen Monat mit sechs
+  // Wochenzeilen. Beim Blättern wird nicht gescrollt: Der Monatskopf mit „Nächster Monat“ bleibt,
+  // wo er ist, der Kalender wächst oder schrumpft nur nach unten. rAF: erst wenn auch die
+  // Knopfleiste umgestellt ist. Läuft dabei ein Scroll, zählen Tipps im Kalender bis zu seinem Ende
+  // nicht (mindestens EINBLEND_SPERRE_MS, solange noch Scroll-Ereignisse kommen länger).
   useEffect(() => {
     if (!open) return;
+    let aufraeumen: (() => void) | undefined;
     const id = window.requestAnimationFrame(() => {
-      if (rootRef.current && kalenderRef.current) kalenderEinblenden(rootRef.current, kalenderRef.current);
+      const feld = rootRef.current;
+      const kalender = kalenderRef.current;
+      if (!feld || !kalender) return;
+      const platz = tageRef.current ? platzFuerSechsZeilen(tageRef.current) : 0;
+      if (kalenderEinblenden(feld, kalender, platz) <= 0) return;
+      const start = performance.now();
+      sperreBis.current = start + EINBLEND_SPERRE_MS;
+      const imScroll = () => {
+        const jetzt = performance.now();
+        if (jetzt - start < EINBLEND_SPERRE_MAX_MS) sperreBis.current = Math.max(sperreBis.current, jetzt + SCROLL_RUHE_MS);
+      };
+      document.addEventListener('scroll', imScroll, true);
+      aufraeumen = () => document.removeEventListener('scroll', imScroll, true);
     });
-    return () => window.cancelAnimationFrame(id);
-  }, [open, viewYear, viewMonth]);
+    return () => {
+      window.cancelAnimationFrame(id);
+      aufraeumen?.();
+      sperreBis.current = 0;
+      druckInSperre.current = false;
+    };
+  }, [open]);
 
   const toggle = () => {
     if (!open) {
@@ -242,13 +295,18 @@ export const DateField: FC<{
         // Bewusst KEIN absolute-Dropdown: die Angebots-Karte hat
         // overflow-hidden und würde den Kalender abschneiden (Martin,
         // Screenshot 08.07.). Im Fluss gerendert wächst die Karte mit.
-        <div ref={kalenderRef} className="mt-2 w-full max-w-[340px] bg-white border-[1.5px] border-pm-line rounded-[18px] p-3">
+        <div
+          ref={kalenderRef}
+          onPointerDownCapture={merkeDruck}
+          onTouchStartCapture={merkeDruck}
+          className="mt-2 w-full max-w-[340px] bg-white border-[1.5px] border-pm-line rounded-[18px] p-3"
+        >
           <div className="flex items-center justify-between mb-2 px-1">
-            <button type="button" onClick={prevMonth} aria-label="Voriger Monat" className="w-11 h-11 rounded-full hover:bg-pm-paper flex items-center justify-center text-pm-taupe-ink">
+            <button type="button" onClick={nurNachSperre(prevMonth)} aria-label="Voriger Monat" className="w-11 h-11 rounded-full hover:bg-pm-paper flex items-center justify-center text-pm-taupe-ink">
               <ChevronLeft className="w-4 h-4" />
             </button>
             <span className="text-[15.5px] font-bold text-pm-ink">{MONTHS[viewMonth]} {viewYear}</span>
-            <button type="button" onClick={nextMonth} aria-label="Nächster Monat" className="w-11 h-11 rounded-full hover:bg-pm-paper flex items-center justify-center text-pm-taupe-ink">
+            <button type="button" onClick={nurNachSperre(nextMonth)} aria-label="Nächster Monat" className="w-11 h-11 rounded-full hover:bg-pm-paper flex items-center justify-center text-pm-taupe-ink">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -257,7 +315,7 @@ export const DateField: FC<{
               <span key={w} className="h-7 flex items-center justify-center text-[12.5px] font-semibold text-pm-muted">{w}</span>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-0.5">
+          <div ref={tageRef} className="grid grid-cols-7 gap-0.5">
             {Array.from({ length: lead }, (_, i) => <span key={`lead-${i}`} />)}
             {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => {
               const iso = toIso(viewYear, viewMonth, d);
@@ -271,7 +329,7 @@ export const DateField: FC<{
                   key={d}
                   type="button"
                   disabled={disabled}
-                  onClick={() => { onChange(iso); setOpen(false); }}
+                  onClick={nurNachSperre(() => { onChange(iso); setOpen(false); })}
                   className={`h-11 rounded-full text-[15px] flex items-center justify-center transition-colors ${
                     selected
                       ? 'bg-pm-taupe text-white font-bold'

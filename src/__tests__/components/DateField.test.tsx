@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vite
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { DateField, kalenderNachschub, KALENDER_LUFT_UNTEN } from '../../components/portal/DateField';
+import {
+  DateField, kalenderNachschub, KALENDER_LUFT_UNTEN, EINBLEND_SPERRE_MS, SCROLL_RUHE_MS, EINBLEND_SPERRE_MAX_MS,
+} from '../../components/portal/DateField';
 import { FormNav, meldeFeldAufgeklappt } from '../../components/ui/FormNav';
 
 // jsdom kennt kein PointerEvent: als MouseEvent mit isPrimary nachbauen, damit clientX/Y ankommen.
@@ -31,8 +33,8 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 // Formular wie Schritt 3: Feld, darunter etwas anderes, unten die Knopfleiste.
-function Formular({ onWeiter = () => {}, onDraussen = () => {} }: { onWeiter?: () => void; onDraussen?: () => void }) {
-  const [wert, setWert] = useState('');
+function Formular({ onWeiter = () => {}, onDraussen = () => {}, start = '' }: { onWeiter?: () => void; onDraussen?: () => void; start?: string }) {
+  const [wert, setWert] = useState(start);
   return (
     <div>
       <DateField value={wert} onChange={setWert} min="2000-01-01" />
@@ -208,10 +210,12 @@ describe('DateField – Kalender holt sich beim Öffnen ins Bild', () => {
     });
   });
   // Feld-Wurzel = Elternteil des Feld-Knopfs, Kalender = ihr letztes Kind (erst nach dem Öffnen da).
+  // fireEvent statt userEvent: synchron, damit die Maße stehen, bevor der rAF des Effekts läuft
+  // (mit `await userEvent.click` lief er unter Last manchmal vorher, und der Test sah keinen Scroll).
   const oeffnen = async (feld: Rechteck, kalender: Rechteck) => {
     const wurzel = feldKnopf().parentElement!;
     rechtecke.set(wurzel, feld);
-    await userEvent.click(feldKnopf());
+    fireEvent.click(feldKnopf());
     rechtecke.set(wurzel.lastElementChild!, kalender);
   };
   const innerHeight = window.innerHeight;
@@ -260,5 +264,145 @@ describe('DateField – Kalender holt sich beim Öffnen ins Bild', () => {
     await oeffnen({ top: 400, bottom: 448 }, { top: 456, bottom: 900 });
     await waitFor(() => expect(rahmenScroll).toHaveBeenCalledWith({ top: 900 - (700 - 12), behavior: 'smooth' }));
     expect(scrollBy).not.toHaveBeenCalled();
+  });
+});
+
+// Gegenprüfung 13.10.: (a) ein schneller zweiter Tipp aufs Feld traf nach dem Einblend-Scroll einen Tag
+// und setzte still ein Datum; (b) beim Blättern scrollte der Kalender nach, „Nächster Monat“ rutschte
+// unter dem Daumen weg (Oktober 5 → November 6 Wochenzeilen).
+describe('DateField – Einblend-Scroll nur beim Öffnen, Tipps während des Scrolls zählen nicht', () => {
+  type Rechteck = { top: number; bottom: number };
+  const rechtecke = new Map<Element, Rechteck>();
+  const rect = ({ top, bottom }: Rechteck) =>
+    ({ top, bottom, left: 0, right: 390, width: 390, height: bottom - top, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+  let jetzt = 1000;
+  beforeEach(() => {
+    rechtecke.clear();
+    jetzt = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => jetzt);
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      return rect(rechtecke.get(this) ?? { top: 0, bottom: 0 });
+    });
+  });
+  const innerHeight = window.innerHeight;
+  const ZEILE = 46; // Tag 44 px + Abstand 2 px
+  // Öffnen wie ein Kunde mit Feld in der unteren Bildhälfte: der Kalender ragt unter den Rand, also wird gescrollt.
+  const oeffnenUnten = async (zeilen: number) => {
+    const wurzel = feldKnopf().parentElement!;
+    rechtecke.set(wurzel, { top: 500, bottom: 548 });
+    fireEvent.click(feldKnopf());
+    const kalender = wurzel.lastElementChild!;
+    rechtecke.set(kalender, { top: 556, bottom: 556 + 110 + zeilen * ZEILE });
+    rechtecke.set(kalender.lastElementChild!, { top: 650, bottom: 650 + zeilen * ZEILE });
+    await waitFor(() => expect(scrollBy).toHaveBeenCalledTimes(1));
+    return 556 + 110 + zeilen * ZEILE;
+  };
+  const tag = (n: number) => screen.getAllByRole('button', { name: String(n) })[0];
+  const monat = () => screen.getByText(/^(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember) \d{4}$/).textContent;
+
+  it('beim Öffnen gleich Platz für einen Monat mit sechs Wochenzeilen (Oktober 2026 hat fünf)', async () => {
+    render(<Formular start="2026-10-20" />);
+    const unten = await oeffnenUnten(5);
+    expect(scrollBy).toHaveBeenCalledWith({ top: unten + ZEILE - (innerHeight - KALENDER_LUFT_UNTEN), behavior: 'smooth' });
+  });
+
+  it('Monat mit sechs Zeilen (November 2026): kein Aufschlag', async () => {
+    render(<Formular start="2026-11-20" />);
+    const unten = await oeffnenUnten(6);
+    expect(scrollBy).toHaveBeenCalledWith({ top: unten - (innerHeight - KALENDER_LUFT_UNTEN), behavior: 'smooth' });
+  });
+
+  it('Blättern scrollt nicht: Oktober → November → Dezember, ein einziger Scroll beim Öffnen', async () => {
+    render(<Formular start="2026-10-20" />);
+    await oeffnenUnten(5);
+    jetzt += EINBLEND_SPERRE_MS + 50;
+    tippen(screen.getByRole('button', { name: 'Nächster Monat' }));
+    await new Promise(r => setTimeout(r, 80));
+    expect(monat()).toBe('November 2026');
+    tippen(screen.getByRole('button', { name: 'Nächster Monat' }));
+    await new Promise(r => setTimeout(r, 80));
+    expect(monat()).toBe('Dezember 2026');
+    expect(scrollBy).toHaveBeenCalledTimes(1);
+  });
+
+  it('Doppeltipp: zweiter Tipp landet während des Einblend-Scrolls auf einem Tag → kein Datum, Kalender bleibt offen', async () => {
+    render(<Formular start="2026-10-20" />);
+    await oeffnenUnten(5);
+    jetzt += 200;
+    tippen(tag(15));
+    expect(feldKnopf()).toHaveTextContent('20.10.2026');
+    expect(kalenderOffen()).toBe(true);
+    // Auch „Nächster Monat“ zählt in dieser Zeit nicht.
+    tippen(screen.getByRole('button', { name: 'Nächster Monat' }));
+    expect(monat()).toBe('Oktober 2026');
+  });
+
+  it('nach dem Ende der Sperre zählt der Tipp sofort', async () => {
+    render(<Formular start="2026-10-20" />);
+    await oeffnenUnten(5);
+    jetzt += EINBLEND_SPERRE_MS;
+    tippen(tag(15));
+    expect(feldKnopf()).toHaveTextContent('15.10.2026');
+    expect(kalenderOffen()).toBe(false);
+  });
+
+  it('maßgeblich ist das Aufsetzen: begonnen in der Sperre, losgelassen danach → zählt nicht', async () => {
+    render(<Formular start="2026-10-20" />);
+    await oeffnenUnten(5);
+    jetzt += 300;
+    fireEvent.pointerDown(tag(15), { clientX: 50, clientY: 50 });
+    jetzt += 400;
+    fireEvent.pointerUp(tag(15), { clientX: 50, clientY: 50 });
+    fireEvent.click(tag(15));
+    expect(feldKnopf()).toHaveTextContent('20.10.2026');
+    expect(kalenderOffen()).toBe(true);
+  });
+
+  it('läuft das Scrollen länger, gilt die Sperre bis kurz nach dem letzten Scroll-Ereignis', async () => {
+    render(<Formular start="2026-10-20" />);
+    await oeffnenUnten(5);
+    jetzt += EINBLEND_SPERRE_MS - 10;
+    fireEvent.scroll(document);
+    jetzt += 40; // nach der Grundsperre, aber noch in der Ruhezeit nach dem Scroll
+    tippen(tag(15));
+    expect(feldKnopf()).toHaveTextContent('20.10.2026');
+    jetzt += SCROLL_RUHE_MS;
+    tippen(tag(15));
+    expect(feldKnopf()).toHaveTextContent('15.10.2026');
+  });
+
+  it('Scroll-Ereignisse nach EINBLEND_SPERRE_MAX_MS verlängern nichts (der Kunde scrollt selbst)', async () => {
+    render(<Formular start="2026-10-20" />);
+    await oeffnenUnten(5);
+    jetzt += EINBLEND_SPERRE_MAX_MS + 10;
+    fireEvent.scroll(document);
+    tippen(tag(15));
+    expect(feldKnopf()).toHaveTextContent('15.10.2026');
+  });
+
+  it('ohne Einblend-Scroll keine Sperre: passt der Kalender, zählt auch ein sofortiger Tipp', async () => {
+    render(<Formular start="2026-10-20" />);
+    const wurzel = feldKnopf().parentElement!;
+    rechtecke.set(wurzel, { top: 100, bottom: 148 });
+    fireEvent.click(feldKnopf());
+    rechtecke.set(wurzel.lastElementChild!, { top: 156, bottom: 500 });
+    await new Promise(r => setTimeout(r, 50));
+    expect(scrollBy).not.toHaveBeenCalled();
+    tippen(tag(15));
+    expect(feldKnopf()).toHaveTextContent('15.10.2026');
+  });
+
+  it('zu und wieder auf: die Sperre vom letzten Öffnen gilt nicht weiter', async () => {
+    render(<Formular start="2026-10-20" />);
+    await oeffnenUnten(5);
+    jetzt += 100;
+    tippen(tag(15)); // in der Sperre, zählt nicht
+    fireEvent.click(feldKnopf()); // zu
+    expect(kalenderOffen()).toBe(false);
+    rechtecke.set(feldKnopf().parentElement!, { top: 100, bottom: 148 });
+    fireEvent.click(feldKnopf()); // wieder auf, passt jetzt ohne Scroll
+    await new Promise(r => setTimeout(r, 50));
+    tippen(tag(16));
+    expect(feldKnopf()).toHaveTextContent('16.10.2026');
   });
 });
