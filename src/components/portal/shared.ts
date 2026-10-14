@@ -397,7 +397,8 @@ export function einsatzortHinweis(s: EinsatzortStand): string | null {
       : 'Bitte geben Sie eine 5-stellige Postleitzahl ein.';
   }
   if (s.keinTreffer || s.abgelehnt) {
-    return `Zu der Postleitzahl ${plz} kennen wir keinen Einsatzort. Wir vermitteln ausschließlich innerhalb Deutschlands — bitte prüfen Sie die PLZ. Liegt der Einsatzort außerhalb Deutschlands, können wir leider nicht vermitteln; melden Sie sich bei Fragen gern bei uns.`;
+    // Wortlaut A-R5.4 (texte_final.md, 13.10.): ohne „vermitteln“ (Primundus beschäftigt die Kräfte selbst).
+    return `Zu der Postleitzahl ${plz} kennen wir keinen Einsatzort. Unsere Pflegekräfte sind nur in Deutschland im Einsatz. Bitte prüfen Sie die Postleitzahl. Bei Fragen hilft Ihnen Marta Kapcio gern.`;
   }
   if (s.ort.trim() === '') return 'Bitte wählen Sie Ihren Ort aus der Vorschlagsliste.';
   return null;
