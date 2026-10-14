@@ -5,7 +5,7 @@ import { useState } from 'react';
 import {
   DateField, kalenderNachschub, KALENDER_LUFT_UNTEN, EINBLEND_SPERRE_MS, SCROLL_RUHE_MS, EINBLEND_SPERRE_MAX_MS,
 } from '../../components/portal/DateField';
-import { FormNav, meldeFeldAufgeklappt } from '../../components/ui/FormNav';
+import { FormNav, meldeFeldAufgeklappt, TASTATUR_NACHLAUF_MS } from '../../components/ui/FormNav';
 
 // jsdom kennt kein PointerEvent: als MouseEvent mit isPrimary nachbauen, damit clientX/Y ankommen.
 beforeAll(() => {
@@ -69,6 +69,64 @@ describe('FormNav – im Fluss, solange ein Feld aufgeklappt ist', () => {
     expect(leiste().className).not.toMatch(/\bsticky\b/);
     act(() => { meldeFeldAufgeklappt(false); meldeFeldAufgeklappt(false); });
     expect(leiste().className).toMatch(/\bsticky bottom-0\b/);
+  });
+});
+
+describe('FormNav – nach dem Verlassen eines Eingabefelds klebt die Leiste erst nach dem Tipp wieder', () => {
+  afterEach(() => vi.useRealTimers());
+
+  function MitFeld() {
+    return (
+      <div>
+        <input aria-label="Ort" />
+        <button type="button">Dorf/Land</button>
+        <FormNav onWeiter={() => {}} weiterText="Weiter →" />
+      </div>
+    );
+  }
+
+  it('Fokus im Feld → im Fluss; Fokus weg → bleibt kurz im Fluss, klebt nach TASTATUR_NACHLAUF_MS', () => {
+    vi.useFakeTimers();
+    render(<MitFeld />);
+    const feld = screen.getByRole('textbox', { name: 'Ort' });
+    act(() => { fireEvent.focusIn(feld); });
+    expect(leiste().className).not.toMatch(/\bsticky\b/);
+    act(() => { fireEvent.focusOut(feld); });
+    // Zwischen mousedown und click: die Leiste darf noch nicht unter den Finger rücken.
+    expect(leiste().className).not.toMatch(/\bsticky\b/);
+    act(() => { vi.advanceTimersByTime(TASTATUR_NACHLAUF_MS - 1); });
+    expect(leiste().className).not.toMatch(/\bsticky\b/);
+    act(() => { vi.advanceTimersByTime(1); });
+    expect(leiste().className).toMatch(/\bsticky bottom-0\b/);
+  });
+
+  it('Fokus springt gleich ins nächste Feld → bleibt im Fluss, kein Zwischenkleben', () => {
+    vi.useFakeTimers();
+    render(<MitFeld />);
+    const feld = screen.getByRole('textbox', { name: 'Ort' });
+    act(() => { fireEvent.focusIn(feld); fireEvent.focusOut(feld); });
+    act(() => { vi.advanceTimersByTime(100); fireEvent.focusIn(feld); });
+    act(() => { vi.advanceTimersByTime(TASTATUR_NACHLAUF_MS * 2); });
+    expect(leiste().className).not.toMatch(/\bsticky\b/);
+  });
+
+  it('Tipp auf eine Antwort direkt nach dem Feld kommt an (Leiste rückt nicht dazwischen)', () => {
+    vi.useFakeTimers();
+    const getippt = vi.fn();
+    render(
+      <div>
+        <input aria-label="Ort" />
+        <button type="button" onClick={getippt}>Dorf/Land</button>
+        <FormNav onWeiter={() => {}} weiterText="Weiter →" />
+      </div>,
+    );
+    const feld = screen.getByRole('textbox', { name: 'Ort' });
+    act(() => { fireEvent.focusIn(feld); });
+    const knopf = screen.getByRole('button', { name: 'Dorf/Land' });
+    act(() => { fireEvent.mouseDown(knopf); fireEvent.focusOut(feld); });
+    expect(leiste().className).not.toMatch(/\bsticky\b/);
+    act(() => { fireEvent.click(knopf); });
+    expect(getippt).toHaveBeenCalledTimes(1);
   });
 });
 

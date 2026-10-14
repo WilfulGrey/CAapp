@@ -13,6 +13,9 @@ import { Button } from './Button';
  *  (`false`). Solange eins offen ist, läuft die Leiste im Fluss statt unten zu kleben. */
 export const FELD_AUFGEKLAPPT = 'pm:feld-aufgeklappt';
 
+/** So lange läuft die Leiste nach dem Verlassen eines Eingabefelds noch im Fluss mit (Tipp muss erst ankommen). */
+export const TASTATUR_NACHLAUF_MS = 400;
+
 export function meldeFeldAufgeklappt(auf: boolean) {
   document.dispatchEvent(new CustomEvent<boolean>(FELD_AUFGEKLAPPT, { detail: auf }));
 }
@@ -41,11 +44,19 @@ export function FormNav({
   useEffect(() => {
     const istEingabe = (el: EventTarget | null) =>
       el instanceof HTMLElement && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !['checkbox', 'radio', 'button'].includes((el as HTMLInputElement).type)));
-    const an = (e: FocusEvent) => { if (istEingabe(e.target)) setTastatur(true); };
-    const aus = (e: FocusEvent) => { if (istEingabe(e.target)) setTastatur(false); };
+    // Erst nach dem Tipp wieder ankleben: Der Fokus geht zwischen mousedown und click verloren. Klebte die
+    // Leiste sofort wieder unten, rückte sie unter den Finger und schluckte den Tipp auf eine Antwort
+    // (iPhone-Simulator 14.10.: erster Tipp auf „Dorf/Land“ nach dem Ortsfeld ohne Wirkung).
+    let spaeter: ReturnType<typeof setTimeout> | undefined;
+    const an = (e: FocusEvent) => { if (istEingabe(e.target)) { clearTimeout(spaeter); setTastatur(true); } };
+    const aus = (e: FocusEvent) => {
+      if (!istEingabe(e.target)) return;
+      clearTimeout(spaeter);
+      spaeter = setTimeout(() => setTastatur(false), TASTATUR_NACHLAUF_MS);
+    };
     document.addEventListener('focusin', an);
     document.addEventListener('focusout', aus);
-    return () => { document.removeEventListener('focusin', an); document.removeEventListener('focusout', aus); };
+    return () => { clearTimeout(spaeter); document.removeEventListener('focusin', an); document.removeEventListener('focusout', aus); };
   }, []);
   // Zähler statt Ja/Nein: Mehrere Felder dürfen gleichzeitig offen sein, erst das letzte „zu“ zählt.
   const [aufgeklappt, setAufgeklappt] = useState(0);
