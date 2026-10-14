@@ -305,3 +305,57 @@ describe('AngebotCard – Stand 75b8df8 (stand75b8df8)', () => {
     expect(screen.getAllByText('Aus Ihrer Anfrage übernommen').length).toBeGreaterThan(0);
   });
 });
+
+// Messpunkte des Kalenders (Registry #123): AngebotCard macht aus Öffnen/Schließen des DateField die zwei Meldungen.
+describe('AngebotCard – Kalender-Messpunkte', () => {
+  const zumKalender = async (start: string) => {
+    entwurf({ ...VOLL, startDate: start });
+    const onMesspunkt = vi.fn();
+    render(<AngebotCard lead={lead} onMesspunkt={onMesspunkt} />);
+    for (let i = 0; i < 2; i++) await weiter();
+    schritt(3);
+    return onMesspunkt;
+  };
+  const feld = () => screen.getByRole('button', { name: /Datum wählen|\d{2}\.\d{2}\.\d{4}/ });
+
+  it('Feld leer: geöffnet, dann zu ohne Tag → „kalender_zu_ohne_datum“', async () => {
+    const onMesspunkt = await zumKalender('');
+    await userEvent.click(feld());
+    expect(onMesspunkt.mock.calls).toEqual([['kalender_geoeffnet']]);
+    await userEvent.click(feld());
+    expect(onMesspunkt.mock.calls).toEqual([['kalender_geoeffnet'], ['kalender_zu_ohne_datum']]);
+  });
+
+  it('Tag gewählt: keine Meldung „zu ohne Datum“', async () => {
+    const onMesspunkt = await zumKalender('');
+    await userEvent.click(feld());
+    await userEvent.click(screen.getByRole('button', { name: 'Nächster Monat' }));
+    await userEvent.click(screen.getAllByRole('button', { name: '15' })[0]);
+    expect(feld()).toHaveTextContent(/^15\.\d{2}\.\d{4}$/);
+    expect(onMesspunkt.mock.calls).toEqual([['kalender_geoeffnet']]);
+  });
+
+  it('Datum schon gesetzt: nur angesehen und zu → keine Meldung „zu ohne Datum“', async () => {
+    const onMesspunkt = await zumKalender('2099-12-01');
+    await userEvent.click(feld());
+    await userEvent.click(feld());
+    expect(onMesspunkt.mock.calls).toEqual([['kalender_geoeffnet']]);
+  });
+
+  it('Kalender offen, Schritt verlassen („Zurück“), Feld leer → „kalender_zu_ohne_datum“', async () => {
+    const onMesspunkt = await zumKalender('');
+    await userEvent.click(feld());
+    await userEvent.click(screen.getByRole('button', { name: 'Zurück' }));
+    schritt(2);
+    expect(onMesspunkt.mock.calls).toEqual([['kalender_geoeffnet'], ['kalender_zu_ohne_datum']]);
+  });
+
+  it('ohne Rückruf passiert nichts (und reportLeadEvent bekommt keine Kalender-Meldung)', async () => {
+    entwurf({ ...VOLL, startDate: '' });
+    render(<AngebotCard lead={lead} />);
+    for (let i = 0; i < 2; i++) await weiter();
+    await userEvent.click(feld());
+    await userEvent.click(feld());
+    expect(vi.mocked(reportLeadEvent).mock.calls.map((c) => c[1])).not.toContain('kalender_geoeffnet');
+  });
+});

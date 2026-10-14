@@ -70,12 +70,14 @@ export function KopfVorSpeichern({ anrede, kuerzel, sterne }: {
 // Karte unverändert. Nur der Abstand ist neu: Damals lag sie mit -mt-6 über der Unterkante des Kopfs auf der Fläche
 // „shell“; der Kopf steht jetzt auf dem Seitengrund, die Karte folgt mit 28 px Luft (wie die Angebotskarte im
 // Kompakt-Einstieg, pt-7), statt die Sternezeile zu überdecken.
-export function KostenkarteVorSpeichern({ lead, onBestpreis, heimEigenanteil, heimQuelle }: {
+export function KostenkarteVorSpeichern({ lead, onBestpreis, heimEigenanteil, heimQuelle, onKostenAufgeklappt }: {
   lead: Lead | null;
   onBestpreis: () => void;
   /** Heim-Eigenanteil im 1. Jahr und Quelle (eine Konstante in CustomerPortalPage). */
   heimEigenanteil: number;
   heimQuelle: string;
+  /** Messpunkt (Registry #123): „Alle Kosten im Überblick" aufgeklappt. Unsichtbar. */
+  onKostenAufgeklappt?: () => void;
 }) {
   const [offerExpandedManual, setOfferExpandedManual] = useState<boolean | null>(null);
   const [costsExpanded, setCostsExpanded] = useState(false);
@@ -161,7 +163,7 @@ export function KostenkarteVorSpeichern({ lead, onBestpreis, heimEigenanteil, he
 
             <button
               type="button"
-              onClick={() => setCostsExpanded(!costsExpanded)}
+              onClick={() => { if (!costsExpanded) onKostenAufgeklappt?.(); setCostsExpanded(!costsExpanded); }}
               aria-expanded={costsExpanded}
               className="mt-3 w-full min-h-[48px] flex items-center justify-between gap-2 border-t border-pm-line-soft pt-2 text-[15px] font-semibold text-pm-taupe-ink"
             >
@@ -332,6 +334,7 @@ export function WarumSheetVorSpeichern({ offen, onClose, onVervollstaendigen }: 
 export function EinstiegVorSpeichern({
   anrede, kuerzel, lead, onBestpreis, heimEigenanteil, heimQuelle, onWarum, onVervollstaendigen,
   laedt, karten, gehalteneEinladungen, vorschlaegeVorhanden, bereitsBearbeitet, formular, sterne,
+  onKostenAufgeklappt, onFaqGeoeffnet,
 }: {
   /** Anrede für „Guten Tag, …" (customerSalutation), ohne Anrede nur „Guten Tag". */
   anrede: string | null;
@@ -357,13 +360,16 @@ export function EinstiegVorSpeichern({
   /** Das offene Formular (AngebotCard mit `stand75b8df8`). */
   formular: ReactNode;
   sterne: SterneStand | null;
+  /** Unsichtbare Messpunkte (Registry #123): Kostenaufstellung aufgeklappt, eine Häufige Frage aufgeklappt. */
+  onKostenAufgeklappt?: () => void;
+  onFaqGeoeffnet?: (schluessel: string) => void;
 }) {
   const hasAnyCard = karten.length > 0;
   return (
     <div className="bg-pm-paper">
       <KopfVorSpeichern anrede={anrede} kuerzel={kuerzel} sterne={sterne} />
 
-      <KostenkarteVorSpeichern lead={lead} onBestpreis={onBestpreis} heimEigenanteil={heimEigenanteil} heimQuelle={heimQuelle} />
+      <KostenkarteVorSpeichern lead={lead} onBestpreis={onBestpreis} heimEigenanteil={heimEigenanteil} heimQuelle={heimQuelle} onKostenAufgeklappt={onKostenAufgeklappt} />
 
       <div className="max-w-3xl mx-auto px-3.5 pt-1 pb-6 space-y-4">
         {/* id = Sprungziel des Mail-Deeplinks `goto=matches`. */}
@@ -466,7 +472,7 @@ export function EinstiegVorSpeichern({
         {/* Häufige Fragen wie heute im Kompakt-Einstieg (Martin 10.10.2026): Karte mit den drei Grundfragen und
             „N weitere Fragen“, heutiger Bestand (auch die Bestpreis-Frage, #118). */}
         <div className="pt-6">
-          <FaqListe ruhig karte />
+          <FaqListe ruhig karte onFrageGeoeffnet={onFaqGeoeffnet} />
         </div>
         <div className="pt-4">
           <MartaBox sterne={sterne} />

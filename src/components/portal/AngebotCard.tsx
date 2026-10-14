@@ -89,7 +89,10 @@ export const AngebotCard: FC<{
    *  75b8df8 — letzter Knopf „Speichern" mit „Zurück" daneben, kein Satz darüber, Ladetext „Speichern…", beim
    *  festen Wert „Aus Ihrem Kostenrechner übernommen". Datenfluss, Prüfungen und Speichern bleiben wie heute. */
   stand75b8df8?: boolean;
-}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet, gewaehlterStart, schonAbgesendet, onImBlick, eingebettet = false, stand75b8df8 = false }) => {
+  /** Unsichtbare Messpunkte des Kalenders (Registry #123): geöffnet, und zu ohne Datum (kein Tag gewählt, Feld leer).
+   *  Das Portal meldet sie nur für echte Leads; ohne Rückruf passiert nichts. */
+  onMesspunkt?: (punkt: 'kalender_geoeffnet' | 'kalender_zu_ohne_datum') => void;
+}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet, gewaehlterStart, schonAbgesendet, onImBlick, eingebettet = false, stand75b8df8 = false, onMesspunkt }) => {
   // Offen, sobald die Karte gerendert wird: Seit dem Wegfall des
   // Zwischenkopfs (11.08.) steuert allein der Abschnittskopf in
   // CustomerPortalPage, ob dieser Block überhaupt erscheint.
@@ -985,6 +988,8 @@ export const AngebotCard: FC<{
                     min={localTodayIso()}
                     invalid={!!fehlerFuer('startDate')}
                     onChange={iso => updatePatient(p => ({ ...p, startDate: iso }))}
+                    onGeoeffnet={() => onMesspunkt?.('kalender_geoeffnet')}
+                    onGeschlossen={(gewaehlt) => { if (!gewaehlt && !patient.startDate) onMesspunkt?.('kalender_zu_ohne_datum'); }}
                   />
                 </FormField>
                 {/* Rückrufnummer IMMER hier, neben dem Termin (Martin, 17.09.:

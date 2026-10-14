@@ -406,3 +406,74 @@ describe('DateField – Einblend-Scroll nur beim Öffnen, Tipps während des Scr
     expect(feldKnopf()).toHaveTextContent('16.10.2026');
   });
 });
+
+// Messpunkte (Registry #123): DateField bleibt generisch und meldet nur Öffnen und Schließen; was daraus ein Messpunkt
+// wird („zu ohne Datum"), entscheidet der Aufrufer (AngebotCard).
+describe('DateField – Rückrufe beim Öffnen und Schließen', () => {
+  function MitRueckrufen({ onGeoeffnet, onGeschlossen, start = '' }: {
+    onGeoeffnet: () => void; onGeschlossen: (gewaehlt: boolean) => void; start?: string;
+  }) {
+    const [wert, setWert] = useState(start);
+    return (
+      <div>
+        <DateField value={wert} onChange={setWert} min="2000-01-01" onGeoeffnet={onGeoeffnet} onGeschlossen={onGeschlossen} />
+        <button type="button">Draußen</button>
+        <FormNav onWeiter={() => {}} weiterText="Weiter →" />
+      </div>
+    );
+  }
+  const setup = (start = '') => {
+    const onGeoeffnet = vi.fn();
+    const onGeschlossen = vi.fn();
+    const r = render(<MitRueckrufen onGeoeffnet={onGeoeffnet} onGeschlossen={onGeschlossen} start={start} />);
+    return { onGeoeffnet, onGeschlossen, ...r };
+  };
+
+  it('Öffnen meldet einmal, Blättern nichts, ein gewählter Tag schließt mit gewaehlt=true', async () => {
+    const { onGeoeffnet, onGeschlossen } = setup();
+    expect(onGeoeffnet).not.toHaveBeenCalled();
+    await userEvent.click(feldKnopf());
+    expect(onGeoeffnet).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Nächster Monat' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Voriger Monat' }));
+    expect(onGeoeffnet).toHaveBeenCalledTimes(1);
+    expect(onGeschlossen).not.toHaveBeenCalled();
+    await userEvent.click(screen.getAllByRole('button', { name: '15' })[0]);
+    expect(kalenderOffen()).toBe(false);
+    expect(onGeschlossen).toHaveBeenCalledTimes(1);
+    expect(onGeschlossen).toHaveBeenLastCalledWith(true);
+  });
+
+  it('zu über das Feld ohne Tag: gewaehlt=false; wieder auf meldet erneut', async () => {
+    const { onGeoeffnet, onGeschlossen } = setup();
+    await userEvent.click(feldKnopf());
+    await userEvent.click(feldKnopf());
+    expect(onGeschlossen).toHaveBeenLastCalledWith(false);
+    await userEvent.click(feldKnopf());
+    expect(onGeoeffnet).toHaveBeenCalledTimes(2);
+  });
+
+  it('Tipp außerhalb ohne Tag: gewaehlt=false', async () => {
+    const { onGeschlossen } = setup();
+    await userEvent.click(feldKnopf());
+    tippen(screen.getByRole('button', { name: 'Draußen' }));
+    expect(kalenderOffen()).toBe(false);
+    expect(onGeschlossen).toHaveBeenCalledTimes(1);
+    expect(onGeschlossen).toHaveBeenLastCalledWith(false);
+  });
+
+  it('verschwindet offen (Schrittwechsel über „Zurück“/„Weiter“): gewaehlt=false', async () => {
+    const { onGeschlossen, rerender } = setup();
+    await userEvent.click(feldKnopf());
+    rerender(<div><FormNav onWeiter={() => {}} weiterText="Weiter →" /></div>);
+    expect(onGeschlossen).toHaveBeenCalledTimes(1);
+    expect(onGeschlossen).toHaveBeenLastCalledWith(false);
+  });
+
+  it('ohne Rückrufe wie bisher', async () => {
+    render(<Formular />);
+    await userEvent.click(feldKnopf());
+    await userEvent.click(screen.getAllByRole('button', { name: '20' })[0]);
+    expect(kalenderOffen()).toBe(false);
+  });
+});

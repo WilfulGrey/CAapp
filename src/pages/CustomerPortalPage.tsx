@@ -15,7 +15,7 @@ import { rankComparator } from '../lib/mamamia/matchingsRanking';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { isAboutDeStale, regenerateGermanDescription } from '../lib/mamamia/caregiverAbout';
 import { feedbackInRuhezeit, reportLeadEvent, fetchLeadEvents, KOSTENRECHNER_URL } from '../lib/leadEvents';
-import type { CaregiverSnapshot } from '../lib/leadEvents';
+import type { CaregiverSnapshot, EinladenQuelle, LeadEventMetadata, Messpunkt, ProfilQuelle } from '../lib/leadEvents';
 import { identifyClarity } from '../lib/clarity';
 import {
   useRejectApplication,
@@ -720,6 +720,42 @@ const CustomerPortalPage: FC = () => {
       return !!roh && (JSON.parse(roh) as { _isDraft?: boolean })._isDraft !== true;
     } catch { return false; }
   }, [lead?.token]);
+
+  // ── Unsichtbare Messpunkte (Registry #123, Martin 14.10.2026: „1,2,3 ja") ──────────────────────────────────────────
+  // Was Kunden vor und nach dem ersten Speichern ansehen und antippen: Profil, „Einladen", die Pop-ups „Warum erst die
+  // Pflegesituation?" und Bestpreisgarantie, „Alle Kosten im Überblick", Häufige Fragen, Kalender des Startdatums. Für
+  // Kunden unsichtbar. Nur echte Leads, nie in den Vorschau-Modi. Reine Aufzeichnung über die Bridge mit `notify: false`:
+  // keine Team-Mail, keine Kundenmail, kein Status-Wechsel (project 3/lib/messpunkte.ts). Einmal je Sitzung, Profil und
+  // Einladen je Pflegekraft, Fragen je Frage (Schlüssel in leadEvents.ts). Keine Personendaten in metadata.
+  // `vor_speichern` = Pflegesituation noch nie gespeichert (weder in dieser Sitzung noch laut Lead oder mamamia).
+  const vorSpeichern = !patientSaved && !schonAbgesendet;
+  const messen = (punkt: Messpunkt, metadata?: LeadEventMetadata) => {
+    if (IS_PREVIEW_ANY) return;
+    reportLeadEvent(lead?.token, punkt, metadata, false);
+  };
+  // Woher das nächste Profil geöffnet wird, wo der Zustand es nicht verrät (Liste im Kompakt-Einstieg, Mail-Link `cg=`,
+  // „Bereits bearbeitet", gebucht). Sonst folgt die Quelle aus dem Zustand, den derselbe Klick setzt.
+  const profilQuelleRef = useRef<ProfilQuelle | null>(null);
+  useEffect(() => {
+    if (!selectedNurse) return;
+    const quelle: ProfilQuelle = profilQuelleRef.current
+      ?? (nurseModalApp ? 'bewerbung' : selectedFromInterestId !== null ? 'interesse' : nurseMatchIdx !== null ? 'karte' : 'sonstige');
+    profilQuelleRef.current = null;
+    messen('profil_geoeffnet', { caregiver_id: selectedNurse.caregiverId, quelle, vor_speichern: vorSpeichern });
+    // Nur beim Öffnen eines Profils; die übrigen Zustände setzt derselbe Klick mit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedNurse]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (warumOffen) messen('warum_geoeffnet'); }, [warumOffen]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (bestpreisOffen) messen('bestpreis_geoeffnet'); }, [bestpreisOffen]);
+  // Kostenaufstellung der Angebotskarte (nach dem Speichern, Kompakt-Einstieg); vor dem Speichern meldet sie
+  // KostenkarteVorSpeichern selbst.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (costsExpanded) messen('kosten_aufgeklappt'); }, [costsExpanded]);
+  const messeEinladen = (nurse: Nurse, quelle: EinladenQuelle) =>
+    messen('einladen_getippt', { caregiver_id: nurse.caregiverId, quelle, vor_speichern: vorSpeichern });
+  const messeFrage = (frage: string) => messen('faq_geoeffnet', { frage });
   // Formular im Hinweis „Ihre Pflegesituation ist noch nicht vollständig" aufgeklappt (Kompakt-Einstieg).
   const [formImKasten, setFormImKasten] = useState(false);
   // Startdatum NUR aus dem Formular des Kunden (Martin 25.09.: „Das einzige
@@ -1312,6 +1348,7 @@ const CustomerPortalPage: FC = () => {
     // setzen, sonst versucht es jeder Refetch erneut.
     cgOpenedRef.current = true;
     if (idx < 0) return;
+    profilQuelleRef.current = 'mail';
     openNurseFromMatch(effectiveMatched[idx].nurse, idx);
   }, [effectiveMatched.length]);
   const doneApps = applications.filter((a) => a.status !== 'new');
@@ -2664,6 +2701,7 @@ const CustomerPortalPage: FC = () => {
         <AngebotCard
           eingebettet={eingebettet}
           stand75b8df8={stand75b8df8}
+          onMesspunkt={messen}
           lead={lead}
           mmCustomer={mmCustomer}
           onPatientSaved={(saved) => {
@@ -3464,7 +3502,7 @@ const CustomerPortalPage: FC = () => {
           isRecommended={idx === recIdx}
           onNurseClick={() => openNurseFromMatch(nurse, i)}
           onStufeClick={() => { setNurseModalStufe(true); openNurseFromMatch(nurse, i); }}
-          onInvite={() => canInviteNurse(i)}
+          onInvite={() => { messeEinladen(nurse, 'karte'); return canInviteNurse(i); }}
           onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
           onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
           globalInviteLocked={inviteInFlight}
@@ -3502,7 +3540,7 @@ const CustomerPortalPage: FC = () => {
         isRecommended={idx === recIdx}
         onNurseClick={() => openNurseFromMatch(nurse, i)}
         onStufeClick={() => { setNurseModalStufe(true); openNurseFromMatch(nurse, i); }}
-        onInvite={() => canInviteNurse(i)}
+        onInvite={() => { messeEinladen(nurse, 'karte'); return canInviteNurse(i); }}
         onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
         onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
         globalInviteLocked={inviteInFlight}
@@ -3562,7 +3600,7 @@ const CustomerPortalPage: FC = () => {
       <div className="space-y-2">
         <p className={kompakt && !rueckbau ? 'px-1 text-[15px] font-semibold text-pm-ink' : 'text-[11.5px] font-bold uppercase tracking-[.15em] text-pm-mute px-1'}>Bereits bearbeitet</p>
         {doneApps.map((app) => (
-          <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
+          <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { profilQuelleRef.current = 'bearbeitet'; setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
         ))}
         {shownDone.map(({ nurse, caregiverId, status, key, matchIdx, interest, fromEvent }) => (
           <MatchCardDone
@@ -3570,7 +3608,7 @@ const CustomerPortalPage: FC = () => {
             nurse={nurse}
             status={status}
             hasInterestOrigin={interest}
-            onNurseClick={() => (fromEvent || interest) ? setSelectedNurse(nurse) : openNurseFromMatch(nurse, matchIdx)}
+            onNurseClick={() => { profilQuelleRef.current = 'bearbeitet'; if (fromEvent || interest) setSelectedNurse(nurse); else openNurseFromMatch(nurse, matchIdx); }}
             // Kein „Rückgängig" für abgelehnte Interessenten (Review 25.09.): Die
             // Ablehnung steht serverseitig in lead_dismissed_caregivers, und der
             // Proxy kennt kein Zurücknehmen. Das lokale Rückgängig ließ die Karte
@@ -3724,7 +3762,7 @@ const CustomerPortalPage: FC = () => {
               }}
               sterne={sterne}
               app={acceptedApp}
-              onNurseClick={setSelectedNurse}
+              onNurseClick={(n) => { profilQuelleRef.current = 'gebucht'; setSelectedNurse(n); }}
               vertragSigned={vertragSigned}
               onSignContract={
                 canCompleteContract ? () => setContractApp(acceptedApp) : undefined
@@ -3768,6 +3806,8 @@ const CustomerPortalPage: FC = () => {
           bereitsBearbeitet={bereitsBearbeitet}
           formular={patientFormular(false, true)}
           sterne={sterne}
+          onKostenAufgeklappt={() => messen('kosten_aufgeklappt')}
+          onFaqGeoeffnet={messeFrage}
         />
       ) : (
       // Angebotsseite auf „paper" wie primundus.de; Karten weiß (Teil 3 des Redesigns).
@@ -4124,7 +4164,7 @@ const CustomerPortalPage: FC = () => {
                     setSelectedNurse(nurse);
                     setSelectedFromInterestId(i.caregiver_id);
                   }}
-                  onInvite={() => canInviteNurse(0)}
+                  onInvite={() => { messeEinladen(nurse, 'interesse'); return canInviteNurse(0); }}
                   onInviteConfirm={() => confirmInviteInterest(i.caregiver_id, label)}
                   onDismiss={() => confirmDismissInterest(i.caregiver_id)}
                   globalInviteLocked={inviteInFlight}
@@ -4249,7 +4289,7 @@ const CustomerPortalPage: FC = () => {
                             isRecommended={isRecommended}
                             onNurseClick={() => openNurseFromMatch(nurse, i)}
                             onStufeClick={() => { setNurseModalStufe(true); openNurseFromMatch(nurse, i); }}
-                            onInvite={() => canInviteNurse(i)}
+                            onInvite={() => { messeEinladen(nurse, 'karte'); return canInviteNurse(i); }}
                             onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
                             onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
                             globalInviteLocked={inviteInFlight}
@@ -4367,7 +4407,7 @@ const CustomerPortalPage: FC = () => {
               laedt={listeLaedt}
               alleBearbeitet={pflegekraftAuswahl.visibleNurses.length === 0 && pflegekraftAuswahl.allVisible.length > 0}
               keineVorschlaege={pflegekraftAuswahl.allVisible.length === 0 && (IS_PREVIEW_ANY || (mmReady && !!mmMatchings?.data))}
-              onProfil={openNurseFromMatch}
+              onProfil={(n, i) => { profilQuelleRef.current = 'liste'; openNurseFromMatch(n, i); }}
               telefonHref={TELEFON_HREF}
               gross={KOMPAKT_LOOK === 'angebot'}
             />
@@ -4474,7 +4514,7 @@ const CustomerPortalPage: FC = () => {
           </div>
         )}
         <div className={kompakt || nachAbsendenNeu ? '' : 'pt-6'}>
-          <FaqListe ruhig={kompakt || nachAbsendenNeu} karte={(kompakt || nachAbsendenNeu) && KOMPAKT_LOOK === 'angebot'} />
+          <FaqListe ruhig={kompakt || nachAbsendenNeu} karte={(kompakt || nachAbsendenNeu) && KOMPAKT_LOOK === 'angebot'} onFrageGeoeffnet={messeFrage} />
         </div>
         <div className="pt-4">
           <MartaBox sterne={sterne} ohneVertrauen={kompakt && KOMPAKT_LOOK === 'angebot'} />
@@ -4584,7 +4624,7 @@ const CustomerPortalPage: FC = () => {
           // Nur Profil-Ansicht (wie im BookedScreen) — KEIN nurseModalApp,
           // sonst böte das Profil-Modal „Angebot prüfen"/„Ablehnen" für die
           // längst gebuchte Pflegekraft an.
-          onNurseClick={setSelectedNurse}
+          onNurseClick={(n) => { profilQuelleRef.current = 'gebucht'; setSelectedNurse(n); }}
         />
       )}
 
@@ -4627,6 +4667,7 @@ const CustomerPortalPage: FC = () => {
             nurseMatchIdx !== null
               ? async () => {
                   const idx = nurseMatchIdx;
+                  messeEinladen(selectedNurse, 'profil');
                   // Modal animation is driven by the returned Promise — surfaces
                   // failure to the user instead of fake success (CLAUDE.md §1).
                   try {
@@ -4643,6 +4684,7 @@ const CustomerPortalPage: FC = () => {
                   // Einladen ruft denselben Interest-Invite-Pfad wie der
                   // Card-Footer-Button.
                   const cgId = selectedFromInterestId;
+                  messeEinladen(selectedNurse, 'profil');
                   try {
                     await confirmInviteInterest(cgId, displayName(selectedNurse.name));
                   } finally {

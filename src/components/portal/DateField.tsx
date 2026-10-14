@@ -153,8 +153,26 @@ export const DateField: FC<{
   min?: string; // ISO — frühere Tage sind ausgegraut
   invalid?: boolean; // Pflichtfeld-Optik (rote Umrandung solange leer)
   placeholder?: string;
-}> = ({ value, onChange, min, invalid, placeholder = 'Datum wählen' }) => {
+  /** Kalender wurde geöffnet (Tipp aufs Feld). Für Messpunkte des Aufrufers; ändert am Kalender nichts. */
+  onGeoeffnet?: () => void;
+  /** Kalender ist wieder zu — auch wenn das Feld verschwindet, solange er offen ist (z. B. „Zurück"/„Weiter").
+   *  `gewaehlt` = in diesem Öffnen wurde ein Tag gewählt. */
+  onGeschlossen?: (gewaehlt: boolean) => void;
+}> = ({ value, onChange, min, invalid, placeholder = 'Datum wählen', onGeoeffnet, onGeschlossen }) => {
   const [open, setOpen] = useState(false);
+  // Rückrufe ohne eigenen Zustand: immer die aktuellen nehmen, damit das Öffnen/Schließen unten nur an `open` hängt.
+  const geoeffnetRef = useRef(onGeoeffnet);
+  const geschlossenRef = useRef(onGeschlossen);
+  geoeffnetRef.current = onGeoeffnet;
+  geschlossenRef.current = onGeschlossen;
+  // In diesem Öffnen einen Tag gewählt?
+  const gewaehltRef = useRef(false);
+  useEffect(() => {
+    if (!open) return;
+    gewaehltRef.current = false;
+    geoeffnetRef.current?.();
+    return () => geschlossenRef.current?.(gewaehltRef.current);
+  }, [open]);
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
   const rootRef = useRef<HTMLDivElement>(null);
@@ -329,7 +347,7 @@ export const DateField: FC<{
                   key={d}
                   type="button"
                   disabled={disabled}
-                  onClick={nurNachSperre(() => { onChange(iso); setOpen(false); })}
+                  onClick={nurNachSperre(() => { gewaehltRef.current = true; onChange(iso); setOpen(false); })}
                   className={`h-11 rounded-full text-[15px] flex items-center justify-center transition-colors ${
                     selected
                       ? 'bg-pm-taupe text-white font-bold'
