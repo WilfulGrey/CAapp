@@ -19,6 +19,7 @@ import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { createHash } from 'crypto';
 import { kundenEmpfaenger } from '@/lib/empfaenger';
 import { holeBewertungsStand } from '@/lib/bewertungen-stand';
+import { MESSPUNKTE } from '@/lib/messpunkte';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
 // kostenrechner lead so the Nachfass emails can branch. Token-authenticated —
@@ -99,6 +100,9 @@ const ALLOWED_EVENTS = [
   // handlePost (planeAnreise): Kundenmail über die Warteschlange, keine Team-Mail
   // (die Kopie geht per BCC an info@).
   'caregiver_arrival_scheduled',
+  // Registry #123: unsichtbare Messpunkte des Portals (Profil geöffnet, Einladen getippt, Pop-ups, Kosten, Fragen,
+  // Kalender). Reine Aufzeichnung — bewusst in KEINER Mail-Liste und ohne eigenen Zweig (lib/messpunkte.ts).
+  ...MESSPUNKTE,
 ];
 const TEAM_NOTIFY_EVENTS = [
   'patient_data_saved',
@@ -166,6 +170,9 @@ const NON_DEDUPED_EVENTS = new Set([
   // messbar. Keine Mail: weder in TEAM_NOTIFY_EVENTS noch in
   // CUSTOMER_MAIL_EVENTS. Das Portal meldet jeden Schritt einmal je Sitzung.
   'patient_form_step',
+  // Registry #123: jeder Messpunkt zählt (Profil/Einladen je Pflegekraft, Fragen je Frage) — der Dedupe hier prüft nur
+  // (Lead, Typ) und ließe je Lead nur den ersten stehen. Keine Mail, das Portal meldet jeden einmal je Sitzung.
+  ...MESSPUNKTE,
 ]);
 // Customer-facing Mails (an die Lead-Email) je Event. Trigger sind die neuen
 // Caregiver-Lifecycle-Events; das eigentliche Hooking aus Mamamia kommt

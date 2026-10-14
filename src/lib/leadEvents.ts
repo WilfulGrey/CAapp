@@ -21,7 +21,29 @@ export type LeadEvent =
   | 'patient_form_step'           // Patientenbogen: Schritt erreicht (metadata.step) — Abbruch-Analyse; Server speichert jeden (nicht dedupliziert, Registry #109), Sitzungs-Schlüssel mit Schritt (Registry #122)
   | 'patient_form_save_failed'    // Patientenbogen: Server-Save gescheitert (metadata.error)
   | 'patient_form_location_unresolved' // Einsatzort nicht auf einen Mamamia-location_id auflösbar → Speichern abgelehnt (Registry #65); Team-Mail
-  | 'angebots_feedback';          // Rückmeldung zum Angebot: ein Tap + optionales Detail
+  | 'angebots_feedback'           // Rückmeldung zum Angebot: ein Tap + optionales Detail
+  // Unsichtbare Messpunkte (Registry #123, Martin 14.10.2026): nur aufzeichnen, nie eine Mail, nie ein Status-Wechsel.
+  // Der Server dedupliziert sie nicht (NON_DEDUPED_EVENTS); einmal je Sitzung zählt der Schlüssel in `dedupeKey`.
+  | Messpunkt;
+
+/** Die unsichtbaren Messpunkte des Portals (Registry #123). Spiegel von `project 3/lib/messpunkte.ts` (MESSPUNKTE) —
+ *  ein Test vergleicht beide Listen. */
+export const MESSPUNKTE = [
+  'profil_geoeffnet',         // Profil einer Pflegekraft geöffnet {caregiver_id, quelle, vor_speichern}
+  'einladen_getippt',         // „Einladen" getippt, auch mit Schloss vor dem Speichern {caregiver_id, quelle, vor_speichern}
+  'warum_geoeffnet',          // Pop-up „Warum erst die Pflegesituation?" geöffnet
+  'bestpreis_geoeffnet',      // Pop-up Bestpreisgarantie geöffnet
+  'kosten_aufgeklappt',       // „Alle Kosten im Überblick" aufgeklappt
+  'faq_geoeffnet',            // eine Häufige Frage aufgeklappt {frage}
+  'kalender_geoeffnet',       // Kalender des Startdatums geöffnet
+  'kalender_zu_ohne_datum',   // Kalender zu, ohne dass ein Tag gewählt wurde und das Feld leer ist
+] as const;
+export type Messpunkt = typeof MESSPUNKTE[number];
+
+/** Woher ein Profil geöffnet wurde. */
+export type ProfilQuelle = 'karte' | 'liste' | 'interesse' | 'bewerbung' | 'bearbeitet' | 'gebucht' | 'mail' | 'sonstige';
+/** Wo „Einladen" getippt wurde. */
+export type EinladenQuelle = 'karte' | 'interesse' | 'profil';
 
 // Mini-Snapshot der Nurse-Daten, die wir brauchen um eine declined-from-
 // Interest Pflegekraft im bearbeitet-Bereich als virtuelle MatchCard zu
@@ -99,6 +121,12 @@ export interface LeadEventMetadata {
   // niemand wüsste, welche eine Mail ausgelöst hat (Lehre aus den Seed-
   // Events, Bug #25).
   feedback_final?: string;
+  // Messpunkte (Registry #123) — keine Personendaten, nur Kennungen und Zustände.
+  // profil_geoeffnet / einladen_getippt: woher, und ob die Pflegesituation noch nie gespeichert wurde.
+  quelle?: ProfilQuelle | EinladenQuelle;
+  vor_speichern?: boolean;
+  // faq_geoeffnet: kurzer Schlüssel der Frage (FAQ_SCHLUESSEL in FaqListe), nie der Wortlaut.
+  frage?: string;
 }
 
 // Session-level dedupe so a re-render or repeated save doesn't spam the
@@ -136,6 +164,14 @@ function dedupeKey(token: string, event: LeadEvent, metadata?: LeadEventMetadata
   // speichert. Wo im Bogen abgebrochen wird, war deshalb nicht messbar.
   if (event === 'patient_form_step') {
     return `${token}:${event}:${metadata?.step ?? ''}`;
+  }
+  // Messpunkte (Registry #123): je Pflegekraft einmal, getrennt vor und nach dem ersten Speichern (dieselbe Pflegekraft
+  // nach dem Speichern noch einmal anzusehen ist eine eigene Aussage); je Frage einmal. Die übrigen einmal je Sitzung.
+  if (event === 'profil_geoeffnet' || event === 'einladen_getippt') {
+    return `${token}:${event}:${metadata?.caregiver_id ?? ''}:${metadata?.vor_speichern ? 1 : 0}`;
+  }
+  if (event === 'faq_geoeffnet') {
+    return `${token}:${event}:${metadata?.frage ?? ''}`;
   }
   return `${token}:${event}`;
 }

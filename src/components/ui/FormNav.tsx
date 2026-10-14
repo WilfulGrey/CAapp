@@ -1,9 +1,24 @@
 // Knopfleiste des Formulars: Zurück und Weiter/Speichern gleich hoch, unten im Formular
 // mitlaufend (sticky), mit Abstand zum iPhone-Rand. Solange die Tastatur offen ist
 // (ein Eingabefeld hat den Fokus), läuft die Leiste normal im Fluss mit, damit sie
-// nicht über dem Feld klebt.
+// nicht über dem Feld klebt. Ebenso, solange ein Feld unter sich etwas aufgeklappt hat
+// (der Startdatum-Kalender, `meldeFeldAufgeklappt`): Seit Registry #86 lag der 339 px
+// hohe Kalender am Handy zum großen Teil hinter der 83–117 px hohen Leiste (iPhone SE
+// bei 553 px Höhe 0 von 19 Tagen antippbar, Messung 13.10.), und ein Tipp auf einen
+// verdeckten Tag traf „Zurück“ oder „Weiter“.
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from './Button';
+
+/** Ereignis an `document`: Ein Feld klappt unter sich etwas auf (detail `true`) bzw. wieder zu
+ *  (`false`). Solange eins offen ist, läuft die Leiste im Fluss statt unten zu kleben. */
+export const FELD_AUFGEKLAPPT = 'pm:feld-aufgeklappt';
+
+/** So lange läuft die Leiste nach dem Verlassen eines Eingabefelds noch im Fluss mit (Tipp muss erst ankommen). */
+export const TASTATUR_NACHLAUF_MS = 400;
+
+export function meldeFeldAufgeklappt(auf: boolean) {
+  document.dispatchEvent(new CustomEvent<boolean>(FELD_AUFGEKLAPPT, { detail: auf }));
+}
 
 export function FormNav({
   onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, zurueckAlsLink, ruhig = false, stand75b8df8 = false,
@@ -29,15 +44,35 @@ export function FormNav({
   useEffect(() => {
     const istEingabe = (el: EventTarget | null) =>
       el instanceof HTMLElement && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !['checkbox', 'radio', 'button'].includes((el as HTMLInputElement).type)));
-    const an = (e: FocusEvent) => { if (istEingabe(e.target)) setTastatur(true); };
-    const aus = (e: FocusEvent) => { if (istEingabe(e.target)) setTastatur(false); };
+    // Erst nach dem Tipp wieder ankleben: Der Fokus geht zwischen mousedown und click verloren. Klebte die
+    // Leiste sofort wieder unten, rückte sie unter den Finger und schluckte den Tipp auf eine Antwort
+    // (iPhone-Simulator 14.10.: erster Tipp auf „Dorf/Land“ nach dem Ortsfeld ohne Wirkung).
+    let spaeter: ReturnType<typeof setTimeout> | undefined;
+    const an = (e: FocusEvent) => { if (istEingabe(e.target)) { clearTimeout(spaeter); setTastatur(true); } };
+    const aus = (e: FocusEvent) => {
+      if (!istEingabe(e.target)) return;
+      clearTimeout(spaeter);
+      spaeter = setTimeout(() => setTastatur(false), TASTATUR_NACHLAUF_MS);
+    };
     document.addEventListener('focusin', an);
     document.addEventListener('focusout', aus);
-    return () => { document.removeEventListener('focusin', an); document.removeEventListener('focusout', aus); };
+    return () => { clearTimeout(spaeter); document.removeEventListener('focusin', an); document.removeEventListener('focusout', aus); };
   }, []);
+  // Zähler statt Ja/Nein: Mehrere Felder dürfen gleichzeitig offen sein, erst das letzte „zu“ zählt.
+  const [aufgeklappt, setAufgeklappt] = useState(0);
+  useEffect(() => {
+    const melden = (e: Event) => {
+      const auf = (e as CustomEvent<boolean>).detail === true;
+      setAufgeklappt(n => Math.max(0, n + (auf ? 1 : -1)));
+    };
+    document.addEventListener(FELD_AUFGEKLAPPT, melden);
+    return () => document.removeEventListener(FELD_AUFGEKLAPPT, melden);
+  }, []);
+  const imFluss = tastatur || aufgeklappt > 0;
 
   return (
-    <div className={`${tastatur ? '' : 'sticky bottom-0'} z-10 ${ruhig ? '-mx-6 px-6' : '-mx-5 px-5'} pt-3.5 pb-[calc(16px+env(safe-area-inset-bottom))] bg-white border-t border-[#EFEBE4] rounded-b-card`}>
+    // data-knopfleiste: daran misst ein aufgeklapptes Feld, wie viel die Leiste unten verdeckt.
+    <div data-knopfleiste="" className={`${imFluss ? '' : 'sticky bottom-0'} z-10 ${ruhig ? '-mx-6 px-6' : '-mx-5 px-5'} pt-3.5 pb-[calc(16px+env(safe-area-inset-bottom))] bg-white border-t border-[#EFEBE4] rounded-b-card`}>
       {hinweis && <div className="mb-2.5 text-center text-[13.5px] text-pm-error-ink">{hinweis}</div>}
       <div className={onZurueck && !zurueckAlsLink ? 'grid grid-cols-[auto_1fr] gap-2.5' : ''}>
         {onZurueck && !zurueckAlsLink && (

@@ -85,17 +85,17 @@ describe('einsatzortHinweis (Registry #65)', () => {
       .toMatch(/5-stellige/);
   });
 
-  it('Mamamia kennt die PLZ nicht → Satz über Deutschland, mit der PLZ darin', () => {
+  it('Mamamia kennt die PLZ nicht → Satz über Deutschland, mit der PLZ darin (Wortlaut A-R5.4, ohne „vermitteln“)', () => {
     const m = einsatzortHinweis({ ...ok, plz: '50348', ort: '', eingabe: '50348', keinTreffer: true });
-    expect(m).toContain('50348');
-    expect(m).toMatch(/innerhalb Deutschlands/);
+    expect(m).toBe('Zu der Postleitzahl 50348 kennen wir keinen Einsatzort. Unsere Pflegekräfte sind nur in Deutschland im Einsatz. Bitte prüfen Sie die Postleitzahl. Bei Fragen hilft Ihnen Marta Kapcio gern.');
+    expect(m).not.toMatch(/vermittel/);
   });
 
   it('vom Save-Wall abgelehnte PLZ sagt dasselbe wie kein Treffer', () => {
     // Draft/Prefill: PLZ 5-stellig UND ort gefüllt — ohne dieses Flag käme null
     // und der Kunde stünde in der Schleife Speichern → Weiter → Speichern.
     expect(einsatzortHinweis({ ...ok, plz: '50348', ort: 'Lüdinghausen', abgelehnt: true }))
-      .toMatch(/innerhalb Deutschlands/);
+      .toMatch(/nur in Deutschland im Einsatz/);
   });
 
   it('5-stellige PLZ ohne gewählten Ort verlangt die Liste', () => {

@@ -86,14 +86,46 @@ export const FAQ_ANGEBOT = [FAQ[0], ...FAQ_GRUNDFRAGEN, ...FAQ.slice(1).filter((
 
 const SICHTBAR = 4;
 
+/** Kurzer, fester Schlüssel je Frage für den Messpunkt `faq_geoeffnet` (Registry #123) — unabhängig von der Reihenfolge
+ *  in FAQ bzw. FAQ_ANGEBOT und vom Wortlaut der Antwort. Neue Frage = neuer Schlüssel (ein Test prüft, dass keine fehlt). */
+export const FAQ_SCHLUESSEL: Record<string, string> = {
+  'Was bedeuten die Deutsch-Niveaus (Grund, Mittel, Gut)?': 'deutsch',
+  'Ich habe ein günstigeres Angebot. Was kann ich tun?': 'guenstiger',
+  'Was bedeutet „Einladen"?': 'einladen',
+  'Gehe ich mit dem Einladen einen Vertrag ein?': 'einladen_vertrag',
+  'Kann ich jederzeit kündigen?': 'kuendigen',
+  'Wie funktioniert die Abrechnung?': 'abrechnung',
+  'Wie lange bleibt die Pflegekraft — und wie läuft der Wechsel?': 'wechsel',
+  'Was passiert, wenn die Pflegekraft ausfällt?': 'ausfall',
+  'Wie werden Reisekosten abgerechnet?': 'reisekosten',
+  'Ist das legal?': 'legal',
+  'Mit wem wird der Vertrag geschlossen?': 'vertragspartner',
+  'Welche Kosten entstehen insgesamt?': 'kosten',
+  'Kann ich die Pflegesachleistungen der Pflegekasse dafür einsetzen?': 'sachleistung',
+  'Was übernimmt die Pflegekraft, was ein Pflegedienst?': 'pflegedienst',
+  'Was brauche ich zu Hause?': 'zuhause',
+  'Wie läuft die Betreuung ab?': 'ablauf',
+};
+
 /** `ruhig` (Kompakt-Einstieg, Runde 15): Kopf ohne Eyebrow im ruhigen H2-Stil; sonst unverändert.
  *  `karte` (Look „angebot", Runde 27 — Martin zu Fassung 21: „die häufig gestellten Fragen sehen nicht gut aus … alles mit
  *  diesem komischen Hintergrund"): die Fragen in einer weißen Karte mit Zeilen wie die Karten darüber, Pfeil statt Plus. */
-export function FaqListe({ ruhig = false, karte = false }: { ruhig?: boolean; karte?: boolean } = {}) {
+export function FaqListe({ ruhig = false, karte = false, onFrageGeoeffnet }: {
+  ruhig?: boolean;
+  karte?: boolean;
+  /** Messpunkt (Registry #123): eine Frage wurde aufgeklappt, mit ihrem Schlüssel aus FAQ_SCHLUESSEL. Unsichtbar. */
+  onFrageGeoeffnet?: (schluessel: string) => void;
+} = {}) {
   const [offen, setOffen] = useState<number | null>(null);
   const [alle, setAlle] = useState(false);
   const quelle = karte ? FAQ_ANGEBOT : FAQ;
   const liste = alle ? quelle : quelle.slice(0, SICHTBAR);
+  // Auf- und zuklappen wie bisher; nur beim Aufklappen meldet die Liste den Schlüssel der Frage.
+  const umschalten = (i: number, q: string) => {
+    const auf = offen === i;
+    setOffen(auf ? null : i);
+    if (!auf) onFrageGeoeffnet?.(FAQ_SCHLUESSEL[q] ?? `frage_${i}`);
+  };
   if (karte) {
     // OpenAI 05.10. (mutig14): die Fragen leiser als die Karten darüber — mittleres Gewicht, kompaktere Zeilen.
     const zeile = 'flex min-h-[52px] w-full items-center justify-between gap-4 px-5 py-3.5 text-left';
@@ -105,7 +137,7 @@ export function FaqListe({ ruhig = false, karte = false }: { ruhig?: boolean; ka
             const auf = offen === i;
             return (
               <div key={item.q} className={i > 0 ? 'border-t border-pm-line' : ''}>
-                <button type="button" onClick={() => setOffen(auf ? null : i)} aria-expanded={auf} className={zeile}>
+                <button type="button" onClick={() => umschalten(i, item.q)} aria-expanded={auf} className={zeile}>
                   <span className="text-[15.5px] font-medium leading-[1.4] text-pm-ink">{item.q}</span>
                   <ChevronDown className={`h-5 w-5 flex-none text-pm-taupe transition-transform ${auf ? 'rotate-180' : ''}`} aria-hidden="true" />
                 </button>
@@ -139,7 +171,7 @@ export function FaqListe({ ruhig = false, karte = false }: { ruhig?: boolean; ka
             <div key={item.q} className="border-t border-pm-line">
               <button
                 type="button"
-                onClick={() => setOffen(auf ? null : i)}
+                onClick={() => umschalten(i, item.q)}
                 aria-expanded={auf}
                 className="w-full min-h-[56px] flex items-center justify-between gap-3.5 py-4 text-left"
               >
