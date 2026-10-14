@@ -49,7 +49,7 @@ import {
   type PatientForm,
 } from '../components/portal/shared';
 import { BookedScreen } from '../components/portal/BookedScreen';
-import { KONTAKT_EMPFEHLUNG, MARTA_UNTEN_STANDARD, NOTFALL_PLATZHALTER, kontaktVarianteAusUrl, martaUntenAusUrl } from '../components/portal/GebuchtKontakt';
+import { kontaktPositionAusUrl, kontaktVarianteAusUrl, martaUntenAusUrl, notfallAusVorschauUrl } from '../components/portal/GebuchtKontakt';
 import { VertragSignieren } from '../components/portal/VertragSignieren';
 import { AngebotCard } from '../components/portal/AngebotCard';
 import { AppCard } from '../components/portal/AppCard';
@@ -143,16 +143,25 @@ const IS_PREVIEW_LEER =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('leer') === '1';
 const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIEW_GEBUCHT || IS_PREVIEW_CHAT || IS_PREVIEW_PATIENT || IS_PREVIEW_WARTET;
 
-// PROTOTYP 14.10.2026 — Kontaktbereich oben im Gebucht-Bildschirm (GebuchtKontakt). Schalter NUR in der Vorschau:
-//   ?preview=gebucht&kontakt=1|2|3   Variante (ohne Parameter: Empfehlung V3)
-//   ?preview=gebucht&unten=marta|siegel   Seitenende: Marta-Kasten wie heute | nur Siegel und Sterne (Entscheidung 5)
-// Die Notfallnummer steht nirgends im Code. Die Vorschau zeigt den Platzhalter; echte Kunden bekommen null (Zeile entfällt),
-// bis der Server die Nummer für gebuchte Leads liefert (Weg A in notfall_herkunft.md, noch nicht gebaut).
-const GEBUCHT_KONTAKT = {
-  variante: IS_PREVIEW_GEBUCHT && typeof window !== 'undefined' ? kontaktVarianteAusUrl(window.location.search) : KONTAKT_EMPFEHLUNG,
-  notfallTelefon: IS_PREVIEW_GEBUCHT ? NOTFALL_PLATZHALTER : null,
-  martaUnten: IS_PREVIEW_GEBUCHT && typeof window !== 'undefined' ? martaUntenAusUrl(window.location.search) : MARTA_UNTEN_STANDARD,
-};
+// PROTOTYP 14.10.2026 — Kontaktbereich im Gebucht-Bildschirm (GebuchtKontakt). NUR in der Vorschau ?preview=gebucht,
+// außerhalb ist er AUS (undefined), bis Martin entscheidet und der Server die Nummer für gebuchte Leads liefert
+// (Weg A in notfall_herkunft.md, noch nicht gebaut). Schalter:
+//   &kontakt=1|2|3          Variante (ohne Parameter: Empfehlung V1); &kontakt=aus = ohne Bereich (Vergleich mit heute)
+//   &unten=marta|siegel     Seitenende: Marta-Kasten wie heute | nur Siegel und Sterne (Entscheidung 4)
+//   &kontaktpos=oben|unten  Bereich unter der Einleitung (Standard) | unter „Als Nächstes"
+//   &notfall=…              Notfallnummer zur Laufzeit (nie im Code); ohne Parameter der Platzhalter
+//   &vertrag=offen          Zustand „Vertrag offen" (Pflegekraft gebucht, Vertrag noch nicht unterschrieben)
+const VORSCHAU_SUCHE = IS_PREVIEW_GEBUCHT && typeof window !== 'undefined' ? window.location.search : null;
+const GEBUCHT_KONTAKT = VORSCHAU_SUCHE !== null && new URLSearchParams(VORSCHAU_SUCHE).get('kontakt') !== 'aus'
+  ? {
+      variante: kontaktVarianteAusUrl(VORSCHAU_SUCHE),
+      notfallTelefon: notfallAusVorschauUrl(VORSCHAU_SUCHE),
+      martaUnten: martaUntenAusUrl(VORSCHAU_SUCHE),
+      position: kontaktPositionAusUrl(VORSCHAU_SUCHE),
+    }
+  : undefined;
+/** Vorschau-Zustand „Vertrag offen" (sonst sperrt die Vorschau ihn: PREVIEW_SIGNED_FORM gilt als unterschrieben). */
+const IS_PREVIEW_GEBUCHT_VERTRAG_OFFEN = VORSCHAU_SUCHE !== null && new URLSearchParams(VORSCHAU_SUCHE).get('vertrag') === 'offen';
 
 // Sub-Nav-Zeile mit Job-Kontext (Status-Badge + Zeitraum links) +
 // "Alle Einsätze →" rechts, wenn der Kunde aus der Multi-Job-Übersicht
@@ -581,7 +590,7 @@ const CustomerPortalPage: FC = () => {
   // Unterschriebener Vertrag (Daten + getippte Signatur) aus dem Annahme-Flow.
   // Erlaubt die read-only Präsentation des fertigen Vertrags im gebuchten Portal.
   const [signedForm, setSignedForm] = useState<ContractFormData | null>(
-    IS_PREVIEW_GEBUCHT ? PREVIEW_SIGNED_FORM : null,
+    IS_PREVIEW_GEBUCHT && !IS_PREVIEW_GEBUCHT_VERTRAG_OFFEN ? PREVIEW_SIGNED_FORM : null,
   );
   const [showSignedContract, setShowSignedContract] = useState(false);
   // „Vertrag nachträglich abschließen" (Martin, 2026-07-15): App, für die das
@@ -3781,7 +3790,10 @@ const CustomerPortalPage: FC = () => {
               onNurseClick={(n) => { profilQuelleRef.current = 'gebucht'; setSelectedNurse(n); }}
               vertragSigned={vertragSigned}
               onSignContract={
-                canCompleteContract ? () => setContractApp(acceptedApp) : undefined
+                canCompleteContract
+                  ? () => setContractApp(acceptedApp)
+                  // Vorschau „Vertrag offen": Knopf sichtbar, schließt aber nichts ab (kein Lead, kein Server).
+                  : IS_PREVIEW_GEBUCHT_VERTRAG_OFFEN ? () => showToast('Vorschau: Hier wird kein Vertrag abgeschlossen.') : undefined
               }
               // leadId + Token aktivieren den eingebetteten PDF-Viewer im
               // Vertrag-Milestone (Mustervertrag-Look via /api/contract-pdf).
