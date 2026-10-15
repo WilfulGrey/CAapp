@@ -636,7 +636,7 @@ function addPage3(doc: jsPDF, leadData?: LeadData) {
     },
     {
       titel: 'Freie Kost und Logis',
-      text: 'Die Pflegekraft wird von Ihnen verkoestigt und wohnt kostenfrei. Rechnen Sie mit ca.\n150-250 EUR monatlich zusaetzlich fuer Lebensmittel.',
+      text: 'Die Pflegekraft wird von Ihnen verkoestigt und wohnt kostenfrei.',
     },
     {
       titel: 'Offenheit und gegenseitiger Respekt',

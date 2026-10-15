@@ -156,7 +156,7 @@ export async function generateKalkulationPDF(
  
       doc.fontSize(8).fillColor(lightGrayColor);
       doc.text(
-        'Zzgl. Kost & Logis für die Pflegekraft (Verpflegung und eigenes Zimmer, ca. 150–250 €/Monat). An- und Abreisekosten sowie Feiertagszuschläge fallen nach Aufwand an.',
+        'Zzgl. Kost & Logis für die Pflegekraft (Verpflegung und eigenes Zimmer). An- und Abreisekosten sowie Feiertagszuschläge fallen nach Aufwand an.',
         60,
         kostenY + 185,
         { width: 475, align: 'justify', lineGap: 2 }
