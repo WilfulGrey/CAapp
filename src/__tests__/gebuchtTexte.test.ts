@@ -1,4 +1,5 @@
-// Gebucht-Seite neu (PROTOTYP 15.10.2026): Wortlaut je Zustand gegen texte_final.md und die Kopie aus der Anreise-Mail.
+// Gebucht-Seite neu (PROTOTYP 15.10.2026): Wortlaut gegen texte_final.md, Nachtrag 3, und die Kopie aus der Anreise-Mail.
+// „frei" = im freigegebenen Bild aufgaben_390.png (Martin 15.10. abends: „finde ich super"), Zeichen für Zeichen.
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import {
@@ -6,26 +7,25 @@ import {
   VERKEHRSMITTEL,
   anreiseDatum,
   anreiseZeit,
-  h1Tag,
-  statusTexte,
-  vertragDatum,
+  einsatzTag,
+  nameFest,
 } from '../lib/gebuchtTexte';
-import { gebuchtStand, type EinsatzZeile, type GebuchtEingabe } from '../lib/gebuchtStand';
 
-const HEUTE = '2026-10-15';
-const nb = (t: string | null) => (t ?? '').replace(/ /g, ' ');
+const NBSP = ' ';
+const nb = (t: string) => t.replace(/ /g, ' ');
 
-function stand(over: Partial<GebuchtEingabe>) {
-  return gebuchtStand({
-    heute: HEUTE,
-    einsatz: { id: 'j1', status: 'gebucht', anreise: '2026-10-19', abreise: '2026-11-29' },
-    anreise: null,
-    vertrag: 'unterschrieben',
-    ...over,
-  });
+/** Alle Texte als Liste (Funktionen mit Beispielwerten aufgerufen). */
+function alleTexte(): string[] {
+  const aus: string[] = [];
+  const sammle = (wert: unknown) => {
+    if (typeof wert === 'string') aus.push(wert);
+    else if (typeof wert === 'function') aus.push((wert as (a: string) => string)('X'));
+    else if (wert && typeof wert === 'object') Object.values(wert).forEach(sammle);
+  };
+  sammle(T);
+  aus.push(T.bewerbungenAnsehen(1), T.bewerbungenAnsehen(2), T.bewerbungen(1), T.bewerbungen(2));
+  return aus;
 }
-const DATENSATZ = { datum: '2026-10-19', von: '14:00', bis: '16:00', verkehrsmittel: 'Minibus', strasse: 'Musterstraße 1', plzOrt: '12345 Musterstadt' };
-const folge = (over: Partial<EinsatzZeile>): EinsatzZeile => ({ id: 'f', status: 'gebucht', anreise: '2026-10-29', abreise: '2026-12-10', pflegekraft: 'Anna B.', bewerbungen: null, ...over });
 
 describe('Kopie aus der Anreise-Mail (Registry #119) — gleiche Ausgabe', () => {
   const quelle = readFileSync('project 3/supabase/functions/send-scheduled-emails/kundenMails.ts', 'utf8');
@@ -45,142 +45,126 @@ describe('Kopie aus der Anreise-Mail (Registry #119) — gleiche Ausgabe', () =>
   });
   it('Ausgaben wie in der Mail', () => {
     expect(anreiseDatum('2026-10-12')).toBe('Montag, 12.10.2026');
-    expect(anreiseZeit('14:00', '18:00')).toBe('14–18 Uhr');
+    expect(anreiseZeit('14:00', '16:00')).toBe('14–16 Uhr');
     expect(anreiseZeit('14:30', null)).toBe('ab 14:30 Uhr');
+    expect(anreiseZeit('14:00', null)).toBe('ab 14 Uhr');
     expect(anreiseZeit('14:00', '14:00')).toBe('14 Uhr');
+    expect(VERKEHRSMITTEL['Minibus']).toBe('Minibus');
     expect(VERKEHRSMITTEL['Sindbad']).toBe('Reisebus (Sindbad)');
     expect(VERKEHRSMITTEL['Own transport']).toBe('Eigene Anreise');
   });
-  it('H1-Datum ohne Jahr, Wochentag geschützt angehängt', () => {
-    expect(nb(h1Tag('2026-10-19'))).toBe('Montag, 19.10.');
-    expect(h1Tag('2026-10-19')).toContain(' ');
+});
+
+describe('einsatzTag: Teile der Spalten und Text des Titels', () => {
+  it('ohne Jahr: „Montag" / „19.10." / Text mit geschütztem Leerzeichen', () => {
+    expect(einsatzTag('2026-10-19', false)).toEqual({ iso: '2026-10-19', wochentag: 'Montag', datum: '19.10.', jahr: null, text: `Montag,${NBSP}19.10.` });
+  });
+  it('mit Jahr: Jahr klein hinter dem Datum, im Text direkt angehängt', () => {
+    expect(einsatzTag('2027-02-24', true)).toMatchObject({ wochentag: 'Mittwoch', datum: '24.02.', jahr: '2027', text: `Mittwoch,${NBSP}24.02.2027` });
+  });
+  it('nameFest: der Name bricht nie in sich um', () => {
+    expect(nameFest(' Anna  B. ')).toBe(`Anna${NBSP}B.`);
   });
 });
 
-describe('statusTexte: H1 und Satz je Zustand (texte_final.md, Abschnitt 1)', () => {
-  const st = (s: ReturnType<typeof stand>, over: Partial<Parameters<typeof statusTexte>[0]> = {}) => {
-    const t = statusTexte({ stand: s, heute: HEUTE, pflegekraft: 'Maria K.', folge: null, ...over });
-    return { h1: nb(t.h1), satz: nb(t.satz) };
-  };
-  it('VO: T1 „Buchung bestätigt" (wie Mail C) + live Satz, mit und ohne Namen gleich, kein Pronomen', () => {
-    const vo = { h1: 'Buchung bestätigt', satz: 'Bitte schließen Sie noch Ihren Betreuungsvertrag ab.' };
-    expect(st(stand({ vertrag: 'offen' }))).toEqual(vo);
-    expect(st(stand({ vertrag: 'offen' }), { pflegekraft: null })).toEqual(vo);
-    expect(st(stand({ vertrag: 'offen' }), { pflegekraft: 'Pavel K.' })).toEqual(vo);
-    expect(vo.satz).not.toMatch(/ist (sie|er) gebucht|Letzter Schritt|eingeplant/);
-  });
-  it('VV und AF: „Anreise am …" mit den freigegebenen Sätzen', () => {
-    expect(st(stand({ vertrag: 'vorbereitung' }))).toEqual({ h1: 'Anreise am Montag, 19.10.', satz: 'Wir bereiten Ihre Vertragsdokumente vor. Marta Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen.' });
-    expect(st(stand({}))).toEqual({ h1: 'Anreise am Montag, 19.10.', satz: 'Ihr Vertrag ist unterschrieben. Marta Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen, um die Anreise zu besprechen.' });
-  });
-  it('AD und AT', () => {
-    expect(st(stand({ anreise: DATENSATZ }))).toEqual({ h1: 'Maria K. reist am Montag, 19.10. an', satz: 'Wir haben die Anreise Ihrer Pflegekraft organisiert.' });
-    expect(st(stand({ anreise: DATENSATZ }), { pflegekraft: null }).h1).toBe('Ihre Pflegekraft reist am Montag, 19.10. an');
-    const at = stand({ einsatz: { id: 'j1', status: 'gebucht', anreise: HEUTE, abreise: '2026-11-29' }, anreise: { ...DATENSATZ, datum: HEUTE } });
-    expect(st(at)).toEqual({ h1: 'Maria K. reist heute an', satz: 'Wir haben die Anreise Ihrer Pflegekraft organisiert.' });
-    const atOhne = stand({ einsatz: { id: 'j1', status: 'gebucht', anreise: HEUTE, abreise: '2026-11-29' } });
-    expect(st(atOhne)).toEqual({ h1: 'Anreise heute geplant', satz: '' });
-  });
-  it('L: „Gebuchter Einsatz bis …", kein Satz', () => {
-    expect(st(stand({ einsatz: { id: 'j1', status: 'gebucht', anreise: '2026-10-01', abreise: '2026-11-29' } }))).toEqual({ h1: 'Gebuchter Einsatz bis Sonntag, 29.11.', satz: '' });
-  });
-  const eb = stand({ einsatz: { id: 'j1', status: 'gebucht', anreise: '2026-09-01', abreise: '2026-10-26' } });
-  it('EB, Folgekraft gebucht: zwei Daten aus zwei Quellen (Befund 2)', () => {
-    expect(st(eb, { folge: folge({}) })).toEqual({
-      h1: 'Anna B. übernimmt ab Donnerstag, 29.10.',
-      satz: 'Anna B. ist Ihre nächste Pflegekraft. Der Einsatz von Maria K. endet am Montag, 26.10.',
-    });
-    expect(st(eb, { folge: folge({ anreise: HEUTE }) }).h1).toBe('Anna B. übernimmt ab heute');
-    // T2: ohne Namen der jetzigen Pflegekraft Genitiv mit „jetzigen" (nicht „von Ihrer Pflegekraft").
-    expect(st(eb, { folge: folge({}), pflegekraft: null }).satz).toBe('Anna B. ist Ihre nächste Pflegekraft. Der Einsatz Ihrer jetzigen Pflegekraft endet am Montag, 26.10.');
-  });
-  it('EB, Folgekraft gebucht ohne Namen: Rückfall', () => {
-    expect(st(eb, { folge: folge({ pflegekraft: null }) })).toEqual({ h1: 'Einsatz endet am Montag, 26.10.', satz: 'Ihre nächste Pflegekraft übernimmt ab Donnerstag, 29.10.' });
-  });
-  it('EB, Folgeeinsatz geplant / keiner', () => {
-    expect(st(eb, { folge: folge({ status: 'geplant', pflegekraft: null }) })).toEqual({ h1: 'Einsatz endet am Montag, 26.10.', satz: 'Für die Zeit danach suchen wir eine Pflegekraft für Sie.' });
-    expect(st(eb)).toEqual({ h1: 'Einsatz endet am Montag, 26.10.', satz: '' });
-    const ebHeute = stand({ einsatz: { id: 'j1', status: 'gebucht', anreise: '2026-09-01', abreise: HEUTE } });
-    expect(st(ebHeute).h1).toBe('Einsatz endet heute');
-  });
-  it('B: live Wortlaut', () => {
-    const b = stand({ einsatz: { id: 'j1', status: 'abgeschlossen', anreise: '2026-05-19', abreise: '2026-07-19' } });
-    expect(st(b)).toEqual({ h1: 'Einsatz beendet', satz: 'Der Einsatz vom 19.05.2026 bis 19.07.2026 ist abgeschlossen. Ihre Unterlagen bleiben jederzeit zugänglich.' });
-  });
-  it('ohne belegtes Datum keine H1 mit Datum', () => {
-    expect(statusTexte({ stand: stand({ einsatz: { id: 'j1', status: 'gebucht', anreise: null, abreise: null } }), heute: HEUTE, pflegekraft: 'Maria K.', folge: null }).h1).toBeNull();
-  });
-});
-
-describe('vertragDatum: Berliner Tag (Registry #20), nie der UTC-Tag', () => {
-  it('ISO-Zeitstempel nach 22/23 Uhr UTC ist in Berlin schon der nächste Tag', () => {
-    expect(vertragDatum('2026-10-12T22:30:00Z')).toBe('13.10.2026'); // Sommerzeit, 00:30 in Berlin
-    expect(vertragDatum('2026-10-12T21:59:00Z')).toBe('12.10.2026');
-    expect(vertragDatum('2026-01-05T23:30:00+00:00')).toBe('06.01.2026'); // Winterzeit
-  });
-  it('contract_snapshot.datum kommt schon als „dd.mm.yyyy" und bleibt; Kalendertag bleibt; Unlesbares ⇒ null', () => {
-    expect(vertragDatum('12.10.2026')).toBe('12.10.2026');
-    expect(vertragDatum('2026-10-12')).toBe('12.10.2026');
-    expect(vertragDatum('quatsch')).toBeNull();
-    expect(vertragDatum('')).toBeNull();
-    expect(vertragDatum(null)).toBeNull();
-  });
-});
-
-describe('Wortlaut-Wächter', () => {
-  const alle = Object.values(T).map((t) => (typeof t === 'function' ? (t as (...a: string[]) => string)('X', 'Y', 'Z') : t)).join('\n');
-  it('nichts, was die Spezifikation streicht oder ohne Beleg behauptet', () => {
-    expect(alle).not.toMatch(/ kommt |läuft bis|Es fehlt|Abreise geplant am|Vielen Dank —|\bFolgt\b|Zur Hälfte|ist angekommen|ist bei Ihnen|im Einsatz ist/);
-  });
-  it('freigegebene und live Texte Zeichen für Zeichen', () => {
-    expect(nb(T.afSatz)).toBe('Ihr Vertrag ist unterschrieben. Marta Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen, um die Anreise zu besprechen.');
-    expect(T.vertragKnopf).toBe('Vertrag jetzt abschließen →');
-    expect(T.reisekosten).toBe('Anreise und Abreise pauschal je 125 €.');
-    expect(T.kostenAuf).toBe('Alle Kosten im Überblick');
-    expect(T.kostenZu).toBe('Weniger anzeigen');
-    expect(T.sucheOhneBewerbung).toBe('Suchlauf läuft — noch keine Bewerbungen');
-    expect(T.kopieMail).toBe('Eine Kopie haben Sie auch per E\u2011Mail erhalten.');
-    expect(T.kontaktA).toBe('Ihr Kontakt zur Agentur');
+describe('Wortlaut Nachtrag 3, Zeichen für Zeichen', () => {
+  it('frei 15.10. abends (Bild aufgaben_390.png)', () => {
+    expect(T.ihrEinsatz).toBe('Ihr Einsatz');
+    expect(T.etikett.gebucht).toBe('Gebucht');
     expect(T.ihrePflegekraft).toBe('Ihre Pflegekraft');
-    expect(T.voSatz).toBe('Bitte schließen Sie noch Ihren Betreuungsvertrag ab.');
+    expect(T.anreise).toBe('Anreise');
+    expect(T.abreise).toBe('Abreise');
+    expect(T.geplant).toBe('geplant');
+    expect(T.tagessatz).toBe('Tagessatz');
+    expect(T.proTag).toBe(`${NBSP}/${NBSP}Tag`);
+    expect(T.kostenuebersicht).toBe('Kostenübersicht');
+    expect(T.soGehtEsWeiter).toBe('So geht es weiter');
+    expect(T.vertragUnterschrieben).toBe('Vertrag unterschrieben');
+    expect(T.vertragAm('12.10.2026')).toBe(`am${NBSP}12.10.2026`);
+    expect(T.trenner).toBe(`${NBSP}· `);
+    expect(T.vertragPdf).toBe('Vertrag als PDF');
+    expect(T.anreiseOrganisiert).toBe('Anreise organisiert');
+    expect(T.ankunft).toBe('Ankunft');
+    expect(T.verkehrsmittel).toBe('Verkehrsmittel');
+    expect(T.adresse).toBe('Adresse');
+    expect(T.hierhinGebracht('Maria')).toBe('Hierhin wird Maria gebracht.');
+    expect(T.stimmtNicht).toBe('Stimmt eine Angabe nicht, sagen Sie uns bitte Bescheid.');
+    expect(T.nachDerAnreise).toBe('Nach der Anreise');
+    expect(T.nachSatz).toBe('Wir melden uns bei Ihnen und fragen nach, ob alles gut klappt.');
+    expect(nb(T.folgeAb(`Sonntag,${NBSP}29.11.`))).toBe('Folgeeinsatz ab Sonntag, 29.11.');
+    expect(T.folgeSucht).toBe('Für den Folgeeinsatz suchen wir eine Pflegekraft für Sie.');
+    expect(T.einladen).toBe(`Pflegekräfte einladen${NBSP}›`);
   });
-  it('Nachtrag 15.10. (T1–T6): Endwortlaut Zeichen für Zeichen', () => {
-    expect(T.voH1).toBe('Buchung bestätigt');
-    expect(T.ebFolgeSatzOhneJetzigenNamen('Anna B.', 'Montag, 26.10.')).toBe('Anna B. ist Ihre nächste Pflegekraft. Der Einsatz Ihrer jetzigen Pflegekraft endet am Montag, 26.10.');
-    expect(T.kostenQuelle('12.10.2026')).toBe('Laut Ihrem Vertrag vom 12.10.2026');
+  it('NEU R6 / R6b und wiederverwendete Texte', () => {
+    expect(T.etikett).toEqual({ gebucht: 'Gebucht', heuteGeplant: 'Anreise heute geplant', endetBald: 'Endet bald', endetHeute: 'Endet heute', beendet: 'Beendet' });
+    expect(T.vertragUnterschreiben).toBe('Vertrag unterschreiben');
+    expect(T.vertragVorbereitung).toBe('Vertrag in Vorbereitung');
+    expect(T.vertragFrueher).toBe('Vertrag aus früherer Buchung');
+    expect(nb(T.unterschriebenAm('28.07.2026'))).toBe('unterschrieben am 28.07.2026');
+    expect(T.anreiseAbgestimmt).toBe('Anreise wird abgestimmt');
+    expect(T.anreisedaten).toBe('Anreisedaten');
+    expect(T.anreiseHeuteOffen).toBe('Uhrzeit und Verkehrsmittel stehen hier nicht. Rufen Sie uns bitte an, falls Ihnen diese Angaben fehlen.');
+    expect(T.heute).toBe('heute');
+    expect(T.folgeAb(T.heute)).toBe('Folgeeinsatz ab heute');
+    expect(nb(T.folgeGebucht(`Anna${NBSP}B.`))).toBe('Für den Folgeeinsatz ist Anna B. gebucht.');
+    expect(T.folgeGebuchtOhneName).toBe('Für den Folgeeinsatz ist eine Pflegekraft gebucht.');
+    expect(T.folgeAnsehen).toBe(`Folgeeinsatz ansehen${NBSP}›`);
+    expect(T.bewerbungenAnsehen(1)).toBe(`1${NBSP}Bewerbung ansehen${NBSP}›`);
+    expect(T.bewerbungenAnsehen(2)).toBe(`2${NBSP}Bewerbungen ansehen${NBSP}›`);
+    expect(T.ihreUnterlagen).toBe('Ihre Unterlagen');
+    expect(T.aktuellerEinsatz).toBe('Ihr aktueller Einsatz');
+    expect(T.naechsterEinsatz).toBe('Ihr nächster Einsatz');
+    expect(T.warteSatz1).toBe('Uhrzeit und Verkehrsmittel sehen Sie hier, sobald wir die Anreise organisiert haben.');
+    expect(T.warteSatz2).toBe('Dann bekommen Sie auch eine E‑Mail.');
     expect(T.kostenGrundlage).toBe('Grundlage: Ihr Tagessatz und die angegebenen Daten für Anreise und Abreise.');
-    expect(T.dokumentFrueher).toBe('Dienstleistungsvertrag zur früheren Buchung');
-    expect(T.unterschriebenMitBeginn('28.07.2026', '01.08.2026')).toBe('unterschrieben am 28.07.2026, Vertragsbeginn 01.08.2026');
-    // T5: geschütztes Leerzeichen zwischen Zahl und Wort und vor „›"
-    expect(T.folgeHinweis(1)).toBe('Folgeeinsatz: 1\u00a0Bewerbung ansehen\u00a0›');
-    expect(T.folgeHinweis(2)).toBe('Folgeeinsatz: 2\u00a0Bewerbungen ansehen\u00a0›');
-    expect(T.folgeHinweisSprung(1)).toBe('1\u00a0Bewerbung für Ihren Folgeeinsatz\u00a0›');
-    expect(T.folgeHinweisSprung(2)).toBe('2\u00a0Bewerbungen für Ihren Folgeeinsatz\u00a0›');
-    // T6: Zeichen
-    expect(T.warteSatz2).toBe('Dann bekommen Sie auch eine E\u2011Mail.');
-    expect(T.einladen).toBe('Pflegekräfte einladen\u00a0›');
-    expect(T.alleEinsaetze).toBe('Alle meine Einsätze\u00a0›');
+    expect(T.vertragPdfAria).toBe('Vertrag als PDF ansehen, öffnet in einem neuen Fenster');
   });
-  it('jedes „E-Mail" mit geschütztem Bindestrich, jedes „›" hängt per NBSP am Wort; keine Gedankenstriche in NEU-Texten', () => {
-    expect(alle).not.toMatch(/E-Mail/);
-    expect(alle).not.toMatch(/ ›/);
-    const neu = [T.voH1, T.voSatz, T.ebFolgeSatzOhneJetzigenNamen('X', 'Y'), T.kostenGrundlage, T.dokumentFrueher,
-      T.unterschriebenMitBeginn('X', 'Y'), T.folgeHinweis(2), T.folgeHinweisSprung(2), T.kartenAria('X'), T.kartenAriaOhneName];
-    for (const t of neu) expect(t, t).not.toMatch(/[—–]|~/);
+  it('freigegebene live Sätze (#116 Satz 2, Fassung 35) Zeichen für Zeichen', () => {
+    expect(T.anreiseBesprechen).toBe('Marta Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen, um die Anreise zu besprechen.');
+    expect(T.vvSatz).toBe('Wir bereiten Ihre Vertragsdokumente vor. Marta Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen.');
+    expect(T.vertragKnopf).toBe('Vertrag jetzt abschließen →');
+    expect(T.vertragRueckfall).toBe('Unterschriebenen Vertrag ansehen →');
   });
-  it('live Satz „Bitte schließen Sie noch Ihren Betreuungsvertrag ab." steht wirklich im live BookedScreen', () => {
-    expect(readFileSync('src/components/portal/BookedScreen.tsx', 'utf8')).toContain(T.voSatz);
-  });
-  it('live Texte stehen wirklich im Trunk-Code', () => {
-    const faq = readFileSync('src/components/portal/FaqListe.tsx', 'utf8');
-    expect(faq).toContain(T.reisekosten);
-    const einstieg = readFileSync('src/components/portal/EinstiegVorSpeichern.tsx', 'utf8');
-    expect(einstieg).toContain(T.kostenAuf);
-    expect(einstieg).toContain(T.kostenZu);
-    const uebersicht = readFileSync('src/pages/JobsOverviewPage.tsx', 'utf8');
-    expect(uebersicht).toContain(T.sucheOhneBewerbung);
+  it('live Texte stehen wirklich im live Code (BookedScreen, Einsatzübersicht, Kompakt-Einstieg, Anreise-Mail)', () => {
+    // Der Quelltext schreibt das geschützte Leerzeichen als Escape „\u00a0".
+    const booked = readFileSync('src/components/portal/BookedScreen.tsx', 'utf8').replace(/\\u00a0/g, NBSP);
+    for (const t of [T.anreiseBesprechen, T.vvSatz, T.vertragKnopf, T.vertragRueckfall, T.ihreUnterlagen, `'${T.anreisedaten}'`]) {
+      expect(booked, t).toContain(t);
+    }
+    expect(readFileSync('src/pages/JobsOverviewPage.tsx', 'utf8')).toContain(T.sucheOhneBewerbung);
+    expect(readFileSync('src/components/portal/KompaktEinstieg.tsx', 'utf8')).toContain("EINLADEN_TITEL = 'Pflegekräfte einladen'");
     const mail = readFileSync('project 3/supabase/functions/send-scheduled-emails/kundenMails.ts', 'utf8');
     expect(mail).toContain('Hierhin wird ${vorname} gebracht.');
     expect(mail).toContain('Hierhin reist ${vorname} selbst an.');
+  });
+});
+
+describe('Wortlaut-Wächter (N3.2 Regel 11, N3.7, N3.8)', () => {
+  const alle = alleTexte();
+  it('nichts behaupten: kein „kommt", „ist da", „übernimmt", „angekommen", „startet"; „läuft" nur im live Text der Einsatzübersicht', () => {
+    for (const t of alle) {
+      expect(t, t).not.toMatch(/\bkommt\b|ist da\b|übernimmt|angekommen|startet|ist bei Ihnen/);
+      if (t !== T.sucheOhneBewerbung) expect(t, t).not.toMatch(/läuft/);
+    }
+  });
+  it('was entfällt, steht nicht mehr in den Texten', () => {
+    const zusammen = alle.join('\n');
+    expect(zusammen).not.toMatch(/Laut Ihrem Vertrag|Alle Kosten im Überblick|Weniger anzeigen|Eine Kopie|Alle meine Einsätze|pauschal je 125|Buchung bestätigt|reist am|Gebuchter Einsatz bis|Bitte schließen Sie noch|Dienstleistungsvertrag|Vertragsbeginn|Hinweis/);
+  });
+  it('„E‑Mail" mit geschütztem Bindestrich, „›" per NBSP am Wort, keine Tilde', () => {
+    for (const t of alle) {
+      expect(t, t).not.toMatch(/E-Mail/);
+      expect(t, t).not.toMatch(/ ›/);
+      expect(t, t).not.toMatch(/~/);
+    }
+  });
+  it('keine Gedankenstriche in neuen Texten (Striche nur in Zeitbereichen und im live Text der Einsatzübersicht)', () => {
+    const neu = [T.etikett.heuteGeplant, T.etikett.endetBald, T.etikett.endetHeute, T.etikett.beendet, T.vertragUnterschreiben,
+      T.vertragVorbereitung, T.vertragFrueher, T.unterschriebenAm('X'), T.anreiseAbgestimmt, T.anreiseHeuteOffen, T.folgeGebucht('X'),
+      T.folgeGebuchtOhneName, T.folgeAnsehen, T.bewerbungenAnsehen(2), T.trenner, T.kostenGrundlage];
+    for (const t of neu) expect(t, t).not.toMatch(/[—–]/);
+  });
+  it('nie „wir vermitteln", nie Martin', () => {
+    for (const t of alle) expect(t, t).not.toMatch(/vermitteln|Martin/);
   });
 });

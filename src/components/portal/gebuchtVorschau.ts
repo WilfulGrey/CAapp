@@ -4,28 +4,27 @@
 // „Anna B.", „Małgorzata W.", „Bogumiła S.", „Musterstraße 1" sind Vorschau-Werte. Die Notfallnummer kommt nur zur
 // Laufzeit aus &notfall= und nur auf localhost/127.0.0.1/::1 (notfallAusVorschauUrl); sonst der Platzhalter.
 //
-// Schalter (alle optional):
+// Schalter (alle optional), Zustände wie texte_final.md, Nachtrag 3 (N3.5):
 //   &zustand=vertrag-offen|vorbereitung|unterschrieben|anreise-offen|anreise-da|anreisetag|anreisetag-offen|im-einsatz|
-//            endet-bald|beendet|folgeeinsatz   (Kürzel vo|vv|af|ad|at|l|eb|b gehen auch; ohne: anreise-da)
-//   &folge=keiner|geplant|bewerbungen|gebucht  Folgeeinsatz (bei „beendet": der andere Einsatz; ohne: laufend)
+//            endet-bald|endet-heute|beendet|folgeeinsatz   (Kürzel vo|vv|af|ad|at|l|eb|b gehen auch; ohne: anreise-da)
+//   &folge=keiner|geplant|bewerbungen|gebucht  Folgeeinsatz (bei „beendet": der andere Einsatz; ohne: je Zustand, AD wie
+//                                              im freigegebenen Bild „geplant" ohne Bewerbung)
+//   &eintrag=ja|nein                           Anreise-Eintrag erzwingen/weglassen (z. B. VO oder VV mit Eintrag)
 //   &verkehr=minibus|sindbad|eigen             Verkehrsmittel im Anreise-Eintrag
+//   &ohne=abreise|anreise                      ohne Abreise- bzw. Anreisedatum (Randfälle)
+//   &jahr=wechsel                              Jahreswechsel: vor der Anreise 31.12. → 24.02., beendet 03.12. → 04.02.
 //   &kontakt=a|b                               Entscheidung 2 (ohne: A, Martins Wortlaut)
-//   &kontaktoben=ja|nein                       Entscheidung 4, nur L und EB: ja = Kontakt über der Karte (Alternative);
-//                                              ohne oder nein = Martins Reihenfolge, erst die Karte, dann der Kontakt
-//   &folgezeile=sprung                         Hinweiszeile T5 springt zum Abschnitt (Rückfall-Wortlaut); ohne: direkt
-//                                              zu den Bewerbungen wie „Bewerbungen ansehen"
 //   &ende=a|b                                  Entscheidung 7 (ohne: B, Siegel und Sterne)
-//   &vertrag=anderer                           Entscheidung 5 = B: Vertrag einer früheren Buchung (T4)
+//   &vertrag=anderer|offen                     Entscheidung 5 = B: Vertrag einer früheren Buchung; offen = nie nachgeholt
 //   &bruecke=aus                               Brücke hat nicht geantwortet ⇒ keine Wartezeile
-//   &mail=nein                                 Lead ohne E-Mail / Vermittler ⇒ ohne E-Mail-Sätze
+//   &mail=nein                                 Lead ohne E-Mail / Vermittler ⇒ Wartezeile ohne E-Mail-Satz
 //   &foto=nein, &name=nein                     Pflegekraft ohne Foto bzw. ohne Namen
-//   &name=lang                                 lange Namen für die H1-Messung: „Małgorzata W.", Folgekraft „Bogumiła S."
+//   &name=lang                                 lange Namen: „Małgorzata W.", Folgekraft „Bogumiła S."
 //   &notfall=…                                 Notfallnummer (nie im Code), nur auf localhost; sonst sichtbarer Platzhalter
 //   &seite=alt                                 die heutige Seite (BookedScreen) zum Vergleich
 import type { Nurse } from '../../types';
 import { plusTage, type AnreiseDatensatz, type EinsatzZeile, type VertragStand } from '../../lib/gebuchtStand';
-import { datumKurz } from '../../lib/gebuchtTexte';
-import type { FolgeZeile, GebuchtSeiteDaten, Seitenende } from './GebuchtSeite';
+import type { GebuchtSeiteDaten, Seitenende } from './GebuchtSeite';
 import { kontaktTitelAusUrl, notfallAusVorschauUrl, type KontaktTitel } from './GebuchtKontakt';
 
 export type VorschauZustand =
@@ -37,6 +36,7 @@ export type VorschauZustand =
   | 'anreisetag-offen'
   | 'im-einsatz'
   | 'endet-bald'
+  | 'endet-heute'
   | 'beendet'
   | 'folgeeinsatz';
 
@@ -49,6 +49,7 @@ const ALIAS: Record<string, VorschauZustand> = {
   'anreisetag-offen': 'anreisetag-offen',
   'im-einsatz': 'im-einsatz', l: 'im-einsatz',
   'endet-bald': 'endet-bald', eb: 'endet-bald',
+  'endet-heute': 'endet-heute',
   beendet: 'beendet', b: 'beendet',
   folgeeinsatz: 'folgeeinsatz',
 };
@@ -75,8 +76,6 @@ export interface GebuchtVorschau {
   zustand: VorschauZustand;
   daten: GebuchtSeiteDaten;
   kontaktTitel: KontaktTitel;
-  kontaktObenImEinsatz: boolean;
-  folgeZeile: FolgeZeile;
   seitenende: Seitenende;
 }
 
@@ -107,24 +106,35 @@ export function gebuchtVorschau({ search, heute, nurse, kopf, hostname }: {
     'anreisetag-offen': [0, 41],
     'im-einsatz': [-14, 45],
     'endet-bald': [-40, 11],
+    'endet-heute': [-40, 0],
     folgeeinsatz: [-14, 45],
     beendet: [-100, -40],
   };
   const [vonTag, bisTag] = zeitraum[zustand];
-  const anreise = t(vonTag);
-  const abreise = t(bisTag);
   const beendet = zustand === 'beendet';
+  const ohne = q.get('ohne');
+  let anreise: string | null = t(vonTag);
+  let abreise: string | null = t(bisTag);
+  if (q.get('jahr') === 'wechsel') {
+    // N3.5 „Jahreswechsel": vor der Anreise 31.12. → 24.02. des Folgejahrs; beendet im Vorjahr 03.12. → 04.02.
+    const jahr = Number(heute.slice(0, 4));
+    if (beendet) { anreise = `${jahr - 1}-12-03`; abreise = `${jahr}-02-04`; }
+    else if (vonTag > 0) { anreise = `${jahr}-12-31`; abreise = plusTage(anreise, 55); }
+  }
+  if (ohne === 'abreise') abreise = null;
+  if (ohne === 'anreise') anreise = null;
 
   let vertrag: VertragStand = zustand === 'vertrag-offen' ? 'offen' : zustand === 'vorbereitung' ? 'vorbereitung' : 'unterschrieben';
   const vertragParam = q.get('vertrag');
   if (vertragParam === 'anderer' && vertrag === 'unterschrieben') vertrag = 'anderer';
   if (vertragParam === 'offen' && !beendet) vertrag = 'offen';
-  // „anderer" = Vertrag einer früheren Buchung: lange vor dieser Anreise unterschrieben, Vertragsbeginn wenige Tage danach.
+  // „anderer" = Vertrag einer früheren Buchung: lange vor dieser Anreise unterschrieben.
   const unterschriebenAm = vertrag === 'unterschrieben' ? t(Math.min(vonTag, 0) - 3) : vertrag === 'anderer' ? t(vonTag - 80) : null;
-  const vertragsbeginn = vertrag === 'unterschrieben' ? datumKurz(t(vonTag)) : vertrag === 'anderer' ? datumKurz(t(vonTag - 76)) : null;
 
-  const mitDatensatz = zustand === 'anreise-da' || zustand === 'anreisetag';
-  const anreiseEintrag: AnreiseDatensatz | null = mitDatensatz
+  const eintragParam = q.get('eintrag');
+  const vorOderAm = vonTag >= 0 && !beendet;
+  const mitDatensatz = !!anreise && vorOderAm && (eintragParam === 'ja' || (eintragParam !== 'nein' && (zustand === 'anreise-da' || zustand === 'anreisetag')));
+  const anreiseEintrag: AnreiseDatensatz | null = mitDatensatz && anreise
     ? {
         datum: anreise,
         von: '14:00',
@@ -136,7 +146,11 @@ export function gebuchtVorschau({ search, heute, nurse, kopf, hostname }: {
     : null;
 
   const folgeParam = q.get('folge') as Folge | null;
-  const folgeStandard: Folge = zustand === 'endet-bald' ? 'gebucht' : zustand === 'folgeeinsatz' ? 'bewerbungen' : beendet ? 'laufend' : 'keiner';
+  // Standard je Zustand wie N3.5: AD wie im freigegebenen Bild mit Folgeeinsatz „geplant" ohne Bewerbung.
+  const folgeStandard: Folge = zustand === 'endet-bald' || zustand === 'endet-heute' ? 'gebucht'
+    : zustand === 'folgeeinsatz' ? 'bewerbungen'
+    : zustand === 'anreise-da' ? 'geplant'
+    : beendet ? 'laufend' : 'keiner';
   const folgeArt: Folge = folgeParam && ['keiner', 'geplant', 'bewerbungen', 'gebucht', 'laufend'].includes(folgeParam) ? folgeParam : folgeStandard;
 
   const dieser: EinsatzZeile = {
@@ -148,9 +162,9 @@ export function gebuchtVorschau({ search, heute, nurse, kopf, hostname }: {
     bewerbungen: null,
   };
   const jobs: EinsatzZeile[] = [dieser];
-  if (folgeArt !== 'keiner') {
+  if (folgeArt !== 'keiner' && (beendet || abreise)) {
     // Beim beendeten Einsatz ist der andere Einsatz der laufende (Standard) oder der nächste; sonst der Folgeeinsatz ab Abreise.
-    const fVon = beendet ? (folgeArt === 'laufend' ? t(-40) : t(10)) : abreise;
+    const fVon = beendet ? (folgeArt === 'laufend' ? t(-40) : t(10)) : abreise!;
     const fBis = plusTage(fVon, folgeArt === 'laufend' ? 60 : 42);
     jobs.push({
       id: 'vorschau-einsatz-2',
@@ -171,8 +185,6 @@ export function gebuchtVorschau({ search, heute, nurse, kopf, hostname }: {
   return {
     zustand,
     kontaktTitel: kontaktTitelAusUrl(search),
-    kontaktObenImEinsatz: q.get('kontaktoben') === 'ja',
-    folgeZeile: q.get('folgezeile') === 'sprung' ? 'sprung' : 'direkt',
     seitenende: q.get('ende') === 'a' ? 'a' : 'b',
     daten: {
       heute,
@@ -185,7 +197,6 @@ export function gebuchtVorschau({ search, heute, nurse, kopf, hostname }: {
       vertrag: {
         stand: vertrag,
         datum: unterschriebenAm,
-        beginn: vertragsbeginn,
         // Vorschau: das öffentliche Muster statt eines echten Vertrags (kein Lead, kein Token).
         pdfHref: unterschriebenAm ? '/primundus-mustervertrag.pdf' : null,
       },

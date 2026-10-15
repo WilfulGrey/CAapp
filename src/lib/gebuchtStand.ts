@@ -1,13 +1,25 @@
 // Gebucht-Seite neu (PROTOTYP 15.10.2026, nur Vorschau ?preview=gebucht): Zustandslogik als reine Funktionen.
 //
-// Grundlage: seo-reports/analysen/gebucht-seite-2026-10-15/spezifikation.md, Abschnitte 5 und 7 (Jury-Sieger
-// „Status zuerst"), Endwortlaut in texte_final.md. Drei unabhängige Merkmale bestimmen die Seite: Vertrag, Zeit,
-// Folgeeinsatz. Der Tag ist der Berliner Kalendertag (wie `berlinJetzt` im Cron detect-caregiver-events) — nicht die
-// Ortszeit des Browsers.
+// Grundlage: seo-reports/analysen/gebucht-seite-2026-10-15/spezifikation.md, Abschnitte 5 und 7, und texte_final.md,
+// Nachtrag 3 (Karte B mit Schritten, Martin 15.10. abends: „finde ich super"). Drei unabhängige Merkmale bestimmen die
+// Seite: Vertrag, Zeit, Folgeeinsatz. Etikett, Spalten und Schritte werden aus diesen Merkmalen gerechnet, nicht aus dem
+// Zustandskürzel (N3.11: VV mit Anreise-Eintrag rechnet als AD, Schritt 1 heißt trotzdem „Vertrag in Vorbereitung").
+// Der Tag ist der Berliner Kalendertag (wie `berlinJetzt` im Cron detect-caregiver-events) — nicht die Ortszeit des
+// Browsers.
 //
 // Święta zasada 1: Hier wird nichts erfunden. Uhrzeit, Verkehrsmittel und Adresse kommen NUR aus einem gültigen
-// Anreise-Datensatz (Ereignis `caregiver_arrival_scheduled`, Feldliste wie die Anreise-Mail, nie `hinweis`). Fehlt er,
-// zeigt die Seite das Datum aus dem Job mit „geplant". Fehlt ein Datum, entfällt die Angabe.
+// Anreise-Datensatz (Ereignis `caregiver_arrival_scheduled`, Feldliste wie die Anreise-Mail, nie die Notiz der Agentur).
+// Fehlt er, zeigt die Seite das Datum aus dem Job mit „geplant". Fehlt ein Datum, entfällt die Angabe.
+import { formatJobDate } from './mamamia/leadJobs';
+import {
+  GEBUCHT_TEXTE as T,
+  VERKEHRSMITTEL,
+  anreiseZeit,
+  datumKurz,
+  einsatzTag,
+  nameFest,
+  type EinsatzTag,
+} from './gebuchtTexte';
 
 /** Entscheidung 9 (Empfehlung): „endet bald" ab 14 Tagen vor der Abreise. */
 export const ENDET_BALD_TAGE = 14;
@@ -243,70 +255,284 @@ export function einsatzPille(job: EinsatzZeile, heute: string): 'Laufend' | 'Geb
   return z === 'anreisetag' || z === 'im-einsatz' || z === 'endet-bald' ? 'Laufend' : z === 'vor' ? 'Gebucht' : null;
 }
 
-// ─── Reihenfolge der Bausteine (Spez. 4.2 mit texte_final Befund 1) ───────────
 
-export type Baustein =
-  | 'status'
-  | 'folgeHinweis'
-  | 'vertragsknopf'
-  | 'karte'
-  | 'unterKarte'
-  | 'kontakt'
-  | 'folge'
-  | 'andererEinsatz'
-  | 'unterlagen'
-  | 'alleEinsaetze'
-  | 'ende';
+/**
+ * Vertragsdatum für „am …" und „unterschrieben am …": „12.10.2026", Berliner Tag (`vertragTag`, Registry #20).
+ * `contract_snapshot.datum` kommt schon als „dd.mm.yyyy", `accepted_at` als Zeitstempel. Unlesbar ⇒ null (dann entfällt
+ * das Datum, nichts geraten).
+ */
+export function vertragDatum(wert: string | null | undefined): string | null {
+  const tag = vertragTag(wert);
+  return tag ? formatJobDate(tag) : null;
+}
 
-export interface ReihenfolgeOptionen {
-  folge: EinsatzZeile | null;
-  anderer: AndererEinsatz | null;
-  mehrereEinsaetze: boolean;
-  /** Unterlagen nur mit unterschriebenem bzw. anderem Vertrag (nie VO, VV). */
-  unterlagen: boolean;
-  /**
-   * Entscheidung 4, nur L und EB. Standard false = Martins Reihenfolge (15.10.: erst Bild, Name, Zeitraum und Kosten,
-   * dann der Kontakt). true = Alternative „Kontakt über der Karte" (Vorschau `&kontaktoben=ja`).
-   */
-  kontaktObenImEinsatz: boolean;
+// ─── Karte: Etikett, Spalten, Kosten (Nachtrag 3, N3.2 und N3.3) ─────────────
+
+/** N3.2, Regel 4: Das Jahr steht, sobald eines der Daten nicht im laufenden Berliner Jahr liegt — dann an allen. */
+export function jahrNoetig(daten: ReadonlyArray<string | null | undefined>, heute: string): boolean {
+  return daten.some((d) => !!d && d.slice(0, 4) !== heute.slice(0, 4));
+}
+
+export type EtikettTon = 'warnung' | 'neutral';
+export interface Etikett { text: string; ton: EtikettTon }
+
+/**
+ * N3.3: Etikett nach der Zeit, nicht nach dem Vertrag. Vor der Anreise „Gebucht", am Anreisetag „Anreise heute geplant",
+ * im Einsatz keins, ab 14 Tagen vor der Abreise „Endet bald" (am Abreisetag „Endet heute"), danach „Beendet" (neutral).
+ * Ohne Abreisedatum gibt es nie „Endet bald" (zeitstand kennt die Abreise dann nicht).
+ */
+export function einsatzEtikett(stand: GebuchtStand, heute: string): Etikett | null {
+  switch (stand.zeit) {
+    case 'vor': return { text: T.etikett.gebucht, ton: 'warnung' };
+    case 'anreisetag': return { text: T.etikett.heuteGeplant, ton: 'warnung' };
+    case 'im-einsatz': return null;
+    case 'endet-bald': return { text: stand.abreiseDatum === heute ? T.etikett.endetHeute : T.etikett.endetBald, ton: 'warnung' };
+    case 'beendet': return { text: T.etikett.beendet, ton: 'neutral' };
+  }
+}
+
+export interface EinsatzZeitraum {
+  an: EinsatzTag;
+  /** „geplant" unter ANREISE: kein gültiger Anreise-Eintrag und Zeit vor oder am Anreisetag. */
+  anGeplant: boolean;
+  /** null = kein Abreisedatum, dann nur die Spalte ANREISE (ohne Pfeil). */
+  ab: EinsatzTag | null;
+  /** „geplant" unter ABREISE: immer außer im beendeten Einsatz. */
+  abGeplant: boolean;
+}
+
+/** N3.2, Regel 3: Spalten der Karte. Ohne Anreisedatum entfallen sie ganz (null). */
+export function einsatzZeitraum(stand: GebuchtStand, heute: string): EinsatzZeitraum | null {
+  const an = stand.anreiseDatum;
+  if (!an) return null;
+  const ab = stand.abreiseDatum;
+  const mitJahr = jahrNoetig([an, ab], heute);
+  const vorOderAm = stand.zeit === 'vor' || stand.zeit === 'anreisetag';
+  return {
+    an: einsatzTag(an, mitJahr),
+    anGeplant: vorOderAm && !stand.mitAnreiseDaten,
+    ab: ab ? einsatzTag(ab, mitJahr) : null,
+    abGeplant: stand.zeit !== 'beendet',
+  };
+}
+
+export interface KostenZeile {
+  tagessatz: number;
+  /** Daten für die Monatsaufstellung („19.10.2026"), null = ohne „Kostenübersicht ›". */
+  uebersicht: { anreise: string; abreise: string } | null;
 }
 
 /**
- * Hinweiszeile T5 („Folgeeinsatz: 2 Bewerbungen ansehen ›") direkt unter dem Status: nur L und EB, Folgeeinsatz
- * „geplant" mit mindestens einer Bewerbung. Der Abschnitt Folgeeinsatz selbst steht nie über dem Kontakt (Notfallnummer
- * im ersten Bildschirm, Gegenprüfung 15.10.); die Zeile hält die Bewerbungen trotzdem oben sichtbar.
+ * N3.2, Regel 5: Kostenzeile nur mit unterschriebenem Vertrag DIESER Pflegekraft und belegtem Tagessatz (nie VO, VV,
+ * anderer Vertrag). „Kostenübersicht ›" nur, wenn beide Daten da sind.
  */
-export function folgeHinweis(zustand: GebuchtZustand, folge: EinsatzZeile | null): boolean {
-  return !!folge && folge.status === 'geplant' && (folge.bewerbungen ?? 0) > 0 && (zustand === 'L' || zustand === 'EB');
+export function kostenZeile(stand: GebuchtStand, vertrag: VertragStand, tagessatz: number | null): KostenZeile | null {
+  if (vertrag !== 'unterschrieben' || tagessatz === null) return null;
+  const an = stand.anreiseDatum;
+  const ab = stand.abreiseDatum;
+  return { tagessatz, uebersicht: an && ab ? { anreise: datumKurz(an), abreise: datumKurz(ab) } : null };
 }
 
-export function reihenfolge(stand: GebuchtStand, o: ReihenfolgeOptionen): Baustein[] {
-  const { zustand } = stand;
-  // Folgeeinsatz immer unter dem Kontakt (in jedem Zustand mit Kontakt davor).
-  const folgeUnten: Baustein[] = o.folge ? ['folge'] : [];
-  const alle: Baustein[] = o.mehrereEinsaetze ? ['alleEinsaetze'] : [];
-  const unterlagen: Baustein[] = o.unterlagen ? ['unterlagen'] : [];
-  const start: Baustein[] = folgeHinweis(zustand, o.folge) ? ['status', 'folgeHinweis'] : ['status'];
+// ─── Schritte „So geht es weiter" (Nachtrag 3, N3.4) ─────────────────────────
 
-  switch (zustand) {
-    case 'VO':
-      return ['status', 'vertragsknopf', 'karte', 'kontakt', ...folgeUnten, ...alle];
-    case 'VV':
-      return ['status', 'karte', 'kontakt', ...folgeUnten, ...alle];
-    case 'AF':
-      return [...start, 'karte', 'kontakt', ...folgeUnten, ...unterlagen, ...alle, 'ende'];
-    case 'AD':
-      return [...start, 'karte', 'unterKarte', 'kontakt', ...folgeUnten, ...unterlagen, ...alle, 'ende'];
-    case 'AT':
-      return stand.mitAnreiseDaten
-        ? [...start, 'karte', 'unterKarte', 'kontakt', ...folgeUnten, ...unterlagen, ...alle, 'ende']
-        : [...start, 'kontakt', 'karte', ...folgeUnten, ...unterlagen, ...alle, 'ende'];
-    case 'L':
-    case 'EB':
-      return o.kontaktObenImEinsatz
-        ? [...start, 'kontakt', 'karte', ...folgeUnten, ...unterlagen, ...alle, 'ende']
-        : [...start, 'karte', 'kontakt', ...folgeUnten, ...unterlagen, ...alle, 'ende'];
-    case 'B':
-      return ['status', 'karte', ...(o.anderer ? ['andererEinsatz' as const] : []), ...unterlagen, 'kontakt', ...alle, 'ende'];
+export type SchrittId = 'vertrag' | 'anreise' | 'nach' | 'folge';
+/** fertig = grüner Kreis mit Haken; jetzt = erster offener Schritt (Nummer, taupe Rand); spaeter = weitere offene. */
+export type SchrittArt = 'fertig' | 'jetzt' | 'spaeter';
+
+/** Ein Teil eines Werts; `fest` = bricht nicht in sich um. Text der Zeile = Teile mit Leerzeichen verbunden. */
+export interface WertTeil { text: string; fest: boolean }
+
+export interface SchrittZeile {
+  id: 'ankunft' | 'verkehrsmittel' | 'adresse';
+  label: string;
+  wert: WertTeil[];
+  /** kleiner Satz unter dem Wert („Hierhin wird Maria gebracht.") */
+  zusatz: string | null;
+  /** Adresse: für Clarity maskieren */
+  maske: boolean;
+}
+
+export type SchrittLink =
+  /** „Vertrag als PDF" (neues Fenster); `inline` = hinter dem Text der Zeile, nach dem Trenner „ · ". */
+  | { ziel: 'pdf'; text: string; aria: string; inline: boolean }
+  /** Rückfall ohne PDF-Link: „Unterschriebenen Vertrag ansehen →" (öffnet den Vertrag im Portal). */
+  | { ziel: 'vertragAnsehen'; text: string }
+  /** Seite eines anderen Einsatzes (`?token=…&job=<id>`). */
+  | { ziel: 'einsatz'; text: string; jobId: string };
+
+export interface Schritt {
+  id: SchrittId;
+  art: SchrittArt;
+  /** Stelle in der sichtbaren Liste (1-basiert), wie im Bild: ✓, ✓, 3, 4. */
+  nummer: number;
+  titel: string;
+  /** Satz bzw. Zeile unter dem Titel („am 12.10.2026", vvSatz, …); null = keiner. */
+  text: string | null;
+  link: SchrittLink | null;
+  /** Ankunft, Verkehrsmittel, Adresse (nur mit gültigem Anreise-Eintrag). */
+  zeilen: SchrittZeile[];
+  /** kleine Zeile unter Text bzw. Zeilen (Hinweis „Stimmt eine Angabe nicht …" oder Wartezeile). */
+  klein: string | null;
+  /** Knopf „Vertrag jetzt abschließen →" (nur mit Nachhol-Weg). */
+  knopf: string | null;
+}
+
+export interface SchritteAbschnitt {
+  /** „So geht es weiter", wenn mindestens ein Schritt offen ist; sonst „Ihre Unterlagen" (N3.2, Regel 8). */
+  titel: string;
+  liste: Schritt[];
+}
+
+export interface SchritteEingabe {
+  stand: GebuchtStand;
+  heute: string;
+  /** Gültiger Anreise-Datensatz oder null. Zeilen nur, solange `stand.mitAnreiseDaten`. */
+  anreise: AnreiseDatensatz | null;
+  vertrag: {
+    stand: VertragStand;
+    /** contract_snapshot.datum („dd.mm.yyyy") oder accepted_at (Zeitstempel). */
+    datum: string | null;
+    /** Es gibt einen PDF-Link für diesen Einsatz. */
+    pdf: boolean;
+    /** Rückfall ohne PDF: Der Vertrag lässt sich im Portal öffnen. */
+    ansehen: boolean;
+    /** Nachhol-Weg für den offenen Vertrag (sonst kein toter Knopf). */
+    knopf: boolean;
+  };
+  /** Die Brücke hat in diesem Seitenaufruf geantwortet — nur dann steht die Wartezeile (Spez. 7, Regel 4). */
+  brueckeOk: boolean;
+  /** Lead bekommt die Anreise-Mail (E-Mail vorhanden, kein Vermittler). */
+  bekommtMail: boolean;
+  /** Folgeeinsatz F (`findeFolgeeinsatz`), null = keiner. Nie im beendeten Einsatz. */
+  folge: EinsatzZeile | null;
+  /** Vorname der jetzigen Pflegekraft (für „Hierhin wird Maria gebracht."), null = ohne Zusatz. */
+  pflegekraftVorname: string | null;
+}
+
+type Entwurf = Omit<Schritt, 'art' | 'nummer'> & { erledigt: boolean };
+
+function entwurf(id: SchrittId, erledigt: boolean, titel: string, teil: Partial<Pick<Schritt, 'text' | 'link' | 'zeilen' | 'klein' | 'knopf'>> = {}): Entwurf {
+  return { id, erledigt, titel, text: teil.text ?? null, link: teil.link ?? null, zeilen: teil.zeilen ?? [], klein: teil.klein ?? null, knopf: teil.knopf ?? null };
+}
+
+function vertragSchritt(e: SchritteEingabe): Entwurf | null {
+  const v = e.vertrag;
+  if (v.stand === 'offen') return entwurf('vertrag', false, T.vertragUnterschreiben, { knopf: v.knopf ? T.vertragKnopf : null });
+  if (v.stand === 'vorbereitung') return entwurf('vertrag', false, T.vertragVorbereitung, { text: T.vvSatz });
+  // unterschrieben oder Vertrag einer früheren Buchung (Entscheidung 5 = B)
+  const datum = vertragDatum(v.datum);
+  const tag = vertragTag(v.datum);
+  const frueher = v.stand === 'anderer' && !!tag && !!e.stand.anreiseDatum && tag < e.stand.anreiseDatum;
+  const text = datum ? (frueher ? T.unterschriebenAm(datum) : T.vertragAm(datum)) : null;
+  const link: SchrittLink | null = v.pdf
+    ? { ziel: 'pdf', text: T.vertragPdf, aria: T.vertragPdfAria, inline: !!text }
+    : v.ansehen ? { ziel: 'vertragAnsehen', text: T.vertragRueckfall } : null;
+  return entwurf('vertrag', true, frueher ? T.vertragFrueher : T.vertragUnterschrieben, { text, link });
+}
+
+function anreiseZeilen(a: AnreiseDatensatz, mitJahr: boolean, vorname: string | null): SchrittZeile[] {
+  const tag = einsatzTag(a.datum, mitJahr);
+  const zeilen: SchrittZeile[] = [
+    {
+      id: 'ankunft',
+      label: T.ankunft,
+      // „Montag, 19.10., 14–16 Uhr": bricht höchstens zwischen den Teilen um.
+      wert: [{ text: `${tag.wochentag},`, fest: true }, { text: `${tag.datum}${tag.jahr ?? ''},`, fest: true }, { text: anreiseZeit(a.von, a.bis), fest: true }],
+      zusatz: null,
+      maske: false,
+    },
+    { id: 'verkehrsmittel', label: T.verkehrsmittel, wert: [{ text: VERKEHRSMITTEL[a.verkehrsmittel] ?? a.verkehrsmittel, fest: false }], zusatz: null, maske: false },
+  ];
+  if (a.strasse) {
+    // Entscheidung 8: bei Sindbad bis zur Klärung kein „Hierhin …"-Satz; ohne Vornamen kein Zusatz.
+    const zusatz = vorname && a.verkehrsmittel !== 'Sindbad'
+      ? (a.verkehrsmittel === 'Own transport' ? T.hierhinSelbst(vorname) : T.hierhinGebracht(vorname))
+      : null;
+    zeilen.push({
+      id: 'adresse',
+      label: T.adresse,
+      wert: a.plzOrt ? [{ text: `${a.strasse},`, fest: false }, { text: a.plzOrt, fest: true }] : [{ text: a.strasse, fest: false }],
+      zusatz,
+      maske: true,
+    });
   }
+  return zeilen;
+}
+
+function anreiseSchritt(e: SchritteEingabe): Entwurf | null {
+  const { stand } = e;
+  if (stand.zeit !== 'vor' && stand.zeit !== 'anreisetag') return null;
+  if (stand.mitAnreiseDaten && e.anreise) {
+    const mitJahr = jahrNoetig([stand.anreiseDatum, stand.abreiseDatum], e.heute);
+    return entwurf('anreise', true, T.anreiseOrganisiert, { zeilen: anreiseZeilen(e.anreise, mitJahr, e.pflegekraftVorname), klein: T.stimmtNicht });
+  }
+  if (stand.zeit === 'anreisetag') return entwurf('anreise', false, T.anreisedaten, { text: T.anreiseHeuteOffen });
+  // Vor dem Anreisetag ohne Eintrag. Beim Vertrag in Vorbereitung steht der Anruf schon in Schritt 1.
+  const warte = e.brueckeOk ? (e.bekommtMail ? `${T.warteSatz1} ${T.warteSatz2}` : T.warteSatz1) : null;
+  return entwurf('anreise', false, T.anreiseAbgestimmt, {
+    text: e.vertrag.stand === 'vorbereitung' ? null : T.anreiseBesprechen,
+    klein: warte,
+  });
+}
+
+function folgeSchritt(e: SchritteEingabe): Entwurf | null {
+  const f = e.folge;
+  if (!f || e.stand.zeit === 'beendet') return null;
+  const an = isoTag(f.anreise);
+  if (!an) return null;
+  const tag = an === e.heute ? T.heute : einsatzTag(an, jahrNoetig([an], e.heute)).text;
+  const gebucht = f.status === 'gebucht';
+  const bewerbungen = f.bewerbungen ?? 0;
+  const text = gebucht ? (f.pflegekraft ? T.folgeGebucht(nameFest(f.pflegekraft)) : T.folgeGebuchtOhneName) : T.folgeSucht;
+  const linkText = gebucht ? T.folgeAnsehen : bewerbungen > 0 ? T.bewerbungenAnsehen(bewerbungen) : T.einladen;
+  return entwurf('folge', false, T.folgeAb(tag), { text, link: { ziel: 'einsatz', text: linkText, jobId: f.id } });
+}
+
+/**
+ * N3.2, Regeln 6–8, und N3.4: Schritte in fester Reihenfolge (Vertrag, Anreise, Nach der Anreise, Folgeeinsatz), jeder
+ * nur unter seiner Bedingung. Der erste offene Schritt ist `jetzt`, alle weiteren offenen `spaeter`; die Nummer ist die
+ * Stelle in der Liste. Ohne Schritt (beendet ohne Vertrag) ⇒ null, der Abschnitt entfällt.
+ */
+export function schritte(e: SchritteEingabe): SchritteAbschnitt | null {
+  const beendet = e.stand.zeit === 'beendet';
+  const vorOderAm = e.stand.zeit === 'vor' || e.stand.zeit === 'anreisetag';
+  const mitVertrag = e.vertrag.stand === 'unterschrieben' || e.vertrag.stand === 'anderer';
+  const entwuerfe = [
+    beendet && !mitVertrag ? null : vertragSchritt(e),
+    anreiseSchritt(e),
+    vorOderAm ? entwurf('nach', false, T.nachDerAnreise, { text: T.nachSatz }) : null,
+    folgeSchritt(e),
+  ].filter((s): s is Entwurf => s !== null);
+  if (entwuerfe.length === 0) return null;
+  let jetztVergeben = false;
+  const liste: Schritt[] = entwuerfe.map(({ erledigt, ...s }, i) => {
+    let art: SchrittArt = 'fertig';
+    if (!erledigt) { art = jetztVergeben ? 'spaeter' : 'jetzt'; jetztVergeben = true; }
+    return { ...s, art, nummer: i + 1 };
+  });
+  return { titel: jetztVergeben ? T.soGehtEsWeiter : T.ihreUnterlagen, liste };
+}
+
+/** Text einer Schritt-Zeile wie auf der Seite (Teile mit Leerzeichen verbunden). */
+export function zeilenText(z: SchrittZeile): string {
+  return z.wert.map((w) => w.text).join(' ');
+}
+
+// ─── Reihenfolge der Bausteine (N3.2, Regel 1) ─────────────────────────────────
+
+export type Baustein = 'gruss' | 'einsatz' | 'andererEinsatz' | 'schritte' | 'kontakt' | 'ende';
+
+/**
+ * Eine Reihenfolge für alle Zustände: Begrüßung · Einsatz-Karte · [nur B: „Ihr aktueller" bzw. „Ihr nächster Einsatz"] ·
+ * Schritte · Kontakt · Siegel. Keine Ausnahme (Martin 15.10.: „nur einen vollständigen screen statt alles so komplex").
+ */
+export function reihenfolge(o: { anderer: boolean; schritte: boolean; ende: boolean }): Baustein[] {
+  return [
+    'gruss',
+    'einsatz',
+    ...(o.anderer ? ['andererEinsatz' as const] : []),
+    ...(o.schritte ? ['schritte' as const] : []),
+    'kontakt',
+    ...(o.ende ? ['ende' as const] : []),
+  ];
 }

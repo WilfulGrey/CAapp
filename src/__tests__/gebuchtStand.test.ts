@@ -1,25 +1,31 @@
-// Gebucht-Seite neu (PROTOTYP 15.10.2026): Zustandslogik. Spezifikation gebucht-seite-2026-10-15, Abschnitte 5 und 7.
-// Alle Daten sind Fantasie-Werte; „heute" ist Donnerstag, 15.10.2026.
-import { describe, it, expect } from 'vitest';
+// Gebucht-Seite neu (PROTOTYP 15.10.2026): Zustandslogik. Spezifikation gebucht-seite-2026-10-15, Abschnitte 5 und 7, und
+// texte_final.md, Nachtrag 3 (Karte B mit Schritten, N3.2–N3.5). Alle Daten sind Fantasie-Werte; „heute" ist Donnerstag,
+// 15.10.2026.
 import {
   ENDET_BALD_TAGE,
   anreiseAusEreignissen,
   berlinTag,
+  einsatzEtikett,
   einsatzPille,
+  einsatzZeitraum,
   findeAnderenEinsatz,
   findeFolgeeinsatz,
-  folgeHinweis,
   gebuchtStand,
+  jahrNoetig,
+  kostenZeile,
   plusTage,
   reihenfolge,
+  schritte,
   tageBis,
+  vertragDatum,
   vertragTag,
+  zeilenText,
   zeitstand,
   type AnreiseEreignis,
-  type Baustein,
   type EinsatzZeile,
   type GebuchtEingabe,
-  type GebuchtZustand,
+  type SchritteEingabe,
+  type VertragStand,
 } from '../lib/gebuchtStand';
 
 const HEUTE = '2026-10-15';
@@ -174,15 +180,6 @@ describe('Folgeeinsatz (Spez. 5.4)', () => {
     expect(findeFolgeeinsatz([dieser, job({ id: 'f', status: 'geplant', anreise: null })], 'j1', '2026-11-29')).toBeNull();
     expect(findeFolgeeinsatz([dieser, job({ id: 'f', anreise: '2026-12-01' })], 'j1', null)).toBeNull();
   });
-  it('Hinweiszeile T5 nur in L und EB bei „geplant" mit Bewerbungen', () => {
-    const f = job({ id: 'f', status: 'geplant', anreise: '2026-11-29', bewerbungen: 2 });
-    expect(folgeHinweis('L', f)).toBe(true);
-    expect(folgeHinweis('EB', f)).toBe(true);
-    for (const z of ['VO', 'VV', 'AF', 'AD', 'AT', 'B'] as const) expect(folgeHinweis(z, f), z).toBe(false);
-    expect(folgeHinweis('L', { ...f, bewerbungen: 0 })).toBe(false);
-    expect(folgeHinweis('L', { ...f, status: 'gebucht' })).toBe(false);
-    expect(folgeHinweis('L', null)).toBe(false);
-  });
 });
 
 describe('anderer Einsatz beim beendeten (Ihr aktueller / nächster Einsatz)', () => {
@@ -215,66 +212,385 @@ describe('vertragTag: Berliner Kalendertag des Vertragsdatums', () => {
   });
 });
 
-describe('reihenfolge (Spez. 4.2, texte_final Befund 1)', () => {
-  // Standard seit der Gegenprüfung 15.10.: Martins Reihenfolge, die Karte vor dem Kontakt.
-  const basis = { folge: null, anderer: null, mehrereEinsaetze: false, unterlagen: true, kontaktObenImEinsatz: false };
-  const s = (over: Partial<GebuchtEingabe>) => gebuchtStand(eingabe(over));
-  it('VO: Knopf direkt unter dem Status, keine Unterlagen, kein Seitenende', () => {
-    expect(reihenfolge(s({ vertrag: 'offen' }), { ...basis, unterlagen: false })).toEqual(['status', 'vertragsknopf', 'karte', 'kontakt']);
+describe('vertragDatum: Berliner Tag (Registry #20), nie der UTC-Tag', () => {
+  it('ISO-Zeitstempel nach 22/23 Uhr UTC ist in Berlin schon der nächste Tag', () => {
+    expect(vertragDatum('2026-10-12T22:30:00Z')).toBe('13.10.2026');
+    expect(vertragDatum('2026-10-12T21:59:00Z')).toBe('12.10.2026');
+    expect(vertragDatum('2026-01-05T23:30:00+00:00')).toBe('06.01.2026');
   });
-  it('AD: Karte, Satz unter der Karte, Kontakt, Unterlagen', () => {
-    expect(reihenfolge(s({ anreise: DATENSATZ }), basis)).toEqual(['status', 'karte', 'unterKarte', 'kontakt', 'unterlagen', 'ende']);
+  it('„dd.mm.yyyy" und Kalendertag bleiben; Unlesbares ⇒ null', () => {
+    expect(vertragDatum('12.10.2026')).toBe('12.10.2026');
+    expect(vertragDatum('2026-10-12')).toBe('12.10.2026');
+    expect(vertragDatum('quatsch')).toBeNull();
+    expect(vertragDatum(null)).toBeNull();
   });
-  it('AT ohne Daten: Kontakt vor der Karte', () => {
-    expect(reihenfolge(s({ einsatz: { id: 'j1', status: 'gebucht', anreise: HEUTE, abreise: '2026-11-29' } }), basis))
-      .toEqual(['status', 'kontakt', 'karte', 'unterlagen', 'ende']);
+});
+
+// ─── Nachtrag 3: Karte und Schritte ───────────────────────────────────────────
+
+const nb = (t: string | null | undefined) => (t ?? '').replace(/ /g, ' ');
+type Zeitraum = { anreise: string | null; abreise: string | null; status?: string };
+/** Beispieldaten wie N3.5 (heute Donnerstag, 15.10.2026). */
+const ZR = {
+  vor: { anreise: '2026-10-19', abreise: '2026-11-29' },
+  at: { anreise: HEUTE, abreise: '2026-11-25' },
+  l: { anreise: '2026-10-01', abreise: '2026-11-29' },
+  eb: { anreise: '2026-09-05', abreise: '2026-10-26' },
+  ebHeute: { anreise: '2026-09-05', abreise: HEUTE },
+  b: { anreise: '2026-07-07', abreise: '2026-09-05', status: 'abgeschlossen' },
+} satisfies Record<string, Zeitraum>;
+
+interface Fall {
+  zr?: Zeitraum;
+  eintrag?: boolean | Partial<typeof DATENSATZ>;
+  vertrag?: VertragStand;
+  datum?: string | null;
+  pdf?: boolean;
+  ansehen?: boolean;
+  knopf?: boolean;
+  folge?: EinsatzZeile | null;
+  brueckeOk?: boolean;
+  bekommtMail?: boolean;
+  vorname?: string | null;
+}
+
+function fall(f: Fall = {}) {
+  const zr = f.zr ?? ZR.vor;
+  const anreise = f.eintrag ? { ...DATENSATZ, datum: zr.anreise ?? DATENSATZ.datum, ...(typeof f.eintrag === 'object' ? f.eintrag : {}) } : null;
+  const vertrag = f.vertrag ?? 'unterschrieben';
+  const stand = gebuchtStand({ heute: HEUTE, einsatz: { id: 'j1', status: zr.status ?? 'gebucht', anreise: zr.anreise, abreise: zr.abreise }, anreise, vertrag });
+  const e: SchritteEingabe = {
+    stand,
+    heute: HEUTE,
+    anreise,
+    vertrag: { stand: vertrag, datum: f.datum === undefined ? '12.10.2026' : f.datum, pdf: f.pdf ?? true, ansehen: f.ansehen ?? false, knopf: f.knopf ?? true },
+    brueckeOk: f.brueckeOk ?? true,
+    bekommtMail: f.bekommtMail ?? true,
+    folge: f.folge ?? null,
+    pflegekraftVorname: f.vorname === undefined ? 'Maria' : f.vorname,
+  };
+  return { stand, abschnitt: schritte(e) };
+}
+/** Kurzform „art:nummer:titel" je Schritt. */
+const kurz = (f: Fall) => {
+  const { abschnitt } = fall(f);
+  return abschnitt ? { titel: abschnitt.titel, liste: abschnitt.liste.map((s) => `${s.art}:${s.nummer}:${nb(s.titel)}`) } : null;
+};
+const schritt = (f: Fall, id: string) => fall(f).abschnitt?.liste.find((s) => s.id === id) ?? null;
+const folgeGeplant = (over: Partial<EinsatzZeile> = {}) => job({ id: 'f', status: 'geplant', anreise: '2026-11-29', bewerbungen: 0, ...over });
+const folgeGebucht = (over: Partial<EinsatzZeile> = {}) => job({ id: 'f', status: 'gebucht', anreise: '2026-11-29', pflegekraft: 'Anna B.', ...over });
+const WARTE = 'Uhrzeit und Verkehrsmittel sehen Sie hier, sobald wir die Anreise organisiert haben. Dann bekommen Sie auch eine E‑Mail.';
+const BESPRECHEN = 'Marta Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen, um die Anreise zu besprechen.';
+
+describe('jahrNoetig (N3.2 Regel 4)', () => {
+  it('Jahr nur, wenn ein Datum nicht im laufenden Berliner Jahr liegt', () => {
+    expect(jahrNoetig(['2026-10-19', '2026-11-29'], HEUTE)).toBe(false);
+    expect(jahrNoetig(['2026-12-31', '2027-02-24'], HEUTE)).toBe(true);
+    expect(jahrNoetig(['2025-12-03', '2026-02-04'], HEUTE)).toBe(true);
+    expect(jahrNoetig([null, undefined], HEUTE)).toBe(false);
   });
-  const l = s({ einsatz: { id: 'j1', status: 'gebucht', anreise: '2026-10-01', abreise: '2026-11-29' } });
-  const eb = s({ einsatz: { id: 'j1', status: 'gebucht', anreise: '2026-09-01', abreise: '2026-10-26' } });
-  it('L und EB: Standard Martins Reihenfolge (Karte, dann Kontakt), Alternative Kontakt über der Karte', () => {
-    expect(l.zustand).toBe('L');
-    expect(eb.zustand).toBe('EB');
-    for (const st of [l, eb]) {
-      expect(reihenfolge(st, basis)).toEqual(['status', 'karte', 'kontakt', 'unterlagen', 'ende']);
-      expect(reihenfolge(st, { ...basis, kontaktObenImEinsatz: true })).toEqual(['status', 'kontakt', 'karte', 'unterlagen', 'ende']);
+});
+
+describe('einsatzEtikett: nach der Zeit, nicht nach dem Vertrag (N3.3)', () => {
+  const et = (zr: Zeitraum, vertrag: VertragStand = 'unterschrieben', eintrag = false) => einsatzEtikett(fall({ zr, vertrag, eintrag }).stand, HEUTE);
+  it('vor der Anreise „Gebucht" (warnung), auch bei offenem Vertrag und in Vorbereitung', () => {
+    for (const v of ['unterschrieben', 'offen', 'vorbereitung', 'anderer'] as const) expect(et(ZR.vor, v), v).toEqual({ text: 'Gebucht', ton: 'warnung' });
+    expect(et(ZR.vor, 'unterschrieben', true)).toEqual({ text: 'Gebucht', ton: 'warnung' });
+  });
+  it('Anreisetag „Anreise heute geplant", mit und ohne Eintrag', () => {
+    expect(et(ZR.at, 'unterschrieben', true)).toEqual({ text: 'Anreise heute geplant', ton: 'warnung' });
+    expect(et(ZR.at)).toEqual({ text: 'Anreise heute geplant', ton: 'warnung' });
+  });
+  it('im Einsatz keins (auch VO während des Einsatzes)', () => {
+    expect(et(ZR.l)).toBeNull();
+    expect(et(ZR.l, 'offen')).toBeNull();
+  });
+  it('„Endet bald" ab 14 Tagen, „Endet heute" am Abreisetag, „Beendet" neutral', () => {
+    expect(et(ZR.eb)).toEqual({ text: 'Endet bald', ton: 'warnung' });
+    expect(et(ZR.ebHeute)).toEqual({ text: 'Endet heute', ton: 'warnung' });
+    expect(et(ZR.b)).toEqual({ text: 'Beendet', ton: 'neutral' });
+  });
+  it('ohne Abreisedatum nie „Endet bald"', () => {
+    expect(et({ anreise: '2026-09-05', abreise: null })).toBeNull();
+  });
+});
+
+describe('einsatzZeitraum: Spalten mit „geplant" (N3.2 Regel 3)', () => {
+  const zr = (f: Fall) => einsatzZeitraum(fall(f).stand, HEUTE);
+  it('AD: ANREISE Montag 19.10. ohne „geplant", ABREISE Sonntag 29.11. geplant, ohne Jahr', () => {
+    expect(zr({ eintrag: true })).toEqual({
+      an: { iso: '2026-10-19', wochentag: 'Montag', datum: '19.10.', jahr: null, text: 'Montag, 19.10.' },
+      anGeplant: false,
+      ab: { iso: '2026-11-29', wochentag: 'Sonntag', datum: '29.11.', jahr: null, text: 'Sonntag, 29.11.' },
+      abGeplant: true,
+    });
+  });
+  it('ohne Eintrag vor und am Anreisetag: beide „geplant" (VO, VV, AF, AT ohne)', () => {
+    for (const f of [{ vertrag: 'offen' as const }, { vertrag: 'vorbereitung' as const }, {}, { zr: ZR.at }]) {
+      expect(zr(f)).toMatchObject({ anGeplant: true, abGeplant: true });
     }
   });
-  it('L/EB mit Folgeeinsatz „geplant" und Bewerbungen: Hinweiszeile unter dem Status, Abschnitt unter dem Kontakt, nur einmal', () => {
-    const folge = job({ id: 'f', status: 'geplant', anreise: '2026-11-29', bewerbungen: 2 });
-    const r = reihenfolge(l, { ...basis, folge, mehrereEinsaetze: true });
-    expect(r).toEqual(['status', 'folgeHinweis', 'karte', 'kontakt', 'folge', 'unterlagen', 'alleEinsaetze', 'ende']);
-    expect(r.filter((b) => b === 'folge')).toHaveLength(1);
-    expect(reihenfolge(eb, { ...basis, folge, kontaktObenImEinsatz: true }))
-      .toEqual(['status', 'folgeHinweis', 'kontakt', 'karte', 'folge', 'unterlagen', 'ende']);
+  it('VO mit Eintrag: ANREISE ohne „geplant"', () => {
+    expect(zr({ vertrag: 'offen', eintrag: true })).toMatchObject({ anGeplant: false, abGeplant: true });
   });
-  it('vor der Anreise mit Bewerbungen beim Folgeeinsatz: keine Hinweiszeile, Abschnitt unter dem Kontakt', () => {
-    const folge = job({ id: 'f', status: 'geplant', anreise: '2026-11-29', bewerbungen: 2 });
-    expect(reihenfolge(s({ anreise: DATENSATZ }), { ...basis, folge }))
-      .toEqual(['status', 'karte', 'unterKarte', 'kontakt', 'folge', 'unterlagen', 'ende']);
+  it('im Einsatz nur ABREISE geplant; beendet keins', () => {
+    expect(zr({ zr: ZR.l })).toMatchObject({ an: { wochentag: 'Donnerstag', datum: '01.10.' }, anGeplant: false, abGeplant: true });
+    expect(zr({ zr: ZR.b })).toMatchObject({ an: { wochentag: 'Dienstag', datum: '07.07.' }, ab: { wochentag: 'Samstag', datum: '05.09.' }, anGeplant: false, abGeplant: false });
   });
-  it('Regel: der Abschnitt Folgeeinsatz steht in keinem Zustand und keiner Variante über dem Kontakt', () => {
-    const staende = [
-      s({ vertrag: 'offen' }), s({ vertrag: 'vorbereitung' }), s({}), s({ anreise: DATENSATZ }),
-      s({ einsatz: { id: 'j1', status: 'gebucht', anreise: HEUTE, abreise: '2026-11-29' } }),
-      s({ einsatz: { id: 'j1', status: 'gebucht', anreise: HEUTE, abreise: '2026-11-29' }, anreise: { ...DATENSATZ, datum: HEUTE } }),
-      l, eb,
-    ];
-    const zustaende = new Set<GebuchtZustand>();
-    for (const st of staende) {
-      zustaende.add(st.zustand);
-      for (const folge of [job({ id: 'f', status: 'geplant', anreise: '2026-11-29', bewerbungen: 2 }), job({ id: 'f', status: 'gebucht', anreise: '2026-11-29', pflegekraft: 'Anna B.' })]) {
-        for (const kontaktObenImEinsatz of [false, true]) {
-          const r: Baustein[] = reihenfolge(st, { ...basis, folge, kontaktObenImEinsatz });
-          expect(r.indexOf('folge'), `${st.zustand} ${kontaktObenImEinsatz}`).toBeGreaterThan(r.indexOf('kontakt'));
-          expect(r.indexOf('kontakt')).toBeGreaterThan(-1);
-        }
+  it('ohne Abreisedatum nur ANREISE; ohne Anreisedatum keine Spalten', () => {
+    expect(zr({ zr: { anreise: '2026-10-01', abreise: null } })?.ab).toBeNull();
+    expect(zr({ zr: { anreise: null, abreise: '2026-11-29' } })).toBeNull();
+  });
+  it('Jahreswechsel: Jahr an beiden Spalten (auch beendet im Vorjahr)', () => {
+    expect(zr({ zr: { anreise: '2026-12-31', abreise: '2027-02-24' }, eintrag: true })).toMatchObject({
+      an: { wochentag: 'Donnerstag', datum: '31.12.', jahr: '2026' }, ab: { wochentag: 'Mittwoch', datum: '24.02.', jahr: '2027' },
+    });
+    expect(zr({ zr: { anreise: '2025-12-03', abreise: '2026-02-04', status: 'abgeschlossen' } })).toMatchObject({
+      an: { wochentag: 'Mittwoch', datum: '03.12.', jahr: '2025' }, ab: { wochentag: 'Mittwoch', datum: '04.02.', jahr: '2026' }, abGeplant: false,
+    });
+  });
+});
+
+describe('kostenZeile (N3.2 Regel 5)', () => {
+  const k = (f: Fall, tagessatz: number | null = 95) => kostenZeile(fall(f).stand, f.vertrag ?? 'unterschrieben', tagessatz);
+  it('mit Vertrag dieser Pflegekraft: Tagessatz und Kostenübersicht mit beiden Daten', () => {
+    expect(k({ eintrag: true })).toEqual({ tagessatz: 95, uebersicht: { anreise: '19.10.2026', abreise: '29.11.2026' } });
+    expect(k({ zr: ZR.b })).toEqual({ tagessatz: 95, uebersicht: { anreise: '07.07.2026', abreise: '05.09.2026' } });
+  });
+  it('nie bei VO, VV, anderem Vertrag oder ohne Tagessatz', () => {
+    for (const v of ['offen', 'vorbereitung', 'anderer'] as const) expect(k({ vertrag: v }), v).toBeNull();
+    expect(k({}, null)).toBeNull();
+  });
+  it('ohne Abreise- oder Anreisedatum: Tagessatz ohne „Kostenübersicht ›"', () => {
+    expect(k({ zr: { anreise: '2026-10-01', abreise: null } })).toEqual({ tagessatz: 95, uebersicht: null });
+    expect(k({ zr: { anreise: null, abreise: null } })).toEqual({ tagessatz: 95, uebersicht: null });
+  });
+});
+
+describe('schritte: Zustandstabelle N3.5, Wortlaut Zeichen für Zeichen', () => {
+  it('AD (freigegebenes Bild): ✓ Vertrag, ✓ Anreise, 3 Nach der Anreise (nächster), 4 Folgeeinsatz (später)', () => {
+    const f: Fall = { eintrag: true, folge: folgeGeplant() };
+    expect(kurz(f)).toEqual({
+      titel: 'So geht es weiter',
+      liste: ['fertig:1:Vertrag unterschrieben', 'fertig:2:Anreise organisiert', 'jetzt:3:Nach der Anreise', 'spaeter:4:Folgeeinsatz ab Sonntag, 29.11.'],
+    });
+    const [vertrag, anreise, nach, folge] = fall(f).abschnitt!.liste;
+    expect(nb(vertrag.text)).toBe('am 12.10.2026');
+    expect(vertrag.link).toEqual({ ziel: 'pdf', text: 'Vertrag als PDF', aria: 'Vertrag als PDF ansehen, öffnet in einem neuen Fenster', inline: true });
+    expect(anreise.zeilen.map((z) => [z.label, zeilenText(z), z.zusatz])).toEqual([
+      ['Ankunft', 'Montag, 19.10., 14–16 Uhr', null],
+      ['Verkehrsmittel', 'Minibus', null],
+      ['Adresse', 'Musterstraße 1, 12345 Musterstadt', 'Hierhin wird Maria gebracht.'],
+    ]);
+    expect(anreise.zeilen.find((z) => z.id === 'adresse')?.maske).toBe(true);
+    expect(anreise.klein).toBe('Stimmt eine Angabe nicht, sagen Sie uns bitte Bescheid.');
+    expect(anreise.text).toBeNull();
+    expect(nach.text).toBe('Wir melden uns bei Ihnen und fragen nach, ob alles gut klappt.');
+    expect(folge.text).toBe('Für den Folgeeinsatz suchen wir eine Pflegekraft für Sie.');
+    expect(folge.link).toEqual({ ziel: 'einsatz', text: 'Pflegekräfte einladen ›', jobId: 'f' });
+  });
+  it('VO: 1 Vertrag unterschreiben (nächster) mit Knopf ohne Satz, 2 Anreise wird abgestimmt + #116 + Wartezeile, 3 Nach der Anreise', () => {
+    expect(kurz({ vertrag: 'offen' })).toEqual({
+      titel: 'So geht es weiter',
+      liste: ['jetzt:1:Vertrag unterschreiben', 'spaeter:2:Anreise wird abgestimmt', 'spaeter:3:Nach der Anreise'],
+    });
+    const v = schritt({ vertrag: 'offen' }, 'vertrag')!;
+    expect(v).toMatchObject({ text: null, link: null, knopf: 'Vertrag jetzt abschließen →' });
+    const a = schritt({ vertrag: 'offen' }, 'anreise')!;
+    expect(nb(a.text)).toBe(BESPRECHEN);
+    expect(a.klein).toBe(WARTE);
+    expect(a.zeilen).toEqual([]);
+  });
+  it('VO ohne Nachhol-Weg: kein Knopf (kein toter Knopf)', () => {
+    expect(schritt({ vertrag: 'offen', knopf: false }, 'vertrag')?.knopf).toBeNull();
+  });
+  it('VO mit Anreise-Eintrag: 1 nächster, ✓ Anreise, 3 später', () => {
+    expect(kurz({ vertrag: 'offen', eintrag: true })?.liste).toEqual(['jetzt:1:Vertrag unterschreiben', 'fertig:2:Anreise organisiert', 'spaeter:3:Nach der Anreise']);
+  });
+  it('VV: 1 Vertrag in Vorbereitung + Satz Fassung 35, 2 Anreise wird abgestimmt nur mit Wartezeile, 3 Nach der Anreise', () => {
+    expect(kurz({ vertrag: 'vorbereitung' })?.liste).toEqual(['jetzt:1:Vertrag in Vorbereitung', 'spaeter:2:Anreise wird abgestimmt', 'spaeter:3:Nach der Anreise']);
+    expect(nb(schritt({ vertrag: 'vorbereitung' }, 'vertrag')?.text)).toBe('Wir bereiten Ihre Vertragsdokumente vor. Marta Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen.');
+    expect(schritt({ vertrag: 'vorbereitung' }, 'anreise')).toMatchObject({ text: null, klein: WARTE });
+  });
+  it('VV ohne Antwort der Brücke: Anreise-Schritt nur mit Titel', () => {
+    expect(schritt({ vertrag: 'vorbereitung', brueckeOk: false }, 'anreise')).toMatchObject({ titel: 'Anreise wird abgestimmt', text: null, klein: null, zeilen: [] });
+  });
+  it('VV mit Anreise-Eintrag rechnet als AD, Schritt 1 bleibt „Vertrag in Vorbereitung"', () => {
+    const f: Fall = { vertrag: 'vorbereitung', eintrag: true };
+    expect(fall(f).stand.zustand).toBe('AD');
+    expect(kurz(f)?.liste).toEqual(['jetzt:1:Vertrag in Vorbereitung', 'fertig:2:Anreise organisiert', 'spaeter:3:Nach der Anreise']);
+  });
+  it('AF: ✓ Vertrag, 2 Anreise wird abgestimmt (nächster) + #116 + Wartezeile, 3 später', () => {
+    expect(kurz({})?.liste).toEqual(['fertig:1:Vertrag unterschrieben', 'jetzt:2:Anreise wird abgestimmt', 'spaeter:3:Nach der Anreise']);
+    expect(schritt({}, 'anreise')).toMatchObject({ klein: WARTE });
+    expect(nb(schritt({}, 'anreise')?.text)).toBe(BESPRECHEN);
+  });
+  it('AF ohne E-Mail: Wartezeile ohne Satz 2; ohne Brücke: keine Wartezeile', () => {
+    expect(schritt({ bekommtMail: false }, 'anreise')?.klein).toBe('Uhrzeit und Verkehrsmittel sehen Sie hier, sobald wir die Anreise organisiert haben.');
+    expect(schritt({ brueckeOk: false }, 'anreise')?.klein).toBeNull();
+  });
+  it('AT mit Eintrag: Ankunft „Donnerstag, 15.10., 14–16 Uhr", 3 Nach der Anreise (nächster)', () => {
+    const f: Fall = { zr: ZR.at, eintrag: true };
+    expect(fall(f).stand.zustand).toBe('AT');
+    expect(kurz(f)?.liste).toEqual(['fertig:1:Vertrag unterschrieben', 'fertig:2:Anreise organisiert', 'jetzt:3:Nach der Anreise']);
+    expect(zeilenText(schritt(f, 'anreise')!.zeilen[0])).toBe('Donnerstag, 15.10., 14–16 Uhr');
+  });
+  it('AT ohne Eintrag: 2 Anreisedaten mit Bitte um Anruf, keine Wartezeile', () => {
+    const f: Fall = { zr: ZR.at };
+    expect(kurz(f)?.liste).toEqual(['fertig:1:Vertrag unterschrieben', 'jetzt:2:Anreisedaten', 'spaeter:3:Nach der Anreise']);
+    expect(schritt(f, 'anreise')).toMatchObject({
+      text: 'Uhrzeit und Verkehrsmittel stehen hier nicht. Rufen Sie uns bitte an, falls Ihnen diese Angaben fehlen.',
+      klein: null,
+      zeilen: [],
+    });
+  });
+  it('L ohne Folgejob: nur ✓ Vertrag, Überschrift „Ihre Unterlagen"', () => {
+    expect(kurz({ zr: ZR.l, datum: '25.09.2026' })).toEqual({ titel: 'Ihre Unterlagen', liste: ['fertig:1:Vertrag unterschrieben'] });
+    expect(nb(schritt({ zr: ZR.l, datum: '25.09.2026' }, 'vertrag')?.text)).toBe('am 25.09.2026');
+  });
+  it('L mit Folgeeinsatz: geplant mit Bewerbungen, geplant ohne, gebucht', () => {
+    const mitBew: Fall = { zr: ZR.l, folge: folgeGeplant({ bewerbungen: 2 }) };
+    expect(kurz(mitBew)).toEqual({ titel: 'So geht es weiter', liste: ['fertig:1:Vertrag unterschrieben', 'jetzt:2:Folgeeinsatz ab Sonntag, 29.11.'] });
+    expect(schritt(mitBew, 'folge')).toMatchObject({ text: 'Für den Folgeeinsatz suchen wir eine Pflegekraft für Sie.', link: { ziel: 'einsatz', text: '2 Bewerbungen ansehen ›', jobId: 'f' } });
+    expect(schritt({ zr: ZR.l, folge: folgeGeplant() }, 'folge')?.link).toMatchObject({ text: 'Pflegekräfte einladen ›' });
+    const gebucht = schritt({ zr: ZR.l, folge: folgeGebucht() }, 'folge')!;
+    expect(nb(gebucht.text)).toBe('Für den Folgeeinsatz ist Anna B. gebucht.');
+    expect(gebucht.link).toMatchObject({ text: 'Folgeeinsatz ansehen ›' });
+  });
+  it('EB: Folgeeinsatz ab Montag, 26.10.; ohne Namen; mit 1 Bewerbung; ab heute', () => {
+    const f26 = { anreise: '2026-10-26' };
+    expect(kurz({ zr: ZR.eb, folge: folgeGebucht(f26) })?.liste).toEqual(['fertig:1:Vertrag unterschrieben', 'jetzt:2:Folgeeinsatz ab Montag, 26.10.']);
+    expect(schritt({ zr: ZR.eb, folge: folgeGebucht({ ...f26, pflegekraft: null }) }, 'folge')?.text).toBe('Für den Folgeeinsatz ist eine Pflegekraft gebucht.');
+    expect(schritt({ zr: ZR.eb, folge: folgeGeplant({ ...f26, bewerbungen: 1 }) }, 'folge')?.link).toMatchObject({ text: '1 Bewerbung ansehen ›' });
+    const heute = schritt({ zr: ZR.ebHeute, folge: folgeGebucht({ anreise: HEUTE }) }, 'folge')!;
+    expect(heute.titel).toBe('Folgeeinsatz ab heute');
+    expect(nb(heute.text)).toBe('Für den Folgeeinsatz ist Anna B. gebucht.');
+  });
+  it('EB ohne Folgejob: kein Satz zum „Danach", Überschrift „Ihre Unterlagen"', () => {
+    expect(kurz({ zr: ZR.eb })).toEqual({ titel: 'Ihre Unterlagen', liste: ['fertig:1:Vertrag unterschrieben'] });
+  });
+  it('B: nur ✓ Vertrag, „Ihre Unterlagen"; nie ein Folgeeinsatz-Schritt', () => {
+    expect(kurz({ zr: ZR.b, datum: '02.07.2026', folge: folgeGebucht({ anreise: '2026-09-05' }) })).toEqual({ titel: 'Ihre Unterlagen', liste: ['fertig:1:Vertrag unterschrieben'] });
+  });
+  it('B ohne Vertrag: Abschnitt entfällt', () => {
+    expect(fall({ zr: ZR.b, vertrag: 'offen' }).abschnitt).toBeNull();
+    expect(fall({ zr: ZR.b, vertrag: 'vorbereitung' }).abschnitt).toBeNull();
+  });
+  it('anderer Vertrag (Entscheidung 5 = B): „Vertrag aus früherer Buchung" + „unterschrieben am …", weitere Schritte wie der Zustand', () => {
+    const l: Fall = { zr: ZR.l, vertrag: 'anderer', datum: '28.07.2026' };
+    expect(kurz(l)).toEqual({ titel: 'Ihre Unterlagen', liste: ['fertig:1:Vertrag aus früherer Buchung'] });
+    expect(nb(schritt(l, 'vertrag')?.text)).toBe('unterschrieben am 28.07.2026');
+    expect(schritt(l, 'vertrag')?.link).toMatchObject({ ziel: 'pdf', inline: true });
+    const af: Fall = { vertrag: 'anderer', datum: '28.07.2026' };
+    expect(kurz(af)?.liste).toEqual(['fertig:1:Vertrag aus früherer Buchung', 'jetzt:2:Anreise wird abgestimmt', 'spaeter:3:Nach der Anreise']);
+    expect(nb(schritt(af, 'anreise')?.text)).toBe(BESPRECHEN);
+  });
+  it('anderer Vertrag, Unterschrift nicht vor dieser Anreise (Randfall): „Vertrag unterschrieben" / „am …"', () => {
+    const f: Fall = { zr: ZR.l, vertrag: 'anderer', datum: '02.10.2026' };
+    expect(schritt(f, 'vertrag')?.titel).toBe('Vertrag unterschrieben');
+    expect(nb(schritt(f, 'vertrag')?.text)).toBe('am 02.10.2026');
+  });
+  it('VO während des Einsatzes (Randfall): 1 Vertrag unterschreiben, [2 später Folgeeinsatz], kein Anreise- und Nach-Schritt', () => {
+    expect(kurz({ zr: ZR.l, vertrag: 'offen' })).toEqual({ titel: 'So geht es weiter', liste: ['jetzt:1:Vertrag unterschreiben'] });
+    expect(kurz({ zr: ZR.l, vertrag: 'offen', folge: folgeGeplant() })?.liste).toEqual(['jetzt:1:Vertrag unterschreiben', 'spaeter:2:Folgeeinsatz ab Sonntag, 29.11.']);
+  });
+  it('ohne Abreisedatum: nie ein Folgeeinsatz (das Fenster braucht die Abreise)', () => {
+    const jobs = [job({ id: 'j1', anreise: '2026-10-01', abreise: null }), folgeGeplant()];
+    const folge = findeFolgeeinsatz(jobs, 'j1', null);
+    expect(folge).toBeNull();
+    expect(kurz({ zr: { anreise: '2026-10-01', abreise: null }, folge })).toEqual({ titel: 'Ihre Unterlagen', liste: ['fertig:1:Vertrag unterschrieben'] });
+  });
+  it('ohne Anreisedatum (Zeit gilt als „vor"): wie AF', () => {
+    expect(kurz({ zr: { anreise: null, abreise: null } })?.liste).toEqual(['fertig:1:Vertrag unterschrieben', 'jetzt:2:Anreise wird abgestimmt', 'spaeter:3:Nach der Anreise']);
+  });
+  it('Jahreswechsel: Ankunft und Folgeeinsatz-Titel mit Jahr, Vertragsdatum unverändert', () => {
+    const f: Fall = { zr: { anreise: '2026-12-31', abreise: '2027-02-24' }, eintrag: true, folge: folgeGeplant({ anreise: '2027-02-24' }) };
+    expect(zeilenText(schritt(f, 'anreise')!.zeilen[0])).toBe('Donnerstag, 31.12.2026, 14–16 Uhr');
+    expect(nb(schritt(f, 'folge')?.titel)).toBe('Folgeeinsatz ab Mittwoch, 24.02.2027');
+    expect(nb(schritt(f, 'vertrag')?.text)).toBe('am 12.10.2026');
+  });
+  it('Verkehrsmittel: Sindbad ohne Zusatz (Entscheidung 8), eigene Anreise „reist selbst an", Ankunft ohne Ende „ab 14 Uhr"', () => {
+    const sindbad = schritt({ eintrag: { verkehrsmittel: 'Sindbad' } }, 'anreise')!;
+    expect(zeilenText(sindbad.zeilen[1])).toBe('Reisebus (Sindbad)');
+    expect(sindbad.zeilen[2].zusatz).toBeNull();
+    const eigen = schritt({ eintrag: { verkehrsmittel: 'Own transport', bis: null } }, 'anreise')!;
+    expect(zeilenText(eigen.zeilen[0])).toBe('Montag, 19.10., ab 14 Uhr');
+    expect(zeilenText(eigen.zeilen[1])).toBe('Eigene Anreise');
+    expect(eigen.zeilen[2].zusatz).toBe('Hierhin reist Maria selbst an.');
+  });
+  it('ohne Vornamen kein Zusatz; ohne Straße keine Adresse-Zeile; lange Namen', () => {
+    expect(schritt({ eintrag: true, vorname: null }, 'anreise')!.zeilen[2].zusatz).toBeNull();
+    expect(schritt({ eintrag: { strasse: null } }, 'anreise')!.zeilen.map((z) => z.id)).toEqual(['ankunft', 'verkehrsmittel']);
+    expect(schritt({ eintrag: true, vorname: 'Małgorzata' }, 'anreise')!.zeilen[2].zusatz).toBe('Hierhin wird Małgorzata gebracht.');
+    expect(nb(schritt({ zr: ZR.l, folge: folgeGebucht({ pflegekraft: 'Bogumiła S.' }) }, 'folge')?.text)).toBe('Für den Folgeeinsatz ist Bogumiła S. gebucht.');
+  });
+  it('Vertrag ohne PDF-Link: Datum + Rückfall „Unterschriebenen Vertrag ansehen →"; ohne Rückfall-Weg kein Link; Datum unlesbar: nur der Link', () => {
+    expect(schritt({ pdf: false, ansehen: true }, 'vertrag')?.link).toEqual({ ziel: 'vertragAnsehen', text: 'Unterschriebenen Vertrag ansehen →' });
+    expect(schritt({ pdf: false, ansehen: false }, 'vertrag')?.link).toBeNull();
+    expect(schritt({ datum: 'quatsch' }, 'vertrag')).toMatchObject({ text: null, link: { ziel: 'pdf', inline: false } });
+  });
+});
+
+describe('schritte: Regeln über alle Fälle', () => {
+  const ZEITEN: Zeitraum[] = [ZR.vor, ZR.at, ZR.l, ZR.eb, ZR.ebHeute, ZR.b, { anreise: null, abreise: null }, { anreise: '2026-10-01', abreise: null }];
+  const VERTRAEGE: VertragStand[] = ['unterschrieben', 'offen', 'vorbereitung', 'anderer'];
+  const FOLGEN = [null, folgeGeplant(), folgeGeplant({ bewerbungen: 2 }), folgeGebucht()];
+  const alle: Fall[] = [];
+  for (const zr of ZEITEN) for (const vertrag of VERTRAEGE) for (const folge of FOLGEN) for (const eintrag of [false, true]) {
+    for (const brueckeOk of [true, false]) alle.push({ zr, vertrag, folge, eintrag, brueckeOk });
+  }
+  it('höchstens ein „jetzt"; es ist der erste offene Schritt; Nummern = Stelle in der Liste', () => {
+    for (const f of alle) {
+      const a = fall(f).abschnitt;
+      if (!a) continue;
+      const offen = a.liste.filter((s) => s.art !== 'fertig');
+      expect(a.liste.filter((s) => s.art === 'jetzt').length, JSON.stringify(f)).toBe(offen.length > 0 ? 1 : 0);
+      if (offen.length) expect(offen[0].art).toBe('jetzt');
+      a.liste.forEach((s, i) => expect(s.nummer).toBe(i + 1));
+      expect(a.titel).toBe(offen.length ? 'So geht es weiter' : 'Ihre Unterlagen');
+      expect(a.liste.map((s) => s.id)).toEqual(['vertrag', 'anreise', 'nach', 'folge'].filter((id) => a.liste.some((s) => s.id === id)));
+    }
+  });
+  it('keine Uhrzeit und keine Anreise-Zeilen ohne gültigen Anreise-Eintrag', () => {
+    for (const f of alle.filter((x) => !x.eintrag)) {
+      for (const s of fall(f).abschnitt?.liste ?? []) {
+        expect(s.zeilen, JSON.stringify(f)).toEqual([]);
+        for (const t of [s.titel, s.text, s.klein]) expect(nb(t)).not.toMatch(/\d{1,2}(:\d{2})?(–\d{1,2})? Uhr|Minibus|Musterstraße/);
       }
     }
-    expect([...zustaende].sort()).toEqual(['AD', 'AF', 'AT', 'EB', 'L', 'VO', 'VV']);
   });
-  it('B: Karte, dann der andere Einsatz, Unterlagen, Kontakt (Befund 1 texte_final)', () => {
-    const b = s({ einsatz: { id: 'j1', status: 'abgeschlossen', anreise: '2026-05-19', abreise: '2026-07-19' } });
-    const anderer = { art: 'aktuell' as const, job: job({ id: 'j2', anreise: '2026-10-01', abreise: '2026-11-29' }) };
-    expect(reihenfolge(b, { ...basis, anderer, mehrereEinsaetze: true })).toEqual(['status', 'karte', 'andererEinsatz', 'unterlagen', 'kontakt', 'alleEinsaetze', 'ende']);
+  it('kein Folgeeinsatz-Schritt ohne Folgejob, nie im beendeten Einsatz', () => {
+    for (const f of alle) {
+      const hatFolge = (fall(f).abschnitt?.liste ?? []).some((s) => s.id === 'folge');
+      if (!f.folge || f.zr === ZR.b) expect(hatFolge, JSON.stringify(f)).toBe(false);
+    }
+  });
+  it('Anreise- und Nach-Schritt nur vor oder am Anreisetag', () => {
+    for (const f of alle) {
+      const { stand, abschnitt } = fall(f);
+      const ids = (abschnitt?.liste ?? []).map((s) => s.id);
+      if (stand.zeit !== 'vor' && stand.zeit !== 'anreisetag') {
+        expect(ids).not.toContain('anreise');
+        expect(ids).not.toContain('nach');
+      } else {
+        expect(ids).toContain('nach');
+      }
+    }
+  });
+  it('Wartezeile nur vor dem Anreisetag, ohne Eintrag, mit Antwort der Brücke', () => {
+    for (const f of alle) {
+      const { stand, abschnitt } = fall(f);
+      const a = abschnitt?.liste.find((s) => s.id === 'anreise');
+      const warte = !!a?.klein && a.klein.startsWith('Uhrzeit und Verkehrsmittel sehen Sie hier');
+      expect(warte, JSON.stringify(f)).toBe(stand.zeit === 'vor' && !f.eintrag && f.brueckeOk !== false);
+    }
+  });
+});
+
+describe('reihenfolge (N3.2 Regel 1): eine Reihenfolge für alle Zustände', () => {
+  it('Begrüßung, Karte, [anderer Einsatz], [Schritte], Kontakt, [Siegel]', () => {
+    expect(reihenfolge({ anderer: false, schritte: true, ende: true })).toEqual(['gruss', 'einsatz', 'schritte', 'kontakt', 'ende']);
+    expect(reihenfolge({ anderer: true, schritte: true, ende: true })).toEqual(['gruss', 'einsatz', 'andererEinsatz', 'schritte', 'kontakt', 'ende']);
+    expect(reihenfolge({ anderer: false, schritte: false, ende: false })).toEqual(['gruss', 'einsatz', 'kontakt']);
   });
 });

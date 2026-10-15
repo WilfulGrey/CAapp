@@ -22,7 +22,7 @@ beforeAll(() => {
 });
 
 describe('?preview=gebucht zeigt die neue Gebucht-Seite', () => {
-  it('Zustand „im Einsatz": Status, Karte vor dem Kontakt mit Notfallfeld, kein alter Kopf; Hilfe-Blatt mit Notfallfeld unter der Kopfzeile', async () => {
+  it('Zustand „im Einsatz": Karte „Ihr Einsatz" vor dem Kontakt mit Notfallfeld, keine Satz-Überschrift, kein alter Kopf; Hilfe-Blatt mit Notfallfeld unter der Kopfzeile', async () => {
     server.use(
       http.get('https://primundus.de/api/bewertungen-stand', () => HttpResponse.json({ schnitt: '4,9', wert: 4.9, anzahl: 126 })),
       http.post('https://test.supabase.co/functions/v1/onboard-to-mamamia', () => HttpResponse.json({ error: 'no token' }, { status: 401 })),
@@ -31,15 +31,17 @@ describe('?preview=gebucht zeigt die neue Gebucht-Seite', () => {
     const user = userEvent.setup();
     const { container } = render(<CustomerPortalPage />);
     const h1 = await screen.findByRole('heading', { level: 1 }, { timeout: 5000 });
-    expect((h1.textContent ?? '').replace(/ /g, ' ')).toMatch(/^Gebuchter Einsatz bis /);
+    expect((h1.textContent ?? '').trim()).toBe('Ihr Einsatz');
     const seite = container.querySelector('[data-gebucht-seite]') as HTMLElement;
     expect(seite.getAttribute('data-zustand')).toBe('L');
     expect(screen.queryByText(/Vielen Dank — Pflegekraft gebucht!/)).toBeNull();
     expect(screen.queryByText('Als Nächstes')).toBeNull();
+    expect(seite.textContent).not.toMatch(/Gebuchter Einsatz bis|Alle meine Einsätze/);
     expect(within(seite).getByRole('link', { name: 'Primundus-Notfallnummer anrufen: +48 123 456 789' })).toBeTruthy();
-    // Standard im laufenden Einsatz: Martins Reihenfolge, erst die Karte, dann der Kontakt.
+    // Eine Reihenfolge für alle Zustände (Nachtrag 3): Begrüßung, Karte, Schritte, Kontakt, Siegel.
     const bausteine = [...seite.querySelectorAll('[data-baustein]')].map((e) => e.getAttribute('data-baustein'));
-    expect(bausteine.indexOf('karte')).toBeLessThan(bausteine.indexOf('kontakt'));
+    expect(bausteine.indexOf('einsatz')).toBeLessThan(bausteine.indexOf('schritte'));
+    expect(bausteine.indexOf('schritte')).toBeLessThan(bausteine.indexOf('kontakt'));
 
     await user.click(screen.getByRole('button', { name: 'Hilfe' }));
     const blatt = await screen.findByText('Ihre Beraterin');

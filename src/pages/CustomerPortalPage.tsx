@@ -3774,15 +3774,12 @@ const CustomerPortalPage: FC = () => {
           <GebuchtSeite
             daten={gebuchtNeu.daten}
             kontaktTitel={gebuchtNeu.kontaktTitel}
-            kontaktObenImEinsatz={gebuchtNeu.kontaktObenImEinsatz}
-            folgeZeile={gebuchtNeu.folgeZeile}
             seitenende={gebuchtNeu.seitenende}
             sterne={sterne}
             onPflegekraft={() => { profilQuelleRef.current = 'gebucht'; setSelectedNurse(acceptedApp.nurse); }}
             // Vorschau: kein Lead, kein Server — die Knöpfe zeigen nur, wohin sie führen würden.
             onVertragAbschliessen={() => showToast('Vorschau: Hier öffnet sich der Vertrag („Ihre Angaben" → „Unterschrift").')}
             onEinsatz={() => showToast('Vorschau: Hier öffnet sich dieser Einsatz.')}
-            alleEinsaetzeHref="?preview=jobs"
           />
         </div>
       ) : acceptedApp ? (

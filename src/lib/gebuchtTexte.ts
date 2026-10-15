@@ -1,114 +1,88 @@
 // Gebucht-Seite neu (PROTOTYP 15.10.2026, nur Vorschau): alle sichtbaren Texte an EINER Stelle.
 //
-// Endwortlaut: seo-reports/analysen/gebucht-seite-2026-10-15/texte_final.md (zwei OpenAI-Runden + Nachprüfung 2b,
-// stop-slop) und dessen Nachtrag vom 15.10. (Runde 3 + 3b, Marken „NEU R3"/„NEU R3b", Nummern T1–T6). NEU-Texte: Martins
-// Freigabe offen. „frei", „live", „Mail" und „geprüft" Zeichen für Zeichen übernommen.
+// Endwortlaut: seo-reports/analysen/gebucht-seite-2026-10-15/texte_final.md, Nachtrag 3 (15.10. spät, „Karte B mit
+// Schritten", N3.1–N3.12). Martin zum Bild aufgaben_390.png (Zustand AD): „finde ich super" — dessen Texte sind
+// freigegeben (Marke „frei") und hier Zeichen für Zeichen übernommen. „live", „Mail" ebenso Zeichen für Zeichen.
+// NEU R6 / R6b (OpenAI Runde 6 + Nachprüfung 6b, stop-slop) und ältere NEU-Texte: Martins Freigabe offen.
 // Daten kommen immer als Argument — hier steht kein Datum, kein Name und keine Nummer.
+// Dieses Modul hängt von keiner Zustandslogik ab (lib/gebuchtStand.ts importiert von hier, nicht umgekehrt).
 import { formatJobDate } from './mamamia/leadJobs';
-import { isoTag, vertragTag, type EinsatzZeile, type GebuchtStand } from './gebuchtStand';
 
-const NBSP = '\u00a0';
+const NBSP = ' ';
 /** Geschützter Bindestrich: „E‑Mail" bricht nie um (Portalregel Registry #91). */
-const NB_BINDESTRICH = '\u2011';
+const NB_BINDESTRICH = '‑';
 
-/** Satzende: Das Datum „26.10.“ schließt den Satz schon mit seinem Punkt (kein „26.10..“). */
-function mitPunkt(text: string): string {
-  return text.endsWith('.') ? text : `${text}.`;
-}
-
-/** Wortlaut-Konstanten. Kommentar = Marke aus texte_final.md. */
+/** Wortlaut-Konstanten. Kommentar = Marke aus texte_final.md, Nachtrag 3. */
 export const GEBUCHT_TEXTE = {
-  // 1. Status oben
-  voH1: 'Buchung bestätigt', // NEU R3 (T1a, Wortlaut der Mail C)
-  voSatz: 'Bitte schließen Sie noch Ihren Betreuungsvertrag ab.', // live (T1b, BookedScreen.tsx:93/191)
-  anreiseH1: (tag: string) => `Anreise am ${tag}`, // NEU R1/R2 (VV, AF)
-  vvSatz: `Wir bereiten Ihre Vertragsdokumente vor. Marta${NBSP}Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen.`, // frei (Fassung 35, live)
-  afSatz: `Ihr Vertrag ist unterschrieben. Marta${NBSP}Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen, um die Anreise zu besprechen.`, // frei (#116)
-  reistAn: (pk: string, tag: string) => `${pk} reist am ${tag} an`, // NEU R1/R2 (AD)
-  reistHeuteAn: (pk: string) => `${pk} reist heute an`, // NEU R1/R2 (AT mit Daten)
-  anreiseSatz: 'Wir haben die Anreise Ihrer Pflegekraft organisiert.', // Mail (Satzanfang groß)
-  anreiseHeuteGeplant: 'Anreise heute geplant', // NEU R1/R2 (AT ohne Daten)
-  gebuchtBis: (tag: string) => `Gebuchter Einsatz bis ${tag}`, // NEU R2/2b (L)
-  uebernimmtAb: (folge: string, tag: string) => `${folge} übernimmt ab ${tag}`, // NEU R2/2b (EB, Folgekraft gebucht)
-  uebernimmtHeute: (folge: string) => `${folge} übernimmt ab heute`, // NEU R2/2b
-  ebFolgeSatz: (folge: string, pk: string, tag: string) =>
-    `${folge} ist Ihre nächste Pflegekraft. Der Einsatz von ${pk} endet am ${mitPunkt(tag)}`, // NEU R2/2b
-  ebFolgeSatzOhneJetzigenNamen: (folge: string, tag: string) =>
-    `${folge} ist Ihre nächste Pflegekraft. Der Einsatz Ihrer jetzigen Pflegekraft endet am ${mitPunkt(tag)}`, // NEU R3 (T2)
-  ebFolgeOhneName: (tag: string) => `Ihre nächste Pflegekraft übernimmt ab ${mitPunkt(tag)}`, // NEU 2b
-  endetAm: (tag: string) => `Einsatz endet am ${tag}`, // NEU R2/2b (EB)
-  endetHeute: 'Einsatz endet heute', // NEU R2/2b
-  ebSucheSatz: 'Für die Zeit danach suchen wir eine Pflegekraft für Sie.', // NEU R1/R2
-  beendetH1: 'Einsatz beendet', // live (Fassung 34)
-  beendetSatz: (von: string, bis: string) =>
-    `Der Einsatz vom ${von} bis ${bis} ist abgeschlossen. Ihre Unterlagen bleiben jederzeit zugänglich.`, // live (Fassung 34)
-  aktuellerEinsatz: 'Ihr aktueller Einsatz', // NEU R1/R2
-  naechsterEinsatz: 'Ihr nächster Einsatz', // NEU R1/R2
-
-  // Hinweiszeile T5 (nur L und EB, Folgeeinsatz „geplant" mit Bewerbungen), Ziel wie „Bewerbungen ansehen".
-  folgeHinweis: (n: number) =>
-    `Folgeeinsatz: ${n}${NBSP}${n === 1 ? 'Bewerbung' : 'Bewerbungen'} ansehen${NBSP}›`, // NEU R3 (T5)
-  /** Rückfall, falls die Zeile nur zum Abschnitt springt (Vorschau `&folgezeile=sprung`). */
-  folgeHinweisSprung: (n: number) =>
-    `${n}${NBSP}${n === 1 ? 'Bewerbung' : 'Bewerbungen'} für Ihren Folgeeinsatz${NBSP}›`, // NEU R3 (T5 Rückfall, vorgelegt)
-
-  // 2. Vertragsknopf
-  vertragKnopf: 'Vertrag jetzt abschließen →', // live
-
-  // 3. Karte „Ihr Einsatz"
-  /** Unsichtbare H1, wenn kein Datum belegt ist. */
-  seiteOhneDatum: 'Ihr Einsatz', // NEU R1/R2
-  /** Name der Karte für Screenreader; anders als die unsichtbare H1 (Gegenprüfung 15.10.). Nicht sichtbar. */
-  kartenAria: (pk: string) => `Ihr Einsatz mit ${pk}`, // NEU, nur Screenreader, Freigabe offen
-  kartenAriaOhneName: 'Ihr Einsatz mit Ihrer Pflegekraft', // NEU, nur Screenreader, Freigabe offen
-  ihrePflegekraft: 'Ihre Pflegekraft', // Martin 15.10.
-  profilAria: (pk: string) => `Profil von ${pk} ansehen`, // live (PflegekraftZeile)
-  profilAriaOhneName: 'Profil ansehen', // live („Profil ansehen ›", PflegekraftProfil)
-  anreise: 'Anreise', // live
-  geplant: 'geplant', // NEU R1/R2
-  warteSatz1: 'Uhrzeit und Verkehrsmittel sehen Sie hier, sobald wir die Anreise organisiert haben.', // NEU R1/R2
-  warteSatz2: `Dann bekommen Sie auch eine E${NB_BINDESTRICH}Mail.`, // NEU R1/R2, Zeichen T6a
-  ankunft: 'Ankunft', // Mail
-  verkehrsmittel: 'Verkehrsmittel', // Mail
-  adresse: 'Adresse', // Mail
-  hierhinGebracht: (vorname: string) => `Hierhin wird ${vorname} gebracht.`, // Mail
-  hierhinSelbst: (vorname: string) => `Hierhin reist ${vorname} selbst an.`, // Mail
-  abreise: 'Abreise', // live
-  tagessatz: 'Tagessatz', // live (AppCard.tsx:55)
-  proTag: `${NBSP}/${NBSP}Tag`, // live (AppCard.tsx:56)
-  reisekosten: 'Anreise und Abreise pauschal je 125 €.', // live (FaqListe.tsx:57)
-  kostenQuelle: (datum: string) => `Laut Ihrem Vertrag vom ${datum}`, // NEU R1/R2, Lage T3a: direkt unter dem Tagessatz
-  kostenAuf: 'Alle Kosten im Überblick', // live (EinstiegVorSpeichern.tsx:170)
-  kostenZu: 'Weniger anzeigen', // live (EinstiegVorSpeichern.tsx:170)
+  // ─── Einsatz-Karte (N3.1) ───
+  ihrEinsatz: 'Ihr Einsatz', // frei 15.10. abends (Kopfleiste, h1)
+  etikett: {
+    gebucht: 'Gebucht', // frei 15.10. abends (AD); VO, VV, AF NEU R6
+    heuteGeplant: 'Anreise heute geplant', // Wortlaut NEU R1/R2, Rolle R6b
+    endetBald: 'Endet bald', // NEU R4b
+    endetHeute: 'Endet heute', // NEU R4b
+    beendet: 'Beendet', // NEU R4
+  },
+  ihrePflegekraft: 'Ihre Pflegekraft', // frei 15.10. abends
+  profilAria: (pk: string) => `Profil von ${pk} ansehen`, // live (PflegekraftZeile), nur Screenreader
+  profilAriaOhneName: 'Profil ansehen', // live („Profil ansehen ›", PflegekraftProfil), nur Screenreader
+  anreise: 'Anreise', // frei (Spalte, Versalien per CSS)
+  abreise: 'Abreise', // frei (Spalte, Versalien per CSS)
+  geplant: 'geplant', // frei
+  tagessatz: 'Tagessatz', // frei
+  proTag: `${NBSP}/${NBSP}Tag`, // frei (live AppCard.tsx:56)
+  kostenuebersicht: 'Kostenübersicht', // frei (Pfeil als Symbol)
   kostenGrundlage: 'Grundlage: Ihr Tagessatz und die angegebenen Daten für Anreise und Abreise.', // NEU R3b (T3b)
 
-  // 4. Satz unter der Karte (AD, AT mit Anreise-Eintrag)
-  unterKarte:
-    'Stimmt eine Angabe nicht, sagen Sie uns bitte Bescheid. Nach der Anreise melden wir uns bei Ihnen und fragen nach, ob alles gut klappt.', // NEU R1/R2
+  // ─── Schritte (N3.4) ───
+  soGehtEsWeiter: 'So geht es weiter', // frei 15.10. abends
+  ihreUnterlagen: 'Ihre Unterlagen', // live (Fassung 34), Rolle NEU R6: Titel, wenn kein Schritt offen ist
 
-  // 5. Kontakt (Überschrift; der Rest kommt aus GebuchtKontakt.tsx / KONTAKT_TEXTE)
-  kontaktA: 'Ihr Kontakt zur Agentur', // Martin 15.10. (bleibt im Bau, bis Martin wählt)
-  kontaktB: 'Ihr Kontakt zu Primundus', // NEU R1/R2 (Empfehlung)
+  vertragUnterschrieben: 'Vertrag unterschrieben', // frei 15.10. abends
+  vertragAm: (datum: string) => `am${NBSP}${datum}`, // frei 15.10. abends
+  /** „·" hängt per geschütztem Leerzeichen am Datum, keine Zeile beginnt mit „·" (N3.10). */
+  trenner: `${NBSP}· `, // frei
+  vertragPdf: 'Vertrag als PDF', // frei 15.10. abends (Link)
+  vertragPdfAria: 'Vertrag als PDF ansehen, öffnet in einem neuen Fenster', // NEU R2/2b, nur Screenreader
+  vertragRueckfall: 'Unterschriebenen Vertrag ansehen →', // live (BookedScreen), nur ohne PDF-Link
+  vertragFrueher: 'Vertrag aus früherer Buchung', // R6b (R6-11)
+  unterschriebenAm: (datum: string) => `unterschrieben am${NBSP}${datum}`, // NEU R1/R2 (R6-11)
+  vertragUnterschreiben: 'Vertrag unterschreiben', // NEU R6 (R6-3)
+  vertragKnopf: 'Vertrag jetzt abschließen →', // live (BookedScreen)
+  vertragVorbereitung: 'Vertrag in Vorbereitung', // NEU R6 (R6-4)
+  vvSatz: `Wir bereiten Ihre Vertragsdokumente vor. Marta${NBSP}Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen.`, // frei (Fassung 35, live)
 
-  // 6. Folgeeinsatz
-  folgeeinsatz: 'Folgeeinsatz', // NEU R1/R2 (Martins Wort)
+  anreiseAbgestimmt: 'Anreise wird abgestimmt', // NEU R6 (R6-5)
+  anreiseBesprechen: `Marta${NBSP}Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen, um die Anreise zu besprechen.`, // frei (#116, Satz 2)
+  warteSatz1: 'Uhrzeit und Verkehrsmittel sehen Sie hier, sobald wir die Anreise organisiert haben.', // NEU R1/R2
+  warteSatz2: `Dann bekommen Sie auch eine E${NB_BINDESTRICH}Mail.`, // NEU R1/R2, Zeichen T6a
+  anreiseOrganisiert: 'Anreise organisiert', // frei 15.10. abends
+  ankunft: 'Ankunft', // frei (Mail)
+  verkehrsmittel: 'Verkehrsmittel', // frei (Mail)
+  adresse: 'Adresse', // frei (Mail)
+  hierhinGebracht: (vorname: string) => `Hierhin wird ${vorname} gebracht.`, // frei (Mail)
+  hierhinSelbst: (vorname: string) => `Hierhin reist ${vorname} selbst an.`, // Mail
+  stimmtNicht: 'Stimmt eine Angabe nicht, sagen Sie uns bitte Bescheid.', // frei 15.10. abends
+  anreisedaten: 'Anreisedaten', // live (BookedScreen „Als Nächstes"), Rolle R6b
+  anreiseHeuteOffen: 'Uhrzeit und Verkehrsmittel stehen hier nicht. Rufen Sie uns bitte an, falls Ihnen diese Angaben fehlen.', // R6b (R6-6)
+
+  nachDerAnreise: 'Nach der Anreise', // frei 15.10. abends
+  nachSatz: 'Wir melden uns bei Ihnen und fragen nach, ob alles gut klappt.', // frei 15.10. abends
+
+  heute: 'heute', // NEU R6 (nur „Folgeeinsatz ab heute", R6-10)
+  folgeAb: (tag: string) => `Folgeeinsatz ab ${tag}`, // frei 15.10. abends
+  folgeSucht: 'Für den Folgeeinsatz suchen wir eine Pflegekraft für Sie.', // frei 15.10. abends
+  folgeGebucht: (name: string) => `Für den Folgeeinsatz ist ${name} gebucht.`, // NEU R6 (R6-7)
+  folgeGebuchtOhneName: 'Für den Folgeeinsatz ist eine Pflegekraft gebucht.', // NEU R6 (R6-7)
+  folgeAnsehen: `Folgeeinsatz ansehen${NBSP}›`, // NEU R6 (R6-8)
+  bewerbungenAnsehen: (n: number) => `${n}${NBSP}${n === 1 ? 'Bewerbung' : 'Bewerbungen'} ansehen${NBSP}›`, // NEU R6 (R6-9)
+  einladen: `Pflegekräfte einladen${NBSP}›`, // frei 15.10. abends (live KompaktEinstieg `{EINLADEN_TITEL}&nbsp;›`)
+
+  // ─── Nur im beendeten Einsatz mit neuerem Einsatz (N3.5 „B mit neuerem Einsatz") ───
+  aktuellerEinsatz: 'Ihr aktueller Einsatz', // NEU R1/R2
+  naechsterEinsatz: 'Ihr nächster Einsatz', // NEU R1/R2
   bewerbungen: (n: number) => `${n} ${n === 1 ? 'Bewerbung' : 'Bewerbungen'}`, // live (Einsatzübersicht)
-  sucheOhneBewerbung: 'Suchlauf läuft — noch keine Bewerbungen', // live (Einsatzübersicht)
-  bewerbungenAnsehen: 'Bewerbungen ansehen', // NEU R1/R2
-  einladen: `Pflegekräfte einladen${NBSP}›`, // live (KompaktEinstieg.tsx:394 `{EINLADEN_TITEL}&nbsp;›`), Zeichen T6c
-
-  // 7. Ihre Unterlagen
-  unterlagen: 'Ihre Unterlagen', // live (Fassung 34)
-  dokument: 'Dienstleistungsvertrag', // live
-  dokumentFrueher: 'Dienstleistungsvertrag zur früheren Buchung', // NEU R3b (T4a, nur Vertragsstand „anderer")
-  unterschriebenAm: (datum: string) => `unterschrieben am ${datum}`, // NEU R1/R2
-  unterschriebenMitBeginn: (datum: string, beginn: string) =>
-    `unterschrieben am ${datum}, Vertragsbeginn ${beginn}`, // NEU R3 (T4b, nur Vertragsstand „anderer")
-  vertragPdf: 'Vertrag ansehen (PDF)', // NEU R1/R2
-  vertragPdfAria: 'Vertrag als PDF ansehen, öffnet in einem neuen Fenster', // NEU R2/2b
-  kopieMail: `Eine Kopie haben Sie auch per E${NB_BINDESTRICH}Mail erhalten.`, // live, Zeichen T6b
-  vertragRueckfall: 'Unterschriebenen Vertrag ansehen →', // live
-  alleEinsaetze: `Alle meine Einsätze${NBSP}›`, // live (ohne „←"), Zeichen T6d
+  sucheOhneBewerbung: 'Suchlauf läuft — noch keine Bewerbungen', // live (Einsatzübersicht), unverändert
 } as const;
 
 // ─── Kopie aus der Anreise-Mail (Registry #119) ───────────────────────────────
@@ -139,94 +113,32 @@ export function anreiseZeit(von: string, bis: string | null): string {
 
 // ─── Eigene Formate ────────────────────────────────────────────────────────────
 
-/** H1-Datum ohne Jahr, Wochentag und Datum mit geschütztem Leerzeichen: „Montag,\u00a019.10.". */
-export function h1Tag(iso: string): string {
-  const voll = anreiseDatum(iso); // „Montag, 19.10.2026"
-  const [wochentag, datum] = voll.split(', ');
-  return `${wochentag},${NBSP}${datum.slice(0, 6)}`;
-}
-
 /** „2026-10-12" → „12.10.2026" (wie die Einsatzübersicht). */
 export function datumKurz(iso: string): string {
   return formatJobDate(iso);
 }
 
-/**
- * Vertragsdatum für „unterschrieben am", „Laut Ihrem Vertrag vom" und „Vertragsbeginn": „12.10.2026", Berliner Tag
- * (`vertragTag`, Registry #20). `contract_snapshot.datum`/`.vertragsbeginn` kommen schon als „dd.mm.yyyy", `accepted_at`
- * als Zeitstempel. Unlesbar ⇒ null (dann entfällt die Angabe, nichts geraten).
- */
-export function vertragDatum(wert: string | null | undefined): string | null {
-  const tag = vertragTag(wert);
-  return tag ? formatJobDate(tag) : null;
-}
-
-/** Name mit geschütztem Leerzeichen („Maria\u00a0K."), damit die H1 nicht mitten im Namen umbricht. */
+/** Name mit geschütztem Leerzeichen („Maria K."), damit er nie mitten im Namen umbricht. */
 export function nameFest(name: string): string {
   return name.trim().replace(/\s+/g, NBSP);
 }
 
-// ─── Status oben: H1 und Satz je Zustand (texte_final.md, Abschnitt 1) ────────
-
-export interface StatusEingabe {
-  stand: GebuchtStand;
-  heute: string;
-  /** Kurzname der Pflegekraft dieses Einsatzes („Maria K."), sonst null. */
-  pflegekraft: string | null;
-  /** Folgeeinsatz F (nur EB nutzt ihn für die H1). */
-  folge: EinsatzZeile | null;
+/** Ein Tag des Einsatzes in Teilen (Spalten der Karte) und als Text (Titel „Folgeeinsatz ab …"). */
+export interface EinsatzTag {
+  iso: string;
+  /** „Montag" */
+  wochentag: string;
+  /** „19.10." */
+  datum: string;
+  /** „2026" nur nach der Jahr-Regel (N3.2, Regel 4), sonst null */
+  jahr: string | null;
+  /** „Montag, 19.10." bzw. „Montag, 31.12.2026" (bricht nie im Datum um) */
+  text: string;
 }
 
-export interface StatusTexte {
-  /** null = kein belegtes Datum für die H1; die Seite setzt dann nur eine unsichtbare Überschrift. */
-  h1: string | null;
-  satz: string | null;
-}
-
-/**
- * H1 und Satz je Zustand. Kein Name ⇒ „Ihre Pflegekraft" (am Satzanfang groß); im EB-Satz ohne Namen der jetzigen
- * Pflegekraft der eigene Satz T2. Kein Pronomen für die Pflegekraft (Nachtrag T1). Kein Datum ⇒ keine H1 mit erfundenem
- * Datum.
- */
-export function statusTexte({ stand, heute, pflegekraft, folge }: StatusEingabe): StatusTexte {
-  const T = GEBUCHT_TEXTE;
-  const pk = pflegekraft ? nameFest(pflegekraft) : T.ihrePflegekraft;
-  const an = stand.anreiseDatum;
-  const ab = stand.abreiseDatum;
-  switch (stand.zustand) {
-    case 'VO':
-      return { h1: T.voH1, satz: T.voSatz };
-    case 'VV':
-      return { h1: an ? T.anreiseH1(h1Tag(an)) : null, satz: T.vvSatz };
-    case 'AF':
-      return { h1: an ? T.anreiseH1(h1Tag(an)) : null, satz: T.afSatz };
-    case 'AD':
-      return { h1: an ? T.reistAn(pk, h1Tag(an)) : null, satz: T.anreiseSatz };
-    case 'AT':
-      return stand.mitAnreiseDaten
-        ? { h1: T.reistHeuteAn(pk), satz: T.anreiseSatz }
-        : { h1: T.anreiseHeuteGeplant, satz: null };
-    case 'L':
-      return { h1: ab ? T.gebuchtBis(h1Tag(ab)) : null, satz: null };
-    case 'EB': {
-      const endet = ab === heute ? T.endetHeute : ab ? T.endetAm(h1Tag(ab)) : null;
-      const folgeAn = isoTag(folge?.anreise);
-      if (folge && folge.status === 'gebucht' && folgeAn) {
-        if (folge.pflegekraft && ab) {
-          const name = nameFest(folge.pflegekraft);
-          return {
-            h1: folgeAn === heute ? T.uebernimmtHeute(name) : T.uebernimmtAb(name, h1Tag(folgeAn)),
-            satz: pflegekraft
-              ? T.ebFolgeSatz(name, nameFest(pflegekraft), h1Tag(ab))
-              : T.ebFolgeSatzOhneJetzigenNamen(name, h1Tag(ab)),
-          };
-        }
-        return { h1: endet, satz: T.ebFolgeOhneName(h1Tag(folgeAn)) };
-      }
-      if (folge && folge.status === 'geplant') return { h1: endet, satz: T.ebSucheSatz };
-      return { h1: endet, satz: null };
-    }
-    case 'B':
-      return { h1: T.beendetH1, satz: an && ab ? T.beendetSatz(datumKurz(an), datumKurz(ab)) : null };
-  }
+export function einsatzTag(iso: string, mitJahr: boolean): EinsatzTag {
+  const [wochentag, voll] = anreiseDatum(iso).split(', '); // „Montag", „19.10.2026"
+  const datum = voll.slice(0, 6);
+  const jahr = mitJahr ? voll.slice(6) : null;
+  return { iso, wochentag, datum, jahr, text: `${wochentag},${NBSP}${datum}${jahr ?? ''}` };
 }
