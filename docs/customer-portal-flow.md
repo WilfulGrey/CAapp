@@ -216,6 +216,14 @@ Content-Type: application/json
 }
 ```
 
+**`zuschüsse.items[].in_kalkulation`** = czy pozycja obniża `eigenanteil` (`gesamt` = suma pozycji z `true`).
+Od Registry #124 (2026-10-15, decyzja 3 Martina) **`entlastungsbudget_neu` NIGDY nie wchodzi do Eigenanteil**, niezależnie
+od `subsidies_config.in_kalkulation` (na prodzie nadal `true`): nowe kalkulacje (`lib/calculation.ts`,
+`lib/calculator-context.tsx`) zapisują ją z `false`. Stare leady mają ją jeszcze z `true` i `eigenanteil` niższy o
+294,92 € — każde miejsce pokazujące zapisaną kalkulację (portal, maile, `/kalkulation`, PDF) czyta przez
+`project 3/lib/eigenanteil.ts` (`zaehltZumEigenanteil`, `eigenanteilOhneEntlastungsbudget`; lustra
+`src/lib/eigenanteil.ts`, `send-scheduled-emails/eigenanteil.ts`), nigdy przez samo `in_kalkulation`.
+
 ### Co robi `/api/angebot-anfordern`
 
 `project 3/app/api/angebot-anfordern/route.ts:62`:
