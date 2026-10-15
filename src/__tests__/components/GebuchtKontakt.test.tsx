@@ -16,6 +16,7 @@ import {
   martaUntenAusUrl,
   notfallAusVorschauUrl,
   notfallTelHref,
+  vorschauHostLokal,
   type KontaktVariante,
 } from '../../components/portal/GebuchtKontakt';
 import { BookedScreen } from '../../components/portal/BookedScreen';
@@ -216,6 +217,21 @@ describe('Vorschau-Schalter', () => {
     expect(notfallAusVorschauUrl('?preview=gebucht&notfall=0123%20456789')).toBe(FANTASIE_DE);
     expect(notfallAusVorschauUrl('?preview=gebucht')).toBe(NOTFALL_PLATZHALTER);
     expect(notfallAusVorschauUrl('?preview=gebucht&notfall=')).toBe(NOTFALL_PLATZHALTER);
+  });
+  it('Sicherheit: &notfall= nur auf localhost, 127.0.0.1 und ::1 — sonst immer der Platzhalter (kein Anruf-Link)', () => {
+    const q = '?preview=gebucht&notfall=%2B48%20123%20456%20789';
+    for (const host of ['localhost', '127.0.0.1', '::1', '[::1]', 'LOCALHOST']) {
+      expect(vorschauHostLokal(host), host).toBe(true);
+      expect(notfallAusVorschauUrl(q, host), host).toBe(FANTASIE_PL);
+    }
+    for (const host of ['kundenportal.primundus.de', 'caapp-staging.onrender.com', 'localhost.evil.example', '127.0.0.2', '0.0.0.0', '']) {
+      expect(vorschauHostLokal(host), host).toBe(false);
+      expect(notfallAusVorschauUrl(q, host), host).toBe(NOTFALL_PLATZHALTER);
+      expect(notfallTelHref(notfallAusVorschauUrl(q, host)), host).toBeNull();
+    }
+    // Ohne Angabe gilt der Host des Browsers (jsdom: localhost).
+    expect(window.location.hostname).toBe('localhost');
+    expect(notfallAusVorschauUrl(q)).toBe(FANTASIE_PL);
   });
   it('Quelltext-Wächter: außerhalb ?preview=gebucht ist der Bereich AUS, die Nummer kommt nur aus der Vorschau-URL', () => {
     const quelle = readFileSync('src/pages/CustomerPortalPage.tsx', 'utf8');

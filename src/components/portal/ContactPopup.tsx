@@ -12,11 +12,12 @@ const MEDIA_LOGOS = [
 ];
 
 /**
- * Hilfe-Blatt. PROTOTYP Gebucht-Seite neu (15.10.2026, nur Vorschau): `oben` setzt ganz oben einen Block ein (das
- * Notfallfeld, Spezifikation 6.10), `zeiten` ersetzt „Mo–So, 8–20 Uhr" (Entscheidung 10). Ohne beide Props: unverändert.
- * „Bekannt aus" und die Kacheln bleiben immer.
+ * Hilfe-Blatt. PROTOTYP Gebucht-Seite neu (15.10.2026, nur Vorschau): `unterKopf` setzt einen Block direkt unter die
+ * Kopfzeile „Ihre Beraterin" mit dem X (das Notfallfeld, Spezifikation 6.10; das X bleibt oben, Gegenprüfung 15.10.),
+ * `zeiten` ersetzt „Mo–So, 8–20 Uhr" (Entscheidung 10). Ohne beide Props: unverändert. „Bekannt aus" und die Kacheln
+ * bleiben immer.
  */
-export const ContactPopup: FC<{ onClose: () => void; oben?: ReactNode; zeiten?: string }> = ({ onClose, oben, zeiten }) => (
+export const ContactPopup: FC<{ onClose: () => void; unterKopf?: ReactNode; zeiten?: string }> = ({ onClose, unterKopf, zeiten }) => (
   <>
     <div
       className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]"
@@ -37,7 +38,6 @@ export const ContactPopup: FC<{ onClose: () => void; oben?: ReactNode; zeiten?: 
         </div>
 
         <div className="px-5 pt-4 pb-6 space-y-5">
-          {oben}
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Ihre Beraterin</p>
             <button
@@ -47,6 +47,7 @@ export const ContactPopup: FC<{ onClose: () => void; oben?: ReactNode; zeiten?: 
               <X className="w-4 h-4 text-gray-400" />
             </button>
           </div>
+          {unterKopf}
 
           <div className="flex items-center gap-4">
             <div className="relative flex-shrink-0">

@@ -4,15 +4,17 @@
 // ‚Maria K., Ihre Pflegekraft', und dann Einsatzzeitraum und Kosten … Kontakt … schöner … gebuchte Informationen, die
 // Pflegekraft, die Notfallrufnummer, den Kontakt, aber auch Anreisedaten, Abreisedaten, der Folgeeinsatz."
 // Aufbau „Status zuerst" (Jury-Sieger, seo-reports/analysen/gebucht-seite-2026-10-15/spezifikation.md), Wortlaut
-// texte_final.md. Oben ein Satz mit Datum je Stand, darunter EINE Karte (Pflegekraft, Anreise/Ankunft, Abreise, Kosten),
-// dann Kontakt mit Notfallfeld, Folgeeinsatz, Unterlagen. Reihenfolge je Zustand: `reihenfolge()` in lib/gebuchtStand.ts.
+// texte_final.md (mit Nachtrag 15.10., T1–T6). Oben ein Satz mit Datum je Stand, darunter EINE Karte (Pflegekraft,
+// Anreise/Ankunft, Abreise, Kosten), dann Kontakt mit Notfallfeld, Folgeeinsatz, Unterlagen. Reihenfolge je Zustand:
+// `reihenfolge()` in lib/gebuchtStand.ts. Im laufenden Einsatz standardmäßig Martins Reihenfolge (Karte, dann Kontakt);
+// der Abschnitt Folgeeinsatz steht nie über dem Kontakt, offene Bewerbungen zeigt in L/EB die Hinweiszeile T5 oben.
 //
 // Święta zasada 1: Die Seite zeigt nur Belegtes. Fehlt der Anreise-Eintrag, steht das Datum aus dem Job mit „geplant";
 // Uhrzeit, Verkehrsmittel und Adresse nie geraten. Kosten nur mit belegter Quelle (Vertrag dieser Pflegekraft). Die
 // Notfallnummer kommt als Prop (in der Vorschau aus &notfall=), nie aus dem Code; ohne gültige Nummer kein Notfallfeld.
 // Look: pm-Tokens, Abschnitt = h2 22 px + weiße Karte (wie AngebotAbschnitt), Kopf AngebotPerson, Knöpfe ui/Button,
 // Tippflächen ≥ 44 px, keine Überbreite bei 360 px.
-import { useState, type ReactNode } from 'react';
+import { useState, type MouseEvent, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, FileText, UserRound } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { SterneStand } from '../../lib/sterne';
@@ -21,9 +23,10 @@ import {
   findeFolgeeinsatz,
   einsatzPille,
   gebuchtStand,
-  folgeOben as folgeObenPruefen,
+  folgeHinweis as folgeHinweisPruefen,
   isoTag,
   reihenfolge,
+  vertragTag,
   type AnreiseDatensatz,
   type Baustein,
   type EinsatzZeile,
@@ -38,6 +41,7 @@ import {
   datumKurz,
   nameFest,
   statusTexte,
+  vertragDatum,
 } from '../../lib/gebuchtTexte';
 import { formatJobZeitraum } from '../../lib/mamamia/leadJobs';
 import type { LeadJobRow } from '../../lib/mamamia/types';
@@ -49,6 +53,14 @@ import { displayName, initials } from './shared';
 import { Button } from '../ui/Button';
 
 export type Seitenende = 'a' | 'b';
+/**
+ * Ziel der Hinweiszeile T5: `direkt` = zu den Bewerbungen wie der Knopf „Bewerbungen ansehen" (Wortlaut T5, OpenAI 3b);
+ * `sprung` = Anker zum Abschnitt Folgeeinsatz weiter unten (Rückfall-Wortlaut, Vorschau `&folgezeile=sprung`).
+ */
+export type FolgeZeile = 'direkt' | 'sprung';
+
+/** Anker des Abschnitts Folgeeinsatz (Hinweiszeile `sprung`). */
+export const FOLGE_ABSCHNITT_ID = 'folgeeinsatz-abschnitt';
 
 export interface GebuchtSeiteDaten {
   /** Berliner Kalendertag YYYY-MM-DD. */
@@ -66,8 +78,13 @@ export interface GebuchtSeiteDaten {
   bekommtMail: boolean;
   vertrag: {
     stand: VertragStand;
-    /** „Unterschrieben am": contract_snapshot.datum, sonst accepted_at (ISO). */
+    /**
+     * „Unterschrieben am": contract_snapshot.datum (schon „dd.mm.yyyy"), sonst accepted_at (ISO-Zeitstempel). Angezeigt
+     * als Berliner Tag (`vertragDatum`), nie als UTC-Tag.
+     */
     datum: string | null;
+    /** contract_snapshot.vertragsbeginn („dd.mm.yyyy"); sichtbar nur beim Vertragsstand „anderer" (T4b). */
+    beginn: string | null;
     /** PDF dieses Einsatzes (/api/contract-pdf/…&application_id=…); null = Rückfall-Knopf, falls onVertragAnsehen. */
     pdfHref: string | null;
   };
@@ -82,8 +99,13 @@ export interface GebuchtSeiteDaten {
 export interface GebuchtSeiteProps {
   daten: GebuchtSeiteDaten;
   kontaktTitel: KontaktTitel;
-  /** Entscheidung 4 (Empfehlung ja): im laufenden Einsatz Kontakt über der Karte. */
+  /**
+   * Entscheidung 4, nur L und EB: false = Martins Reihenfolge (Karte, dann Kontakt, Standard); true = Alternative
+   * „Kontakt über der Karte" (Vorschau `&kontaktoben=ja`).
+   */
   kontaktObenImEinsatz: boolean;
+  /** Ziel der Hinweiszeile T5; ohne Angabe `direkt`. */
+  folgeZeile?: FolgeZeile;
   seitenende: Seitenende;
   sterne: SterneStand | null;
   onPflegekraft?: () => void;
@@ -99,6 +121,16 @@ const H2 = 'text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-
 const KARTE = 'rounded-card border border-pm-line bg-white';
 const INNEN = 'px-5 max-[374px]:px-4';
 const LINK = 'inline-flex min-h-[44px] items-center gap-1.5 text-[15px] font-semibold text-pm-taupe-ink hover:text-pm-ink';
+
+/** Der berechnete Stand der Seite — EINE Stelle für die Seite und das Hilfe-Blatt (CustomerPortalPage). */
+export function gebuchtStandAusDaten(daten: GebuchtSeiteDaten): GebuchtStand {
+  return gebuchtStand({ heute: daten.heute, einsatz: daten.einsatz, anreise: daten.anreise, vertrag: daten.vertrag.stand });
+}
+
+/** Notfallfeld im Hilfe-Blatt nur, solange der Einsatz nicht beendet ist — am berechneten Zustand, nie am Vorschau-Etikett. */
+export function notfallImHilfeBlatt(daten: GebuchtSeiteDaten): boolean {
+  return gebuchtStandAusDaten(daten).zustand !== 'B';
+}
 
 /** Ohne Umbruch innerhalb eines Teils; zwischen den Teilen darf umbrochen werden. */
 function Teile({ teile }: { teile: string[] }) {
@@ -184,49 +216,59 @@ function EinsatzKarte({ stand, daten, onPflegekraft, wartezeile, mitKosten }: {
   const an = stand.anreiseDatum;
   const ab = stand.abreiseDatum;
   const tagessatz = mitKosten ? daten.tagessatz : null;
+  // T3a: Der Vertrag belegt nur den Tagessatz, deshalb steht die Quelle direkt darunter (nicht über der Aufstellung).
+  const quelle = tagessatz !== null ? vertragDatum(daten.vertrag.datum) : null;
+  const pkName = daten.pflegekraft?.name?.trim() ? displayName(daten.pflegekraft.name.trim()) : null;
+
+  // Anreise-Zeilen, Wartezeile und Abreise/Kosten stehen in getrennten Blöcken: Die Wartezeile ist kein dt/dd-Paar und
+  // darf deshalb nicht direkt in einem <dl> stehen.
+  const anreiseZeilen = a ? (
+    <>
+      <Zeile label={T.ankunft} testid="ankunft">
+        <DatumMitJahr iso={a.datum} komma /> <span className="whitespace-nowrap">{anreiseZeit(a.von, a.bis)}</span>
+      </Zeile>
+      <Zeile label={T.verkehrsmittel} testid="verkehrsmittel">{mittel}</Zeile>
+      {a.strasse && (
+        <Zeile label={T.adresse} testid="adresse" zusatz={hierhin} maske>
+          {a.strasse}
+          {a.plzOrt && <><br />{a.plzOrt}</>}
+        </Zeile>
+      )}
+    </>
+  ) : an ? (
+    <Zeile label={T.anreise} testid="anreise" zusatz={vorAnreise ? T.geplant : null}>
+      <DatumMitJahr iso={an} />
+    </Zeile>
+  ) : null;
 
   return (
-    <section aria-label={T.kartenAria} className={KARTE} data-baustein="karte">
+    <section aria-label={pkName ? T.kartenAria(pkName) : T.kartenAriaOhneName} className={KARTE} data-baustein="karte">
       <PflegekraftKopf nurse={daten.pflegekraft} onClick={onPflegekraft} />
-      <dl className={INNEN}>
-        {a ? (
-          <>
-            <Zeile label={T.ankunft} testid="ankunft">
-              <DatumMitJahr iso={a.datum} komma /> <span className="whitespace-nowrap">{anreiseZeit(a.von, a.bis)}</span>
-            </Zeile>
-            <Zeile label={T.verkehrsmittel} testid="verkehrsmittel">{mittel}</Zeile>
-            {a.strasse && (
-              <Zeile label={T.adresse} testid="adresse" zusatz={hierhin} maske>
-                {a.strasse}
-                {a.plzOrt && <><br />{a.plzOrt}</>}
-              </Zeile>
-            )}
-          </>
-        ) : an ? (
-          <Zeile label={T.anreise} testid="anreise" zusatz={vorAnreise ? T.geplant : null}>
-            <DatumMitJahr iso={an} />
-          </Zeile>
-        ) : null}
-        {wartezeile && (
+      {anreiseZeilen && <dl className={INNEN}>{anreiseZeilen}</dl>}
+      {wartezeile && (
+        <div className={INNEN}>
           <p className="border-t border-pm-line-soft py-3 text-pretty text-[15px] leading-[1.5] text-pm-muted" data-zeile="warten">
             {T.warteSatz1}{wartezeile.satz2 && <> {T.warteSatz2}</>}
           </p>
-        )}
-        {ab && (
-          <Zeile label={T.abreise} testid="abreise" zusatz={stand.zustand !== 'B' ? T.geplant : null}>
-            <DatumMitJahr iso={ab} />
-          </Zeile>
-        )}
-        {tagessatz !== null && (
-          <Zeile label={T.tagessatz} testid="tagessatz">
-            <span className="tabular-nums">{tagessatz}&nbsp;€</span><span className="font-medium text-pm-muted">{T.proTag}</span>
-          </Zeile>
-        )}
-      </dl>
+        </div>
+      )}
+      {(ab || tagessatz !== null) && (
+        <dl className={INNEN}>
+          {ab && (
+            <Zeile label={T.abreise} testid="abreise" zusatz={stand.zustand !== 'B' ? T.geplant : null}>
+              <DatumMitJahr iso={ab} />
+            </Zeile>
+          )}
+          {tagessatz !== null && (
+            <Zeile label={T.tagessatz} testid="tagessatz" zusatz={quelle ? T.kostenQuelle(quelle) : null}>
+              <span className="tabular-nums">{tagessatz}&nbsp;€</span><span className="font-medium text-pm-muted">{T.proTag}</span>
+            </Zeile>
+          )}
+        </dl>
+      )}
       {tagessatz !== null && (
         <div className={`${INNEN} pb-2`} data-zeile="kosten">
           <p className="text-[14px] leading-[1.45] text-pm-muted">{T.reisekosten}</p>
-          {daten.vertrag.datum && <p className="text-[14px] leading-[1.45] text-pm-muted">{T.kostenQuelle(datumKurz(daten.vertrag.datum))}</p>}
           {an && ab && (
             <>
               <button
@@ -240,7 +282,7 @@ function EinsatzKarte({ stand, daten, onPflegekraft, wartezeile, mitKosten }: {
               </button>
               {kostenOffen && (
                 <div className="pb-3">
-                  <MonatsZeilen anreise={datumKurz(an)} abreise={datumKurz(ab)} tagessatz={tagessatz} />
+                  <MonatsZeilen anreise={datumKurz(an)} abreise={datumKurz(ab)} tagessatz={tagessatz} grundlage={T.kostenGrundlage} />
                 </div>
               )}
             </>
@@ -309,8 +351,8 @@ function EinsatzZeileKarte({ job, heute, href, onClick, mitHandlung }: {
 }
 
 export function GebuchtSeite(props: GebuchtSeiteProps) {
-  const { daten, kontaktTitel, kontaktObenImEinsatz, seitenende, sterne } = props;
-  const stand = gebuchtStand({ heute: daten.heute, einsatz: daten.einsatz, anreise: daten.anreise, vertrag: daten.vertrag.stand });
+  const { daten, kontaktTitel, kontaktObenImEinsatz, seitenende, sterne, folgeZeile = 'direkt' } = props;
+  const stand = gebuchtStandAusDaten(daten);
   const { zustand } = stand;
   const pflegekraftName = daten.pflegekraft?.name?.trim() ? displayName(daten.pflegekraft.name.trim()) : null;
   const folge = zustand === 'B' ? null : findeFolgeeinsatz(daten.jobs, daten.einsatz.id, isoTag(daten.einsatz.abreise));
@@ -323,22 +365,41 @@ export function GebuchtSeite(props: GebuchtSeiteProps) {
     unterlagen: vertragBelegt && zustand !== 'VO' && zustand !== 'VV',
     kontaktObenImEinsatz,
   });
-  const { h1, satz } = statusTexte({
-    stand,
-    heute: daten.heute,
-    pflegekraft: pflegekraftName,
-    pflegekraftMaennlich: daten.pflegekraft?.gender === 'male',
-    folge,
-  });
+  const { h1, satz } = statusTexte({ stand, heute: daten.heute, pflegekraft: pflegekraftName, folge });
   // Kosten nur mit dem Vertrag DIESER Pflegekraft (nie VO, VV, „anderer Vertrag").
   const mitKosten = daten.vertrag.stand === 'unterschrieben' && zustand !== 'VO' && zustand !== 'VV';
   const wartezeile = !stand.mitAnreiseDaten && stand.zeit === 'vor' && (zustand === 'VO' || zustand === 'VV' || zustand === 'AF') && daten.brueckeOk
     ? { satz2: daten.bekommtMail }
     : null;
-  const oben = folgeObenPruefen(zustand, folge);
+  const hinweis = folgeHinweisPruefen(zustand, folge);
+  /** Der erste Baustein nach Status (und Hinweiszeile) rückt etwas näher heran. */
+  const direktNachStatus = (i: number) => bausteine[i - 1] === 'status' || bausteine[i - 1] === 'folgeHinweis';
   const einsatzZiel = (id: string) => (props.einsatzHref
     ? { href: props.einsatzHref(id) }
     : { onClick: () => props.onEinsatz?.(id) });
+
+  // T4: Vertrag einer früheren Buchung (Vertragsstand „anderer") mit Vertragsbeginn; „zur früheren Buchung" nur, wenn die
+  // Unterschrift belegt vor der Anreise dieses Einsatzes liegt.
+  const vertragAnderer = daten.vertrag.stand === 'anderer';
+  const unterschriebenAm = vertragDatum(daten.vertrag.datum);
+  const unterschriebenTag = vertragTag(daten.vertrag.datum);
+  const vertragsbeginn = vertragAnderer ? vertragDatum(daten.vertrag.beginn) : null;
+  const dokumentName = vertragAnderer && unterschriebenTag && stand.anreiseDatum && unterschriebenTag < stand.anreiseDatum
+    ? T.dokumentFrueher
+    : T.dokument;
+  const datumZeile = unterschriebenAm
+    ? (vertragsbeginn ? T.unterschriebenMitBeginn(unterschriebenAm, vertragsbeginn) : T.unterschriebenAm(unterschriebenAm))
+    : null;
+
+  // Hinweiszeile `sprung`: Fenster bzw. Telefonrahmen scrollen nach dem Tipp (gewollt, nur nach Nutzeraktion);
+  // scroll-mt am Abschnitt hält die Überschrift unter der klebenden Kopfleiste frei. Fokus auf die Überschrift.
+  const zumFolgeabschnitt = (e: MouseEvent<HTMLAnchorElement>) => {
+    const ziel = document.getElementById(FOLGE_ABSCHNITT_ID);
+    if (!ziel) return;
+    e.preventDefault();
+    ziel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('folgeeinsatz')?.focus({ preventScroll: true });
+  };
 
   const teile: Record<Baustein, (i: number) => ReactNode> = {
     status: () => (
@@ -347,18 +408,33 @@ export function GebuchtSeite(props: GebuchtSeiteProps) {
         {h1 ? (
           <h1 className="mt-6 text-balance text-[28px] font-extrabold leading-[1.1] tracking-[-0.035em] text-pm-ink min-[376px]:text-[31px]">{h1}</h1>
         ) : (
-          <h1 className="sr-only">{T.kartenAria}</h1>
+          <h1 className="sr-only">{T.seiteOhneDatum}</h1>
         )}
         {satz && <p className="mt-4 text-pretty text-[17px] leading-[1.55] text-pm-body">{satz}</p>}
       </div>
     ),
+    folgeHinweis: () => folge ? (
+      <div key="folgeHinweis" className="mt-2" data-baustein="folgeHinweis">
+        {folgeZeile === 'sprung' ? (
+          <a href={`#${FOLGE_ABSCHNITT_ID}`} onClick={zumFolgeabschnitt} className={LINK}>
+            {T.folgeHinweisSprung(folge.bewerbungen ?? 0)}
+          </a>
+        ) : props.einsatzHref ? (
+          <a href={props.einsatzHref(folge.id)} className={LINK}>{T.folgeHinweis(folge.bewerbungen ?? 0)}</a>
+        ) : (
+          <button type="button" onClick={() => props.onEinsatz?.(folge.id)} className={`${LINK} text-left`}>
+            {T.folgeHinweis(folge.bewerbungen ?? 0)}
+          </button>
+        )}
+      </div>
+    ) : null,
     vertragsknopf: () => props.onVertragAbschliessen ? (
       <div key="vertragsknopf" className="mt-6" data-baustein="vertragsknopf">
         <Button breit onClick={props.onVertragAbschliessen}>{T.vertragKnopf}</Button>
       </div>
     ) : null,
     karte: (i) => (
-      <div key="karte" className={i === 1 ? 'mt-8' : 'mt-10'}>
+      <div key="karte" className={direktNachStatus(i) ? 'mt-8' : 'mt-10'}>
         <EinsatzKarte stand={stand} daten={daten} onPflegekraft={props.onPflegekraft} wartezeile={wartezeile} mitKosten={mitKosten} />
       </div>
     ),
@@ -371,12 +447,18 @@ export function GebuchtSeite(props: GebuchtSeiteProps) {
         titel={kontaktTitel}
         notfallTelefon={daten.notfallTelefon}
         mitNotfall={zustand !== 'B'}
-        className={i === 1 ? 'mt-8' : 'mt-10'}
+        className={direktNachStatus(i) ? 'mt-8' : 'mt-10'}
       />
     ),
     folge: (i) => folge ? (
-      <section key="folge" aria-labelledby="folgeeinsatz" className={i === 1 ? 'mt-8' : 'mt-10'} data-baustein="folge">
-        <h2 id="folgeeinsatz" className={H2}>{T.folgeeinsatz}</h2>
+      <section
+        key="folge"
+        id={FOLGE_ABSCHNITT_ID}
+        aria-labelledby="folgeeinsatz"
+        className={`${direktNachStatus(i) ? 'mt-8' : 'mt-10'} scroll-mt-24`}
+        data-baustein="folge"
+      >
+        <h2 id="folgeeinsatz" tabIndex={-1} className={`${H2} focus:outline-none`}>{T.folgeeinsatz}</h2>
         <div className="mt-4">
           <EinsatzZeileKarte job={folge} heute={daten.heute} mitHandlung {...einsatzZiel(folge.id)} />
         </div>
@@ -399,8 +481,8 @@ export function GebuchtSeite(props: GebuchtSeiteProps) {
               <FileText className="h-5 w-5" strokeWidth={1.75} />
             </span>
             <div className="min-w-0">
-              <p className="text-[16px] font-semibold leading-snug text-pm-ink">{T.dokument}</p>
-              {daten.vertrag.datum && <p className="text-[14.5px] leading-snug text-pm-muted">{T.unterschriebenAm(datumKurz(daten.vertrag.datum))}</p>}
+              <p className="text-[16px] font-semibold leading-snug text-pm-ink" data-zeile="dokument">{dokumentName}</p>
+              {datumZeile && <p className="text-[14.5px] leading-snug text-pm-muted" data-zeile="vertragsdatum">{datumZeile}</p>}
               {daten.vertrag.pdfHref ? (
                 <a href={daten.vertrag.pdfHref} target="_blank" rel="noopener noreferrer" aria-label={T.vertragPdfAria} className={LINK}>
                   {T.vertragPdf}
@@ -432,7 +514,7 @@ export function GebuchtSeite(props: GebuchtSeiteProps) {
       data-gebucht-seite=""
       data-zustand={zustand}
       data-zeit={stand.zeit}
-      data-folge-oben={oben ? '1' : undefined}
+      data-folge-hinweis={hinweis ? '1' : undefined}
       style={{ animation: 'fadeIn 0.4s ease-out' }}
     >
       {bausteine.map((b, i) => teile[b](i))}

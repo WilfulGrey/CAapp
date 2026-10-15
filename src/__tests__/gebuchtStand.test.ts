@@ -8,15 +8,18 @@ import {
   einsatzPille,
   findeAnderenEinsatz,
   findeFolgeeinsatz,
-  folgeOben,
+  folgeHinweis,
   gebuchtStand,
   plusTage,
   reihenfolge,
   tageBis,
+  vertragTag,
   zeitstand,
   type AnreiseEreignis,
+  type Baustein,
   type EinsatzZeile,
   type GebuchtEingabe,
+  type GebuchtZustand,
 } from '../lib/gebuchtStand';
 
 const HEUTE = '2026-10-15';
@@ -171,14 +174,14 @@ describe('Folgeeinsatz (Spez. 5.4)', () => {
     expect(findeFolgeeinsatz([dieser, job({ id: 'f', status: 'geplant', anreise: null })], 'j1', '2026-11-29')).toBeNull();
     expect(findeFolgeeinsatz([dieser, job({ id: 'f', anreise: '2026-12-01' })], 'j1', null)).toBeNull();
   });
-  it('folgeOben nur bei „geplant" mit Bewerbungen, nie in VO und B', () => {
+  it('Hinweiszeile T5 nur in L und EB bei „geplant" mit Bewerbungen', () => {
     const f = job({ id: 'f', status: 'geplant', anreise: '2026-11-29', bewerbungen: 2 });
-    expect(folgeOben('L', f)).toBe(true);
-    expect(folgeOben('EB', f)).toBe(true);
-    expect(folgeOben('VO', f)).toBe(false);
-    expect(folgeOben('B', f)).toBe(false);
-    expect(folgeOben('L', { ...f, bewerbungen: 0 })).toBe(false);
-    expect(folgeOben('L', { ...f, status: 'gebucht' })).toBe(false);
+    expect(folgeHinweis('L', f)).toBe(true);
+    expect(folgeHinweis('EB', f)).toBe(true);
+    for (const z of ['VO', 'VV', 'AF', 'AD', 'AT', 'B'] as const) expect(folgeHinweis(z, f), z).toBe(false);
+    expect(folgeHinweis('L', { ...f, bewerbungen: 0 })).toBe(false);
+    expect(folgeHinweis('L', { ...f, status: 'gebucht' })).toBe(false);
+    expect(folgeHinweis('L', null)).toBe(false);
   });
 });
 
@@ -201,8 +204,20 @@ describe('anderer Einsatz beim beendeten (Ihr aktueller / nächster Einsatz)', (
   });
 });
 
+describe('vertragTag: Berliner Kalendertag des Vertragsdatums', () => {
+  it('Zeitstempel ⇒ Berliner Tag; „dd.mm.yyyy" und Kalendertag bleiben; Unlesbares ⇒ null', () => {
+    expect(vertragTag('2026-10-12T22:30:00Z')).toBe('2026-10-13');
+    expect(vertragTag('2026-10-12T21:59:59.999Z')).toBe('2026-10-12');
+    expect(vertragTag('28.07.2026')).toBe('2026-07-28');
+    expect(vertragTag('2026-07-28')).toBe('2026-07-28');
+    expect(vertragTag('28.7.2026')).toBeNull();
+    expect(vertragTag(undefined)).toBeNull();
+  });
+});
+
 describe('reihenfolge (Spez. 4.2, texte_final Befund 1)', () => {
-  const basis = { folge: null, anderer: null, mehrereEinsaetze: false, unterlagen: true, kontaktObenImEinsatz: true };
+  // Standard seit der Gegenprüfung 15.10.: Martins Reihenfolge, die Karte vor dem Kontakt.
+  const basis = { folge: null, anderer: null, mehrereEinsaetze: false, unterlagen: true, kontaktObenImEinsatz: false };
   const s = (over: Partial<GebuchtEingabe>) => gebuchtStand(eingabe(over));
   it('VO: Knopf direkt unter dem Status, keine Unterlagen, kein Seitenende', () => {
     expect(reihenfolge(s({ vertrag: 'offen' }), { ...basis, unterlagen: false })).toEqual(['status', 'vertragsknopf', 'karte', 'kontakt']);
@@ -214,17 +229,48 @@ describe('reihenfolge (Spez. 4.2, texte_final Befund 1)', () => {
     expect(reihenfolge(s({ einsatz: { id: 'j1', status: 'gebucht', anreise: HEUTE, abreise: '2026-11-29' } }), basis))
       .toEqual(['status', 'kontakt', 'karte', 'unterlagen', 'ende']);
   });
-  it('L: Kontakt oben (Entscheidung 4), Alternative: Karte zuerst', () => {
-    const l = s({ einsatz: { id: 'j1', status: 'gebucht', anreise: '2026-10-01', abreise: '2026-11-29' } });
-    expect(reihenfolge(l, basis)).toEqual(['status', 'kontakt', 'karte', 'unterlagen', 'ende']);
-    expect(reihenfolge(l, { ...basis, kontaktObenImEinsatz: false })).toEqual(['status', 'karte', 'kontakt', 'unterlagen', 'ende']);
+  const l = s({ einsatz: { id: 'j1', status: 'gebucht', anreise: '2026-10-01', abreise: '2026-11-29' } });
+  const eb = s({ einsatz: { id: 'j1', status: 'gebucht', anreise: '2026-09-01', abreise: '2026-10-26' } });
+  it('L und EB: Standard Martins Reihenfolge (Karte, dann Kontakt), Alternative Kontakt über der Karte', () => {
+    expect(l.zustand).toBe('L');
+    expect(eb.zustand).toBe('EB');
+    for (const st of [l, eb]) {
+      expect(reihenfolge(st, basis)).toEqual(['status', 'karte', 'kontakt', 'unterlagen', 'ende']);
+      expect(reihenfolge(st, { ...basis, kontaktObenImEinsatz: true })).toEqual(['status', 'kontakt', 'karte', 'unterlagen', 'ende']);
+    }
   });
-  it('L mit Folgeeinsatz „geplant" und Bewerbungen: Folgeeinsatz direkt unter dem Status, nur einmal', () => {
-    const l = s({ einsatz: { id: 'j1', status: 'gebucht', anreise: '2026-10-01', abreise: '2026-11-29' } });
+  it('L/EB mit Folgeeinsatz „geplant" und Bewerbungen: Hinweiszeile unter dem Status, Abschnitt unter dem Kontakt, nur einmal', () => {
     const folge = job({ id: 'f', status: 'geplant', anreise: '2026-11-29', bewerbungen: 2 });
     const r = reihenfolge(l, { ...basis, folge, mehrereEinsaetze: true });
-    expect(r).toEqual(['status', 'folge', 'kontakt', 'karte', 'unterlagen', 'alleEinsaetze', 'ende']);
+    expect(r).toEqual(['status', 'folgeHinweis', 'karte', 'kontakt', 'folge', 'unterlagen', 'alleEinsaetze', 'ende']);
     expect(r.filter((b) => b === 'folge')).toHaveLength(1);
+    expect(reihenfolge(eb, { ...basis, folge, kontaktObenImEinsatz: true }))
+      .toEqual(['status', 'folgeHinweis', 'kontakt', 'karte', 'folge', 'unterlagen', 'ende']);
+  });
+  it('vor der Anreise mit Bewerbungen beim Folgeeinsatz: keine Hinweiszeile, Abschnitt unter dem Kontakt', () => {
+    const folge = job({ id: 'f', status: 'geplant', anreise: '2026-11-29', bewerbungen: 2 });
+    expect(reihenfolge(s({ anreise: DATENSATZ }), { ...basis, folge }))
+      .toEqual(['status', 'karte', 'unterKarte', 'kontakt', 'folge', 'unterlagen', 'ende']);
+  });
+  it('Regel: der Abschnitt Folgeeinsatz steht in keinem Zustand und keiner Variante über dem Kontakt', () => {
+    const staende = [
+      s({ vertrag: 'offen' }), s({ vertrag: 'vorbereitung' }), s({}), s({ anreise: DATENSATZ }),
+      s({ einsatz: { id: 'j1', status: 'gebucht', anreise: HEUTE, abreise: '2026-11-29' } }),
+      s({ einsatz: { id: 'j1', status: 'gebucht', anreise: HEUTE, abreise: '2026-11-29' }, anreise: { ...DATENSATZ, datum: HEUTE } }),
+      l, eb,
+    ];
+    const zustaende = new Set<GebuchtZustand>();
+    for (const st of staende) {
+      zustaende.add(st.zustand);
+      for (const folge of [job({ id: 'f', status: 'geplant', anreise: '2026-11-29', bewerbungen: 2 }), job({ id: 'f', status: 'gebucht', anreise: '2026-11-29', pflegekraft: 'Anna B.' })]) {
+        for (const kontaktObenImEinsatz of [false, true]) {
+          const r: Baustein[] = reihenfolge(st, { ...basis, folge, kontaktObenImEinsatz });
+          expect(r.indexOf('folge'), `${st.zustand} ${kontaktObenImEinsatz}`).toBeGreaterThan(r.indexOf('kontakt'));
+          expect(r.indexOf('kontakt')).toBeGreaterThan(-1);
+        }
+      }
+    }
+    expect([...zustaende].sort()).toEqual(['AD', 'AF', 'AT', 'EB', 'L', 'VO', 'VV']);
   });
   it('B: Karte, dann der andere Einsatz, Unterlagen, Kontakt (Befund 1 texte_final)', () => {
     const b = s({ einsatz: { id: 'j1', status: 'abgeschlossen', anreise: '2026-05-19', abreise: '2026-07-19' } });

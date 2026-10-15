@@ -22,7 +22,7 @@ beforeAll(() => {
 });
 
 describe('?preview=gebucht zeigt die neue Gebucht-Seite', () => {
-  it('Zustand „im Einsatz": Status, Kontakt mit Notfallfeld, kein alter Kopf; Hilfe-Blatt mit Notfallfeld oben', async () => {
+  it('Zustand „im Einsatz": Status, Karte vor dem Kontakt mit Notfallfeld, kein alter Kopf; Hilfe-Blatt mit Notfallfeld unter der Kopfzeile', async () => {
     server.use(
       http.get('https://primundus.de/api/bewertungen-stand', () => HttpResponse.json({ schnitt: '4,9', wert: 4.9, anzahl: 126 })),
       http.post('https://test.supabase.co/functions/v1/onboard-to-mamamia', () => HttpResponse.json({ error: 'no token' }, { status: 401 })),
@@ -37,11 +37,16 @@ describe('?preview=gebucht zeigt die neue Gebucht-Seite', () => {
     expect(screen.queryByText(/Vielen Dank — Pflegekraft gebucht!/)).toBeNull();
     expect(screen.queryByText('Als Nächstes')).toBeNull();
     expect(within(seite).getByRole('link', { name: 'Primundus-Notfallnummer anrufen: +48 123 456 789' })).toBeTruthy();
+    // Standard im laufenden Einsatz: Martins Reihenfolge, erst die Karte, dann der Kontakt.
+    const bausteine = [...seite.querySelectorAll('[data-baustein]')].map((e) => e.getAttribute('data-baustein'));
+    expect(bausteine.indexOf('karte')).toBeLessThan(bausteine.indexOf('kontakt'));
 
     await user.click(screen.getByRole('button', { name: 'Hilfe' }));
     const blatt = await screen.findByText('Ihre Beraterin');
     const huelle = blatt.closest('.pointer-events-auto') as HTMLElement;
-    expect(within(huelle).getByRole('link', { name: 'Primundus-Notfallnummer anrufen: +48 123 456 789' })).toBeTruthy();
+    const anruf = within(huelle).getByRole('link', { name: 'Primundus-Notfallnummer anrufen: +48 123 456 789' });
+    // Notfallfeld unter der Kopfzeile mit dem X (das X bleibt oben).
+    expect(blatt.compareDocumentPosition(anruf) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(huelle).getByText('täglich 8–20 Uhr')).toBeTruthy();
     expect(within(huelle).getByText('Bekannt aus')).toBeTruthy();
   }, 20_000);

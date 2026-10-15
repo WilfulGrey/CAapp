@@ -75,21 +75,24 @@ export function aufstellungHinweis(zuschlag: { hasSummer: boolean; relevantHolid
 /**
  * Gebucht-Seite neu (PROTOTYP 15.10.2026, nur Vorschau): die Monatszeilen in pm-Tokens, aufgeklappt IN der Einsatz-Karte.
  * Rechnet mit den Daten, die die Karte zeigt (nicht mit den Vertragsdaten); die Zeilen „Anreise"/„Abreise" entfallen, weil
- * die Karte sie direkt darüber nennt. Wortlaut wie oben (live).
+ * die Karte sie direkt darüber nennt. Wortlaut wie oben (live). `grundlage` = erste Zeile über den Monaten (T3b), sie sagt,
+ * womit gerechnet ist; ohne Monatszeilen entfällt sie mit.
  */
-export function MonatsZeilen({ anreise, abreise, tagessatz, anreisekosten = 125, abreisekosten = 125 }: {
+export function MonatsZeilen({ anreise, abreise, tagessatz, anreisekosten = 125, abreisekosten = 125, grundlage }: {
   /** „19.10.2026" */
   anreise: string;
   abreise: string;
   tagessatz: number;
   anreisekosten?: number;
   abreisekosten?: number;
+  grundlage?: string;
 }) {
   const summary = buildMonthlyBreakdown(anreise, abreise, tagessatz, anreisekosten, abreisekosten, tagessatz);
   const zuschlag = computeZuschlagRelevance(anreise, abreise);
   if (summary.length === 0) return null;
   return (
     <div data-baustein="monatszeilen">
+      {grundlage && <p className="mb-2.5 text-pretty text-[13px] leading-[1.45] text-pm-muted" data-zeile="kosten-grundlage">{grundlage}</p>}
       <div className="rounded-[16px] bg-pm-paper px-4 py-3.5 space-y-3">
         {summary.map((m) => (
           <div key={m.monat}>

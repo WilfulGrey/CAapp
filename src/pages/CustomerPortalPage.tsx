@@ -50,7 +50,7 @@ import {
 } from '../components/portal/shared';
 import { BookedScreen } from '../components/portal/BookedScreen';
 import { kontaktPositionAusUrl, kontaktVarianteAusUrl, martaUntenAusUrl, notfallAusVorschauUrl, NotfallFeld } from '../components/portal/GebuchtKontakt';
-import { GebuchtSeite } from '../components/portal/GebuchtSeite';
+import { GebuchtSeite, notfallImHilfeBlatt } from '../components/portal/GebuchtSeite';
 import { gebuchtVorschau, vorschauAlteSeite } from '../components/portal/gebuchtVorschau';
 import { berlinTag } from '../lib/gebuchtStand';
 import { ERREICHBAR } from '../lib/kontakt';
@@ -3775,6 +3775,7 @@ const CustomerPortalPage: FC = () => {
             daten={gebuchtNeu.daten}
             kontaktTitel={gebuchtNeu.kontaktTitel}
             kontaktObenImEinsatz={gebuchtNeu.kontaktObenImEinsatz}
+            folgeZeile={gebuchtNeu.folgeZeile}
             seitenende={gebuchtNeu.seitenende}
             sterne={sterne}
             onPflegekraft={() => { profilQuelleRef.current = 'gebucht'; setSelectedNurse(acceptedApp.nurse); }}
@@ -4831,9 +4832,9 @@ const CustomerPortalPage: FC = () => {
       {showContactPopup && (
         <ContactPopup
           onClose={() => setShowContactPopup(false)}
-          // PROTOTYP Gebucht-Seite neu (nur Vorschau): Notfallfeld oben bis zum Abreisetag (Spezifikation 6.10, Entscheidung 3),
-          // „täglich 8–20 Uhr" statt „Mo–So, 8–20 Uhr" (Entscheidung 10). Sonst unverändert.
-          oben={gebuchtNeu && gebuchtNeu.zustand !== 'beendet' ? <NotfallFeld nummer={gebuchtNeu.daten.notfallTelefon} /> : undefined}
+          // PROTOTYP Gebucht-Seite neu (nur Vorschau): Notfallfeld unter der Kopfzeile, solange der berechnete Zustand nicht
+          // „beendet" ist (Spezifikation 6.10, Entscheidung 3), „täglich 8–20 Uhr" statt „Mo–So, 8–20 Uhr" (Entscheidung 10).
+          unterKopf={gebuchtNeu && notfallImHilfeBlatt(gebuchtNeu.daten) ? <NotfallFeld nummer={gebuchtNeu.daten.notfallTelefon} /> : undefined}
           zeiten={gebuchtNeu ? ERREICHBAR : undefined}
         />
       )}

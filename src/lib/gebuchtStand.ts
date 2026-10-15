@@ -90,6 +90,22 @@ export function berlinTag(jetzt: Date = new Date()): string {
   return `${wert('year')}-${wert('month')}-${wert('day')}`;
 }
 
+/**
+ * Kalendertag eines Vertragsdatums als „YYYY-MM-DD", Berliner Tag (Regel aus Registry #20: Europe/Berlin, nie der UTC-Tag
+ * eines Zeitstempels). Nimmt die zwei Formen, in denen das Datum ankommt: `contract_snapshot.datum` ist schon
+ * „dd.mm.yyyy" (VertragSignieren), `accepted_at` ist ein ISO-Zeitstempel („2026-10-12T22:30:00Z" = 13.10. in Berlin).
+ * Ein reiner Kalendertag „2026-10-12" bleibt, wie er ist. Alles andere → null.
+ */
+export function vertragTag(wert: string | null | undefined): string | null {
+  const roh = (wert ?? '').trim();
+  const dmy = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(roh);
+  if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(roh)) return roh;
+  if (!/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(roh)) return null;
+  const d = new Date(roh.replace(' ', 'T'));
+  return Number.isNaN(d.getTime()) ? null : berlinTag(d);
+}
+
 /** „2026-10-19T…" / „2026-10-19" → „2026-10-19"; alles andere → null. */
 export function isoTag(wert: string | null | undefined): string | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(wert ?? '');
@@ -231,6 +247,7 @@ export function einsatzPille(job: EinsatzZeile, heute: string): 'Laufend' | 'Geb
 
 export type Baustein =
   | 'status'
+  | 'folgeHinweis'
   | 'vertragsknopf'
   | 'karte'
   | 'unterKarte'
@@ -247,23 +264,29 @@ export interface ReihenfolgeOptionen {
   mehrereEinsaetze: boolean;
   /** Unterlagen nur mit unterschriebenem bzw. anderem Vertrag (nie VO, VV). */
   unterlagen: boolean;
-  /** Entscheidung 4 (Empfehlung ja): im laufenden Einsatz Kontakt über der Karte. */
+  /**
+   * Entscheidung 4, nur L und EB. Standard false = Martins Reihenfolge (15.10.: erst Bild, Name, Zeitraum und Kosten,
+   * dann der Kontakt). true = Alternative „Kontakt über der Karte" (Vorschau `&kontaktoben=ja`).
+   */
   kontaktObenImEinsatz: boolean;
 }
 
-/** Folgeeinsatz „geplant" mit mindestens einer Bewerbung rückt direkt unter den Status (nie in VO, VV, B). */
-export function folgeOben(zustand: GebuchtZustand, folge: EinsatzZeile | null): boolean {
-  return !!folge && folge.status === 'geplant' && (folge.bewerbungen ?? 0) > 0
-    && (zustand === 'AF' || zustand === 'AD' || zustand === 'AT' || zustand === 'L' || zustand === 'EB');
+/**
+ * Hinweiszeile T5 („Folgeeinsatz: 2 Bewerbungen ansehen ›") direkt unter dem Status: nur L und EB, Folgeeinsatz
+ * „geplant" mit mindestens einer Bewerbung. Der Abschnitt Folgeeinsatz selbst steht nie über dem Kontakt (Notfallnummer
+ * im ersten Bildschirm, Gegenprüfung 15.10.); die Zeile hält die Bewerbungen trotzdem oben sichtbar.
+ */
+export function folgeHinweis(zustand: GebuchtZustand, folge: EinsatzZeile | null): boolean {
+  return !!folge && folge.status === 'geplant' && (folge.bewerbungen ?? 0) > 0 && (zustand === 'L' || zustand === 'EB');
 }
 
 export function reihenfolge(stand: GebuchtStand, o: ReihenfolgeOptionen): Baustein[] {
   const { zustand } = stand;
-  const oben = folgeOben(zustand, o.folge);
-  const folgeUnten: Baustein[] = o.folge && !oben ? ['folge'] : [];
+  // Folgeeinsatz immer unter dem Kontakt (in jedem Zustand mit Kontakt davor).
+  const folgeUnten: Baustein[] = o.folge ? ['folge'] : [];
   const alle: Baustein[] = o.mehrereEinsaetze ? ['alleEinsaetze'] : [];
   const unterlagen: Baustein[] = o.unterlagen ? ['unterlagen'] : [];
-  const start: Baustein[] = oben ? ['status', 'folge'] : ['status'];
+  const start: Baustein[] = folgeHinweis(zustand, o.folge) ? ['status', 'folgeHinweis'] : ['status'];
 
   switch (zustand) {
     case 'VO':

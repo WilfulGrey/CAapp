@@ -77,12 +77,28 @@ export function kontaktPositionAusUrl(search: string): KontaktPosition {
   return new URLSearchParams(search).get('kontaktpos') === 'unten' ? 'unten' : KONTAKT_POSITION_STANDARD;
 }
 
+/** Hosts, auf denen die Vorschau eine Nummer aus der URL annimmt: nur der eigene Rechner. */
+const LOKALE_HOSTS: ReadonlySet<string> = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+/** true nur für localhost, 127.0.0.1 und ::1 (im Browser als „[::1]"). */
+export function vorschauHostLokal(hostname: string | null | undefined): boolean {
+  return LOKALE_HOSTS.has((hostname ?? '').trim().toLowerCase());
+}
+
 /**
  * Vorschau-Schalter `?notfall=…` (NUR für ?preview=gebucht aufrufen): die Nummer kommt zur Laufzeit aus der URL, nie aus
  * dem Code. Ohne Parameter der sichtbare Platzhalter. URLSearchParams macht aus einem unkodierten „+" ein Leerzeichen;
  * „ 48 …" wird deshalb wieder zu „+48 …" (sonst fiele die Zeile in der Vorschau still weg).
+ *
+ * Sicherheit (Gegenprüfung 15.10.): Die Nummer aus der URL gilt NUR auf localhost/127.0.0.1/::1. Auf jedem anderen Host
+ * (Staging, kundenportal.primundus.de) steht immer der Platzhalter ohne Anruf-Link — sonst könnte jeder einen Link mit
+ * einer fremden Nummer als „Primundus-Notfallnummer" auf unserer Domain verschicken.
  */
-export function notfallAusVorschauUrl(search: string): string {
+export function notfallAusVorschauUrl(
+  search: string,
+  hostname: string = typeof window !== 'undefined' ? window.location.hostname : '',
+): string {
+  if (!vorschauHostLokal(hostname)) return NOTFALL_PLATZHALTER;
   const roh = new URLSearchParams(search).get('notfall');
   if (roh === null || !roh.trim()) return NOTFALL_PLATZHALTER;
   return (/^ \d/.test(roh) ? `+${roh.slice(1)}` : roh).trim();

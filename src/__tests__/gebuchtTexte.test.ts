@@ -8,6 +8,7 @@ import {
   anreiseZeit,
   h1Tag,
   statusTexte,
+  vertragDatum,
 } from '../lib/gebuchtTexte';
 import { gebuchtStand, type EinsatzZeile, type GebuchtEingabe } from '../lib/gebuchtStand';
 
@@ -61,10 +62,12 @@ describe('statusTexte: H1 und Satz je Zustand (texte_final.md, Abschnitt 1)', ()
     const t = statusTexte({ stand: s, heute: HEUTE, pflegekraft: 'Maria K.', folge: null, ...over });
     return { h1: nb(t.h1), satz: nb(t.satz) };
   };
-  it('VO', () => {
-    expect(st(stand({ vertrag: 'offen' }))).toEqual({ h1: 'Letzter Schritt: Ihr Vertrag', satz: 'Wir haben Maria K. für Sie eingeplant. Mit Ihrer Unterschrift ist sie gebucht.' });
-    expect(st(stand({ vertrag: 'offen' }), { pflegekraft: null }).satz).toBe('Wir haben Ihre Pflegekraft für Sie eingeplant. Mit Ihrer Unterschrift ist sie gebucht.');
-    expect(st(stand({ vertrag: 'offen' }), { pflegekraft: 'Pavel K.', pflegekraftMaennlich: true }).satz).toBe('Wir haben Pavel K. für Sie eingeplant. Mit Ihrer Unterschrift ist er gebucht.');
+  it('VO: T1 „Buchung bestätigt" (wie Mail C) + live Satz, mit und ohne Namen gleich, kein Pronomen', () => {
+    const vo = { h1: 'Buchung bestätigt', satz: 'Bitte schließen Sie noch Ihren Betreuungsvertrag ab.' };
+    expect(st(stand({ vertrag: 'offen' }))).toEqual(vo);
+    expect(st(stand({ vertrag: 'offen' }), { pflegekraft: null })).toEqual(vo);
+    expect(st(stand({ vertrag: 'offen' }), { pflegekraft: 'Pavel K.' })).toEqual(vo);
+    expect(vo.satz).not.toMatch(/ist (sie|er) gebucht|Letzter Schritt|eingeplant/);
   });
   it('VV und AF: „Anreise am …" mit den freigegebenen Sätzen', () => {
     expect(st(stand({ vertrag: 'vorbereitung' }))).toEqual({ h1: 'Anreise am Montag, 19.10.', satz: 'Wir bereiten Ihre Vertragsdokumente vor. Marta Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen.' });
@@ -88,7 +91,8 @@ describe('statusTexte: H1 und Satz je Zustand (texte_final.md, Abschnitt 1)', ()
       satz: 'Anna B. ist Ihre nächste Pflegekraft. Der Einsatz von Maria K. endet am Montag, 26.10.',
     });
     expect(st(eb, { folge: folge({ anreise: HEUTE }) }).h1).toBe('Anna B. übernimmt ab heute');
-    expect(st(eb, { folge: folge({}), pflegekraft: null }).satz).toBe('Anna B. ist Ihre nächste Pflegekraft. Der Einsatz von Ihrer Pflegekraft endet am Montag, 26.10.');
+    // T2: ohne Namen der jetzigen Pflegekraft Genitiv mit „jetzigen" (nicht „von Ihrer Pflegekraft").
+    expect(st(eb, { folge: folge({}), pflegekraft: null }).satz).toBe('Anna B. ist Ihre nächste Pflegekraft. Der Einsatz Ihrer jetzigen Pflegekraft endet am Montag, 26.10.');
   });
   it('EB, Folgekraft gebucht ohne Namen: Rückfall', () => {
     expect(st(eb, { folge: folge({ pflegekraft: null }) })).toEqual({ h1: 'Einsatz endet am Montag, 26.10.', satz: 'Ihre nächste Pflegekraft übernimmt ab Donnerstag, 29.10.' });
@@ -108,6 +112,21 @@ describe('statusTexte: H1 und Satz je Zustand (texte_final.md, Abschnitt 1)', ()
   });
 });
 
+describe('vertragDatum: Berliner Tag (Registry #20), nie der UTC-Tag', () => {
+  it('ISO-Zeitstempel nach 22/23 Uhr UTC ist in Berlin schon der nächste Tag', () => {
+    expect(vertragDatum('2026-10-12T22:30:00Z')).toBe('13.10.2026'); // Sommerzeit, 00:30 in Berlin
+    expect(vertragDatum('2026-10-12T21:59:00Z')).toBe('12.10.2026');
+    expect(vertragDatum('2026-01-05T23:30:00+00:00')).toBe('06.01.2026'); // Winterzeit
+  });
+  it('contract_snapshot.datum kommt schon als „dd.mm.yyyy" und bleibt; Kalendertag bleibt; Unlesbares ⇒ null', () => {
+    expect(vertragDatum('12.10.2026')).toBe('12.10.2026');
+    expect(vertragDatum('2026-10-12')).toBe('12.10.2026');
+    expect(vertragDatum('quatsch')).toBeNull();
+    expect(vertragDatum('')).toBeNull();
+    expect(vertragDatum(null)).toBeNull();
+  });
+});
+
 describe('Wortlaut-Wächter', () => {
   const alle = Object.values(T).map((t) => (typeof t === 'function' ? (t as (...a: string[]) => string)('X', 'Y', 'Z') : t)).join('\n');
   it('nichts, was die Spezifikation streicht oder ohne Beleg behauptet', () => {
@@ -120,9 +139,37 @@ describe('Wortlaut-Wächter', () => {
     expect(T.kostenAuf).toBe('Alle Kosten im Überblick');
     expect(T.kostenZu).toBe('Weniger anzeigen');
     expect(T.sucheOhneBewerbung).toBe('Suchlauf läuft — noch keine Bewerbungen');
-    expect(T.kopieMail).toBe('Eine Kopie haben Sie auch per E-Mail erhalten.');
+    expect(T.kopieMail).toBe('Eine Kopie haben Sie auch per E\u2011Mail erhalten.');
     expect(T.kontaktA).toBe('Ihr Kontakt zur Agentur');
     expect(T.ihrePflegekraft).toBe('Ihre Pflegekraft');
+    expect(T.voSatz).toBe('Bitte schließen Sie noch Ihren Betreuungsvertrag ab.');
+  });
+  it('Nachtrag 15.10. (T1–T6): Endwortlaut Zeichen für Zeichen', () => {
+    expect(T.voH1).toBe('Buchung bestätigt');
+    expect(T.ebFolgeSatzOhneJetzigenNamen('Anna B.', 'Montag, 26.10.')).toBe('Anna B. ist Ihre nächste Pflegekraft. Der Einsatz Ihrer jetzigen Pflegekraft endet am Montag, 26.10.');
+    expect(T.kostenQuelle('12.10.2026')).toBe('Laut Ihrem Vertrag vom 12.10.2026');
+    expect(T.kostenGrundlage).toBe('Grundlage: Ihr Tagessatz und die angegebenen Daten für Anreise und Abreise.');
+    expect(T.dokumentFrueher).toBe('Dienstleistungsvertrag zur früheren Buchung');
+    expect(T.unterschriebenMitBeginn('28.07.2026', '01.08.2026')).toBe('unterschrieben am 28.07.2026, Vertragsbeginn 01.08.2026');
+    // T5: geschütztes Leerzeichen zwischen Zahl und Wort und vor „›"
+    expect(T.folgeHinweis(1)).toBe('Folgeeinsatz: 1\u00a0Bewerbung ansehen\u00a0›');
+    expect(T.folgeHinweis(2)).toBe('Folgeeinsatz: 2\u00a0Bewerbungen ansehen\u00a0›');
+    expect(T.folgeHinweisSprung(1)).toBe('1\u00a0Bewerbung für Ihren Folgeeinsatz\u00a0›');
+    expect(T.folgeHinweisSprung(2)).toBe('2\u00a0Bewerbungen für Ihren Folgeeinsatz\u00a0›');
+    // T6: Zeichen
+    expect(T.warteSatz2).toBe('Dann bekommen Sie auch eine E\u2011Mail.');
+    expect(T.einladen).toBe('Pflegekräfte einladen\u00a0›');
+    expect(T.alleEinsaetze).toBe('Alle meine Einsätze\u00a0›');
+  });
+  it('jedes „E-Mail" mit geschütztem Bindestrich, jedes „›" hängt per NBSP am Wort; keine Gedankenstriche in NEU-Texten', () => {
+    expect(alle).not.toMatch(/E-Mail/);
+    expect(alle).not.toMatch(/ ›/);
+    const neu = [T.voH1, T.voSatz, T.ebFolgeSatzOhneJetzigenNamen('X', 'Y'), T.kostenGrundlage, T.dokumentFrueher,
+      T.unterschriebenMitBeginn('X', 'Y'), T.folgeHinweis(2), T.folgeHinweisSprung(2), T.kartenAria('X'), T.kartenAriaOhneName];
+    for (const t of neu) expect(t, t).not.toMatch(/[—–]|~/);
+  });
+  it('live Satz „Bitte schließen Sie noch Ihren Betreuungsvertrag ab." steht wirklich im live BookedScreen', () => {
+    expect(readFileSync('src/components/portal/BookedScreen.tsx', 'utf8')).toContain(T.voSatz);
   });
   it('live Texte stehen wirklich im Trunk-Code', () => {
     const faq = readFileSync('src/components/portal/FaqListe.tsx', 'utf8');
