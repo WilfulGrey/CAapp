@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 import { X, Phone } from 'lucide-react';
 import { TELEFON, TELEFON_HREF, WHATSAPP_HREF } from '../../lib/kontakt';
 
@@ -11,7 +11,12 @@ const MEDIA_LOGOS = [
   { src: '/media-sat1.webp',       alt: 'SAT.1' },
 ];
 
-export const ContactPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
+/**
+ * Hilfe-Blatt. PROTOTYP Gebucht-Seite neu (15.10.2026, nur Vorschau): `oben` setzt ganz oben einen Block ein (das
+ * Notfallfeld, Spezifikation 6.10), `zeiten` ersetzt „Mo–So, 8–20 Uhr" (Entscheidung 10). Ohne beide Props: unverändert.
+ * „Bekannt aus" und die Kacheln bleiben immer.
+ */
+export const ContactPopup: FC<{ onClose: () => void; oben?: ReactNode; zeiten?: string }> = ({ onClose, oben, zeiten }) => (
   <>
     <div
       className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]"
@@ -32,6 +37,7 @@ export const ContactPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
         </div>
 
         <div className="px-5 pt-4 pb-6 space-y-5">
+          {oben}
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Ihre Beraterin</p>
             <button
@@ -67,7 +73,7 @@ export const ContactPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
                 <Phone className="w-3.5 h-3.5 flex-shrink-0" />
                 {TELEFON}
               </a>
-              <p className="text-xs text-gray-500 mt-0.5">Mo–So, 8–20 Uhr</p>
+              <p className="text-xs text-gray-500 mt-0.5">{zeiten ?? 'Mo–So, 8–20 Uhr'}</p>
             </div>
           </div>
 

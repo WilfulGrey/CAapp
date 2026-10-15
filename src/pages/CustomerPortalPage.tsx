@@ -49,7 +49,11 @@ import {
   type PatientForm,
 } from '../components/portal/shared';
 import { BookedScreen } from '../components/portal/BookedScreen';
-import { kontaktPositionAusUrl, kontaktVarianteAusUrl, martaUntenAusUrl, notfallAusVorschauUrl } from '../components/portal/GebuchtKontakt';
+import { kontaktPositionAusUrl, kontaktVarianteAusUrl, martaUntenAusUrl, notfallAusVorschauUrl, NotfallFeld } from '../components/portal/GebuchtKontakt';
+import { GebuchtSeite } from '../components/portal/GebuchtSeite';
+import { gebuchtVorschau, vorschauAlteSeite } from '../components/portal/gebuchtVorschau';
+import { berlinTag } from '../lib/gebuchtStand';
+import { ERREICHBAR } from '../lib/kontakt';
 import { VertragSignieren } from '../components/portal/VertragSignieren';
 import { AngebotCard } from '../components/portal/AngebotCard';
 import { AppCard } from '../components/portal/AppCard';
@@ -160,6 +164,10 @@ const GEBUCHT_KONTAKT = VORSCHAU_SUCHE !== null && new URLSearchParams(VORSCHAU_
       position: kontaktPositionAusUrl(VORSCHAU_SUCHE),
     }
   : undefined;
+// PROTOTYP 15.10.2026 — neue Gebucht-Seite (GebuchtSeite, Spezifikation gebucht-seite-2026-10-15). NUR in der Vorschau
+// ?preview=gebucht; echte Kunden sehen weiter BookedScreen. `&seite=alt` zeigt die heutige Seite samt den Schaltern oben.
+// Zustände und Schalter: Kopf von components/portal/gebuchtVorschau.ts (&zustand=…, &folge=…, &notfall=… usw.).
+const GEBUCHT_NEU_VORSCHAU = VORSCHAU_SUCHE !== null && !vorschauAlteSeite(VORSCHAU_SUCHE);
 /** Vorschau-Zustand „Vertrag offen" (sonst sperrt die Vorschau ihn: PREVIEW_SIGNED_FORM gilt als unterschrieben). */
 const IS_PREVIEW_GEBUCHT_VERTRAG_OFFEN = VORSCHAU_SUCHE !== null && new URLSearchParams(VORSCHAU_SUCHE).get('vertrag') === 'offen';
 
@@ -3654,6 +3662,21 @@ const CustomerPortalPage: FC = () => {
     );
   })();
 
+  // PROTOTYP Gebucht-Seite neu: Eingaben nur im Vorschau-Zweig, alle Daten relativ zu heute (gebuchtVorschau.ts).
+  const gebuchtNeu = GEBUCHT_NEU_VORSCHAU && acceptedApp && VORSCHAU_SUCHE !== null
+    ? gebuchtVorschau({
+        search: VORSCHAU_SUCHE,
+        heute: berlinTag(),
+        nurse: acceptedApp.nurse,
+        kopf: {
+          name: lead ? customerSalutation(lead) : 'Herr Mustermann',
+          kuerzel: lead && (lead.vorname || lead.nachname)
+            ? initials([lead.vorname, lead.nachname].filter(Boolean).join(' ').trim()).toUpperCase().slice(0, 2)
+            : null,
+        },
+      })
+    : null;
+
   return (
     <>
     <div className="min-h-screen bg-gray-100 font-pm md:flex md:items-start md:justify-center md:py-10">
@@ -3746,7 +3769,22 @@ const CustomerPortalPage: FC = () => {
         )}
       </nav>
 
-      {acceptedApp ? (
+      {acceptedApp && gebuchtNeu ? (
+        <div className="bg-pm-paper">
+          <GebuchtSeite
+            daten={gebuchtNeu.daten}
+            kontaktTitel={gebuchtNeu.kontaktTitel}
+            kontaktObenImEinsatz={gebuchtNeu.kontaktObenImEinsatz}
+            seitenende={gebuchtNeu.seitenende}
+            sterne={sterne}
+            onPflegekraft={() => { profilQuelleRef.current = 'gebucht'; setSelectedNurse(acceptedApp.nurse); }}
+            // Vorschau: kein Lead, kein Server — die Knöpfe zeigen nur, wohin sie führen würden.
+            onVertragAbschliessen={() => showToast('Vorschau: Hier öffnet sich der Vertrag („Ihre Angaben" → „Unterschrift").')}
+            onEinsatz={() => showToast('Vorschau: Hier öffnet sich dieser Einsatz.')}
+            alleEinsaetzeHref="?preview=jobs"
+          />
+        </div>
+      ) : acceptedApp ? (
         (() => {
           // vertragSigned aus zwei Quellen ableiten:
           //   1) signedForm — frisch im Annahme-Flow gesetzt (in-memory, lebt
@@ -4673,6 +4711,8 @@ const CustomerPortalPage: FC = () => {
           app={nurseModalApp ?? undefined}
           // Gebucht oder Vertrag offen: nur das Profil, kein „Einladen" (Review 25.09.).
           nurProfil={!!acceptedApp || !!contractApp}
+          // PROTOTYP Gebucht-Seite neu (nur Vorschau, Spezifikation 6.11): ohne „sofort verfügbar".
+          ohneVerfuegbarkeit={!!gebuchtNeu}
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onChat={CHAT_ENABLED && nurseModalApp ? () => { const n = enrichedSelectedNurse; setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setChatNurse(n); } : undefined}
@@ -4788,7 +4828,15 @@ const CustomerPortalPage: FC = () => {
       )}
 
       {/* Contact Popup */}
-      {showContactPopup && <ContactPopup onClose={() => setShowContactPopup(false)} />}
+      {showContactPopup && (
+        <ContactPopup
+          onClose={() => setShowContactPopup(false)}
+          // PROTOTYP Gebucht-Seite neu (nur Vorschau): Notfallfeld oben bis zum Abreisetag (Spezifikation 6.10, Entscheidung 3),
+          // „täglich 8–20 Uhr" statt „Mo–So, 8–20 Uhr" (Entscheidung 10). Sonst unverändert.
+          oben={gebuchtNeu && gebuchtNeu.zustand !== 'beendet' ? <NotfallFeld nummer={gebuchtNeu.daten.notfallTelefon} /> : undefined}
+          zeiten={gebuchtNeu ? ERREICHBAR : undefined}
+        />
+      )}
 
 
       {/* Decline Confirm Modal */}

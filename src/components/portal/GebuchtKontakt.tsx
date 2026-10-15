@@ -196,3 +196,74 @@ export function GebuchtKontakt({ variante, notfallTelefon, className = 'mt-8' }:
     </section>
   );
 }
+
+// ─── Gebucht-Seite neu (PROTOTYP 15.10.2026, nur Vorschau) ─────────────────────
+// Spezifikation gebucht-seite-2026-10-15, Abschnitt 6.5: Kontakt als eigener Abschnitt mit Überschrift (Martin: „Ihr Kontakt
+// zur Agentur … schöner"), Notfallnummer als GETÖNTES Feld in der Karte (statt Linie). Wortlaut aus KONTAKT_TEXTE (V1/V3,
+// geprüft 14.10.); Martins Phrase NOTFALL_GELTUNG wörtlich. Die alten Varianten oben bleiben für `&seite=alt`.
+
+/** Entscheidung 2: A = Martins Wortlaut (steht im Bau, bis er wählt), B = Empfehlung (texte_final.md). */
+export const KONTAKT_TITEL = {
+  a: 'Ihr Kontakt zur Agentur',
+  b: 'Ihr Kontakt zu Primundus',
+} as const;
+export type KontaktTitel = keyof typeof KONTAKT_TITEL;
+
+/** Vorschau-Schalter `&kontakt=a|b` (nur Gebucht-Seite neu). Alles andere: A (Martins Wortlaut). */
+export function kontaktTitelAusUrl(search: string): KontaktTitel {
+  return new URLSearchParams(search).get('kontakt') === 'b' ? 'b' : 'a';
+}
+
+/**
+ * Was vom Notfallfeld erscheint: null = nichts (kein gültiger Wert). Gültig ist eine Nummer mit tel:-Adresse
+ * (notfallTelHref) oder — nur in der Vorschau — der sichtbare Platzhalter ohne Link.
+ */
+export function notfallAnzeige(nummer: string | null | undefined): { nummer: string; href: string | null } | null {
+  const wert = (nummer ?? '').trim();
+  if (!wert) return null;
+  const href = notfallTelHref(wert);
+  if (href) return { nummer: wert, href };
+  return wert === NOTFALL_PLATZHALTER ? { nummer: wert, href: null } : null;
+}
+
+/** Getöntes Notfallfeld: Zeile, Nummer als Anruf-Link (44 px, kein runder Knopf), 112 klein. Ohne gültige Nummer: nichts. */
+export function NotfallFeld({ nummer, className = '' }: { nummer: string | null | undefined; className?: string }) {
+  const anzeige = notfallAnzeige(nummer);
+  if (!anzeige) return null;
+  return (
+    <div className={`rounded-[14px] bg-pm-shell px-4 pb-3 pt-3.5 ${className}`.trim()} data-clarity-mask="true" data-notfall="">
+      <p className={ZEILE}>{KONTAKT_TEXTE.notfallZeile}</p>
+      {anzeige.href ? (
+        <NummerLink href={anzeige.href} aria={notfallAria(anzeige.nummer)} nummer={anzeige.nummer} />
+      ) : (
+        <p className="-mt-1">
+          <span data-platzhalter="notfall" className="inline-flex min-h-[44px] items-center text-[17px] font-semibold text-pm-ink">{anzeige.nummer}</span>
+        </p>
+      )}
+      <p className="text-[13.5px] leading-[1.4] text-pm-muted">{KONTAKT_TEXTE.hinweis112}</p>
+    </div>
+  );
+}
+
+/**
+ * Kontakt-Abschnitt der neuen Gebucht-Seite: h2 (Entscheidung 2) + Karte mit Marta, Tageszeile, Tagesnummer und — nur mit
+ * gültiger Nummer und `mitNotfall` — dem getönten Notfallfeld. `mitNotfall` = false im beendeten Einsatz.
+ */
+export function GebuchtKontaktKarte({ titel, notfallTelefon, mitNotfall, className = 'mt-10' }: {
+  titel: KontaktTitel;
+  notfallTelefon: string | null | undefined;
+  mitNotfall: boolean;
+  className?: string;
+}) {
+  return (
+    <section aria-labelledby="kontakt-gebucht" className={className} data-baustein="kontakt">
+      <h2 id="kontakt-gebucht" className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">{KONTAKT_TITEL[titel]}</h2>
+      <div className={`mt-4 ${KARTE}`}>
+        <MartaZeile eng unterzeile={KONTAKT_TEXTE.kollege} />
+        <p className={`mt-4 ${ZEILE}`}>{mitZeiten(KONTAKT_TEXTE.tagZeile)}</p>
+        <NummerLink href={TELEFON_HREF} aria={KONTAKT_TEXTE.ariaTag} nummer={TELEFON} />
+        {mitNotfall && <NotfallFeld nummer={notfallTelefon} className="mt-3" />}
+      </div>
+    </section>
+  );
+}
