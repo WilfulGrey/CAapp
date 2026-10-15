@@ -128,7 +128,7 @@ BEI FRAGEN ZU KOSTEN/ARBEITSZEITEN:
 - Beginne dann mit den 9 Fragen
 
 BEI FRAGEN ZU ZUSCHÜSSEN:
-"Je nach Pflegegrad können Sie verschiedene Leistungen nutzen: Pflegegeld, Entlastungsbudget und weitere Zuschüsse. In der Kalkulation zeige ich Ihnen genau, welche Zuschüsse Ihnen zustehen und wie sich Ihr Eigenanteil dadurch reduziert."
+"Je nach Pflegegrad können Sie verschiedene Leistungen nutzen: Pflegegeld, Steuervorteil und weitere Zuschüsse. In der Kalkulation zeige ich Ihnen genau, welche Zuschüsse Ihnen zustehen und wie sich Ihr Eigenanteil dadurch reduziert."
 
 ALLGEMEINE FRAGEN:
 Nutze die Informationen aus der WISSENSDATENBANK unten, um spezifische Fragen zu beantworten. Die Einträge enthalten detaillierte Informationen zu verschiedenen Themen.

@@ -7,6 +7,7 @@ import { Loader as Loader2 } from 'lucide-react';
 import { HERO_PUNKTE } from '@/lib/hero-punkte';
 import Image from 'next/image';
 import { usableNamePart } from '@/lib/calculation';
+import { eigenanteilOhneEntlastungsbudget, zuschuesseOhneEntlastungsbudget } from '@/lib/eigenanteil';
 
 function formatEuro(amount: number): string {
   return amount.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' €';
@@ -38,11 +39,12 @@ export default function KalkulationPrintPage() {
   const formData = kalk.formData || kalk.formularDaten || {};
   const zuschuesseItems = kalk.zuschüsse?.items || [];
   const pflegegeld = zuschuesseItems.find((z: any) => z.name === 'pflegegeld')?.betrag_monatlich || 0;
-  const entlastungsbudget = zuschuesseItems.find((z: any) => z.name === 'entlastungsbudget_neu')?.betrag_monatlich || 0;
   const steuervorteil = zuschuesseItems.find((z: any) => z.name === 'steuervorteil')?.betrag_monatlich || 0;
-  const gesamteZuschuesse = kalk.zuschüsse?.gesamt || 0;
+  // Entscheidung 3 (15.10.2026): Summe und Eigenanteil ohne Entlastungsbudget, auch bei gespeicherten alten
+  // Anfragen, die es noch abgezogen haben (lib/eigenanteil.ts).
+  const gesamteZuschuesse = zuschuesseOhneEntlastungsbudget(kalk) || 0;
   const bruttopreis = kalk.bruttopreis || 0;
-  const eigenanteil = kalk.eigenanteil || (bruttopreis - gesamteZuschuesse);
+  const eigenanteil = eigenanteilOhneEntlastungsbudget(kalk) || (bruttopreis - gesamteZuschuesse);
 
   const today = new Date();
   const validUntil = addDays(today, 30);
@@ -201,7 +203,6 @@ export default function KalkulationPrintPage() {
             <div style={s.zBox}>
               <div style={{ fontSize: '8pt', color: '#2D6A4F', fontWeight: 700, marginBottom: '5pt' }}>Mögliche Zuschüsse der Pflegekasse</div>
               <div style={s.zRow}><span>Pflegegeld (Pflegegrad {formData.pflegegrad || 0})</span><span style={{ color: '#1E5C3A', fontWeight: 600 }}>– {formatEuro(pflegegeld)}</span></div>
-              <div style={s.zRow}><span>Entlastungsbudget (anteilig mtl.)</span><span style={{ color: '#1E5C3A', fontWeight: 600 }}>– {formatEuro(entlastungsbudget)}</span></div>
               <div style={s.zRow}><span>Steuervorteil § 35a EStG</span><span style={{ color: '#1E5C3A', fontWeight: 600 }}>– {formatEuro(steuervorteil)}</span></div>
               <div style={{ borderTop: '1pt solid #B8DEC8', margin: '5pt 0' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9.5pt', fontWeight: 700 }}>

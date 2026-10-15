@@ -30,6 +30,8 @@ export const baseLead: Lead = {
           in_kalkulation: true,
         },
         {
+          // Seit 15.10.2026 (Entscheidung 3, project 3/lib/eigenanteil.ts) zählt das Entlastungsbudget nie zum
+          // Eigenanteil — neue Berechnungen tragen es mit `in_kalkulation: false`.
           name: 'entlastungsbudget_neu',
           label: 'Entlastungsbudget',
           beschreibung: '',
@@ -37,7 +39,7 @@ export const baseLead: Lead = {
           betrag_jaehrlich: 500,
           typ: 'monatlich',
           hinweis: null,
-          in_kalkulation: true,
+          in_kalkulation: false,
         },
         {
           name: 'steuervorteil',

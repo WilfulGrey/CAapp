@@ -48,6 +48,7 @@ import {
 import { type Empfehlung, esc, zahlwort } from "./empfehlung.ts";
 import { ABSCHIED_SATZ, RUECKMELDUNG_KNOEPFE, rueckmeldungLink } from "./kette.ts";
 import { type ErinnerungStufe, genitiv, reserviertRest } from "./stopRegeln.ts";
+import { eigenanteilOhneEntlastungsbudget, zaehltZumEigenanteil } from "./eigenanteil.ts";
 
 export type Kontext = {
   /** „Guten Tag Frau Müller" (ohne Komma). */
@@ -145,7 +146,9 @@ export function eingangsLabel(key: string, val: string | undefined | null): stri
  *  Bei neuen Werten hier UND im Portal (CustomerPortalPage, HEIM_EIGENANTEIL) ändern. */
 export const HEIM_EIGENANTEIL = 3364;
 export function heimVergleich(kalk: Record<string, unknown> | null | undefined): { eigen: number; diff: number } | null {
-  const e = typeof kalk?.eigenanteil === "number" ? Math.round(kalk.eigenanteil as number) : NaN;
+  // Entscheidung 3 (15.10.2026): Eigenanteil ohne Entlastungsbudget, auch bei alten Anfragen (eigenanteil.ts).
+  const ohneBudget = eigenanteilOhneEntlastungsbudget(kalk);
+  const e = ohneBudget !== null ? Math.round(ohneBudget) : NaN;
   if (!Number.isFinite(e) || e <= 0 || e >= HEIM_EIGENANTEIL) return null;
   return { eigen: e, diff: HEIM_EIGENANTEIL - e };
 }
@@ -159,13 +162,14 @@ function heimText(h: { eigen: number; diff: number }): string {
 }
 
 /* Eigenanteil in der Angebotsmail (Vorschlag 08.10.2026, Martin: „maximal conversionsstark mit infos"; einziger belegter
-   Einwand ist „zu teuer"). Posten aus der Kalkulation des Kunden (`zuschüsse.items`, nur `in_kalkulation`) — dieselbe Rechnung
-   wie „Kosten im Überblick" im Portal. Martin 03.10.: „eigenanteil betrachtet immer 3 dinge: geldleistungen,
-   entlastungsbudget und steuerersparnis"; 18.09.: der Preis bleibt Bruttopreis, die Posten senken nur den Eigenanteil.
-   Unbekannter Posten → kein Kasten (lieber der alte Heimvergleich als eine falsche Aufzählung). */
+   Einwand ist „zu teuer"). Posten aus der Kalkulation des Kunden (`zuschüsse.items`, die zum Eigenanteil zählen) — dieselbe
+   Rechnung wie „Kosten im Überblick" im Portal. Martin 03.10.: „eigenanteil betrachtet immer 3 dinge: geldleistungen,
+   entlastungsbudget und steuerersparnis" — seit Entscheidung 3 (15.10.2026) ohne Entlastungsbudget: es zählt nie, auch
+   nicht in alten Anfragen, die es noch mit `in_kalkulation: true` tragen (eigenanteil.ts). 18.09.: der Preis bleibt
+   Bruttopreis, die Posten senken nur den Eigenanteil. Unbekannter Posten → kein Kasten (lieber der alte Heimvergleich als
+   eine falsche Aufzählung). */
 const ZUSCHUSS_WORT: Record<string, string> = {
   pflegegeld: "Pflegegeld",
-  entlastungsbudget_neu: "Entlastungsbudget",
   steuervorteil: "Steuerersparnis",
 };
 export type ZuschussPosten = { name: string; wort: string; monat: number; jahr: number };
@@ -174,8 +178,10 @@ export type Eigenanteil = { brutto: number; eigen: number; posten: ZuschussPoste
 export function eigenanteilAus(kalk: Record<string, any> | null | undefined): Eigenanteil | null {
   const brutto = typeof kalk?.bruttopreis === "number" ? kalk.bruttopreis : 0;
   const items = kalk?.["zuschüsse"]?.items;
-  if (!brutto || !Array.isArray(items) || typeof kalk?.eigenanteil !== "number") return null;
-  const drin = items.filter((z: any) => z?.in_kalkulation && Number(z.betrag_monatlich) > 0);
+  // Bezugswert der 2-€-Prüfung unten: der gespeicherte Eigenanteil ohne Entlastungsbudget (alte Anfragen + 294,92 €).
+  const soll = eigenanteilOhneEntlastungsbudget(kalk);
+  if (!brutto || !Array.isArray(items) || soll === null) return null;
+  const drin = items.filter((z: any) => zaehltZumEigenanteil(z) && Number(z.betrag_monatlich) > 0);
   if (!drin.length || drin.some((z: any) => !ZUSCHUSS_WORT[z.name])) return null;
   const posten = drin.map((z: any) => ({
     name: String(z.name), wort: ZUSCHUSS_WORT[z.name], monat: Math.round(Number(z.betrag_monatlich)), jahr: Math.round(Number(z.betrag_jaehrlich)),
@@ -183,7 +189,7 @@ export function eigenanteilAus(kalk: Record<string, any> | null | undefined): Ei
   // Angezeigter Eigenanteil = Preis minus die GERUNDETEN Posten, damit die Rechnung in den Fragen aufgeht. Weicht das um
   // mehr als 2 € von der Kalkulation ab, stimmt etwas nicht → kein Kasten.
   const eigen = brutto - posten.reduce((s: number, p: ZuschussPosten) => s + p.monat, 0);
-  if (eigen <= 0 || eigen >= brutto || Math.abs(eigen - kalk.eigenanteil) > 2) return null;
+  if (eigen <= 0 || eigen >= brutto || Math.abs(eigen - soll) > 2) return null;
   const pg = Number(kalk?.formularDaten?.pflegegrad);
   return { brutto, eigen, posten, pflegegrad: Number.isFinite(pg) ? pg : null, ehepaar: kalk?.formularDaten?.betreuung_fuer === "ehepaar" };
 }
@@ -195,7 +201,7 @@ function eigenanteilSatz(e: Eigenanteil): string {
   const satz = w.length === 1
     ? `Die ${w[0]} kann Ihren Eigenanteil auf diesen Betrag senken.`
     : `${aufzaehlung(w)} können Ihren Eigenanteil auf diesen Betrag senken.`;
-  // Der Rechner kennt einen Pflegegrad und zieht Pflegegeld/Entlastungsbudget einmal ab (OpenAI angebot10: bei „zwei
+  // Der Rechner kennt einen Pflegegrad und zieht das Pflegegeld einmal ab (OpenAI angebot10: bei „zwei
   // Personen" sonst missverständlich) — derselbe Satz steht in der Rechnung der Fragen.
   return e.ehepaar && e.posten.some((p) => p.name === "pflegegeld") ? `${satz} Gerechnet ist mit den Zuschüssen für eine Person.` : satz;
 }
@@ -203,7 +209,7 @@ const heimSatz = (e: Eigenanteil): string => e.eigen < HEIM_EIGENANTEIL
   ? ` Zum Vergleich: Im Pflegeheim liegt der Eigenanteil im ersten Jahr bei durchschnittlich ${euro(HEIM_EIGENANTEIL)}&nbsp;€ im Monat pro Person (vdek, Stand 1.&nbsp;Juli&nbsp;2026).`
   : "";
 
-/** Grüner Kasten unter dem Preis: „Nach Zuschüssen ca. 1.622 € im Monat" (Martins Wortlaut der Preisseite, 17.09.). */
+/** Grüner Kasten unter dem Preis: „Nach Zuschüssen ca. 1.917 € im Monat" (Martins Wortlaut der Preisseite, 17.09.). */
 function eigenanteilHtml(e: Eigenanteil, unten = 18): string {
   return `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 ${unten}px;border-radius:14px;background:${F.mint};border-collapse:separate;">
@@ -225,7 +231,7 @@ function eigenanteilRechnung(e: Eigenanteil): string {
   const hatPflegegeld = e.posten.some((p) => p.name === "pflegegeld");
   return `So rechnen wir: ${euro(e.brutto)}&nbsp;€ im Monat, abzüglich ${aufzaehlung(e.posten.map(teil))}.`
     + (hatPflegegeld && e.ehepaar ? " Gerechnet ist mit den Zuschüssen für eine Person." : "")
-    + (hatPflegegeld ? " Das Pflegegeld können Sie frei für die Betreuung einsetzen." : " Pflegegeld und Entlastungsbudget gibt es ab Pflegegrad&nbsp;2.")
+    + (hatPflegegeld ? " Das Pflegegeld können Sie frei für die Betreuung einsetzen." : " Pflegegeld gibt es ab Pflegegrad&nbsp;2.")
     + " Die vollständige Rechnung sehen Sie im Portal unter „Kosten im Überblick“.";
 }
 

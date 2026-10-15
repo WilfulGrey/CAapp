@@ -37,8 +37,10 @@ const k = (token: string | null = "tok123"): Kontext => ({
   token,
   marta: "<p>Mit freundlichen Grüßen<br>Marta Kapcio</p>",
 });
+// Ehepaar, Pflegegrad 4: 3.050 − 800 Pflegegeld − 333,33 Steuer = 1.916,67 € (seit 15.10.2026 ohne Entlastungsbudget,
+// Entscheidung 3, eigenanteil.ts).
 const kalk = {
-  bruttopreis: 3050, eigenanteil: 1621.75,
+  bruttopreis: 3050, eigenanteil: 1916.67,
   formularDaten: { betreuung_fuer: "ehepaar", pflegegrad: 4, mobilitaet: "rollstuhl", nachteinsaetze: "taeglich", deutschkenntnisse: "sehr-gut", geschlecht: "weiblich" },
 };
 const empf: Empfehlung = {
@@ -74,12 +76,23 @@ Deno.test("Portal-Link: Token + Parameter, leere fallen weg, ohne Token die Webs
   assertEquals(portalLink(PORTAL, null, SITE, { goto: "anfragen" }), SITE);
 });
 
-/* Kalkulation mit Zuschuss-Posten wie aus lib/calculation.ts (Ehepaar, Pflegegrad 4): 3.050 − 800 − 295 − 333 = 1.622 €. */
+/* Gespeicherte ALTE Anfrage (vor dem 15.10.2026, Ehepaar, Pflegegrad 4): Der Rechner zog das Entlastungsbudget noch ab,
+   3.050 − 800 − 295 − 333 = 1.621,75 €. Seit Entscheidung 3 zählt es nie (eigenanteil.ts): Die Mail rechnet mit
+   3.050 − 800 − 333 = 1.917 €. `kalkPostenNeu` = dieselbe Anfrage aus dem neuen Rechner (Budget mit in_kalkulation: false). */
 const kalkPosten = {
   ...kalk,
-  "zuschüsse": { items: [
+  eigenanteil: 1621.75,
+  "zuschüsse": { gesamt: 1428.25, items: [
     { name: "pflegegeld", label: "Pflegegeld", betrag_monatlich: 800, betrag_jaehrlich: 9600, in_kalkulation: true },
     { name: "entlastungsbudget_neu", label: "Entlastungsbudget", betrag_monatlich: 294.92, betrag_jaehrlich: 3539, in_kalkulation: true },
+    { name: "steuervorteil", label: "Steuervorteil", betrag_monatlich: 333.33, betrag_jaehrlich: 4000, in_kalkulation: true },
+  ] },
+};
+const kalkPostenNeu = {
+  ...kalk,
+  "zuschüsse": { gesamt: 1133.33, items: [
+    { name: "pflegegeld", label: "Pflegegeld", betrag_monatlich: 800, betrag_jaehrlich: 9600, in_kalkulation: true },
+    { name: "entlastungsbudget_neu", label: "Entlastungsbudget", betrag_monatlich: 294.92, betrag_jaehrlich: 3539, in_kalkulation: false },
     { name: "steuervorteil", label: "Steuervorteil", betrag_monatlich: 333.33, betrag_jaehrlich: 4000, in_kalkulation: true },
   ] },
 };
@@ -97,7 +110,7 @@ Deno.test("01 Angebot: Preis, Knopf oben und unten, Schritte vor den Pflegekräf
   const s = sichtbar(m.html);
   for (const t of ["Ihr Angebot vom 08.10.2026", "Gerne übernehmen wir die Rund-um-Betreuung", "zum sechsten Mal in Folge als Testsieger",
     "Für zwei Personen mit Pflegegrad 4", "3.050 €", "Lohn, Steuern, Gebühren: alles drin", "Keine Vermittlungsgebühr",
-    "Kein Vertrag vor Ihrer Auswahl", "Täglich kündbar, taggenau abgerechnet", "Bestpreisgarantie", "1.742 € weniger",
+    "Kein Vertrag vor Ihrer Auswahl", "Täglich kündbar, taggenau abgerechnet", "Bestpreisgarantie", "1.447 € weniger",
     "So geht es weiter", "Pflegesituation ergänzen und Pflegekräfte einladen", "Jetzt vervollständigen", "Bewerbungen erhalten",
     "Sie entscheiden", "Wir kümmern uns um alles", "ab 3 Tagen nach Ihrer Zusage", "Ihre 5 passenden Pflegekräfte",
     "Echte Profile, ausgewählt nach Ihren Angaben.", "Maria K.", "Erfahrung mit Demenz", "Pflegekräfte einladen",
@@ -128,14 +141,16 @@ Deno.test("01 Angebot: Preis, Knopf oben und unten, Schritte vor den Pflegekräf
 Deno.test("01 Angebot: Karte mit Zuschüssen — erst die vier Punkte, dann der Kasten; Rechnung in den Fragen", () => {
   const m = angebotMail(k(), { kalkulation: kalkPosten, careStartTiming: null, herkunft: null, portalBetreff: "X", angabenHinweis: null, resubmit: false, empfehlung: null });
   const s = sichtbar(m.html);
-  assertStringIncludes(s, "Nach Zuschüssen ca. 1.622 € im Monat");
-  assertStringIncludes(s, "Pflegegeld, Entlastungsbudget und Steuerersparnis können Ihren Eigenanteil auf diesen Betrag senken. Gerechnet ist mit den Zuschüssen für eine Person.");
+  // Alte Anfrage: ohne die 294,92 € Entlastungsbudget (Entscheidung 3, 15.10.2026).
+  assertStringIncludes(s, "Nach Zuschüssen ca. 1.917 € im Monat");
+  assertStringIncludes(s, "Pflegegeld und Steuerersparnis können Ihren Eigenanteil auf diesen Betrag senken. Gerechnet ist mit den Zuschüssen für eine Person.");
+  assert(!m.html.includes("Entlastungsbudget") && !m.text.includes("Entlastungsbudget"), "Entlastungsbudget nirgends in der Mail");
   assert(s.indexOf("Täglich kündbar, taggenau abgerechnet") < s.indexOf("Nach Zuschüssen"), "Martin 08.10.: erst die Vorteile, dann die Zuschüsse");
   assert(s.indexOf("Kosten entstehen erst") < s.indexOf("Nach Zuschüssen"));
   assert(m.text.indexOf("Täglich kündbar, taggenau abgerechnet") < m.text.indexOf("Nach Zuschüssen"), "Textfassung in derselben Reihenfolge");
-  assert(!s.includes("1.742 € weniger"), "Kasten ersetzt den Heimvergleich");
-  assertStringIncludes(s, "Wie kommen die ca. 1.622 € Eigenanteil zustande?");
-  assertStringIncludes(s, "So rechnen wir: 3.050 € im Monat, abzüglich 800 € Pflegegeld bei Pflegegrad 4, bis zu 295 € Entlastungsbudget (3.539 € im Jahr) und bis zu 333 € Steuerersparnis (4.000 € im Jahr).");
+  assert(!s.includes("1.447 € weniger"), "Kasten ersetzt den Heimvergleich");
+  assertStringIncludes(s, "Wie kommen die ca. 1.917 € Eigenanteil zustande?");
+  assertStringIncludes(s, "So rechnen wir: 3.050 € im Monat, abzüglich 800 € Pflegegeld bei Pflegegrad 4 und bis zu 333 € Steuerersparnis (4.000 € im Jahr).");
   // ohne Empfehlung: alter Betreff, Vorschau ohne Pflegekräfte
   assertEquals(m.betreff, "Ihr Angebot zur 24-Stunden-Betreuung – Primundus");
   assertEquals(m.vorschau, "3.050 € im Monat, täglich kündbar, ohne Vermittlungsgebühr.");
@@ -143,9 +158,11 @@ Deno.test("01 Angebot: Karte mit Zuschüssen — erst die vier Punkte, dann der 
 
 Deno.test("Eigenanteil: nur mit lesbaren Posten und aufgehender Rechnung", () => {
   const e = eigenanteilAus(kalkPosten);
-  assertEquals(e?.eigen, 1622);
-  assertEquals(e?.posten.map((p) => p.wort), ["Pflegegeld", "Entlastungsbudget", "Steuerersparnis"]);
+  assertEquals(e?.eigen, 1917);
+  assertEquals(e?.posten.map((p) => p.wort), ["Pflegegeld", "Steuerersparnis"]);
   assertEquals(e?.ehepaar, true);
+  // Neue Anfrage (Budget mit in_kalkulation: false) ergibt dieselbe Rechnung wie die alte.
+  assertEquals(eigenanteilAus(kalkPostenNeu), e);
   assertEquals(eigenanteilAus(kalk), null, "ohne Posten");
   assertEquals(eigenanteilAus({ ...kalkPosten, eigenanteil: 1700 }), null, "Abweichung über 2 €");
   const fremd = { ...kalkPosten, "zuschüsse": { items: [...kalkPosten["zuschüsse"].items, { name: "unbekannt", betrag_monatlich: 50, betrag_jaehrlich: 600, in_kalkulation: true }] } };
@@ -155,6 +172,10 @@ Deno.test("Eigenanteil: nur mit lesbaren Posten und aufgehender Rechnung", () =>
     { name: "pflegegeld", betrag_monatlich: 0, betrag_jaehrlich: 0, in_kalkulation: false },
   ] } };
   assertEquals(eigenanteilAus(ohnePg)?.posten.map((p) => p.name), ["steuervorteil"]);
+  // Ohne Pflegegrad nennt die Rechnung nur noch das Pflegegeld (Analyse 15.10.2026, Nr. 11).
+  const rechnung = angebotFragen(eigenanteilAus(ohnePg)).find((f) => f.frage.startsWith("Wie kommen"))?.antwort ?? "";
+  assertStringIncludes(rechnung, " Pflegegeld gibt es ab Pflegegrad&nbsp;2.");
+  assert(!rechnung.includes("Entlastungsbudget"));
 });
 
 Deno.test("Fragen: Deutsch-Niveaus zuerst, keine Einladen-Frage, Eigenanteil nur mit Kasten", () => {
@@ -162,7 +183,7 @@ Deno.test("Fragen: Deutsch-Niveaus zuerst, keine Einladen-Frage, Eigenanteil nur
   assertEquals(ohne, ["Was bedeuten die Deutsch-Niveaus (Grund, Mittel, Gut)?", "Ich habe ein günstigeres Angebot. Was kann ich tun?",
     "Ist das legal?", "Wie läuft die Betreuung ab?", "Was brauche ich zu Hause?"]);
   const mit = angebotFragen(eigenanteilAus(kalkPosten)).map((f) => f.frage);
-  assertEquals(mit[4], "Wie kommen die ca. 1.622&nbsp;€ Eigenanteil zustande?");
+  assertEquals(mit[4], "Wie kommen die ca. 1.917&nbsp;€ Eigenanteil zustande?");
   assertEquals(mit.length, 6);
 });
 
@@ -200,7 +221,10 @@ Deno.test("01 Angebot: ohne Empfehlung, Resubmit, eingekaufter Lead", () => {
 });
 
 Deno.test("Heim-Vergleich nur mit echter Kalkulation unter dem Heim-Schnitt", () => {
-  assertEquals(heimVergleich({ eigenanteil: 1621.75 }), { eigen: 1622, diff: 1742 });
+  assertEquals(heimVergleich({ eigenanteil: 1621.75 }), { eigen: 1622, diff: 1742 }, "ohne Posten: gespeicherter Wert");
+  // Alte Anfrage mit Entlastungsbudget im Eigenanteil: Heimvergleich ohne die 294,92 € (Entscheidung 3).
+  assertEquals(heimVergleich(kalkPosten), { eigen: 1917, diff: 1447 });
+  assertEquals(heimVergleich(kalkPostenNeu), { eigen: 1917, diff: 1447 });
   assertEquals(heimVergleich({ eigenanteil: 3500 }), null);
   assertEquals(heimVergleich(null), null);
   assertEquals(eingangsLabel("care_start_timing", "sofort"), "Sofort");

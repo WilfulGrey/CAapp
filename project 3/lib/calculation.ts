@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { nachEigenanteilRegel } from './eigenanteil';
 
 // auth.{persistSession,autoRefreshToken}=false is MANDATORY for every
 // server-side Supabase client. With the defaults (autoRefreshToken=true),
@@ -223,11 +224,15 @@ async function berechneZuschüsse(
     }
   }
 
-  const gesamt = zuschüsse
+  // Entscheidung 3 (Martin, 15.10.2026): Das Entlastungsbudget (`entlastungsbudget_neu`) geht nie in den Eigenanteil
+  // ein, egal was `subsidies_config.in_kalkulation` sagt — der Posten bleibt sichtbar in `items`, aber mit
+  // `in_kalkulation: false`. Begründung und Lesen alter Anfragen: lib/eigenanteil.ts.
+  const items = zuschüsse.map(nachEigenanteilRegel);
+  const gesamt = items
     .filter((z) => z.in_kalkulation)
     .reduce((sum, z) => sum + z.betrag_monatlich, 0);
 
-  return { items: zuschüsse, gesamt };
+  return { items, gesamt };
 }
 
 export function generateToken(): string {

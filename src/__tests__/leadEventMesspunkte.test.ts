@@ -42,6 +42,7 @@ vi.mock('@/lib/empfaenger', () => ({ kundenEmpfaenger: vi.fn() }));
 vi.mock('@/lib/bewertungen-stand', () => ({ holeBewertungsStand: vi.fn() }));
 vi.mock('@/lib/memlog', () => ({ withMem: (_name: string, fn: unknown) => fn }));
 vi.mock('@/lib/messpunkte', async () => import('../../project 3/lib/messpunkte'));
+vi.mock('@/lib/eigenanteil', async () => import('../../project 3/lib/eigenanteil'));
 
 // Supabase-Attrappe: jede Kette wird als { tabelle, art, daten } mitgeschrieben.
 type Zugriff = { tabelle: string; art: string; daten?: unknown };

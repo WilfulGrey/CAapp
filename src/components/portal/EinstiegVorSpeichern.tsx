@@ -30,6 +30,7 @@
 import { useState, type ReactNode } from 'react';
 import { Check, ChevronDown, ShieldCheck } from 'lucide-react';
 import { formatEuro, type Lead } from '../../lib/supabase';
+import { zaehltZumEigenanteil } from '../../lib/eigenanteil';
 import type { SterneStand } from '../../lib/sterne';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -91,9 +92,10 @@ export function KostenkarteVorSpeichern({ lead, onBestpreis, heimEigenanteil, he
     { text: 'Keine Vermittlungsgebühr' },
   ];
   // Heimvergleich: Eigenanteil aus dem ANGEZEIGTEN Brutto minus Posten mit `in_kalkulation`. Nur zeigen, wenn wir
-  // wirklich günstiger sind.
+  // wirklich günstiger sind. Entscheidung 3 (15.10.2026): nie das Entlastungsbudget, auch wenn eine alte Anfrage es
+  // noch mit `in_kalkulation: true` trägt (lib/eigenanteil.ts).
   const zuschussPosten = (lead?.kalkulation?.['zuschüsse']?.items ?? [])
-    .filter(z => z.in_kalkulation && z.betrag_monatlich > 0);
+    .filter(z => zaehltZumEigenanteil(z) && z.betrag_monatlich > 0);
   const eigenanteil = zuschussPosten.length > 0
     ? Math.max(0, brutto - zuschussPosten.reduce((a, z) => a + z.betrag_monatlich, 0))
     : null;
@@ -221,7 +223,7 @@ export function KostenkarteVorSpeichern({ lead, onBestpreis, heimEigenanteil, he
                     </div>
                   </div>
                   <p className="text-[13px] leading-snug mt-3 text-pm-muted">
-                    Pflegegeld, Entlastungsbudget und Steuervorteil sind Leistungen
+                    Pflegegeld und Steuervorteil sind Leistungen
                     Dritter mit eigenen Voraussetzungen — die Beträge sind eine
                     Orientierung, keine Zusage. Jahresbeträge sind auf den Monat umgelegt.
                   </p>

@@ -69,6 +69,7 @@ import {
 } from "./stopRegeln.ts";
 import { deutschStufe } from "./deutschStufe.ts";
 import { anreiseTestUmleitung, testphaseUmleitung } from "./testphase.ts";
+import { eigenanteilOhneEntlastungsbudget, zuschuesseOhneEntlastungsbudget } from "./eigenanteil.ts";
 // Empfehlung fuer die Angebotsmail (Martin, 31.08.2026): echte gematchte
 // Pflegekraft statt der Behauptung "im Portal warten Pflegekraefte".
 // Reihenfolge + Trichter sind Kopien der Portal-Logik — siehe empfehlung.ts.
@@ -475,8 +476,9 @@ function buildAngebotsEmailHtml(lead: Lead, siteUrl: string): string {
   const anredeText = buildAnredeText(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const kalk = lead.kalkulation || {};
   const bruttopreis = kalk.bruttopreis || 0;
-  const gesamteZuschuesse = kalk.zuschüsse?.gesamt || 0;
-  const eigenanteil = kalk.eigenanteil || (bruttopreis - gesamteZuschuesse);
+  // Entscheidung 3 (15.10.2026): ohne Entlastungsbudget, auch bei alten Anfragen (eigenanteil.ts).
+  const gesamteZuschuesse = zuschuesseOhneEntlastungsbudget(kalk) || 0;
+  const eigenanteil = eigenanteilOhneEntlastungsbudget(kalk) || (bruttopreis - gesamteZuschuesse);
  
   const formatEuro = (n: number) => n.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " €";
  

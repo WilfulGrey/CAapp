@@ -110,12 +110,12 @@ export function ComparisonSection() {
             <div className="border-t-2 border-[#708A95] pt-6">
               <div className="text-center">
                 <p className="text-[15px] text-[#3D3D3D] mb-2">Selbst zu tragen bei Pflegegrad 3:</p>
-                <p className="text-4xl font-bold text-[#708A95]">ab ca. 923 €</p>
-                {/* Wie primundus.de (17.09.2026): 2.150 € − 599 € Pflegegeld − 295 € Entlastungsbudget
-                    − 333 € Steuer = 923 €. 3.364 − 923 = 2.441 → "rund 2.440" beim Grundpreis, kein
+                <p className="text-4xl font-bold text-[#708A95]">ab ca. 1.218 €</p>
+                {/* Wie primundus.de (Entscheidung 3, 15.10.2026: ohne Entlastungsbudget): 2.150 € − 599 € Pflegegeld
+                    − 333 € Steuer = 1.218 €. 3.364 − 1.218 = 2.146 → "rund 2.140" beim Grundpreis, kein
                     "bis zu" (rechnerisch kein Höchstwert, §5-UWG-Angriffsfläche). */}
                 <p className="text-[16px] font-semibold text-[#708A95] mt-2">
-                  Beim Grundpreis rund 2.440 € weniger im Monat
+                  Beim Grundpreis rund 2.140 € weniger im Monat
                 </p>
               </div>
             </div>
@@ -125,7 +125,7 @@ export function ComparisonSection() {
         <div className="mt-8 text-center">
           <p className="text-sm text-[#5A5A5A] max-w-2xl mx-auto mb-6">
             <strong className="font-semibold text-[#3D3D3D]">Hinweis:</strong> Pflegeheim: bundesweiter Durchschnitt (vdek, Stand 1. Juli 2026).
-            24-Stunden-Pflege: eine Person, nach Pflegegeld, Entlastungsbudget und Steuerermäßigung, zzgl. An- und Abreise.
+            24-Stunden-Pflege: eine Person, nach Pflegegeld und Steuerermäßigung, zzgl. An- und Abreise.
             Mit unserem Kostenrechner erhalten Sie eine individuelle Berechnung für Ihre Situation.
           </p>
 

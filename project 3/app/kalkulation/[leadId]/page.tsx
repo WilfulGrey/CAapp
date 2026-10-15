@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { identifyClarity } from '@/lib/clarity';
 import { usableNamePart } from '@/lib/calculation';
+import { eigenanteilOhneEntlastungsbudget, zuschuesseOhneEntlastungsbudget } from '@/lib/eigenanteil';
 import { PORTAL_BASIS } from '@/lib/portal-url';
 import { HERO_PUNKTE } from '@/lib/hero-punkte';
 
@@ -60,11 +61,12 @@ export default function KalkulationPage() {
   const formData = kalk.formData || kalk.formularDaten || {};
   const zuschuesseItems = kalk.zuschüsse?.items || [];
   const pflegegeld = zuschuesseItems.find((z: any) => z.name === 'pflegegeld')?.betrag_monatlich || 0;
-  const entlastungsbudget = zuschuesseItems.find((z: any) => z.name === 'entlastungsbudget_neu')?.betrag_monatlich || 0;
   const steuervorteil = zuschuesseItems.find((z: any) => z.name === 'steuervorteil')?.betrag_monatlich || 0;
-  const gesamteZuschuesse = kalk.zuschüsse?.gesamt || 0;
+  // Entscheidung 3 (15.10.2026): Summe und Eigenanteil ohne Entlastungsbudget, auch bei gespeicherten alten
+  // Anfragen, die es noch abgezogen haben (lib/eigenanteil.ts).
+  const gesamteZuschuesse = zuschuesseOhneEntlastungsbudget(kalk) || 0;
   const bruttopreis = kalk.bruttopreis || 0;
-  const eigenanteil = kalk.eigenanteil || (bruttopreis - gesamteZuschuesse);
+  const eigenanteil = eigenanteilOhneEntlastungsbudget(kalk) || (bruttopreis - gesamteZuschuesse);
 
   const createdDate = format(new Date(), 'dd.MM.yyyy');
   const validUntilDate = format(addDays(new Date(), 30), 'dd.MM.yyyy');
@@ -206,10 +208,6 @@ export default function KalkulationPage() {
                   <div className="flex justify-between text-sm text-gray-600">
                     <span>Pflegegeld (Pflegegrad {formData.pflegegrad || 0})</span>
                     <span className="font-semibold text-[#1E5C3A]">– {formatEuro(pflegegeld)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <span>Entlastungsbudget (anteilig mtl.)</span>
-                    <span className="font-semibold text-[#1E5C3A]">– {formatEuro(entlastungsbudget)}</span>
                   </div>
                   <div className="flex justify-between text-sm text-gray-600">
                     <span>Steuervorteil § 35a EStG</span>

@@ -61,27 +61,31 @@ describe('ablaufVariante', () => {
 describe('Zahlen der Preisseite', () => {
   it('Euro ohne Nachkommastellen, deutsches Tausenderzeichen', () => {
     expect(euro(3050)).toBe('3.050\u00A0€');
-    expect(euro(1621.75)).toBe('1.622\u00A0€');
+    expect(euro(1916.67)).toBe('1.917\u00A0€');
     expect(euro(950)).toBe('950\u00A0€');
   });
   it('Heimvergleich nur, wenn zuhause günstiger ist — mit dem vdek-Wert des Portals', () => {
     expect(HEIM_EIGENANTEIL).toBe(3364);
-    expect(PREIS_SEITE.heim(1621.75)).toBe('Zum Vergleich: Im Pflegeheim zahlen Sie im ersten Jahr durchschnittlich 3.364\u00A0€ im Monat selbst – zuhause rund 1.742\u00A0€ weniger.');
+    // PG 4, 3.050 € (Vorschau-Lead): 3.050 − 800 − 333,33 = 1.916,67 € — ohne Entlastungsbudget (Entscheidung 3, 15.10.2026).
+    expect(PREIS_SEITE.heim(1916.67)).toBe('Zum Vergleich: Im Pflegeheim zahlen Sie im ersten Jahr durchschnittlich 3.364\u00A0€ im Monat selbst – zuhause rund 1.447\u00A0€ weniger.');
     expect(PREIS_SEITE.heim(3364)).toBeNull();
     expect(PREIS_SEITE.heim(3900)).toBeNull();
   });
-  it('Zuschuss-Namen: nur Posten der Kalkulation, Kurznamen, „und" vor dem letzten', () => {
+  it('Zuschuss-Namen: nur Posten der Kalkulation, Kurznamen, „und" vor dem letzten — nie das Entlastungsbudget', () => {
     const items = [
       { name: 'pflegegeld', label: 'Pflegegeld', in_kalkulation: true },
       { name: 'entlastungsbudget_neu', label: 'Entlastungsbudget (3.539 Euro/Jahr ab Pflegegrad 2)', in_kalkulation: true },
       { name: 'verhinderungspflege', label: 'Verhinderungspflege', in_kalkulation: false },
       { name: 'steuervorteil', label: 'Steuerliche Absetzbarkeit', in_kalkulation: true },
     ];
-    expect(zuschussNamen(items)).toBe('Pflegegeld, Entlastungsbudget und Steuervorteil');
+    // Entscheidung 3 (15.10.2026): Das Entlastungsbudget zählt nie, auch wenn eine alte Kalkulation es mit
+    // `in_kalkulation: true` trägt (lib/eigenanteil.ts).
+    expect(zuschussNamen(items)).toBe('Pflegegeld und Steuervorteil');
+    expect(zuschussNamen([items[1]])).toBe('');
     expect(zuschussNamen([items[3]])).toBe('Steuervorteil');
     expect(zuschussNamen([])).toBe('');
     expect(PREIS_SEITE.zuschussLabel).toBe('Nach Zuschüssen');
-    expect(PREIS_SEITE.zuschussWert(1621.75)).toBe('ca. 1.622\u00A0€');
+    expect(PREIS_SEITE.zuschussWert(1916.67)).toBe('ca. 1.917\u00A0€');
   });
 });
 

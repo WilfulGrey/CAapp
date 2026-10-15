@@ -17,6 +17,7 @@ import { isAboutDeStale, regenerateGermanDescription } from '../lib/mamamia/care
 import { feedbackInRuhezeit, reportLeadEvent, fetchLeadEvents, KOSTENRECHNER_URL } from '../lib/leadEvents';
 import type { CaregiverSnapshot, EinladenQuelle, LeadEventMetadata, Messpunkt, ProfilQuelle } from '../lib/leadEvents';
 import { identifyClarity } from '../lib/clarity';
+import { zaehltZumEigenanteil } from '../lib/eigenanteil';
 import {
   useRejectApplication,
   useStoreConfirmation,
@@ -237,31 +238,32 @@ const PREVIEW_LEAD: Lead = {
   care_start_timing: 'sofort',
   kalkulation: {
     bruttopreis: 3050,
-    eigenanteil: 1621.75,
+    eigenanteil: 1916.67,
     // Items 1:1 wie `berechneZuschüsse` (project 3/lib/calculation.ts) sie für
     // diesen Lead liefert — am 12.08.2026 gegen die Live-`subsidies_config`
-    // geprüft. Genau DREI Posten stehen auf `in_kalkulation: true`:
-    //   pflegegeld · entlastungsbudget_neu · steuervorteil
+    // geprüft. Seit 15.10.2026 (Entscheidung 3, lib/eigenanteil.ts) zählen genau
+    // ZWEI Posten zum Eigenanteil: pflegegeld · steuervorteil. Das
+    // Entlastungsbudget steht mit `in_kalkulation: false` drin — es zählt nie.
     // (verhinderungspflege, kurzzeitpflege, entlastungsbetrag,
     // wohnraumanpassung, pflegehilfsmittel, hilfe_zur_pflege sind aktiv, aber
     // NICHT in der Kalkulation.)
     //
     // Werte für diesen Lead (Pflegegrad 4, Brutto 3.050 €):
     //   Pflegegeld PG4      800,00 €/Mon (fix aus subsidies_values)
-    //   Entlastungsbudget   294,92 €/Mon (3.539 €/Jahr ÷ 12)
+    //   Entlastungsbudget   294,92 €/Mon (3.539 €/Jahr ÷ 12) — zählt nicht
     //   Steuervorteil       333,33 €/Mon (min(3.050×12×20 %, 4.000) ÷ 12
     //                                     — die 4.000-€-Deckelung greift)
-    //   Summe 1.428,25 → Eigenanteil 1.621,75 €
+    //   Summe 1.133,33 → Eigenanteil 1.916,67 €
     //
     // Der Mock stand bis 12.08. auf zwei Posten (Pflegegeld 545 €,
     // „Steuerersparnis" 355 €) — das Entlastungsbudget fehlte ganz und die
     // Steuerzahl war frei erfunden. Beim Ändern hier: gegen
     // `berechneZuschüsse` gegenrechnen, nicht schätzen.
     zuschüsse: {
-      gesamt: 1428.25,
+      gesamt: 1133.33,
       items: [
         { name: 'pflegegeld', label: 'Pflegegeld', beschreibung: '', betrag_monatlich: 800, betrag_jaehrlich: 9600, typ: 'monatlich', hinweis: null, in_kalkulation: true },
-        { name: 'entlastungsbudget_neu', label: 'Entlastungsbudget (3.539 Euro/Jahr ab Pflegegrad 2)', beschreibung: '', betrag_monatlich: 294.92, betrag_jaehrlich: 3539, typ: 'jaehrlich', hinweis: 'Bis zu 3.539 €/Jahr (seit 1.7.2025)', in_kalkulation: true },
+        { name: 'entlastungsbudget_neu', label: 'Entlastungsbudget (3.539 Euro/Jahr ab Pflegegrad 2)', beschreibung: '', betrag_monatlich: 294.92, betrag_jaehrlich: 3539, typ: 'jaehrlich', hinweis: 'Bis zu 3.539 €/Jahr (seit 1.7.2025)', in_kalkulation: false },
         { name: 'steuervorteil', label: 'Steuerliche Absetzbarkeit', beschreibung: '', betrag_monatlich: 333.33, betrag_jaehrlich: 4000, typ: 'jaehrlich', hinweis: 'Max. 4.000 € pro Jahr (= ca. 333 €/Monat). 20% der Kosten, direkt von der Steuerschuld abziehbar.', in_kalkulation: true },
       ],
     },
@@ -3016,8 +3018,10 @@ const CustomerPortalPage: FC = () => {
         // Heimvergleich EINMAL berechnet (Karte + Aufklapper): Eigenanteil aus dem
         // ANGEZEIGTEN Brutto minus Posten mit `in_kalkulation` (wie `zuschüsse.gesamt`
         // serverseitig). Nur zeigen, wenn wir wirklich günstiger sind.
+        // Entscheidung 3 (15.10.2026): nie das Entlastungsbudget, auch wenn eine alte
+        // Anfrage es noch mit `in_kalkulation: true` trägt (lib/eigenanteil.ts).
         const zuschussPosten = (lead?.kalkulation?.['zuschüsse']?.items ?? [])
-          .filter(z => z.in_kalkulation && z.betrag_monatlich > 0);
+          .filter(z => zaehltZumEigenanteil(z) && z.betrag_monatlich > 0);
         const eigenanteil = zuschussPosten.length > 0
           ? Math.max(0, brutto - zuschussPosten.reduce((a, z) => a + z.betrag_monatlich, 0))
           : null;
@@ -3278,7 +3282,7 @@ const CustomerPortalPage: FC = () => {
                         </div>
                       </div>
                       <p className={`${klein} leading-snug mt-3 text-pm-muted`}>
-                        Pflegegeld, Entlastungsbudget und Steuervorteil sind Leistungen
+                        Pflegegeld und Steuervorteil sind Leistungen
                         Dritter mit eigenen Voraussetzungen — die Beträge sind eine
                         Orientierung, keine Zusage. Jahresbeträge sind auf den Monat umgelegt.
                       </p>

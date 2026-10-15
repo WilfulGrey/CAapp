@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { eigenanteilOhneEntlastungsbudget } from '@/lib/eigenanteil';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,7 +53,6 @@ async function handleGet(
     const kalk = lead.kalkulation;
 
     const pflegegeld = kalk.zuschüsse?.items?.find((z: any) => z.name === 'pflegegeld')?.betrag_monatlich || 0;
-    const entlastungsbudget = kalk.zuschüsse?.items?.find((z: any) => z.name === 'entlastungsbudget_neu')?.betrag_monatlich || 0;
     const steuervorteil = kalk.zuschüsse?.items?.find((z: any) => z.name === 'steuervorteil')?.betrag_monatlich || 0;
 
     const formData = kalk.formularDaten || kalk.formular_daten || {};
@@ -79,9 +79,9 @@ async function handleGet(
     const kalkulationData = {
       bruttopreis: kalk.bruttopreis || 0,
       pflegegeld,
-      entlastungsbudgetMtl: entlastungsbudget,
       steuervorteil,
-      eigenanteil: kalk.eigenanteil || 0,
+      // Entscheidung 3 (15.10.2026): ohne Entlastungsbudget, auch bei gespeicherten alten Anfragen (lib/eigenanteil.ts).
+      eigenanteil: eigenanteilOhneEntlastungsbudget(kalk) || 0,
     };
 
     const { generateKalkulationPDF } = await import('@/lib/pdf-generator-pdfkit');

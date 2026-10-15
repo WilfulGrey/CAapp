@@ -4,6 +4,7 @@ import { getEmailLayout } from './email-template';
 import { PORTAL_BASIS } from './portal-url';
 import { quelleBetreff, websiteHerkunftLabel } from './lead-quelle';
 import { LABELS } from './angaben-labels';
+import { zaehltZumEigenanteil } from './eigenanteil';
 // Bewertungszeile unter Martas Karte (Martin, 17.09.2026). Den Stand holt der
 // Aufrufer per holeBewertungsStand() und reicht ihn herein — die Vorlagen
 // bleiben synchron und ohne Netzaufruf.
@@ -158,7 +159,7 @@ export function getKalkulationEmailTemplate(
           <strong>• Individuelle Kostenberechnung</strong> basierend auf Ihren Angaben
         </li>
         <li style="margin-bottom: 10px; padding-left: 0; font-size: 15px; color: #555; text-align: left;">
-          <strong>• Alle Zuschüsse & Förderungen</strong> (Pflegegeld, Entlastungsbudget, etc.)
+          <strong>• Alle Zuschüsse & Förderungen</strong> (Pflegegeld, Steuerermäßigung, etc.)
         </li>
         <li style="margin-bottom: 0; padding-left: 0; font-size: 15px; color: #555; text-align: left;">
           <strong>• Steuervorteile</strong> und Finanzierungsoptionen
@@ -244,7 +245,7 @@ ${greeting},
 vielen Dank für Ihr Interesse an unserer 24h-Pflege. Hier ist Ihre persönliche Kostenübersicht mit:
 
 • Individueller Kostenberechnung basierend auf Ihren Angaben
-• Allen Zuschüssen und Förderungen (Pflegegeld, Entlastungsbudget, etc.)
+• Allen Zuschüssen und Förderungen (Pflegegeld, Steuerermäßigung, etc.)
 • Steuervorteilen und Finanzierungsoptionen
 
 ---
@@ -509,8 +510,10 @@ export function getAngebotsEmailTemplate(
   const kalkulationAny = kalkulation as any;
   const bruttopreis = kalkulationAny.bruttopreis || 0;
   const tagessatz = bruttopreis ? Math.round(bruttopreis / 30).toLocaleString('de-DE') : null;
+  // Entscheidung 3 (15.10.2026): ohne Entlastungsbudget, auch wenn eine gespeicherte alte Anfrage es noch mit
+  // `in_kalkulation: true` trägt (erneuter Versand, lib/eigenanteil.ts).
   const zuschussItems: Array<{ label: string; betrag_monatlich: number }> =
-    (kalkulation.zuschüsse?.items || []).filter((z: any) => z.in_kalkulation && z.betrag_monatlich > 0);
+    (kalkulation.zuschüsse?.items || []).filter((z: any) => zaehltZumEigenanteil(z) && z.betrag_monatlich > 0);
   const zuschussGesamt = zuschussItems.reduce((s, z) => s + z.betrag_monatlich, 0);
   const zuschussGesamtFormatted = zuschussGesamt > 0 ? Math.round(zuschussGesamt).toLocaleString('de-DE') : null;
 

@@ -1,11 +1,12 @@
+// Die Route rechnet mit formularDaten neu (lib/calculation.ts). Seit 15.10.2026 (Entscheidung 3,
+// lib/eigenanteil.ts) ohne Entlastungsbudget: 2.500 − 599 (Pflegegeld PG 3) − 333,33 (Steuer) = 1.567,67 €.
 const testKalkulation = {
   totalGross: 2500,
-  eigenanteil: 1700,
+  eigenanteil: 1567.67,
   zuschüsse: {
-    gesamt: 800,
-    pflegegeld: 545,
-    entlastungsbudget: 125,
-    verhinderungspflege: 130,
+    gesamt: 932.33,
+    pflegegeld: 599,
+    steuervorteil: 333.33,
   },
 };
 

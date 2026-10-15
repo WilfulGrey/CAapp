@@ -165,8 +165,10 @@ wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
 
 **2.2 — Was bekomme ich von der Kasse zurück?**
 > Liegt ein Pflegegrad vor, bekommen Sie **Pflegegeld** von der Kasse, das Sie für
-> die Betreuung einsetzen können; dazu kommen je nach Situation Verhinderungspflege
-> und der Steuervorteil. Wie viel das bei Ihnen zusammen ergibt, steht in Ihrem Angebot.
+> die Betreuung einsetzen können; dazu kommt der Steuervorteil. Das Entlastungsbudget
+> zahlt die Kasse nur für Ersatzpflege bei Verhinderung einer privaten Pflegeperson oder
+> für Kurzzeitpflege, nicht für die laufende Betreuung. Wie viel das bei Ihnen zusammen
+> ergibt, steht in Ihrem Angebot.
 > *Regel: nie eine konkrete Zuschusshöhe nennen — die hängt am Pflegegrad.*
 
 **2.3 — Kommt noch etwas dazu?** ⚠️ Pflichtantwort bei jeder Preisfrage im Detail

@@ -20,40 +20,36 @@ const supabase = createClient(
 
 async function createTestLead() {
   const testKalkulation = {
+    // Form wie lib/calculation.ts (berechneZuschüsse) sie heute liefert. Seit 15.10.2026 (Entscheidung 3,
+    // lib/eigenanteil.ts) zählt das Entlastungsbudget nie zum Eigenanteil: 2.700 − 347 − 333,33 = 2.019,67 €.
     bruttopreis: 2700,
-    eigenanteil: 1319.51,
+    eigenanteil: 2019.67,
     zuschüsse: {
-      gesamt: 1380.49,
+      gesamt: 680.33,
       items: [
         {
-          label: 'Pflegegeld Pflegegrad 2',
-          betrag_monatlich: 316,
+          name: 'pflegegeld',
+          label: 'Pflegegeld',
+          betrag_monatlich: 347,
+          betrag_jaehrlich: 4164,
           in_kalkulation: true,
           beschreibung: 'Monatliches Pflegegeld'
         },
         {
-          label: 'Entlastungsbetrag',
-          betrag_monatlich: 125,
-          in_kalkulation: true,
-          beschreibung: '§ 45b SGB XI'
+          name: 'entlastungsbudget_neu',
+          label: 'Entlastungsbudget (3.539 Euro/Jahr ab Pflegegrad 2)',
+          betrag_monatlich: 294.92,
+          betrag_jaehrlich: 3539,
+          in_kalkulation: false,
+          beschreibung: ''
         },
         {
-          label: 'Verhinderungspflege',
-          betrag_monatlich: 133.33,
+          name: 'steuervorteil',
+          label: 'Steuerliche Absetzbarkeit',
+          betrag_monatlich: 333.33,
+          betrag_jaehrlich: 4000,
           in_kalkulation: true,
-          beschreibung: 'Jährlich 1.612 € (monatlich umgerechnet)'
-        },
-        {
-          label: 'Kurzzeitpflege',
-          betrag_monatlich: 133.33,
-          in_kalkulation: true,
-          beschreibung: 'Jährlich 1.774 € (monatlich umgerechnet)'
-        },
-        {
-          label: 'Steuerersparnis',
-          betrag_monatlich: 672.83,
-          in_kalkulation: true,
-          beschreibung: 'Haushaltsnahe Dienstleistungen (geschätzt)'
+          beschreibung: ''
         }
       ]
     },

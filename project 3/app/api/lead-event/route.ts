@@ -20,6 +20,7 @@ import { createHash } from 'crypto';
 import { kundenEmpfaenger } from '@/lib/empfaenger';
 import { holeBewertungsStand } from '@/lib/bewertungen-stand';
 import { MESSPUNKTE } from '@/lib/messpunkte';
+import { eigenanteilOhneEntlastungsbudget } from '@/lib/eigenanteil';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
 // kostenrechner lead so the Nachfass emails can branch. Token-authenticated —
@@ -1504,6 +1505,14 @@ async function handlePost(request: NextRequest) {
           console.warn(`lead-event offer_updated: missing/invalid prices in metadata — mail skipped (lead ${lead.id})`);
         } else {
           const rawChanged = Array.isArray(m.changed) ? (m.changed as Array<Record<string, unknown>>) : [];
+          // Entscheidung 3 (15.10.2026): Eigenanteil ohne Entlastungsbudget. Die Kalkulation hat das SA-Portal VOR
+          // diesem Ereignis auf den Lead geschrieben; bei der manuellen Preisübernahme zieht sein `new_eigenanteil`
+          // bei alten Anfragen noch 294,92 € ab (Preis − gespeichertes `zuschüsse.gesamt`). Darum aus der Kalkulation
+          // des Leads, wenn deren Preis der neue ist; sonst wie bisher aus den Metadaten (lib/eigenanteil.ts).
+          const kalkNeu = (lead as any).kalkulation;
+          const eigenAusLead = kalkNeu && Math.round(Number(kalkNeu.bruttopreis)) === Math.round(newB)
+            ? eigenanteilOhneEntlastungsbudget(kalkNeu)
+            : null;
           const portalUrl = buildPortalUrl(lead as any);
           const umlO = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
           holeBewertungsStand()
@@ -1513,7 +1522,7 @@ async function handlePost(request: NextRequest) {
                 {
                   oldBruttopreis: oldB,
                   newBruttopreis: newB,
-                  newEigenanteil: Number.isFinite(Number(m.new_eigenanteil)) ? Number(m.new_eigenanteil) : null,
+                  newEigenanteil: eigenAusLead ?? (Number.isFinite(Number(m.new_eigenanteil)) ? Number(m.new_eigenanteil) : null),
                   changed: rawChanged.map((c) => ({
                     name: typeof c?.name === 'string' ? c.name : undefined,
                     alt: typeof c?.alt === 'string' ? c.alt : undefined,

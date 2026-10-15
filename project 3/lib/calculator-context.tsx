@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { nachEigenanteilRegel } from './eigenanteil';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -239,11 +240,15 @@ export function CalculatorProvider({ children }: { children: React.ReactNode }) 
       }
     }
 
-    const gesamt = zuschüsse
+    // Entscheidung 3 (Martin, 15.10.2026): Das Entlastungsbudget (`entlastungsbudget_neu`) geht nie in den
+    // Eigenanteil ein, egal was `subsidies_config.in_kalkulation` sagt — gleiche Regel wie lib/calculation.ts,
+    // Begründung in lib/eigenanteil.ts.
+    const items = zuschüsse.map(nachEigenanteilRegel);
+    const gesamt = items
       .filter((z) => z.in_kalkulation)
       .reduce((sum, z) => sum + z.betrag_monatlich, 0);
 
-    return { items: zuschüsse, gesamt };
+    return { items, gesamt };
   };
 
   const calculate = (): CalculationResult => {

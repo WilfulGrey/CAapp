@@ -20,6 +20,7 @@
  * React/Next) — Root-Vitest importiert es direkt.
  */
 import { PORTAL_ANZAHL } from './kraefte-vorschau';
+import { zaehltZumEigenanteil } from './eigenanteil';
 
 export const ABLAUF_KEY = 'prim_ablauf_variante';
 export const ABLAUF_VARIANTEN = ['preis', 'alt'] as const;
@@ -86,14 +87,14 @@ export const KNOPF_PREIS = 'Speichern & Pflegekräfte ansehen\u00A0→';
 /** vdek-Auswertung zum 01.07.2026, Bundesdurchschnitt im ersten Jahr — derselbe Wert wie im Portal (HEIM_EIGENANTEIL). */
 export const HEIM_EIGENANTEIL = 3364;
 
-/** Kurznamen der Zuschüsse für die Zeile unter dem Eigenanteil; unbekannte Posten behalten ihr Label. */
+/** Kurznamen der Zuschüsse für die Zeile unter dem Eigenanteil; unbekannte Posten behalten ihr Label.
+ *  Nur Posten, die zum Eigenanteil zählen — das Entlastungsbudget nie (Entscheidung 3, 15.10.2026, lib/eigenanteil.ts). */
 const ZUSCHUSS_KURZ: Record<string, string> = {
   pflegegeld: 'Pflegegeld',
-  entlastungsbudget_neu: 'Entlastungsbudget',
   steuervorteil: 'Steuervorteil',
 };
 export function zuschussNamen(items: Array<{ name: string; label: string; in_kalkulation: boolean }>): string {
-  const n = items.filter((z) => z.in_kalkulation).map((z) => ZUSCHUSS_KURZ[z.name] ?? z.label);
+  const n = items.filter(zaehltZumEigenanteil).map((z) => ZUSCHUSS_KURZ[z.name] ?? z.label);
   if (n.length <= 1) return n.join('');
   return `${n.slice(0, -1).join(', ')} und ${n[n.length - 1]}`;
 }

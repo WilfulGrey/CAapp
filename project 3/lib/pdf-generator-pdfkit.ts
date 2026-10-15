@@ -14,7 +14,6 @@ interface LeadData {
 interface KalkulationData {
   bruttopreis: number;
   pflegegeld: number;
-  entlastungsbudgetMtl: number;
   steuervorteil: number;
   eigenanteil: number;
 }
@@ -138,15 +137,12 @@ export async function generateKalkulationPDF(
       doc.fillColor(greenColor);
       doc.text(`− ${formatEuro(kalkulation.pflegegeld)}`, subLeft, kostenY + 45, { align: 'right', width: 445 });
  
+      // Entscheidung 3 (15.10.2026): keine Zeile „Entlastungsbudget“ mehr — es zählt nie zum Eigenanteil
+      // (lib/eigenanteil.ts). Der Steuervorteil rückt in die frei gewordene Zeile.
       doc.fontSize(10).fillColor(grayColor);
-      doc.text('Entlastungsbudget (anteilig mtl.)', subLeft, kostenY + 65);
+      doc.text('Steuervorteil (§35a EStG)', subLeft, kostenY + 65);
       doc.fillColor(greenColor);
-      doc.text(`− ${formatEuro(kalkulation.entlastungsbudgetMtl)}`, subLeft, kostenY + 65, { align: 'right', width: 445 });
- 
-      doc.fontSize(10).fillColor(grayColor);
-      doc.text('Steuervorteil (§35a EStG)', subLeft, kostenY + 85);
-      doc.fillColor(greenColor);
-      doc.text(`− ${formatEuro(kalkulation.steuervorteil)}`, subLeft, kostenY + 85, { align: 'right', width: 445 });
+      doc.text(`− ${formatEuro(kalkulation.steuervorteil)}`, subLeft, kostenY + 65, { align: 'right', width: 445 });
  
       doc.moveTo(kostenLeft, kostenY + 115).lineTo(kostenRight, kostenY + 115).lineWidth(2).strokeColor(accentColor).stroke();
  

@@ -10,11 +10,11 @@ export interface FAQItem {
 export const faqs: FAQItem[] = [
   {
     // Preis aus pricing_config (Stand 2026-09-17): Grundpreis 2.150 € für eine Person, keine Spanne
-    // (Martin 17.09.). Eigenanteil wie auf primundus.de: Pflegegeld, Entlastungsbudget/12 und
-    // Steuerermäßigung abgezogen, Pflegegrad 3 ab ca. 923 €. Konkrete Zahl im ersten Satz, damit
-    // Google-AI/ChatGPT die Seite als Quelle für "Kosten 24h-Pflege" zitieren.
+    // (Martin 17.09.). Eigenanteil wie auf primundus.de: Pflegegeld und Steuerermäßigung abgezogen
+    // (seit 15.10.2026 ohne Entlastungsbudget, Entscheidung 3), Pflegegrad 3 ab ca. 1.218 €. Konkrete
+    // Zahl im ersten Satz, damit Google-AI/ChatGPT die Seite als Quelle für "Kosten 24h-Pflege" zitieren.
     question: "Was kostet eine 24-Stunden-Pflege ungefähr?",
-    answer: "Eine 24-Stunden-Betreuung kostet bei uns ab 2.150 Euro im Monat für eine Person. Der Preis hängt vor allem von der Pflegesituation ab: Wie viele Personen brauchen Betreuung? Wie mobil ist die zu pflegende Person? Ist nachts Hilfe nötig? Daneben spielen die Deutschkenntnisse der Betreuungskraft eine Rolle. Nach Pflegegeld, Entlastungsbudget und Steuerermäßigung bleiben bei Pflegegrad 3 ab ca. 923 Euro im Monat selbst zu tragen. Ihren genauen Preis sehen Sie nach 2 Minuten im Kostenrechner."
+    answer: "Eine 24-Stunden-Betreuung kostet bei uns ab 2.150 Euro im Monat für eine Person. Der Preis hängt vor allem von der Pflegesituation ab: Wie viele Personen brauchen Betreuung? Wie mobil ist die zu pflegende Person? Ist nachts Hilfe nötig? Daneben spielen die Deutschkenntnisse der Betreuungskraft eine Rolle. Nach Pflegegeld und Steuerermäßigung bleiben bei Pflegegrad 3 ab ca. 1.218 Euro im Monat selbst zu tragen. Ihren genauen Preis sehen Sie nach 2 Minuten im Kostenrechner."
   },
   {
     question: "Wie schnell kann eine Betreuungskraft starten?",
@@ -30,7 +30,7 @@ export const faqs: FAQItem[] = [
   },
   {
     question: "Welche Zuschüsse kann ich von der Pflegekasse erhalten?",
-    answer: "Je nach Pflegegrad können Sie Verhinderungspflege, Pflegegeld und weitere Leistungen nutzen. In Ihrem Angebot zeigen wir Ihnen genau, welche Zuschüsse Ihnen zustehen und wie sich der Eigenanteil reduziert."
+    answer: "Je nach Pflegegrad können Sie Pflegegeld und weitere Leistungen nutzen. In Ihrem Angebot zeigen wir Ihnen genau, welche Zuschüsse Ihnen zustehen und wie sich der Eigenanteil reduziert."
   },
   {
     question: "Sind die Betreuungskräfte qualifiziert?",
