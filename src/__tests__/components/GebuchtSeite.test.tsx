@@ -432,7 +432,7 @@ describe('Quelltext-Wächter', () => {
     expect(quelle).not.toMatch(/gebuchtVorschau/);
   });
   it('Hilfe-Blatt: Notfallfeld am berechneten Zustand, nicht am Vorschau-Etikett', () => {
-    expect(seite).toMatch(/unterKopf=\{gebuchtNeu && notfallImHilfeBlatt\(gebuchtNeu\.daten\)/);
+    expect(seite).toMatch(/nachKontakt=\{gebuchtNeu && notfallImHilfeBlatt\(gebuchtNeu\.daten\)/);
     expect(seite).not.toMatch(/gebuchtNeu\.zustand !== 'beendet'/);
   });
 });
@@ -459,7 +459,7 @@ describe('Bausteine außerhalb der Seite (nur mit den neuen Props anders)', () =
     render(<CustomerNurseModal nurse={n} onClose={() => {}} nurProfil ohneVerfuegbarkeit />);
     expect(screen.queryByText('ab sofort')).toBeNull();
   });
-  it('Hilfe-Blatt: ohne Props unverändert, mit `unterKopf` Notfallfeld UNTER der Kopfzeile mit dem X, „täglich 8–20 Uhr"', async () => {
+  it('Hilfe-Blatt: ohne Props unverändert, mit `nachKontakt` Notfallfeld UNTER Martas Tageskontakt, X bleibt oben, „täglich 8–20 Uhr"', async () => {
     const { ContactPopup } = await import('../../components/portal/ContactPopup');
     const { NotfallFeld } = await import('../../components/portal/GebuchtKontakt');
     const alt = render(<ContactPopup onClose={() => {}} />);
@@ -467,7 +467,7 @@ describe('Bausteine außerhalb der Seite (nur mit den neuen Props anders)', () =
     expect(screen.queryByText(/Notfallnummer/)).toBeNull();
     alt.unmount();
     const zu = vi.fn();
-    const neu = render(<ContactPopup onClose={zu} unterKopf={<NotfallFeld nummer={FANTASIE_PL} />} zeiten="täglich 8–20 Uhr" />);
+    const neu = render(<ContactPopup onClose={zu} nachKontakt={<NotfallFeld nummer={FANTASIE_PL} />} zeiten="täglich 8–20 Uhr" />);
     expect(screen.getByText('täglich 8–20 Uhr')).toBeTruthy();
     const anruf = screen.getByRole('link', { name: `Primundus-Notfallnummer anrufen: ${FANTASIE_PL}` });
     expect(screen.getByText('Bekannt aus')).toBeTruthy();
@@ -478,6 +478,9 @@ describe('Bausteine außerhalb der Seite (nur mit den neuen Props anders)', () =
     const feld = anruf.closest('[data-notfall]') as HTMLElement;
     expect(kopf.compareDocumentPosition(feld) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(kopf.contains(feld)).toBe(false);
+    // Erreichbarkeit zuerst (Martin 02.10.): Martas Tagesnummer steht VOR dem Notfallfeld.
+    const tagesnummer = screen.getByText('täglich 8–20 Uhr').closest('div') as HTMLElement;
+    expect(tagesnummer.compareDocumentPosition(feld) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await userEvent.click(x);
     expect(zu).toHaveBeenCalledTimes(1);
     neu.unmount();

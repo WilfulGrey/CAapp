@@ -12,12 +12,13 @@ const MEDIA_LOGOS = [
 ];
 
 /**
- * Hilfe-Blatt. PROTOTYP Gebucht-Seite neu (15.10.2026, nur Vorschau): `unterKopf` setzt einen Block direkt unter die
- * Kopfzeile „Ihre Beraterin" mit dem X (das Notfallfeld, Spezifikation 6.10; das X bleibt oben, Gegenprüfung 15.10.),
+ * Hilfe-Blatt. PROTOTYP Gebucht-Seite neu (15.10.2026, nur Vorschau): `nachKontakt` setzt einen Block direkt unter
+ * Martas Tageskontakt (das Notfallfeld, Spezifikation 6.10). Erst die Erreichbarkeit, dann die Notfallnummer als
+ * Absicherung (Martin 02.10.); das X bleibt oben (Gegenprüfung 15.10.),
  * `zeiten` ersetzt „Mo–So, 8–20 Uhr" (Entscheidung 10). Ohne beide Props: unverändert. „Bekannt aus" und die Kacheln
  * bleiben immer.
  */
-export const ContactPopup: FC<{ onClose: () => void; unterKopf?: ReactNode; zeiten?: string }> = ({ onClose, unterKopf, zeiten }) => (
+export const ContactPopup: FC<{ onClose: () => void; nachKontakt?: ReactNode; zeiten?: string }> = ({ onClose, nachKontakt, zeiten }) => (
   <>
     <div
       className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]"
@@ -47,7 +48,6 @@ export const ContactPopup: FC<{ onClose: () => void; unterKopf?: ReactNode; zeit
               <X className="w-4 h-4 text-gray-400" />
             </button>
           </div>
-          {unterKopf}
 
           <div className="flex items-center gap-4">
             <div className="relative flex-shrink-0">
@@ -77,6 +77,7 @@ export const ContactPopup: FC<{ onClose: () => void; unterKopf?: ReactNode; zeit
               <p className="text-xs text-gray-500 mt-0.5">{zeiten ?? 'Mo–So, 8–20 Uhr'}</p>
             </div>
           </div>
+          {nachKontakt}
 
           <div className="grid grid-cols-3 gap-2">
             <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">
