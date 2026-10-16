@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "test": "deno test --allow-env --no-check=remote"
+    "test": "deno test --allow-env --allow-read=. --no-check=remote"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@^1.0.0"
