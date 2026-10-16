@@ -75,6 +75,10 @@ Sie geht auch an abgemeldete Kunden (gebuchte Leistung, wie Mail C), nie an Verm
 Schalter `ANREISE_MAILS`: `aus` (Standard) / `test` (ans Team) / `live`. Erinnerungen nie nachts, die letzte sicher vor dem Ende; sie stoppen bei Zu-
 oder Absage, gebucht, weniger als 1 h Rest oder weniger als 6 h nach der letzten Mail
 zu derselben Bewerbung. „Noch keine Bewerbung?" entfällt mit Bewerbung oder Interesse.
+Vor jeder Bewerbungs-Erinnerung fragt der Versand bei mamamia nach, ob die Bewerbung noch
+steht (Registry #125): weg ⇒ Zeile abgebrochen (`application_no_longer_active`, `quelle:
+versand`); keine Antwort ⇒ zehn Minuten später noch einmal, höchstens dreimal, danach wie
+bisher senden. Der Detect-Sweep (alle 15 Min., Registry #124) bleibt als zweites Netz.
 
 ## So arbeiten wir (kein Chaos)
 

@@ -67,6 +67,9 @@ import {
   VOR_DEM_ABSENDEN,
   vorAbsendenStopp,
 } from "./stopRegeln.ts";
+// Registry #125: vor jeder Bewerbungs-Erinnerung bei mamamia nachfragen, ob die Bewerbung
+// noch steht (Rausnahme im SA-Portal kurz vor der Sendezeit rutschte am Detect-Sweep vorbei).
+import { type BewerbungStand, bewerbungStand, standDepsAusEnv, standNochmalUm } from "./bewerbungStand.ts";
 import { deutschStufe } from "./deutschStufe.ts";
 import { anreiseTestUmleitung, testphaseUmleitung } from "./testphase.ts";
 // Empfehlung fuer die Angebotsmail (Martin, 31.08.2026): echte gematchte
@@ -1255,6 +1258,8 @@ interface ReminderMeta {
   caregiver_german_level?: string | null;
   caregiver_photo_url?: string | null;
   caregiver_about_text?: string | null;
+  // Registry #125: Zähler der Fehlversuche der mamamia-Nachfrage vor dem Versand.
+  stand_fehlschlaege?: number;
   // Multi-Job (Bug #25): Job, zu dem dieser Reminder gehört. Reminder eines
   // AKTUELL geplanten Jobs überleben den lead-weiten "beauftragt"-Cancel
   // (die alte Buchung betraf einen ANDEREN Einsatz).
@@ -2591,6 +2596,44 @@ Deno.serve(async (req: Request) => {
             // Reservierung, Karte „Neue Bewerbung", Knopf „Angebot prüfen" öffnet sie.
             // Alte Typen (+1 h/+4 h/+12 h/+70 h) laufen durch denselben Baustein; zu dichte
             // oder zu späte fallen weg (stopRegeln.ts).
+
+            // Registry #125 (16.10.2026): Führt mamamia die Bewerbung noch? Der Detect-Sweep
+            // (alle 15 Min.) bricht Erinnerungen zu verschwundenen Bewerbungen ab, aber eine
+            // Rausnahme im SA-Portal kurz vor der Sendezeit rutschte durch („… noch 2 Tage für
+            // Sie reserviert" zu einer zurückgezogenen Bewerbung). Deshalb fragt der Versand
+            // selbst nach. Keine Antwort ⇒ Zeile zehn Minuten später noch einmal (höchstens
+            // dreimal), danach wie bisher senden — „nicht gefragt" ist nie „weg" (Registry #89).
+            const standDeps = standDepsAusEnv();
+            const standJob = meta.mamamia_job_offer_id ?? ((lead as any).mamamia_job_offer_id ?? null);
+            if (!standDeps) {
+              console.warn(`[erinnerung] Lead ${scheduledEmail.lead_id}: MAMAMIA_*-Secrets fehlen — Bewerbung nicht gegen mamamia geprüft`);
+            } else if (standJob != null) {
+              let stand: BewerbungStand | null = null;
+              try {
+                stand = await bewerbungStand(standDeps, Number(standJob), cgId);
+              } catch (e) {
+                const grund = e instanceof Error ? e.message : String(e);
+                const fehlschlaege = Number(meta.stand_fehlschlaege ?? 0) + 1;
+                const nochmal = standNochmalUm(fehlschlaege, new Date());
+                if (nochmal) {
+                  await supabase.from("scheduled_emails").update({
+                    status: "pending", scheduled_for: nochmal, updated_at: new Date().toISOString(),
+                    metadata: { ...meta, stand_fehlschlaege: fehlschlaege },
+                    error_message: `Stand-Versuch ${fehlschlaege}: ${grund}`,
+                  }).eq("id", scheduledEmail.id);
+                  console.warn(`[erinnerung] Lead ${scheduledEmail.lead_id}: mamamia ohne Antwort (${grund}), neuer Versuch ${nochmal}`);
+                  results.push({ id: scheduledEmail.id, success: true });
+                  continue;
+                }
+                console.warn(`[erinnerung] Lead ${scheduledEmail.lead_id}: mamamia nach ${fehlschlaege} Versuchen ohne Antwort (${grund}) — Erinnerung geht wie bisher raus`);
+              }
+              if (stand === "weg") {
+                await zeileAbbrechen(supabase, scheduledEmail, "application_no_longer_active", { caregiver_id: cgId, quelle: "versand" });
+                results.push({ id: scheduledEmail.id, success: true });
+                continue;
+              }
+            }
+
             const stufe = erinnerungStufe(scheduledEmail.email_type) ?? "1";
             const lage = await bewerbungsLage(
               supabase, scheduledEmail.lead_id, cgId, meta.mamamia_job_offer_id ?? null,
