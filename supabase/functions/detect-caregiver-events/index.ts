@@ -113,9 +113,29 @@ export interface AppStatusEventRow {
 }
 
 // Reminder-Mail-Typen in scheduled_emails — geteilt von Photo-Refresh und
-// Orphan-Cancel-Sweep.
-const REMINDER_TYPES = [
+// Orphan-Cancel-Sweep (Bewerbung aus mamamia verschwunden ⇒ offene Erinnerungen
+// dieser Pflegekraft abbrechen).
+//
+// SPIEGEL von `ERINNERUNG_TYPEN` in
+// `project 3/supabase/functions/send-scheduled-emails/stopRegeln.ts` plus
+// `interest_reminder` — Edge Functions können nicht über Ordnergrenzen importieren
+// (Muster appendJobParam / names.ts). Neue Erinnerungstypen IMMER in beiden Listen
+// eintragen; `_tests/reminderTypes.test.ts` vergleicht die Kopien.
+//
+// Registry #124 (16.10.2026, Kundin Kopka): Die neuen Typen
+// `application_erinnerung_1/2/letzte` (Registry #96/#97, seit 27.09.) fehlten hier.
+// Folge: Zog die Agentur im SA-Portal eine Bewerbung zurück, blieben die drei
+// Erinnerungen stehen und gingen raus („… noch 2 Tage für Sie reserviert“ zu einer
+// Bewerbung, die es nicht mehr gab). Der Sweep hat seit dem 27.09. keine einzige
+// neue Zeile mehr abgebrochen (0 Ereignisse `email_application_erinnerung_*_cancelled`
+// mit reason application_no_longer_active auf PROD).
+export const REMINDER_TYPES = [
   "interest_reminder",
+  // neue Erinnerungen (Plan in project 3/lib/erinnerungsplan.ts)
+  "application_erinnerung_1",
+  "application_erinnerung_2",
+  "application_erinnerung_letzte",
+  // alte Zeilen aus der Warteschlange (+1 h / +4 h / +12 h / +70 h)
   "application_reminder",
   "application_reminder_4h",
   "application_reminder_12h",
