@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from "@std/assert";
-import { ACTIONS, deriveLeadJobStatus } from "../actions.ts";
+import { ACTIONS, deriveLeadJobStatus, einsaetzeFelder } from "../actions.ts";
 import type { SessionPayload, ActionDeps, LeadJobRow } from "../types.ts";
 
 const SESSION: SessionPayload = {
@@ -376,6 +376,56 @@ Deno.test("getCaregiver: merges CaregiverCertificates (Referenz only) onto Careg
 });
 
 // ─── getCaregiver ────────────────────────────────────────────────────────
+
+const row = (o: Record<string, unknown>) => ({
+  customer_id: null, arrival_date: "2026-08-01 00:00:00", departure_date: "2026-09-01 00:00:00",
+  duration_days: 31, status: "finish", zip_code: "10115", city: "Berlin", ...o,
+});
+
+Deno.test("einsaetzeFelder: on_job bei anderem Kunden ⇒ on_other_job, customer_id geht nicht raus", () => {
+  const f = einsaetzeFelder({
+    CaregiverDeparturesWithPagination: { has_more_pages: false, data: [row({ status: "on_job", customer_id: 999 }), row({ customer_id: 1 })] },
+  }, SESSION.customer_id) as { einsaetze: Array<Record<string, unknown>>; on_other_job: boolean };
+  assertEquals(f.on_other_job, true);
+  assertEquals(f.einsaetze.length, 2);
+  assertEquals("customer_id" in f.einsaetze[0], false);
+});
+
+Deno.test("einsaetzeFelder: fremde Agentur (customer_id null) on_job ⇒ on_other_job", () => {
+  const f = einsaetzeFelder({
+    CaregiverDeparturesWithPagination: { has_more_pages: false, data: [row({ status: "on_job" })] },
+  }, SESSION.customer_id);
+  assertEquals(f.on_other_job, true);
+});
+
+Deno.test("einsaetzeFelder: on_job bei DIESEM Kunden ⇒ kein Hinweis", () => {
+  const f = einsaetzeFelder({
+    CaregiverDeparturesWithPagination: { has_more_pages: false, data: [row({ status: "on_job", customer_id: SESSION.customer_id })] },
+  }, SESSION.customer_id);
+  assertEquals(f.on_other_job, false);
+});
+
+Deno.test("einsaetzeFelder: Fehler / >200 ⇒ einsaetze_error statt leerer Liste", () => {
+  assertEquals(einsaetzeFelder(new Error("boom"), 1), { einsaetze_error: "boom" });
+  assertEquals(
+    einsaetzeFelder({ CaregiverDeparturesWithPagination: { has_more_pages: true, data: [] } }, 1),
+    { einsaetze_error: "mehr als 200 Einsätze" },
+  );
+});
+
+Deno.test("getCaregiver: Departures-Fehler lässt das Profil leben (einsaetze_error)", async () => {
+  const fetchFn: typeof fetch = async (_input, init) => {
+    const q = JSON.parse((init as RequestInit).body as string).query as string;
+    const body = q.includes("CaregiverDeparturesWithPagination")
+      ? { errors: [{ message: "Internal server error", extensions: { category: "graphql" } }] }
+      : { data: { Caregiver: { id: 5 }, CaregiverCertificates: [] } };
+    return new Response(JSON.stringify(body), { status: 200 });
+  };
+  const r = await ACTIONS.getCaregiver(SESSION, { id: 5 }, makeDeps(fetchFn)) as { Caregiver: Record<string, unknown> };
+  assertEquals(r.Caregiver.id, 5);
+  assertEquals(typeof r.Caregiver.einsaetze_error, "string");
+  assertEquals("einsaetze" in r.Caregiver, false);
+});
 
 Deno.test("getCaregiver: takes id from variables (caregivers are public within agency)", async () => {
   const { state, fetchFn } = captureFetch({

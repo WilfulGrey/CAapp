@@ -189,7 +189,7 @@ export const CustomerNurseModal: FC<{
   const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
   // Erklaerung zur Stufe — steht sichtbar im Profil (nicht mehr nur im
   // Popup hinter dem Chip). Wortlaut + Schwellen in shared.ts.
-  const stufeErklaerung = badgeErklaerung(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
+  const stufeErklaerung = badgeErklaerung(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0, nurse.onOtherJob);
   const p = nurse.profile;
   const dash = '—';
   const yesNo = (v: boolean | undefined): string => v == null ? dash : v ? 'Ja' : 'Nein';
@@ -487,11 +487,14 @@ export const CustomerNurseModal: FC<{
               </div>
             )}
 
-            {nurse.detailedAssignments && nurse.detailedAssignments.length > 0 && (nurse.history?.assignments ?? 0) > 0 && (
+            {/* Letzte Einsätze — CaregiverDeparturesWithPagination (Registry #126).
+                Drei ehrliche Zustände wie im SA-Portal: gerade woanders im
+                Einsatz, Liste der abgeschlossenen, Fehler der Abfrage. */}
+            {(nurse.onOtherJob || nurse.einsaetzeError || (nurse.detailedAssignments?.length ?? 0) > 0) && (
               <div className="px-5 pb-5">
                 <div className="flex items-center justify-between mb-2 gap-2">
                   <h3 className={sectionHeadCls + ' mb-0'}>Letzte Einsätze</h3>
-                  {nurse.history && (
+                  {nurse.history && (nurse.detailedAssignments?.length ?? 0) > 0 && (
                     <span className="text-[13px] font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                       style={{ color: '#71717A', background: '#F5F5F6', border: '1px solid #D4D4D8' }}>
                       {/* Gleicher Wortlaut wie die Karte, ohne Ø-Dauer (Martin, 03.09.). */}
@@ -500,16 +503,27 @@ export const CustomerNurseModal: FC<{
                   )}
                 </div>
                 <div className="space-y-2">
-                  {nurse.detailedAssignments.map((a, i) => (
+                  {nurse.onOtherJob && (
+                    <div className={boxCls}>
+                      <p className="text-[16px] leading-relaxed" style={{ color: '#71717A' }}>Derzeit im Einsatz bei einem anderen Kunden.</p>
+                    </div>
+                  )}
+                  {nurse.detailedAssignments?.map((a, i) => (
                     <div key={i} className={boxCls}>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
                         <div><p className={assignLabelCls}>Zeitraum</p><p className={assignValueCls}>{a.startDate} – {a.endDate}</p></div>
-                        <div><p className={assignLabelCls}>Ort</p><p className={assignValueCls}>{a.postalCode} {a.city}</p></div>
-                        <div><p className={assignLabelCls}>Patienten</p><p className={assignValueCls}>{a.patientCount} {a.patientCount === 1 ? 'Patient' : 'Patienten'}</p></div>
                         <div><p className={assignLabelCls}>Dauer</p><p className={assignValueCls}>{a.duration}</p></div>
+                        {(a.postalCode || a.city) && (
+                          <div><p className={assignLabelCls}>Ort</p><p className={assignValueCls}>{a.postalCode} {a.city}</p></div>
+                        )}
                       </div>
                     </div>
                   ))}
+                  {nurse.einsaetzeError && (
+                    <div className={boxCls}>
+                      <p className="text-[16px] leading-relaxed" style={{ color: '#71717A' }}>Die Einsätze können wir gerade nicht abrufen.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

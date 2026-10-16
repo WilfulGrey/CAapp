@@ -233,17 +233,20 @@ export interface MamamiaCaregiverFull extends MamamiaCaregiverRef {
   personalities?: Array<{ personality: string | null }>;
   mobilities?: Array<{ mobility: string | null }>;
   languagables?: Array<{ level: string | null; language: { name: string | null } | null }>;
-  hp_recent_assignments?: Array<{
+  /** Einsätze aus CaregiverDeparturesWithPagination (Proxy getCaregiver,
+   *  Registry #126). status accepted | on_job | finish. Ohne customer_id. */
+  einsaetze?: Array<{
     arrival_date: string | null;
     departure_date: string | null;
-    postal_code: string | null;
-    city: string | null;
+    duration_days: number | null;
     status: string | null;
-    /** Number of patients in this assignment (1 = single, 2 = couple care). */
-    patients_count?: number | null;
-    /** Patient's primary mobility level (1=Mobile…5=Bedridden), same scale as patient.mobility_id. */
-    patient_mobility_id?: number | null;
+    zip_code: string | null;
+    city: string | null;
   }>;
+  /** Gerade bei einem ANDEREN Kunden im Einsatz (status on_job). */
+  on_other_job?: boolean;
+  /** Departures-Abfrage gescheitert — Profil lebt, Liste nicht. */
+  einsaetze_error?: string;
 }
 
 export interface MamamiaApplication {

@@ -16,6 +16,7 @@ export { deriveLeadJobStatus };
 import {
   GENERATE_CAREGIVER_GERMAN_DESCRIPTION,
   GET_CAREGIVER,
+  CAREGIVER_DEPARTURES,
   GET_CUSTOMER,
   GET_JOB_OFFER,
   LIST_APPLICATIONS,
@@ -236,19 +237,57 @@ const listInvitedCaregiverIds: ActionHandler = async (session, _variables, deps)
 
 // ─── Public/open actions (id from variables) ────────────────────────────────
 
-const getCaregiver: ActionHandler = async (_session, variables, deps) => {
+type DepartureRow = {
+  customer_id: number | null;
+  arrival_date: string | null;
+  departure_date: string | null;
+  duration_days: number | null;
+  status: string | null;
+  zip_code: string | null;
+  city: string | null;
+};
+
+// Departures → Felder am Caregiver. customer_id bleibt im Proxy: an den Browser
+// geht nur, ob die Kraft gerade bei einem ANDEREN Kunden im Einsatz ist (bei
+// diesem Kunden ist es kein Hinweis wert). Fehler sichtbar als einsaetze_error,
+// nie als leere Liste (Święta zasada 1).
+export function einsaetzeFelder(
+  dep: { CaregiverDeparturesWithPagination?: { has_more_pages: boolean; data: DepartureRow[] } | null } | Error,
+  customerId: number,
+): Record<string, unknown> {
+  if (dep instanceof Error) return { einsaetze_error: dep.message };
+  const page = dep.CaregiverDeparturesWithPagination;
+  if (!page) return { einsaetze_error: "CaregiverDeparturesWithPagination leer" };
+  // ponytail: 200 je Kraft (wie SA-Portal); darüber wäre die Zahl zu klein.
+  if (page.has_more_pages) return { einsaetze_error: "mehr als 200 Einsätze" };
+  return {
+    einsaetze: page.data.map(({ customer_id: _c, ...r }) => r),
+    on_other_job: page.data.some((r) => r.status === "on_job" && r.customer_id !== customerId),
+  };
+}
+
+const getCaregiver: ActionHandler = async (session, variables, deps) => {
   const id = (variables as { id?: unknown }).id;
   if (typeof id !== "number") throw new Error("id required");
   // GET_CAREGIVER fetches Caregiver(id) + the top-level CaregiverCertificates
   // (the relation 500s — see fetchCertificatesByCaregiver). Merge the cert
   // File objects onto Caregiver.certificates so the frontend mapper sees them
   // identically to the list path.
-  const r = await runGraphQL<{
-    Caregiver: Record<string, unknown> | null;
-    CaregiverCertificates?: Array<{ file?: CertFile | null }> | null;
-  }>(deps, GET_CAREGIVER, { id });
+  const [r, dep] = await Promise.all([
+    runGraphQL<{
+      Caregiver: Record<string, unknown> | null;
+      CaregiverCertificates?: Array<{ file?: CertFile | null }> | null;
+    }>(deps, GET_CAREGIVER, { id }),
+    runGraphQL<{ CaregiverDeparturesWithPagination?: { has_more_pages: boolean; data: DepartureRow[] } | null }>(
+      deps, CAREGIVER_DEPARTURES, { id },
+    ).catch((e: Error) => {
+      console.warn(`[einsaetze] cg=${id}: ${e.message}`);
+      return e;
+    }),
+  ]);
   if (r.Caregiver) {
     r.Caregiver.certificates = referenceFilesOnly(r.CaregiverCertificates ?? []);
+    Object.assign(r.Caregiver, einsaetzeFelder(dep, session.customer_id));
   }
   // Return only Caregiver — frontend reads data.Caregiver; the sibling
   // CaregiverCertificates is now merged in.

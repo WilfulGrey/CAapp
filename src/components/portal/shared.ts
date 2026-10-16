@@ -131,6 +131,9 @@ export function nurseLevel(experienceYears: number, assignments: number): {
 export function badgeErklaerung(
   experienceYears: number,
   assignments: number,
+  /** Gerade bei einem anderen Kunden im Einsatz (Registry #126) — dann nicht
+   *  „Noch kein Einsatz über Primundus" behaupten, sondern das sagen. */
+  imEinsatz = false,
 ): string {
   const n = assignments;
   // Wortlaut von Martin (08.09.2026) — woertlich uebernommen, nicht
@@ -161,12 +164,20 @@ export function badgeErklaerung(
     case 'Berufserfahren':
       // Jahre sind Selbstauskunft (care_experience) — die Zahl steht dynamisch
       // hier, weil genau sie den Unterschied zu „Neu bei Primundus" macht.
+      if (imEinsatz) {
+        return `Derzeit im Einsatz bei einem anderen Kunden. Bereits ${jahre} Erfahrung in der `
+          + 'Betreuung. Wir prüfen und sprechen jede Betreuungskraft persönlich, bevor wir sie einer Familie vorstellen.';
+      }
       return `Noch kein Einsatz über Primundus, aber bereits ${jahre} Erfahrung in der `
         + 'Betreuung. Vor dem ersten Einsatz prüfen und sprechen wir jede Betreuungskraft persönlich.';
     default:
       // Kein Einsatz UND keine Jahre. Achtung: 0 Jahre heisst hier oft
       // „nicht angegeben", nicht „keine Erfahrung" — deshalb faellt hier
       // JEDE Aussage ueber ihre Erfahrung weg, statt sie zu verneinen.
+      if (imEinsatz) {
+        return 'Derzeit im Einsatz bei einem anderen Kunden. Die Betreuungskraft wurde von uns persönlich '
+          + 'kennengelernt und geprüft, bevor wir sie einer Familie vorstellen.';
+      }
       return 'Noch kein Einsatz über Primundus. Die Betreuungskraft wurde von uns persönlich '
         + 'kennengelernt und geprüft, bevor wir sie einer Familie vorstellen.';
   }

@@ -867,110 +867,54 @@ describe('mapMamamiaCustomerToPatientForm — Bug #13e Kein/e via care_level=nul
   });
 });
 
-// ─── hp_recent_assignments — patients_count + patient_mobility_id ────────────
+// ─── einsaetze (CaregiverDeparturesWithPagination, Registry #126) ────────────
 
-describe('mapCaregiverToNurse — hp_recent_assignments detail fields', () => {
+describe('mapCaregiverToNurse — einsaetze aus Departures', () => {
   const NOW = '2026-05-12T12:00:00.000Z';
-
-  function makeCgWithAssignments(
-    assignments: Array<{
-      arrival_date: string;
-      departure_date: string;
-      postal_code?: string;
-      city?: string;
-      status: string;
-      patients_count?: number | null;
-      patient_mobility_id?: number | null;
-    }>,
-  ) {
+  const r = (o: Record<string, unknown>) => ({
+    arrival_date: '2025-01-01 00:00:00', departure_date: '2025-02-01 00:00:00',
+    duration_days: 31, status: 'finish', zip_code: '10115', city: 'Berlin', ...o,
+  });
+  function cgMit(extra: Record<string, unknown>, hp = 7) {
     return {
-      ...makeCg({ hp_total_jobs: assignments.length }),
-      hobbies: [],
-      personalities: [],
-      mobilities: [],
-      languagables: [],
-      nationality: null,
-      hp_recent_assignments: assignments.map(a => ({
-        postal_code: '10115',
-        city: 'Berlin',
-        patients_count: null,
-        patient_mobility_id: null,
-        ...a,
-      })),
+      ...makeCg({ hp_total_jobs: hp }),
+      hobbies: [], personalities: [], mobilities: [], languagables: [], nationality: null,
+      ...extra,
     } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
   }
+  const map = (cg: unknown) => mapCaregiverToNurse(cg as any, { nowIso: NOW, nowYear: 2026 }); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-  it('uses patients_count from API (2 patients)', () => {
-    const cg = makeCgWithAssignments([{
-      arrival_date: '2025-01-01',
-      departure_date: '2025-02-01',
-      status: 'finish',
-      patients_count: 2,
-      patient_mobility_id: null,
-    }]);
-    const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
-    expect(n.detailedAssignments?.[0]?.patientCount).toBe(2);
+  it('zählt nur finish, neueste zuerst, höchstens 3, Datum deutsch', () => {
+    const n = map(cgMit({ einsaetze: [
+      r({ arrival_date: '2025-03-01 00:00:00', departure_date: '2025-04-01 00:00:00' }),
+      r({ status: 'on_job', arrival_date: '2026-05-01 00:00:00' }),
+      r({ status: 'accepted', arrival_date: '2026-07-01 00:00:00' }),
+      r({ arrival_date: '2024-01-01 00:00:00' }),
+      r({ arrival_date: '2025-06-01 00:00:00', departure_date: '2025-07-10 00:00:00', duration_days: 39 }),
+      r({ arrival_date: '2023-01-01 00:00:00' }),
+    ] }));
+    expect(n.history?.assignments).toBe(4); // nicht hp_total_jobs=7
+    expect(n.detailedAssignments?.map((a) => a.startDate)).toEqual(['01.06.2025', '01.03.2025', '01.01.2024']);
+    expect(n.detailedAssignments?.[0]).toMatchObject({ endDate: '10.07.2025', duration: '6 Wochen', postalCode: '10115', city: 'Berlin' });
   });
 
-  it('falls back to patientCount=1 when patients_count is null', () => {
-    const cg = makeCgWithAssignments([{
-      arrival_date: '2025-01-01',
-      departure_date: '2025-02-01',
-      status: 'finish',
-      patients_count: null,
-    }]);
-    const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
-    expect(n.detailedAssignments?.[0]?.patientCount).toBe(1);
+  it('nur laufender Einsatz woanders ⇒ keine Zahl, onOtherJob', () => {
+    const n = map(cgMit({ einsaetze: [r({ status: 'on_job' })], on_other_job: true }));
+    expect(n.history).toBeUndefined();
+    expect(n.detailedAssignments).toBeUndefined();
+    expect(n.onOtherJob).toBe(true);
   });
 
-  it('computes duration in Tagen for a short assignment', () => {
-    const cg = makeCgWithAssignments([{
-      arrival_date: '2025-01-01',
-      departure_date: '2025-01-10',
-      status: 'finish',
-    }]);
-    const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
-    expect(n.detailedAssignments?.[0]?.duration).toBe('9 Tage');
+  it('Abfrage gescheitert ⇒ Kartenzahl bleibt, Fehler sichtbar', () => {
+    const n = map(cgMit({ einsaetze_error: 'boom' }));
+    expect(n.history?.assignments).toBe(7);
+    expect(n.einsaetzeError).toBe('boom');
   });
 
-  it('uses singular "Tag" for a 1-day assignment', () => {
-    const cg = makeCgWithAssignments([{
-      arrival_date: '2025-01-01',
-      departure_date: '2025-01-02',
-      status: 'finish',
-    }]);
-    const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
-    expect(n.detailedAssignments?.[0]?.duration).toBe('1 Tag');
-  });
-
-  it('computes duration in Wochen for a mid-length assignment', () => {
-    const cg = makeCgWithAssignments([{
-      arrival_date: '2025-01-01',
-      departure_date: '2025-02-01',
-      status: 'finish',
-    }]);
-    const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
-    expect(n.detailedAssignments?.[0]?.duration).toBe('4 Wochen');
-  });
-
-  it('computes duration in Monaten for a long assignment', () => {
-    const cg = makeCgWithAssignments([{
-      arrival_date: '2025-01-01',
-      departure_date: '2025-04-01',
-      status: 'finish',
-    }]);
-    const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
-    expect(n.detailedAssignments?.[0]?.duration).toBe('3 Monate');
-  });
-
-  it('filters out non-finish assignments', () => {
-    const cg = makeCgWithAssignments([
-      { arrival_date: '2025-01-01', departure_date: '2025-02-01', status: 'rejected', patients_count: 1 },
-      { arrival_date: '2025-03-01', departure_date: '2025-04-01', status: 'finish', patients_count: 2 },
-    ]);
-    const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
-    expect(n.detailedAssignments?.length).toBe(1);
-    expect(n.detailedAssignments?.[0]?.patientCount).toBe(2);
+  it('Dauer aus duration_days (Tage/Wochen/Monate)', () => {
+    expect(map(cgMit({ einsaetze: [r({ duration_days: 1 })] })).detailedAssignments?.[0].duration).toBe('1 Tag');
+    expect(map(cgMit({ einsaetze: [r({ duration_days: 9 })] })).detailedAssignments?.[0].duration).toBe('9 Tage');
+    expect(map(cgMit({ einsaetze: [r({ duration_days: 91 })] })).detailedAssignments?.[0].duration).toBe('3 Monate');
   });
 });
 
