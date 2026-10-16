@@ -24,6 +24,7 @@ import type { Nurse } from '../../types';
 import type { SterneStand } from '../../lib/sterne';
 import { BewertungsZeile } from './BewertungsZeile';
 import { DeutschPunkte } from './PflegekraftProfil';
+import { useEinsatzStand } from '../../lib/mamamia/hooks';
 import { kurzDatum } from './SucheStand';
 import { displayName, initials } from './shared';
 import { Button } from '../ui/Button';
@@ -700,7 +701,8 @@ export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineV
  * Eine Zeile: dieselben Daten wie das Profil (PflegekraftProfil), fehlende Teile entfallen.
  * Keine Sterne: Wir haben keine Bewertungen je Pflegekraft.
  */
-export function PflegekraftZeile({ nurse, empfohlen, onClick, gross = false }: { nurse: Nurse; empfohlen: boolean; onClick: () => void; gross?: boolean }) {
+export function PflegekraftZeile({ nurse: ausListe, empfohlen, onClick, gross = false }: { nurse: Nurse; empfohlen: boolean; onClick: () => void; gross?: boolean }) {
+  const nurse = useEinsatzStand(ausListe);
   const name = displayName(nurse.name);
   const einsaetze = nurse.history?.assignments ?? 0;
   const jahre = nurse.experienceYears ?? 0;
