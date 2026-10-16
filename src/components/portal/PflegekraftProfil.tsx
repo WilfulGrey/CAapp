@@ -1,6 +1,7 @@
 import type { FC, KeyboardEvent, MouseEvent } from 'react';
 import type { Nurse } from '../../types';
 import { displayName, initials, nurseLevel } from './shared';
+import { useEinsatzStand } from '../../lib/mamamia/hooks';
 
 /**
  * Das Profil einer Pflegekraft als geschlossene Einheit — überall gleich: Bewerbung,
@@ -30,7 +31,8 @@ export const PflegekraftProfil: FC<{
   onProfil: () => void;
   /** Tipp auf die Stufe: Profil mit geöffneter Erklärung (sonst normales Profil). */
   onStufeClick?: () => void;
-}> = ({ nurse, onProfil, onStufeClick }) => {
+}> = ({ nurse: ausListe, onProfil, onStufeClick }) => {
+  const nurse = useEinsatzStand(ausListe);
   const name = displayName(nurse.name);
   const einsaetze = nurse.history?.assignments ?? 0;
   const jahre = nurse.experienceYears ?? 0;
@@ -42,7 +44,10 @@ export const PflegekraftProfil: FC<{
   const felder: { wert: string; label: string; stufe?: boolean }[] = [
     einsaetze > 0
       ? { wert: stufe, label: `${einsaetze} ${einsaetze === 1 ? 'Einsatz' : 'Einsätze'} bei uns`, stufe: true }
-      : { wert: 'Neu bei uns', label: 'erster Einsatz bei uns' },
+      // Gerade woanders im Einsatz (Registry #127): nicht „Neu bei uns" behaupten.
+      : nurse.onOtherJob
+        ? { wert: 'Im Einsatz', label: 'bei einem anderen Kunden' }
+        : { wert: 'Neu bei uns', label: 'erster Einsatz bei uns' },
   ];
   if (jahre > 0) felder.push({ wert: `${jahre} ${jahre === 1 ? 'Jahr' : 'Jahre'}`, label: 'Berufserfahrung' });
 

@@ -1052,7 +1052,9 @@ Równolegle osobna query `CaregiverDeparturesWithPagination(caregiver_id, limit 
 proxy dokleja do `Caregiver` pola `einsaetze[]` (BEZ `customer_id`) i
 `on_other_job` (`on_job` u klienta ≠ `session.customer_id`); błąd query lub
 `has_more_pages` ⇒ `einsaetze_error`, profil się ładuje. Modal liczy z tego
-„Letzte Einsätze", licznik i odznakę w profilu; karty/ranking/maile dalej
+„Letzte Einsätze", licznik i odznakę w profilu; karty (`PflegekraftProfil`,
+`PflegekraftZeile`) biorą to samo z cache przez `useEinsatzStand` (Registry #127,
+bez własnego zapytania); ranking, karty przed pierwszym zapisem i maile dalej
 `hp_total_jobs`. Backed
 przez frontend `caregiverCache` (TTL) — `prefetchCaregivers` woła ten endpoint
 dla wszystkich widocznych matchings od razu po onboardzie.
