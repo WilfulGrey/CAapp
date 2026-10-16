@@ -14,7 +14,7 @@ import {
 import { buildVertragAttachmentPdf, formatSignedAtBerlin } from '@/lib/vertrag';
 import { appendJobParam, PORTAL_BASIS } from '@/lib/portal-url';
 import { sendezeitIso } from '@/lib/quiet-hours';
-import { erinnerungsplan, reservierungsEnde } from '@/lib/erinnerungsplan';
+import { eingaengeDerBewerbung, erinnerungenSchonOffen, erinnerungsplan, reservierungsEnde } from '@/lib/erinnerungsplan';
 import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { createHash } from 'crypto';
 import { kundenEmpfaenger } from '@/lib/empfaenger';
@@ -601,9 +601,11 @@ async function resolveLeadJobUuid(
 // application_received → drei Erinnerungen vom Ende der Reservierung aus gerechnet
 // (lib/erinnerungsplan.ts, Vorschau v2 26.09.2026): Ende − 52 h, − 24 h, − 8 h, nie
 // nachts, die letzte sicher vor der automatischen Absage. Jede Zeile trägt
-// `reserviert_bis`, damit die Mail den Countdown nennt. Abbruch beim Versand
-// (Edge Function): Reaktion auf die Bewerbung, beauftragt / nicht interessiert,
-// Reservierung abgelaufen (stopRegeln.ts).
+// `reserviert_bis`, damit die Mail den Countdown nennt, und `application_id`
+// (Registry #126), damit Versand und Planung DIESE Bewerbung von einer früheren
+// derselben Pflegekraft unterscheiden. Abbruch beim Versand (Edge Function):
+// Reaktion auf die Bewerbung, beauftragt / nicht interessiert, Reservierung
+// abgelaufen (stopRegeln.ts).
 const REMINDER_DELAY_INTEREST_MIN = 60;
 
 async function scheduleReactionReminder(
@@ -619,6 +621,8 @@ async function scheduleReactionReminder(
   // Reichweite — der Griff danach traf die lokale Konstante unten und
   // damit sich selbst (ReferenceError zur Laufzeit, Build-Stopp).
   germanySkillRoh: unknown,
+  // Registry #126: mamamia application_id aus dem application_received-Ereignis.
+  applicationId: number | string | null = null,
 ): Promise<void> {
   // Pflegekraft-Snapshot für den Mail-Build beim Versand. Photo-URL ist
   // eine presigned S3-URL mit 30 Min Gültigkeit — beim 1h/4h/12h-Reminder
@@ -642,6 +646,8 @@ async function scheduleReactionReminder(
     // Multi-Job: which job this reminder belongs to (for future per-job
     // reminder handling; cancellation logic unchanged for now).
     mamamia_job_offer_id: jobOfferId,
+    // Registry #126: die Bewerbung, an die erinnert wird (nur application_received).
+    ...(triggerEvent === 'application_received' && applicationId != null ? { application_id: applicationId } : {}),
   };
 
   let zeilen: { emailType: string; scheduledFor: string; extra?: Record<string, unknown> }[];
@@ -649,18 +655,20 @@ async function scheduleReactionReminder(
     // Nachtruhe (Martin, 19.08.): zwischen 21:00 und 08:00 Berliner Zeit auf 8:00.
     zeilen = [{ emailType: 'interest_reminder', scheduledFor: sendezeitIso(new Date(Date.now() + REMINDER_DELAY_INTEREST_MIN * 60 * 1000)) }];
   } else {
-    // Ende der Reservierung wie Server und Portal: frühester echter Eingang des Paars.
-    const ende = await reservierungsEndeFuer(supabaseAdmin, leadId, caregiverId, jobOfferId);
-    // Schon geplant (dieselbe Bewerbung kam erneut an)? Dann nichts doppelt einplanen.
+    // Ende der Reservierung wie Server und Portal: frühester echter Eingang DIESER Bewerbung
+    // (ohne application_id: des Paars, wie bisher).
+    const ende = await reservierungsEndeFuer(supabaseAdmin, leadId, caregiverId, jobOfferId, applicationId);
+    // Schon geplant (dieselbe Bewerbung kam erneut an)? Dann nichts doppelt einplanen. Offene
+    // Zeilen einer FRÜHEREN Bewerbung derselben Kraft zählen nicht (Registry #126) — die neue
+    // Bewerbung bekommt ihre eigenen Erinnerungen.
     const { data: offen } = await supabaseAdmin
       .from('scheduled_emails')
-      .select('id')
+      .select('id, metadata')
       .eq('lead_id', leadId)
       .eq('status', 'pending')
       .like('email_type', 'application_erinnerung_%')
-      .filter('metadata->>caregiver_id', 'eq', String(caregiverId ?? ''))
-      .limit(1);
-    if (Array.isArray(offen) && offen.length > 0) return;
+      .filter('metadata->>caregiver_id', 'eq', String(caregiverId ?? ''));
+    if (erinnerungenSchonOffen((offen ?? []) as { metadata?: Record<string, unknown> | null }[], applicationId)) return;
     zeilen = erinnerungsplan(ende, new Date()).map((z) => ({
       emailType: z.emailType,
       scheduledFor: z.scheduledFor.toISOString(),
@@ -687,10 +695,12 @@ async function scheduleReactionReminder(
 }
 
 /** Ende der Reservierung einer Bewerbung: frühester echter (nicht `seeded`)
- *  application_received desselben Paars (Pflegekraft, Job) + 72 h, abgerundet.
- *  Jobfreie Ereignisse zählen mit (Altbestand, ein Job). Ohne Treffer: ab jetzt. */
+ *  application_received DIESER Bewerbung (Registry #126) + 72 h, abgerundet. Ohne
+ *  application_id wie bisher des Paars (Pflegekraft, Job); jobfreie Ereignisse zählen
+ *  mit (Altbestand, ein Job). Ohne Treffer: ab jetzt. */
 async function reservierungsEndeFuer(
   supabaseAdmin: any, leadId: string, caregiverId: number | string | undefined, jobOfferId: number | null,
+  applicationId: number | string | null = null,
 ): Promise<Date> {
   try {
     const { data } = await supabaseAdmin
@@ -699,14 +709,10 @@ async function reservierungsEndeFuer(
       .eq('lead_id', leadId)
       .eq('event_type', 'application_received')
       .filter('metadata->>caregiver_id', 'eq', String(caregiverId ?? ''));
-    const anker = ((data ?? []) as { created_at: string; metadata?: Record<string, unknown> | null }[])
-      .filter((e) => {
-        const m = e.metadata ?? {};
-        if (m.seeded === true) return false;
-        const job = m.mamamia_job_offer_id;
-        return jobOfferId == null || job == null || Number(job) === jobOfferId;
-      })
-      .map((e) => Date.parse(e.created_at));
+    const anker = eingaengeDerBewerbung(
+      (data ?? []) as { created_at: string; metadata?: Record<string, unknown> | null }[],
+      { jobOfferId, applicationId },
+    );
     const ende = reservierungsEnde(anker);
     if (ende) return ende;
   } catch (e) {
@@ -717,21 +723,29 @@ async function reservierungsEndeFuer(
 
 /** „Reservierung abgelaufen" nach der automatischen Absage (Vorschau v2, Mail 16). Der Name
  *  kommt aus dem letzten Eingang dieser Bewerbung — detect-caregiver-events schickt ihn nicht
- *  mit. Pro Lead, Pflegekraft und Job nur einmal. Mehrere am selben Tag fasst die Edge
- *  Function beim Versand zu einer Mail zusammen. */
+ *  mit. Pro Bewerbung nur einmal (Registry #126: eine neue Bewerbung derselben Kraft auf
+ *  demselben Job, die wieder abläuft, bekommt wieder eine Mail); ohne application_id wie
+ *  bisher pro Lead, Pflegekraft und Job. Mehrere am selben Tag fasst die Edge Function beim
+ *  Versand zu einer Mail zusammen. */
 async function planeReservierungBeendet(
   supabaseAdmin: any, lead: { id: string; email?: string | null }, caregiverId: unknown, jobOfferId: number | null,
+  applicationId: unknown = null,
 ): Promise<void> {
   if (caregiverId == null || !lead.email) return;
   const cg = String(caregiverId);
+  const app = applicationId == null ? '' : String(applicationId);
   const { data: vorhanden } = await supabaseAdmin
     .from('scheduled_emails')
     .select('id, metadata')
     .eq('lead_id', lead.id)
     .eq('email_type', 'reservierung_beendet')
     .filter('metadata->>caregiver_id', 'eq', cg);
+  // Zeilen ohne application_id stammen von vor #126, also von einer anderen (früheren)
+  // Absage — detect sagt jede Bewerbung nur einmal ab.
   const doppelt = ((vorhanden ?? []) as { metadata?: Record<string, unknown> | null }[])
-    .some((z) => (z.metadata?.mamamia_job_offer_id ?? null) == jobOfferId);
+    .some((z) => app
+      ? String(z.metadata?.application_id ?? '') === app
+      : (z.metadata?.mamamia_job_offer_id ?? null) == jobOfferId);
   if (doppelt) return;
   const { data: eingang } = await supabaseAdmin
     .from('lead_events')
@@ -752,7 +766,10 @@ async function planeReservierungBeendet(
     recipient_email: lead.email,
     scheduled_for: sendezeitIso(new Date()),
     status: 'pending',
-    metadata: { caregiver_id: caregiverId, caregiver_name: name, mamamia_job_offer_id: jobOfferId },
+    metadata: {
+      caregiver_id: caregiverId, caregiver_name: name, mamamia_job_offer_id: jobOfferId,
+      ...(app ? { application_id: applicationId } : {}),
+    },
   });
 }
 
@@ -1415,7 +1432,10 @@ async function handlePost(request: NextRequest) {
       metadata && typeof metadata === 'object' && (metadata as Record<string, unknown>).reason === 'auto_timeout_72h'
     ) {
       try {
-        await planeReservierungBeendet(supabase, lead as any, (metadata as Record<string, unknown>).caregiver_id, mamamiaJobOfferId);
+        await planeReservierungBeendet(
+          supabase, lead as any, (metadata as Record<string, unknown>).caregiver_id, mamamiaJobOfferId,
+          (metadata as Record<string, unknown>).application_id ?? null,
+        );
       } catch (e) {
         console.error('reservierung_beendet schedule failed:', e instanceof Error ? e.message : String(e));
       }
@@ -1581,6 +1601,9 @@ async function handlePost(request: NextRequest) {
                   mamamiaJobOfferId,
                   metadata && typeof metadata === 'object'
                     ? (metadata as Record<string, unknown>).caregiver_germany_skill ?? null
+                    : null,
+                  metadata && typeof metadata === 'object'
+                    ? ((metadata as Record<string, unknown>).application_id as number | string | null | undefined) ?? null
                     : null,
                 );
               }

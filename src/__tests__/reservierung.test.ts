@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { reserviertBis, reserviertBisText, RESERVIERUNG_STUNDEN } from '../lib/reservierung';
+import { JE_BEWERBUNG_AB, reserviertBis, reserviertBisText, RESERVIERUNG_STUNDEN } from '../lib/reservierung';
 
 const ev = (event_type: string, created_at: string, metadata: Record<string, unknown>) =>
   ({ id: Math.random().toString(36), event_type, created_at, metadata });
@@ -45,6 +45,54 @@ describe('reserviertBis', () => {
   });
 });
 
+// Registry #126: je Bewerbung. PROD-Verlauf Kundin 52dc3e9d, Pflegekraft 15184, Job 38118
+// (Standard-Job des Leads 35699; die Portal-Absage trägt die application_id als Text, keinen Job).
+describe('reserviertBis je Bewerbung', () => {
+  const FALL = [
+    ev('application_received', '2026-10-14T14:17:00.779Z', { caregiver_id: 15184, application_id: 14728, mamamia_job_offer_id: 38118 }),
+    ev('application_rejected', '2026-10-14T14:33:37.332Z', { caregiver_id: 15184, application_id: '14728' }),
+    ev('application_received', '2026-10-15T09:18:15.916Z', { caregiver_id: 15184, application_id: 14746, mamamia_job_offer_id: 38118 }),
+  ];
+  const paar = { caregiverId: 15184, jobOfferId: 38118, standardJobId: 35699 };
+  const JETZT_16 = Date.parse('2026-10-16T10:00:00Z');
+
+  it('neue Bewerbung nach Absage: Frist ab IHREM Eingang (18.10. 09:00), nicht ab dem alten', () => {
+    expect(reserviertBis(FALL, { ...paar, applicationId: '14746' }, JETZT_16)?.toISOString()).toBe('2026-10-18T09:00:00.000Z');
+    // vorher (je Paar): Frist ab dem alten Eingang — 17.10. 14:00, 19 h zu früh
+    expect(reserviertBis(FALL, paar, JETZT_16)?.toISOString()).toBe('2026-10-17T14:00:00.000Z');
+  });
+
+  it('die abgesagte Bewerbung selbst hat keine Frist mehr', () => {
+    expect(reserviertBis(FALL, { ...paar, applicationId: '14728' }, Date.parse('2026-10-14T15:00:00Z'))).toBeNull();
+  });
+
+  it('Reaktion auf die neue Bewerbung (gleiche id, oder vom Paar und danach) beendet die Frist', () => {
+    const absage = ev('application_rejected', '2026-10-16T08:00:00Z', { caregiver_id: 15184, application_id: '14746' });
+    expect(reserviertBis([...FALL, absage], { ...paar, applicationId: '14746' }, JETZT_16)).toBeNull();
+    const annahme = ev('application_accepted_internal', '2026-10-16T08:00:00Z', { caregiver_id: 15184, mamamia_job_offer_id: 38118 });
+    expect(reserviertBis([...FALL, annahme], { ...paar, applicationId: '14746' }, JETZT_16)).toBeNull();
+    // Annahme ohne id auf einem ANDEREN Job zählt nicht (wie der Server)
+    const fremd = ev('application_accepted_internal', '2026-10-16T08:00:00Z', { caregiver_id: 15184, mamamia_job_offer_id: 38673 });
+    expect(reserviertBis([...FALL, fremd], { ...paar, applicationId: '14746' }, JETZT_16)?.toISOString()).toBe('2026-10-18T09:00:00.000Z');
+  });
+
+  it('Übergang: Eingang vor JE_BEWERBUNG_AB rechnet wie der Server je Paar (frühere Reaktion schützt)', () => {
+    const alt = [
+      ev('application_received', '2026-09-07T14:02:37Z', { caregiver_id: 35313, application_id: 12731, mamamia_job_offer_id: 36132 }),
+      ev('application_rejected', '2026-09-08T10:00:00Z', { caregiver_id: 35313, application_id: '12731', mamamia_job_offer_id: 36132 }),
+      ev('application_received', '2026-10-12T12:17:25Z', { caregiver_id: 35313, application_id: 13060, mamamia_job_offer_id: 36132 }),
+    ];
+    expect(Date.parse('2026-10-12T12:17:25Z')).toBeLessThan(Date.parse(JE_BEWERBUNG_AB));
+    expect(reserviertBis(alt, { caregiverId: 35313, jobOfferId: 36132, applicationId: '13060' }, Date.parse('2026-10-13T10:00:00Z'))).toBeNull();
+  });
+
+  it('Bewerbung ohne eigenen Eingang: nur Eingänge des Paars ohne application_id zählen (nie raten)', () => {
+    expect(reserviertBis(FALL, { ...paar, applicationId: '15000' }, JETZT_16)).toBeNull();
+    const alt = [ev('application_received', '2026-10-15T09:00:00Z', { caregiver_id: 15184, mamamia_job_offer_id: 38118 })];
+    expect(reserviertBis(alt, { ...paar, applicationId: '15000' }, JETZT_16)?.toISOString()).toBe('2026-10-18T09:00:00.000Z');
+  });
+});
+
 describe('reserviertBisText', () => {
   it('schreibt Wochentag, Datum und Uhrzeit in Berliner Zeit', () => {
     // 14:00 UTC = 16:00 MESZ
@@ -59,6 +107,13 @@ describe('Reservierung = Auto-Absage des Servers', () => {
     const quelle = fs.readFileSync('supabase/functions/detect-caregiver-events/index.ts', 'utf8');
     const m = quelle.match(/AUTO_REJECT_AFTER_HOURS\s*=\s*(\d+)/);
     expect(m && Number(m[1])).toBe(RESERVIERUNG_STUNDEN);
+  });
+
+  it('JE_BEWERBUNG_AB passt zum Übergang in detect-caregiver-events (Registry #126)', async () => {
+    const fs = await import('node:fs');
+    const quelle = fs.readFileSync('supabase/functions/detect-caregiver-events/index.ts', 'utf8');
+    const m = quelle.match(/JE_BEWERBUNG_AB\s*=\s*"([^"]+)"/);
+    expect(m && m[1]).toBe(JE_BEWERBUNG_AB);
   });
 });
 

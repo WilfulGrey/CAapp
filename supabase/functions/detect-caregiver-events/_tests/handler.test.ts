@@ -1,4 +1,4 @@
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import {
   type AppStatusEventRow,
   buildCaregiverMetadata,
@@ -9,6 +9,7 @@ import {
   type DetectSupabase,
   type EventRow,
   handleRequest,
+  JE_BEWERBUNG_AB,
   type LeadRow,
   mapHpToBadge,
 } from "../index.ts";
@@ -1490,4 +1491,96 @@ Deno.test("multi-job: auto-reject is per-job; a seeded-only anchor is never reje
   } finally {
     Deno.env.delete("AUTO_REJECT_ENABLED");
   }
+});
+
+// ── Registry #126: Auto-Absage je Bewerbung ──────────────────────────────────
+// Nachbau Kundin 52dc3e9d: dieselbe Pflegekraft bewirbt sich nach einer Absage NEU
+// auf denselben (Folge-)Job. Die Portal-Absage trägt die application_id als Text und
+// KEINEN Job — sie fällt auf den Standard-Job des Leads, nicht auf das Paar.
+const neuNachAbsage = (alterNeuH: number): { status: AppStatusEventRow[]; past: EventRow[] } => ({
+  status: [
+    { event_type: "application_received", caregiver_id: 50001, created_at: hoursAgo(alterNeuH + 19), mamamia_job_offer_id: JOB_B, application_id: 777 },
+    { event_type: "application_rejected", caregiver_id: 50001, created_at: hoursAgo(alterNeuH + 18), application_id: 777 },
+    { event_type: "application_received", caregiver_id: 50001, created_at: hoursAgo(alterNeuH), mamamia_job_offer_id: JOB_B, application_id: 778 },
+  ],
+  past: [
+    { event_type: "application_received", caregiver_id: 50001, mamamia_job_offer_id: JOB_B, application_id: 777 },
+    { event_type: "application_received", caregiver_id: 50001, mamamia_job_offer_id: JOB_B, application_id: 778 },
+  ],
+});
+
+async function autoRejectLauf(status: AppStatusEventRow[], past: EventRow[], apps: ReturnType<typeof appOn>[]) {
+  resetCaches();
+  const rejectRecorder: number[] = [];
+  Deno.env.set("AUTO_REJECT_ENABLED", "true");
+  try {
+    const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+      secrets: SECRETS,
+      supabase: makeSupabase(VALID_LEAD, past, status),
+      fetchFn: makeFetch({ jobOffers: [searchJob(JOB_B)], appsByJob: { [JOB_B]: apps }, rejectRecorder }),
+    });
+    const body = await res.json();
+    return { auto_rejected: body.auto_rejected as number, rejectRecorder };
+  } finally {
+    Deno.env.delete("AUTO_REJECT_ENABLED");
+  }
+}
+
+Deno.test("auto-reject je Bewerbung (#126): neue Bewerbung nach Absage zählt ab IHREM Eingang, nicht ab dem alten", async () => {
+  // Neue Bewerbung 778 ist 60 h alt, die alte 777 kam vor 79 h. Je Paar wäre 778 jetzt fällig.
+  const { status, past } = neuNachAbsage(60);
+  const r = await autoRejectLauf(status, past, [appOn(778, 50001)]);
+  assertEquals(r.auto_rejected, 0);
+  assertEquals(r.rejectRecorder, []);
+});
+
+Deno.test("auto-reject je Bewerbung (#126): nach 72 h ab ihrem Eingang wird die neue Bewerbung abgesagt — die alte Absage schützt sie nicht", async () => {
+  const { status, past } = neuNachAbsage(73);
+  const r = await autoRejectLauf(status, past, [appOn(778, 50001)]);
+  assertEquals(r.auto_rejected, 1);
+  assertEquals(r.rejectRecorder, [778]);
+});
+
+Deno.test("auto-reject je Bewerbung (#126): Reaktion auf DIESE Bewerbung (gleiche id als Text, ohne Job) → nicht abgelehnt", async () => {
+  const { status, past } = neuNachAbsage(73);
+  status.push({ event_type: "application_rejected", caregiver_id: 50001, created_at: hoursAgo(1), application_id: 778 });
+  const r = await autoRejectLauf(status, past, [appOn(778, 50001)]);
+  assertEquals(r.auto_rejected, 0);
+});
+
+Deno.test("auto-reject je Bewerbung (#126): Annahme ohne id auf dem Paar NACH dem Eingang → nicht abgelehnt; davor → abgelehnt", async () => {
+  const nachher = neuNachAbsage(73);
+  nachher.status.push({ event_type: "application_accepted_internal", caregiver_id: 50001, created_at: hoursAgo(2), mamamia_job_offer_id: JOB_B });
+  assertEquals((await autoRejectLauf(nachher.status, nachher.past, [appOn(778, 50001)])).auto_rejected, 0);
+  const vorher = neuNachAbsage(73);
+  vorher.status.push({ event_type: "application_accepted_internal", caregiver_id: 50001, created_at: hoursAgo(80), mamamia_job_offer_id: JOB_B });
+  assertEquals((await autoRejectLauf(vorher.status, vorher.past, [appOn(778, 50001)])).auto_rejected, 1);
+});
+
+Deno.test("auto-reject je Bewerbung (#126): Bewerbung ohne eigenen Eingang erbt keinen fremden Anker (Guard 1)", async () => {
+  // 779 wurde dem Kunden noch nicht gemeldet (z. B. Mail-Deckel); das Paar hat nur den Eingang von 777.
+  const status: AppStatusEventRow[] = [
+    { event_type: "application_received", caregiver_id: 50001, created_at: hoursAgo(90), mamamia_job_offer_id: JOB_B, application_id: 777 },
+  ];
+  const past: EventRow[] = [{ event_type: "application_received", caregiver_id: 50001, mamamia_job_offer_id: JOB_B, application_id: 777 }];
+  const r = await autoRejectLauf(status, past, [appOn(779, 50001)]);
+  assertEquals(r.rejectRecorder, []);
+});
+
+Deno.test("auto-reject je Bewerbung (#126): Übergang — Eingang vor JE_BEWERBUNG_AB behält die alte Regel je Paar (keine Absage-Welle)", async () => {
+  // Wie PROD e94d428b/fa62c164: frühere Reaktion auf das Paar, neue Bewerbung im September,
+  // seitdem keine Reaktion. Je Bewerbung wäre sie längst fällig — sie bleibt verschont.
+  const status: AppStatusEventRow[] = [
+    { event_type: "application_received", caregiver_id: 50001, created_at: "2026-09-07T14:02:37Z", mamamia_job_offer_id: JOB_B, application_id: 777 },
+    { event_type: "application_rejected", caregiver_id: 50001, created_at: "2026-09-08T10:00:00Z", mamamia_job_offer_id: JOB_B, application_id: 777 },
+    { event_type: "application_received", caregiver_id: 50001, created_at: "2026-09-14T12:17:25Z", mamamia_job_offer_id: JOB_B, application_id: 778 },
+  ];
+  const past: EventRow[] = [
+    { event_type: "application_received", caregiver_id: 50001, mamamia_job_offer_id: JOB_B, application_id: 777 },
+    { event_type: "application_received", caregiver_id: 50001, mamamia_job_offer_id: JOB_B, application_id: 778 },
+  ];
+  assert(Date.parse(status[2].created_at) < Date.parse(JE_BEWERBUNG_AB));
+  const r = await autoRejectLauf(status, past, [appOn(778, 50001)]);
+  assertEquals(r.auto_rejected, 0);
+  assertEquals(r.rejectRecorder, []);
 });
