@@ -2604,7 +2604,9 @@ Deno.serve(async (req: Request) => {
             // selbst nach. Keine Antwort ⇒ Zeile zehn Minuten später noch einmal (höchstens
             // dreimal), danach wie bisher senden — „nicht gefragt" ist nie „weg" (Registry #89).
             const standDeps = standDepsAusEnv();
-            const standJob = meta.mamamia_job_offer_id ?? ((lead as any).mamamia_job_offer_id ?? null);
+            // Nur mit dem Job der Zeile prüfen. Ein Rückfall auf den Standard-Job des Leads würde bei
+            // Mehr-Job-Kunden die falsche Liste lesen und eine Bewerbung fälschlich als „weg" melden.
+            const standJob = meta.mamamia_job_offer_id ?? null;
             if (!standDeps) {
               console.warn(`[erinnerung] Lead ${scheduledEmail.lead_id}: MAMAMIA_*-Secrets fehlen — Bewerbung nicht gegen mamamia geprüft`);
             } else if (standJob != null) {
