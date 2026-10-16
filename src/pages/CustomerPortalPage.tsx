@@ -305,8 +305,8 @@ const PREVIEW_INTEREST_PROFILE = {
 };
 
 const PREVIEW_INTEREST_ASSIGNMENTS = [
-  { startDate: '10.01.2026', endDate: '20.03.2026', postalCode: '80331', city: 'München', patientCount: 1, duration: '10 Wochen' },
-  { startDate: '01.09.2025', endDate: '15.11.2025', postalCode: '50667', city: 'Köln', patientCount: 1, duration: '10 Wochen' },
+  { startDate: '10.01.2026', endDate: '20.03.2026', postalCode: '80331', city: 'München', duration: '10 Wochen' },
+  { startDate: '01.09.2025', endDate: '15.11.2025', postalCode: '50667', city: 'Köln', duration: '10 Wochen' },
 ];
 
 const PREVIEW_INTEREST = {

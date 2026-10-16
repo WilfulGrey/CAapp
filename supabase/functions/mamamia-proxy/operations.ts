@@ -347,13 +347,6 @@ export const GET_CAREGIVER = /* GraphQL */ `
       avatar { aws_url }
       avatar_retouched_promo { aws_url }
       avatar_retouched { aws_url }
-      hp_recent_assignments(limit: 5) {
-        arrival_date
-        departure_date
-        postal_code
-        city
-        status
-      }
     }
     # Reference/certificate uploads. NB: the Caregiver.certificates RELATION
     # 500s the Mamamia backend ("Internal server error") — verified live on
@@ -366,6 +359,20 @@ export const GET_CAREGIVER = /* GraphQL */ `
       description
       valid_from
       file { original_name aws_url created_at mime_type }
+    }
+  }
+`;
+
+// Einsätze der Pflegekraft (Registry #126): alle Missionen — HP, mamamia aller
+// Agenturen (fremde ohne customer_id) und web_mission —, status accepted |
+// on_job | finish aus den Daten. Ersetzt `hp_recent_assignments` (kannte keine
+// mamamia-Missionen). Eigene Abfrage, damit ein Fehler hier das Profil nicht
+// mitreisst. Gleiche Quelle wie das SA-Portal (Sadash CaregiverController).
+export const CAREGIVER_DEPARTURES = /* GraphQL */ `
+  query CaregiverDepartures($id: Int!) {
+    CaregiverDeparturesWithPagination(caregiver_id: $id, limit: 200, page: 1) {
+      has_more_pages
+      data { customer_id arrival_date departure_date duration_days status zip_code city }
     }
   }
 `;

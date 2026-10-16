@@ -36,3 +36,25 @@ describe('CustomerNurseModal – Aktionen', () => {
     expect(screen.queryByRole('button', { name: /Einladen/ })).toBeNull();
   });
 });
+
+// Registry #126: Pflegekraft gerade woanders im Einsatz — nicht „Noch kein
+// Einsatz über Primundus", sondern der Hinweis wie im SA-Portal.
+describe('CustomerNurseModal – Letzte Einsätze', () => {
+  it('gerade woanders im Einsatz, ohne abgeschlossene: Hinweis statt „Noch kein Einsatz"', () => {
+    render(<CustomerNurseModal nurse={{ ...nurse, onOtherJob: true }} onClose={() => {}} />);
+    expect(screen.getByText('Letzte Einsätze')).toBeInTheDocument();
+    expect(screen.getByText('Derzeit im Einsatz bei einem anderen Kunden.')).toBeInTheDocument();
+    expect(screen.queryByText(/Noch kein Einsatz über Primundus/)).toBeNull();
+  });
+
+  it('ohne Einsätze und nicht im Einsatz: kein Abschnitt, Erklärung wie bisher', () => {
+    render(<CustomerNurseModal nurse={nurse} onClose={() => {}} />);
+    expect(screen.queryByText('Letzte Einsätze')).toBeNull();
+    expect(screen.getByText(/Noch kein Einsatz über Primundus/)).toBeInTheDocument();
+  });
+
+  it('Abfrage gescheitert: sichtbarer Hinweis', () => {
+    render(<CustomerNurseModal nurse={{ ...nurse, einsaetzeError: 'boom' }} onClose={() => {}} />);
+    expect(screen.getByText('Die Einsätze können wir gerade nicht abrufen.')).toBeInTheDocument();
+  });
+});

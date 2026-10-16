@@ -1046,7 +1046,14 @@ do seedowania statusu `'invited'` po F5 / pierwszym wejściu.
 
 #### `getCaregiver`
 GraphQL: `Caregiver(id: $id)` z pełnym setem pól (nationality, hobbies,
-personalities, mobilities, languagables, recent_assignments, avatar). Backed
+personalities, mobilities, languagables, avatar) + `CaregiverCertificates`.
+Równolegle osobna query `CaregiverDeparturesWithPagination(caregiver_id, limit 200)`
+(Registry #126 — HP + MM wszystkich agencji, status `accepted|on_job|finish`):
+proxy dokleja do `Caregiver` pola `einsaetze[]` (BEZ `customer_id`) i
+`on_other_job` (`on_job` u klienta ≠ `session.customer_id`); błąd query lub
+`has_more_pages` ⇒ `einsaetze_error`, profil się ładuje. Modal liczy z tego
+„Letzte Einsätze", licznik i odznakę w profilu; karty/ranking/maile dalej
+`hp_total_jobs`. Backed
 przez frontend `caregiverCache` (TTL) — `prefetchCaregivers` woła ten endpoint
 dla wszystkich widocznych matchings od razu po onboardzie.
 
