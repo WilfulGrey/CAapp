@@ -1399,6 +1399,8 @@ const CustomerPortalPage: FC = () => {
     caregiverId: app.nurse.caregiverId,
     jobOfferId: mmJobOffer?.id,
     standardJobId: lead?.mamamia_job_offer_id ?? null,
+    // Registry #126: Frist je Bewerbung (app.id = mamamia application_id).
+    applicationId: app.id,
   });
   const reservierungFuer = (app: Application): Date | null => {
     // Vermittler-Leads sagt der Server nie automatisch ab (detect-caregiver-events).

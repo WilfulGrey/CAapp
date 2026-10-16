@@ -67,8 +67,8 @@ application_accepted      → Mail C „Buchung bestätigt"
 Anreise in mamamia        → „Anreisedaten Ihrer Pflegekraft" (bei Änderung von Datum,
                              Uhrzeit oder Verkehrsmittel noch einmal als „Geänderte …")
 ```
-Ende der Reservierung = frühester echter Eingang + 72 h, abgerundet (wie Portal und
-Server). Die Anreise-Mail (Registry #119, Vorlage `20-anreise`) kommt aus
+Ende der Reservierung = frühester echter Eingang DIESER Bewerbung + 72 h, abgerundet (wie
+Portal und Server; je Bewerbung seit Registry #126). Die Anreise-Mail (Registry #119, Vorlage `20-anreise`) kommt aus
 `detect-caregiver-events` (Modus `anreise`, eigener Cron): erst wenn die Agentur Datum,
 Uhrzeit und Verkehrsmittel eingetragen hat und der Eintrag 10 Minuten unverändert ist.
 Sie geht auch an abgemeldete Kunden (gebuchte Leistung, wie Mail C), nie an Vermittler.
@@ -79,6 +79,12 @@ Vor jeder Bewerbungs-Erinnerung fragt der Versand bei mamamia nach, ob die Bewer
 steht (Registry #125): weg ⇒ Zeile abgebrochen (`application_no_longer_active`, `quelle:
 versand`); keine Antwort ⇒ zehn Minuten später noch einmal, höchstens dreimal, danach wie
 bisher senden. Der Detect-Sweep (alle 15 Min., Registry #124) bleibt als zweites Netz.
+Alles davon gilt je Bewerbung (Registry #126): Jede Erinnerungs-Zeile trägt die
+`application_id`; eine Zu- oder Absage zählt nur mit derselben `application_id` oder wenn
+sie nach dem Eingang dieser Bewerbung liegt. Bewirbt sich dieselbe Pflegekraft nach einer
+Absage neu, bekommt die neue Bewerbung eigene Erinnerungen, und „Reservierung abgelaufen“
+kommt je Bewerbung. Zeilen ohne `application_id` (geplant vor #126) laufen nach der alten
+Regel je Pflegekraft.
 
 ## So arbeiten wir (kein Chaos)
 

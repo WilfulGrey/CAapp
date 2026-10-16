@@ -16,7 +16,11 @@
 // Entscheidung: „aktiv“ = die Pflegekraft steht mit irgendeiner Bewerbung in der Liste des
 // Jobs (eine erneut eingestellte Bewerbung derselben Kraft zählt — die Erinnerung meint sie
 // weiter). „weg“ = keine Bewerbung dieser Kraft mehr ⇒ Erinnerung abbrechen, Grund
-// `application_no_longer_active` wie beim Sweep. Fehler (Timeout, HTTP, GraphQL) werfen —
+// `application_no_longer_active` wie beim Sweep.
+// Seit Registry #126 tragen neue Zeilen ihre `application_id`, und eine neue Bewerbung derselben
+// Kraft bekommt eigene Erinnerungen. Für solche Zeilen zählt deshalb nur DIESE Bewerbung — sonst
+// liefen die Erinnerungen der alten (mit ihrem alten Countdown) neben denen der neuen weiter.
+// Zeilen ohne `application_id` behalten die Regel je Pflegekraft. Fehler (Timeout, HTTP, GraphQL) werfen —
 // „nicht gefragt“ ist nie „weg“ (Lehre Registry #89); der Aufrufer verschiebt die Zeile.
 import { sendezeitIso } from "./quietHours.ts";
 
@@ -38,9 +42,18 @@ export interface BewerbungZeile {
   caregiver_id?: number | string | null;
 }
 
-/** Pure: steht die Pflegekraft noch mit einer Bewerbung in der Liste? */
-export function standAus(zeilen: BewerbungZeile[], caregiverId: number | string): BewerbungStand {
+/** Pure: steht die Bewerbung noch in der Liste? Mit `applicationId` genau diese (Registry #126),
+ *  ohne irgendeine Bewerbung der Pflegekraft (Zeilen von vor #126). */
+export function standAus(
+  zeilen: BewerbungZeile[], caregiverId: number | string, applicationId: number | string | null = null,
+): BewerbungStand {
   const cg = String(caregiverId);
+  const app = applicationId == null ? "" : String(applicationId);
+  if (app) {
+    return zeilen.some((z) => z.id != null && String(z.id) === app && (z.caregiver_id == null || String(z.caregiver_id) === cg))
+      ? "aktiv"
+      : "weg";
+  }
   return zeilen.some((z) => z.caregiver_id != null && String(z.caregiver_id) === cg) ? "aktiv" : "weg";
 }
 
@@ -127,11 +140,12 @@ async function agenturToken(deps: StandDeps, f: typeof fetch, timeoutMs: number)
 }
 
 /**
- * Fragt mamamia, ob die Pflegekraft auf dem Job noch eine Bewerbung hat.
+ * Fragt mamamia, ob die Bewerbung (bzw. ohne `applicationId` irgendeine Bewerbung der
+ * Pflegekraft) auf dem Job noch steht.
  * Wirft bei jedem Fehler — der Aufrufer entscheidet (verschieben, nicht abbrechen).
  */
 export async function bewerbungStand(
-  deps: StandDeps, jobOfferId: number, caregiverId: number | string,
+  deps: StandDeps, jobOfferId: number, caregiverId: number | string, applicationId: number | string | null = null,
 ): Promise<BewerbungStand> {
   const f = deps.fetchFn ?? fetch;
   const timeoutMs = deps.timeoutMs ?? 12_000;
@@ -155,5 +169,5 @@ export async function bewerbungStand(
     zeilen.push(...data);
     if (data.length < SEITE) break;
   }
-  return standAus(zeilen, caregiverId);
+  return standAus(zeilen, caregiverId, applicationId);
 }
