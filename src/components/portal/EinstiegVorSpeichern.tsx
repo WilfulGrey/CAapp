@@ -41,6 +41,11 @@ import { FaqListe } from './FaqListe';
 import { MartaBox } from './MartaBox';
 import { AngebotPerson, AngebotSterne } from './KompaktEinstieg';
 
+// Nur opt-in-Vorschau (?usp=pflegekraefte). Standard-Ansicht bleibt exakt wie
+// vor dem Test, insbesondere der Funnel-Rückbau aus Registry #122.
+const USP_VORSCHAU = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('usp') === 'pflegekraefte';
+
 // ── Kopf (wie heute im Kompakt-Einstieg, Martin 10.10.2026) ──────────────────────────────────────────────────────────────
 // Dieselben Bausteine wie der Kopf des Kompakt-Einstiegs in CustomerPortalPage (Look „angebot“): Initialen-Kreis mit
 // „Guten Tag, …“ und „Ihr persönlicher Bereich“ (AngebotPerson), Titel „Ihr Angebot zur 24-Stunden-Betreuung“ (Klassen wie
@@ -57,9 +62,16 @@ export function KopfVorSpeichern({ anrede, kuerzel, sterne }: {
       <AngebotPerson name={anrede} kuerzel={kuerzel} />
       {/* „24-Stunden-Betreuung“ bricht nicht um (sonst „24-“ allein am Zeilenende). */}
       <h1 className="mt-6 text-[28px] min-[376px]:text-[31px] font-extrabold leading-[1.1] tracking-[-0.035em] text-pm-ink">
-        Ihr Angebot zur <span className="whitespace-nowrap">24-Stunden-Betreuung</span>
+        {USP_VORSCHAU
+          ? <>Passende Pflegekräfte für Ihre Familie</>
+          : <>Ihr Angebot zur <span className="whitespace-nowrap">24-Stunden-Betreuung</span></>}
       </h1>
       <AngebotSterne sterne={sterne} />
+      {USP_VORSCHAU && (
+        <p className="mt-2 text-[14px] font-semibold leading-[1.45] text-pm-taupe-ink">
+          6× Testsieger bei DIE WELT · Mit Bestpreisgarantie
+        </p>
+      )}
     </div>
   );
 }
@@ -84,12 +96,19 @@ export function KostenkarteVorSpeichern({ lead, onBestpreis, heimEigenanteil, he
   const offerExpanded = offerExpandedManual ?? true;
   const brutto = lead?.kalkulation?.bruttopreis ?? 3050;
   const tagessatz = Math.round(brutto / 30);
-  const items = [
-    { text: 'Täglich kündbar' },
-    { text: 'Tagesgenaue Abrechnung' },
-    { text: 'Erst auswählen, dann buchen' },
-    { text: 'Keine Vermittlungsgebühr' },
-  ];
+  const items = USP_VORSCHAU
+    ? [
+        { text: 'Täglich kündbar und taggenau abgerechnet' },
+        { text: 'Direktanbieter – keine Vermittlungsgebühr' },
+        { text: 'Anreise schon ab 3 Tagen möglich' },
+        { text: 'Erst auswählen, dann entscheiden' },
+      ]
+    : [
+        { text: 'Täglich kündbar' },
+        { text: 'Tagesgenaue Abrechnung' },
+        { text: 'Erst auswählen, dann buchen' },
+        { text: 'Keine Vermittlungsgebühr' },
+      ];
   // Heimvergleich: Eigenanteil aus dem ANGEZEIGTEN Brutto minus Posten mit `in_kalkulation`. Nur zeigen, wenn wir
   // wirklich günstiger sind.
   const zuschussPosten = (lead?.kalkulation?.['zuschüsse']?.items ?? [])
@@ -376,10 +395,12 @@ export function EinstiegVorSpeichern({
         <div className="px-1 pt-6" id="pflegekraefte" style={{scrollMarginTop:96}}>
           <SectionHeader
             eyebrow="Für Sie ausgewählt"
-            titel="Passende Pflegekräfte"
+            titel={USP_VORSCHAU ? 'Passende Pflegekräfte sofort ansehen' : 'Passende Pflegekräfte'}
             zeile={(
               <>
-                Laden Sie ein, wer Ihnen gefällt. Wir bereiten die Bewerbungen vor. Das geht, sobald Ihre Pflegesituation vollständig ist.{' '}
+                {USP_VORSCHAU
+                  ? 'Sehen Sie sich Ihre Vorschläge an. Damit Pflegekräfte sich bei Ihnen bewerben können, ergänzen Sie noch Ihre Pflegesituation.'
+                  : 'Laden Sie ein, wer Ihnen gefällt. Wir bereiten die Bewerbungen vor. Das geht, sobald Ihre Pflegesituation vollständig ist.'}{' '}
                 <button
                   type="button"
                   onClick={onWarum}
@@ -407,12 +428,16 @@ export function EinstiegVorSpeichern({
                 <Card ton="hinweis" className="p-5 mb-5">
                   <p className="flex items-center gap-2 text-[13px] font-bold text-pm-amber-ink">
                     <span className="w-2 h-2 rounded-full bg-pm-amber" aria-hidden="true" />
-                    Pflegesituation unvollständig
+                    {USP_VORSCHAU ? 'Fast geschafft: Ihre Pflegesituation' : 'Pflegesituation unvollständig'}
                   </p>
                   <p className="mt-2 text-[17.5px] font-extrabold leading-[1.25] text-pm-ink">Noch 2 Minuten bis zu Ihren Bewerbungen</p>
-                  <p className="mt-2 mb-4 text-[14.5px] leading-[1.5] text-pm-muted">Vieles ist schon aus Ihrem Kostenrechner übernommen.</p>
+                  <p className="mt-2 mb-4 text-[14.5px] leading-[1.5] text-pm-muted">
+                    {USP_VORSCHAU
+                      ? 'Vieles ist bereits übernommen. Ergänzen Sie, was die Pflegekräfte über Ihre Betreuung wissen müssen.'
+                      : 'Vieles ist schon aus Ihrem Kostenrechner übernommen.'}
+                  </p>
                   <Button breit onClick={onVervollstaendigen} className="px-2 whitespace-nowrap">
-                    Pflegesituation vervollständigen
+                    {USP_VORSCHAU ? 'Pflegesituation ergänzen' : 'Pflegesituation vervollständigen'}
                   </Button>
                 </Card>
                 <div>
@@ -455,7 +480,9 @@ export function EinstiegVorSpeichern({
                 eyebrow="Für Ihre Bewerbungen"
                 titel="Pflegesituation"
                 rechts={<StatusBadge ton="warnung">Unvollständig</StatusBadge>}
-                zeile="Damit sich Pflegekräfte bewerben können. Vieles ist schon ausgefüllt."
+                zeile={USP_VORSCHAU
+                  ? 'Diese Angaben benötigen Pflegekräfte für eine Bewerbung. Vieles haben wir bereits übernommen.'
+                  : 'Damit sich Pflegekräfte bewerben können. Vieles ist schon ausgefüllt.'}
               />
             </div>
             <div>
