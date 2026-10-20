@@ -1043,6 +1043,11 @@ gender/language**. Filtrowanie `wunschGeschlecht` po stronie frontendu.
 GraphQL: `JobOfferMatchingsWithPagination(filters: { is_request: true })`.
 Proxy spłaszcza odpowiedź do `{ caregiver_ids: [<int>, ...] }`. Używane
 do seedowania statusu `'invited'` po F5 / pierwszym wejściu.
+Od Registry #128 proxy dokleja **nasz ledger** `caregiver_invite_attempts`
+(ten job + stare wiersze bez joba, bez okna czasowego): po odmowie opiekunki
+Mamamia zdejmuje `is_request` i listuje ją znowu jako otwarty matching —
+bez ledgera portal pokazywał „Einladen" drugi raz. Błąd odczytu ledgera =
+błąd akcji.
 
 #### `getCaregiver`
 GraphQL: `Caregiver(id: $id)` z pełnym setem pól (nationality, hobbies,
@@ -1200,6 +1205,12 @@ na preprod). Panel SPA Mamamii żyje na **osobnym subdomain'ie per tenant**,
 nie da się derive'ować z `MAMAMIA_ENDPOINT` host'a. Wartość ustalana per-tenant
 przez inspekcję DevTools Network w żywym panelu (Bug #17). Auth: agency-only
 session cookie z osobnego loginu (Sanctum CSRF + `XSRF-TOKEN`).
+
+**Raz zaproszona = koniec dla tego joba (Registry #128):** przed limitem 5/60 min
+proxy sprawdza ledger; opiekunka już tam jest ⇒ HTTP **409** `{ error: "already-invited" }`,
+zero StoreRequest, zero nowego wiersza. Portal traktuje 409 jak każdy błąd zaproszenia
+(toast + cofnięcie), a przycisk i tak znika po odświeżeniu listy. Inny job tego klienta
+blokady nie dziedziczy.
 
 Tło: K5/K6 historia. `SendInvitationCaregiver` jest customer-side mutacją
 (wymaga customer JWT — niedostępny). `StoreRequest` na zwykłym `/graphql`

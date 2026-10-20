@@ -67,6 +67,11 @@ function makeFakeSupabase(state: FakeSupa = { invites: [] }) {
         if (state.failOnRecord) throw new Error("simulated record failure");
         state.invites.push({ leadId, caregiverId, jobOfferId, attemptedAt: new Date() });
       },
+      async invitedCaregiverIds(leadId: string, jobOfferId: number) {
+        return state.invites
+          .filter((r) => r.leadId === leadId && (r.jobOfferId === jobOfferId || r.jobOfferId == null))
+          .map((r) => r.caregiverId);
+      },
     },
   };
 }
@@ -219,6 +224,24 @@ Deno.test("listApplications: client cannot override job_offer_id", async () => {
 
   const sent = state.body as { variables: { job_offer_id: number } };
   assertEquals(sent.variables.job_offer_id, 16226); // session, not 99999
+});
+
+// ─── listInvitedCaregiverIds (Registry #128) ────────────────────────────
+
+Deno.test("listInvitedCaregiverIds: Mamamia is_request + eigener Ledger, ohne Doppelte", async () => {
+  const { fetchFn } = captureFetch({
+    data: { JobOfferMatchingsWithPagination: { total: 1, data: [{ caregiver: { id: 1 } }] } },
+  });
+  // 18308 hat abgesagt → Mamamia listet sie nicht mehr, der Ledger schon.
+  const supa = makeFakeSupabase({
+    invites: [
+      { leadId: SESSION.lead_id, caregiverId: 1, jobOfferId: SESSION.job_offer_id, attemptedAt: new Date() },
+      { leadId: SESSION.lead_id, caregiverId: 18308, jobOfferId: SESSION.job_offer_id, attemptedAt: new Date() },
+      { leadId: SESSION.lead_id, caregiverId: 777, jobOfferId: 99999, attemptedAt: new Date() }, // anderer Job
+    ],
+  });
+  const r = await ACTIONS.listInvitedCaregiverIds(SESSION, {}, makeDeps(fetchFn, supa.adapter));
+  assertEquals(r, { caregiver_ids: [1, 18308] });
 });
 
 // ─── listMatchings ───────────────────────────────────────────────────────
@@ -910,6 +933,33 @@ function panelFlowFetchFn(state: { calls: number; lastBody?: string }, opts: {
     throw new Error(`unexpected fetch call #${state.calls}`);
   };
 }
+
+Deno.test("inviteCaregiver: schon eingeladen (auch vor Tagen) → already-invited, KEIN Mamamia-Aufruf", async () => {
+  const supa = makeFakeSupabase({
+    invites: [{
+      leadId: SESSION.lead_id, caregiverId: 10061, jobOfferId: SESSION.job_offer_id,
+      attemptedAt: new Date(Date.now() - 3 * 86_400_000),
+    }],
+  });
+  const callState = { calls: 0 };
+  const err = await assertRejects(
+    () => ACTIONS.inviteCaregiver(SESSION, { caregiver_id: 10061 }, makeDeps(panelFlowFetchFn(callState), supa.adapter)),
+    Error,
+    "already-invited",
+  ) as Error & { alreadyInvited?: boolean };
+  assertEquals(err.alreadyInvited, true);
+  assertEquals(callState.calls, 0);
+  assertEquals(supa.state.invites.length, 1);
+});
+
+Deno.test("inviteCaregiver: Einladung auf einem ANDEREN Job blockiert nicht", async () => {
+  const supa = makeFakeSupabase({
+    invites: [{ leadId: SESSION.lead_id, caregiverId: 10061, jobOfferId: 99999, attemptedAt: new Date() }],
+  });
+  const callState = { calls: 0 };
+  await ACTIONS.inviteCaregiver(SESSION, { caregiver_id: 10061 }, makeDeps(panelFlowFetchFn(callState), supa.adapter));
+  assertEquals(callState.calls, 3);
+});
 
 Deno.test("inviteCaregiver[rate-limit]: 1st invite passes through + records attempt", async () => {
   const supa = makeFakeSupabase();
