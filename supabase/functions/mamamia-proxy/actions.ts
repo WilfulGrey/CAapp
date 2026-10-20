@@ -18,6 +18,7 @@ import {
   GET_CAREGIVER,
   CAREGIVER_DEPARTURES,
   GET_CUSTOMER,
+  GET_CUSTOMER_KONTAKTE,
   GET_JOB_OFFER,
   LIST_APPLICATIONS,
   LIST_INTERESTS,
@@ -134,6 +135,10 @@ const getJobOffer: ActionHandler = (session, _variables, deps) =>
 
 const getCustomer: ActionHandler = (session, _variables, deps) =>
   runGraphQL(deps, GET_CUSTOMER, { id: session.customer_id });
+
+// Registry #130: die drei Personen der letzten Annahme (nur lesen, nur der eigene Kunde).
+const getCustomerKontakte: ActionHandler = (session, _variables, deps) =>
+  runGraphQL(deps, GET_CUSTOMER_KONTAKTE, { id: session.customer_id });
 
 // Kill-Switch für den Rekruter-Hinweis (Michał 2026-07-31: „wyłącz/ukryj
 // wyświetlanie tego dodatkowego tekstu na razie u klientów — mamy jeszcze
@@ -1344,6 +1349,7 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   searchLocations,
   getInviteRateState,
   listLeadJobs,
+  getCustomerKontakte,
   updateCustomer,
   updateJobDescription,
   updateJobOfferDates,

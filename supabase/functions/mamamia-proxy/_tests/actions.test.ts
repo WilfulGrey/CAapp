@@ -200,6 +200,19 @@ Deno.test("getCustomer: uses session.customer_id (IGNORES user variables)", asyn
   assertEquals(sent.variables.id, 7570);
 });
 
+// ─── getCustomerKontakte (Registry #130) ─────────────────────────────────
+
+Deno.test("getCustomerKontakte: nur der eigene Kunde, nur lesen, Felder wie das SA-Portal", async () => {
+  const { state, fetchFn } = captureFetch({ data: { Customer: { id: 7570, customer_contracts: [], customer_contacts: [] } } });
+  await ACTIONS.getCustomerKontakte(SESSION, { id: 1 }, makeDeps(fetchFn));
+  const sent = state.body as { query: string; variables: { id: number } };
+  assertEquals(sent.variables.id, 7570);
+  for (const feld of ["customer_contracts", "contact_type", "street_number", "customer_contacts"]) {
+    if (!sent.query.includes(feld)) throw new Error(`Feld fehlt: ${feld}`);
+  }
+  if (/mutation/i.test(sent.query)) throw new Error("darf nur lesen");
+});
+
 // ─── listApplications ────────────────────────────────────────────────────
 
 Deno.test("listApplications: uses session.job_offer_id, accepts limit/page from variables", async () => {

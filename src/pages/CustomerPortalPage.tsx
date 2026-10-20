@@ -10,7 +10,8 @@ import {
   setDeclinedCaregiver,
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
-import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers, useInviteRateState, useLeadJobs } from '../lib/mamamia/hooks';
+import { useCustomer, useCustomerKontakte, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers, useInviteRateState, useLeadJobs } from '../lib/mamamia/hooks';
+import { fruehereBuchung, vertragVorbelegung } from '../lib/vertragVorbelegung';
 import { rankComparator } from '../lib/mamamia/matchingsRanking';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { isAboutDeStale, regenerateGermanDescription } from '../lib/mamamia/caregiverAbout';
@@ -704,6 +705,12 @@ const CustomerPortalPage: FC = () => {
   // gleiches Ziel wie mmExpired: Selbst-Service-Screen für neuen Link.
   const [saveTokenExpired, setSaveTokenExpired] = useState(false);
   const { data: mmCustomer, loading: mmCustomerLoading, error: mmCustomerError } = useCustomer(mmReady);
+  // Registry #130: ab dem zweiten Einsatz die Personen der letzten Annahme aus
+  // Mamamia lesen (nur wenn schon ein anderer Einsatz gebucht ist) — für die
+  // Vorbelegung des Vertragsformulars. Fehler egal, dann wie bisher.
+  const { data: mmKontakte } = useCustomerKontakte(
+    mmReady && !IS_PREVIEW_ANY && fruehereBuchung(mmCustomer?.job_offers, session?.job_offer_id ?? null),
+  );
   // Schon abgesendet: in dieser Sitzung, laut Lead oder laut mamamia.
   // `leads.patient_form_at` setzt der Proxy erst nach erfolgreichem
   // UpdateCustomer. Es kommt mit dem Lead, lange vor mamamia: Ohne das sahen
@@ -1474,34 +1481,15 @@ const CustomerPortalPage: FC = () => {
     return () => clearInterval(t);
   }, [mmReady, mmApplicationsError, refetchApplications]);
 
-  // Prefill for AngebotPruefenModal step 2 — replaces the previous
-  // hardcoded fixture (Hildegard/Müller/Rosenstraße/München) that bled
-  // through to every customer regardless of their actual data.
-  // Priority: stage-B patient_* fields → stage-A lead.* → mmCustomer →
-  // empty string. KP (Kontaktperson) fields stay fresh — first time we
-  // ask for them.
-  const pruefenPrefill: Partial<ContractFormData> = (() => {
-    const stageBStreet = lead?.patient_street ?? '';
-    const stageBZip = lead?.patient_zip ?? mmCustomer?.customer_contract?.zip_code ?? '';
-    const stageBCity = lead?.patient_city ?? mmCustomer?.customer_contract?.city ?? '';
-    const ortLine = [stageBZip, stageBCity].filter(Boolean).join(', ');
-    return {
-      anrede: lead?.patient_anrede || lead?.anrede_text || 'Frau',
-      vorname: lead?.patient_vorname || lead?.vorname || '',
-      nachname: lead?.patient_nachname || lead?.nachname || '',
-      strasse: stageBStreet || mmCustomer?.customer_contract?.street_number || '',
-      einsatzort: ortLine,
-      // Patient hat meist KEINE eigene Telefon/E-Mail — die vorhandenen
-      // Kontaktdaten gehören i.d.R. der Kontaktperson, daher dort vorausfüllen.
-      telefon: '',
-      email: '',
-      kpAnrede: '',
-      kpVorname: '',
-      kpNachname: '',
-      kpTelefon: lead?.telefon || mmCustomer?.phone || mmCustomer?.customer_contract?.phone || '',
-      kpEmail: lead?.email || mmCustomer?.email || '',
-    };
-  })();
+  // Vorbelegung des Vertragsformulars (AngebotPruefenModal, „Ihre Angaben"):
+  // bisher Lead + mmCustomer, ab dem zweiten Einsatz die drei Personen der
+  // letzten Annahme aus Mamamia — lib/vertragVorbelegung.ts (Registry #130).
+  const pruefenPrefill: Partial<ContractFormData> = vertragVorbelegung({
+    lead,
+    mmCustomer,
+    kontakte: mmKontakte,
+    aktuellerJob: session?.job_offer_id ?? null,
+  });
 
   // Compute visible interests — drop rejected-by-caregiver and locally-
   // dismissed-by-customer entries. Also drop interests whose caregiver

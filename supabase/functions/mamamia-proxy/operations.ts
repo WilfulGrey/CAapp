@@ -622,3 +622,22 @@ export const UPDATE_CONFIRMATION_FILES = /* GraphQL */ `
     }
   }
 `;
+
+// Vorbelegung des Vertragsformulars ab dem zweiten Einsatz (Registry #130,
+// Martin 20.10.2026: „beim 2. Job muss der Kunde beim Annehmen alle Kunden- und
+// Kontaktdaten neu eingeben"). Die erste Annahme schreibt die drei Personen nach
+// Mamamia (_shared/acceptanceSync.ts): Leistungsempfänger = customer_contracts
+// mit contact_type "patient_contact", Auftraggeber = "contract_contact",
+// Kontaktperson = customer_contacts. Felder 1:1 wie das SA-Portal sie täglich
+// liest (mamamia-sadash DashboardController, ohne title/location). EIGENE Abfrage,
+// nicht in GET_CUSTOMER: schlägt sie fehl, bleibt das Portal heil (fail-soft).
+export const GET_CUSTOMER_KONTAKTE = /* GraphQL */ `
+  query GetCustomerKontakte($id: Int!) {
+    Customer(id: $id) {
+      id
+      customer_contracts { id contact_type salutation first_name last_name phone email street_number zip_code city }
+      customer_contacts { id salutation first_name last_name phone email }
+    }
+  }
+`;
+
