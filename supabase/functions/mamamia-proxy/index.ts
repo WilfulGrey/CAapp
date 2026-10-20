@@ -145,6 +145,7 @@ export async function handleRequest(req: Request, deps: ProxyDeps): Promise<Resp
   } catch (e) {
     const err = e as Error & {
       rateLimited?: boolean;
+      alreadyInvited?: boolean;
       retry_after_seconds?: number;
       limit?: number;
       window_minutes?: number;
@@ -158,6 +159,11 @@ export async function handleRequest(req: Request, deps: ProxyDeps): Promise<Resp
     // metadata so the frontend modal can show "Bitte warten Sie noch X
     // Min." without depending on DEBUG_PROXY leakage. Distinct from a
     // 502 upstream failure — retry vs wait have different UX.
+    // Registry #128: diese Pflegekraft hat das Portal für diesen Job schon
+    // eingeladen — kein zweites StoreRequest.
+    if (err.alreadyInvited) {
+      return jsonError(409, "already-invited", baseHeaders);
+    }
     if (err.rateLimited) {
       return jsonError(429, "rate-limited", baseHeaders, {
         retry_after_seconds: err.retry_after_seconds,
@@ -296,6 +302,15 @@ function makeRealSupabase(url: string, serviceKey: string): ProxySupabase {
         .from("caregiver_invite_attempts")
         .insert({ lead_id: leadId, caregiver_id: caregiverId, mamamia_job_offer_id: jobOfferId });
       if (error) throw new Error(`supabase recordInviteAttempt: ${error.message}`);
+    },
+    async invitedCaregiverIds(leadId, jobOfferId) {
+      const { data, error } = await client
+        .from("caregiver_invite_attempts")
+        .select("caregiver_id")
+        .eq("lead_id", leadId)
+        .or(`mamamia_job_offer_id.eq.${jobOfferId},mamamia_job_offer_id.is.null`);
+      if (error) throw new Error(`supabase invitedCaregiverIds: ${error.message}`);
+      return [...new Set((data ?? []).map((r) => (r as { caregiver_id: number }).caregiver_id))];
     },
     async saveLeadPatientForm(leadId, form) {
       const { error } = await client

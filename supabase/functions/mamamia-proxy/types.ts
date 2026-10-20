@@ -119,6 +119,11 @@ export interface ProxySupabase {
     caregiverId: number,
     jobOfferId: number,
   ): Promise<void>;
+  // Alle Pflegekräfte, die das Portal für diesen JOB (+ Alt-Zeilen ohne Job)
+  // schon eingeladen hat — ohne Zeitfenster. Registry #128: Mamamia listet
+  // nach einer Absage der Pflegekraft nicht mehr `is_request`, der Ledger
+  // vergisst nicht.
+  invitedCaregiverIds(leadId: string, jobOfferId: number): Promise<number[]>;
   // Plant (bzw. verschiebt) die "neue Pflegekräfte verfügbar"-Mail auf +24h
   // ab JETZT. Reschedult bei jeder Einladung → 24h ab der LETZTEN Einladung.
   // Best-effort: schlägt der Versand-Scheduler fehl, bleibt die Einladung

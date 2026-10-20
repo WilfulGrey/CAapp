@@ -224,15 +224,22 @@ const listMatchings: ActionHandler = async (session, variables, deps) => {
 //
 // We unwrap the GraphQL pagination shape into a flat { caregiver_ids }
 // payload so the client doesn't have to relearn it.
+//
+// Registry #128: plus our own ledger. After the caregiver declines, Mamamia
+// drops the matching from `is_request` and lists it as open again — the
+// portal then offered "Einladen" a second time. Once invited stays invited.
 const listInvitedCaregiverIds: ActionHandler = async (session, _variables, deps) => {
-  const r = await runGraphQL<{
-    JobOfferMatchingsWithPagination: {
-      total: number;
-      data: Array<{ caregiver: { id: number } }>;
-    };
-  }>(deps, LIST_INVITED_CAREGIVER_IDS, { job_offer_id: session.job_offer_id });
+  const [r, ledger] = await Promise.all([
+    runGraphQL<{
+      JobOfferMatchingsWithPagination: {
+        total: number;
+        data: Array<{ caregiver: { id: number } }>;
+      };
+    }>(deps, LIST_INVITED_CAREGIVER_IDS, { job_offer_id: session.job_offer_id }),
+    deps.supabase?.invitedCaregiverIds(session.lead_id, session.job_offer_id) ?? [],
+  ]);
   const ids = r.JobOfferMatchingsWithPagination.data.map(m => m.caregiver.id);
-  return { caregiver_ids: ids };
+  return { caregiver_ids: [...new Set([...ids, ...ledger])] };
 };
 
 // ─── Public/open actions (id from variables) ────────────────────────────────
@@ -597,6 +604,13 @@ const inviteCaregiver: ActionHandler = async (session, variables, deps) => {
   }
   if (!deps.supabase) {
     throw new Error("supabase adapter required for invite rate limiting");
+  }
+
+  // ── Schon eingeladen (Registry #128) ────────────────────────────────
+  // Einmal eingeladen = nie wieder für diesen Job, auch nach einer Absage.
+  if ((await deps.supabase.invitedCaregiverIds(session.lead_id, session.job_offer_id)).includes(id)) {
+    console.log(`[inviteCaregiver][already-invited] lead=${session.lead_id} cg=${id}`);
+    throw Object.assign(new Error("already-invited"), { alreadyInvited: true });
   }
 
   // ── Rate-limit gate ──────────────────────────────────────────────────
