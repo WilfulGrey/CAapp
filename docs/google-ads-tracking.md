@@ -138,6 +138,17 @@ Spend, Kosten je Lead und je Patientenprofil (gestern + 7 Tage, blended
 die Mail kommt trotzdem. Kunden-CAC bewusst nicht in der Mail
 (Martin 16.08.) — steht im Memory/Bericht.
 
+Seit 20.10. prüft der Report auch den Offline-Upload (Registry #129,
+`fetchUploadHealth`). Hintergrund: Vom 02. bis 20.10. rief der Cron die
+Upload-Funktion nur als Probelauf auf (`{"dryRun": true}`, von Hand in der
+Datenbank gesetzt). Die Funktion antwortete 200 und loggte nichts, Google sah
+18 Tage lang kein Profil. Der Report wiederholt die Auswahl der Funktion
+(erstes `patient_data_saved` bzw. erste Annahme je Lead, 90 Tage, mit Klick-ID,
+ohne Zeile in der Statustabelle) und schlägt Alarm, wenn davon etwas länger als
+32 Stunden wartet: roter Block oben, 🚨 im Betreff. Sonst steht eine graue Zeile
+„Google-Upload: nichts wartet“ mit dem letzten Upload. Ein Lesefehler alarmiert
+ebenfalls.
+
 ## Messdefinitionen (für Auswertungen)
 
 - **Lead** = `lead_events.event_type='email_eingangsbestaetigung_sent'`
