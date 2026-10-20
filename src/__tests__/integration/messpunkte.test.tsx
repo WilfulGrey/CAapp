@@ -42,7 +42,7 @@ beforeAll(() => {
 });
 
 type Meldung = { token?: string; event?: string; metadata?: Record<string, unknown>; notify?: boolean };
-const ERLAUBTE_FELDER = ['caregiver_id', 'quelle', 'vor_speichern', 'frage'];
+const ERLAUBTE_FELDER = ['caregiver_id', 'quelle', 'vor_speichern', 'frage', 'schritt', 'feld', 'offen'];
 // Lesende Aufrufe der Seite (Ereignisse für die Karten, Sterne) — hier ohne Inhalt.
 const lesen = [
   http.get('https://kostenrechner.primundus.de/api/lead-event', () => HttpResponse.json({ events: [] })),
