@@ -95,6 +95,22 @@ export interface MamamiaCustomerContract {
   street_number?: string | null;
 }
 
+/** Registry #130: die drei Personen der letzten Annahme, wie die erste Annahme sie
+ *  nach Mamamia schreibt (_shared/acceptanceSync.ts) — Proxy-Aktion getCustomerKontakte. */
+export interface MamamiaKontaktperson {
+  id?: number;
+  salutation?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+}
+export interface MamamiaKontakte {
+  id?: number;
+  customer_contracts?: MamamiaCustomerContract[] | null;
+  customer_contacts?: MamamiaKontaktperson[] | null;
+}
+
 // Job-Offer-Teilmenge aus GET_CUSTOMER (Customer.job_offers). Für die
 // Gebucht-Ableitung aus dem Mamamia-Stand (Fix 2026-07-15):
 // akzeptiert die Agentur eine Bewerbung im SA-Portal, entsteht KEINE

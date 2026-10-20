@@ -11,6 +11,7 @@ import {
 } from './client';
 import type {
   MamamiaCustomer,
+  MamamiaKontakte,
   MamamiaJobOffer,
   MamamiaApplication,
   MamamiaMatching,
@@ -95,6 +96,17 @@ export function useJobOffer(enabled = true) {
 export function useCustomer(enabled = true) {
   const state = useMamamiaQuery<{ Customer: MamamiaCustomer | null }>(
     'getCustomer',
+    {},
+    enabled,
+  );
+  return { ...state, data: state.data?.Customer ?? null };
+}
+
+/** Registry #130: Personen der letzten Annahme für die Vorbelegung des
+ *  Vertragsformulars. Fehler sind egal — dann bleibt die bisherige Vorbelegung. */
+export function useCustomerKontakte(enabled = true) {
+  const state = useMamamiaQuery<{ Customer: MamamiaKontakte | null }>(
+    'getCustomerKontakte',
     {},
     enabled,
   );
