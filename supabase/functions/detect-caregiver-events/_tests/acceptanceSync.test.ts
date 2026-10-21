@@ -293,6 +293,18 @@ Deno.test("buildCustomerContract: AG separat → Composed-Name-Split (letzte Lee
   assertEquals(cc.city, "München");
 });
 
+Deno.test("buildCustomerContract (#131): Snapshot mit Anrede + getrennten Namen ⇒ salutation, kein Split", () => {
+  const snap = makeRow().contract_snapshot!;
+  const row = makeRow({ contract_snapshot: { ...snap, ag: { ...(snap.ag as Record<string, unknown>), name: "Paul von Probe", anrede: "Herr", vorname: "Paul", nachname: "von Probe" } } });
+  const cc = buildCustomerContract(row)!;
+  assertEquals(cc.salutation, "Mr.");
+  assertEquals(cc.first_name, "Paul");
+  assertEquals(cc.last_name, "von Probe");
+  // „Divers" hat in Mamamia keinen Wert ⇒ Feld bleibt weg statt geraten
+  const divers = buildCustomerContract(makeRow({ contract_snapshot: { ...snap, ag: { ...(snap.ag as Record<string, unknown>), anrede: "Divers" } } }))!;
+  assertEquals("salutation" in divers, false);
+});
+
 Deno.test("isAgGleich: le=null ⇒ true; separater AG ⇒ false; kein Snapshot (Legacy) ⇒ true", () => {
   assertEquals(isAgGleich(makeRow({ contract_snapshot: { ...makeRow().contract_snapshot!, le: null } })), true);
   assertEquals(isAgGleich(makeRow()), false);

@@ -1468,3 +1468,23 @@ describe('applyAcceptedOverlay', () => {
     expect(result[0].nurse.name).toBe('Edyta T.'); // upgegradet, nicht dupliziert
   });
 });
+
+describe('Registry #131: Singular customer_contract als Zeile des Auftraggebers', () => {
+  const kunde = (contact_type: string | undefined) => ({
+    id: 1, phone: null, patients: [],
+    customer_contract: { contact_type, zip_code: '80331', city: 'München', phone: '089 111' },
+  }) as unknown as MamamiaCustomer;
+  it('Patientenbogen übernimmt PLZ/Ort/Telefon nicht aus der AG-Zeile', () => {
+    const out = mapMamamiaCustomerToPatientForm(kunde('contract_contact'));
+    expect(out.plz ?? '').toBe('');
+    expect(out.ort ?? '').toBe('');
+    expect(out.phone ?? '').toBe('');
+  });
+  it('Zeile der betreuten Person (oder ohne contact_type) wie bisher', () => {
+    for (const t of ['patient_contact', undefined]) {
+      const out = mapMamamiaCustomerToPatientForm(kunde(t));
+      expect(out.plz).toBe('80331');
+      expect(out.ort).toBe('München');
+    }
+  });
+});

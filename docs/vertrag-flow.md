@@ -30,8 +30,9 @@ Edge sync-acceptance → _shared/acceptanceSync.ts (współdzielony z cronem):
                          wpisywał obce miasto na PODPISANĄ umowę)
                        • AG → invoice_contract{contact_type:"contract_contact"}
                          (panel: „Person für den Vertrag/Rechnung"; agGleich ⇒
-                         dyskretne pola LE, AG odrębny ⇒ split composed ag.name
-                         na ostatniej spacji, bez salutation; location_id z PLZ
+                         dyskretne pola LE, AG odrębny ⇒ ag.anrede/vorname/nachname
+                         ze snapshotu (od Registry #131), starsze rowy: split
+                         composed ag.name na ostatniej spacji, bez salutation; location_id z PLZ
                          AG — Stadt-dropdown AG to JEGO miasto, nie adres opieki.
                          Uwaga: Location select-uje pole `location`, NIE `name`)
                        • KP → customer_contacts[] (panel: „Kontaktperson")

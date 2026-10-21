@@ -123,7 +123,18 @@ export const AngebotCard: FC<{
   // Final-saved localStorage (`_isDraft: false`) sits at level 1 too —
   // it's identical to Mamamia state by construction (the save is what
   // wrote both) so its position relative to (2) doesn't matter.
-  const prefill = lead ? prefillPatientFromLead(lead) : {};
+  // Registry #131: Einsatzort auch aus dem zuletzt abgesendeten Bogen
+  // (`leads.patient_form`) — Mamamia liefert ihn nach einer Annahme oft nicht
+  // mehr (Singular = Zeile des Auftraggebers, mappers.ts patientenVertrag).
+  const zuletzt = (lead?.patient_form ?? {}) as Record<string, unknown>;
+  const prefill = lead
+    ? {
+        ...prefillPatientFromLead(lead),
+        ...(typeof zuletzt.plz === 'string' && zuletzt.plz
+          ? { plz: zuletzt.plz, ort: typeof zuletzt.ort === 'string' ? zuletzt.ort : '' }
+          : {}),
+      }
+    : {};
   // Bug #13: onboard no longer ships patient.gender (kalkulator nie pyta);
   // Mamamia returns null until patient form save → reverse mapper outputs
   // '' for gender so dropdown stays empty. No more patientGenderKnown opt.

@@ -999,9 +999,25 @@ applications/jobs zwracają 403.
 #### `getCustomer`
 GraphQL: `Customer(id: $id)` z całym setem pól potrzebnych do prefilla
 patient form (patrz [operations.ts:26](../supabase/functions/mamamia-proxy/operations.ts:26))
-— customer + patients[] + customer_caregiver_wish + customer_contracts[] + equipments[].
+— customer + patients[] + customer_caregiver_wish + singular `customer_contract` (z
+`contact_type`, Registry #131) + equipments[] + job_offers[].final_confirmation.
 
 `$id` wymuszany z `session.customer_id`.
+
+**Singular `customer_contract` NIE jest pewnym wierszem pacjenta** (beta e2e 21.10.2026):
+po akcepcie Mamamia zwraca przy odczycie często wiersz Auftraggebera
+(`contract_contact`). Front czyta go przez `patientenVertrag()` (mappers.ts), który
+ignoruje wiersz `contract_contact` — formularz pacjenta i fallback vorbelegungu umowy
+nie biorą wtedy adresu/telefonu Auftraggebera jako danych betreute Person.
+
+#### `getCustomerKontakte` (Registry #130)
+GraphQL: `Customer(id: $id) { customer_contracts { … contact_type … } customer_contacts { … } }`
+— osobne zapytanie (fail-soft), tylko odczyt, `$id` z `session.customer_id`. Front woła je
+tylko, gdy INNY job klienta ma `final_confirmation`, i wypełnia z niego formularz umowy
+(`vertragVorbelegung`): LE ← `patient_contact`, AG ← `contract_contact`, KP ←
+`customer_contacts`. Modal „Angebot prüfen" otwiera się dopiero, gdy `getCustomer` i (jeśli
+potrzebne) `getCustomerKontakte` odpowiedziały (Registry #131) — modal czyta vorbelegung
+tylko przy otwarciu i od razu zapisuje ją jako szkic w `sessionStorage`.
 
 #### `getJobOffer`
 GraphQL: `JobOffer(id: $id)` —
@@ -1222,6 +1238,7 @@ warunkiem że Customer ma `status='active'` ORAZ JobOffer też jest active
 | Action | Rodzaj | Endpoint mamamii | Auth |
 |---|---|---|---|
 | `getCustomer` | read | `/graphql` | agency-jwt |
+| `getCustomerKontakte` | read | `/graphql` | agency-jwt |
 | `getJobOffer` | read | `/graphql` | agency-jwt |
 | `listApplications` | read | `/graphql` | agency-jwt |
 | `listMatchings` | read | `/graphql` | agency-jwt |

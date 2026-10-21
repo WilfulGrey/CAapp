@@ -7,6 +7,7 @@ import type {
   MamamiaCaregiverFull,
   MamamiaJobOffer,
   MamamiaCustomer,
+  MamamiaCustomerContract,
 } from './types';
 import { STANDARD_NIGHT_OPS_DE } from './patientFormMapper';
 
@@ -1221,6 +1222,14 @@ function mamamiaNightDescToForm(desc: string | null | undefined): string {
   return t;
 }
 
+/** Singular `customer_contract` als Vertrag der betreuten Person — außer er ist die
+ *  Zeile des Auftraggebers. Mamamia liefert beim Lesen den ersten Vertrag nach id;
+ *  nach einer Annahme ist das oft `contract_contact` (beta-e2e 21.10.2026, Registry #131). */
+export function patientenVertrag(cust: Pick<MamamiaCustomer, 'customer_contract'> | null | undefined): MamamiaCustomerContract | null {
+  const c = cust?.customer_contract ?? null;
+  return c?.contact_type === 'contract_contact' ? null : c;
+}
+
 export function mapMamamiaCustomerToPatientForm(
   cust: MamamiaCustomer | null,
 ): PatientFormPrefill {
@@ -1322,7 +1331,7 @@ export function mapMamamiaCustomerToPatientForm(
   // panel writes only to contract when an agent edits, so a customer who
   // has only contract.phone (manual panel edit) still round-trips into
   // the form cleanly.
-  const phoneValue = cust.phone || cust.customer_contract?.phone;
+  const phoneValue = cust.phone || patientenVertrag(cust)?.phone;
   if (phoneValue) out.phone = phoneValue;
 
   if (cust.day_care_facility === 'yes') out.pflegedienst = 'Ja';
@@ -1371,9 +1380,9 @@ export function mapMamamiaCustomerToPatientForm(
     cust.pets, cust.is_pet_dog, cust.is_pet_cat, cust.is_pet_other,
   );
 
-  // Address z customer_contract (singular). Uwaga: po akcepcie singular bywa wierszem
-  // Auftraggebera (contract_contact), patrz types.ts MamamiaCustomer.customer_contract.
-  const contract = cust.customer_contract;
+  // Address z customer_contract (singular). Po akcepcie singular bywa wierszem
+  // Auftraggebera (contract_contact) — patientenVertrag() go wtedy pomija (Registry #131).
+  const contract = patientenVertrag(cust);
   if (contract?.zip_code) out.plz = contract.zip_code;
   if (contract?.city) out.ort = contract.city;
 

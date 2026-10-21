@@ -60,6 +60,24 @@ describe('vertragVorbelegung', () => {
   });
 });
 
+describe('Registry #131: Fallback ohne Daten der letzten Annahme', () => {
+  const agZeile = { contact_type: 'contract_contact', street_number: 'Bahnhofstr. 9', zip_code: '80331', city: 'München', phone: '089 111' };
+  const ohneTel = { ...LEAD, telefon: '' };
+  it('nimmt nie die Zeile des Auftraggebers als Adresse der betreuten Person', () => {
+    const r = bisherigeVorbelegung(ohneTel, { ...mm([JOB_1]), customer_contract: agZeile } as unknown as MamamiaCustomer);
+    expect(r.strasse).toBe('');
+    expect(r.einsatzort).toBe('');
+    expect(r.kpTelefon).toBe('');
+  });
+  it('Zeile der betreuten Person (oder ohne contact_type, alter Proxy) zählt wie bisher', () => {
+    for (const contact_type of ['patient_contact', undefined]) {
+      const r = bisherigeVorbelegung(ohneTel, { ...mm([JOB_1]), customer_contract: { ...agZeile, contact_type } } as unknown as MamamiaCustomer);
+      expect(r.einsatzort).toBe('80331, München');
+      expect(r.strasse).toBe('Bahnhofstr. 9');
+    }
+  });
+});
+
 describe('fruehereBuchung', () => {
   it('zählt nur einen ANDEREN bestätigten Job, IDs auch als Text', () => {
     expect(fruehereBuchung([JOB_1, JOB_2] as never, 502)).toBe(true);

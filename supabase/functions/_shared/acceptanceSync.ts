@@ -412,9 +412,11 @@ export function buildCustomerContract(row: AcceptanceRow): Record<string, unknow
   const ag = (snap.ag ?? null) as Record<string, unknown> | null;
   if (!ag) return mapContractPatient(row.contract_patient);
   const name = String(ag.name ?? "").trim();
-  let first: string | null = null;
-  let last: string | null = null;
-  if (name) {
+  // Registry #131: neuere Snapshots tragen Anrede + Vor-/Nachname getrennt.
+  // Ohne sie (Rows vor #131) bleibt der Split an der letzten Leerstelle.
+  let first: string | null = clean(ag.vorname);
+  let last: string | null = clean(ag.nachname);
+  if (!first && !last && name) {
     const idx = name.lastIndexOf(" ");
     if (idx > 0) {
       first = name.slice(0, idx).trim() || null;
@@ -424,8 +426,10 @@ export function buildCustomerContract(row: AcceptanceRow): Record<string, unknow
     }
   }
   const { zip, city } = splitEinsatzort(ag.ort);
+  const salutation = sal(ag.anrede);
   return {
-    // salutation: nicht verfügbar (Composed-Form ohne Anrede) → weglassen.
+    // Anrede nur, wenn der Snapshot sie trägt (Rows vor #131: weglassen).
+    ...(salutation ? { salutation } : {}),
     first_name: first,
     last_name: last,
     street_number: clean(ag.strasse),

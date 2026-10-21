@@ -77,7 +77,12 @@ export function buildVertragsDaten(
   const agTelefon = (form.agGleich ? form.telefon : form.agTelefon) || form.kpTelefon;
   return {
     datum,
-    ag: { name: agName || 'Auftraggeber', strasse: agStrasse, plz: '', ort: agOrt, email: agEmail, telefon: agTelefon },
+    ag: {
+      name: agName || 'Auftraggeber', strasse: agStrasse, plz: '', ort: agOrt, email: agEmail, telefon: agTelefon,
+      anrede: form.agGleich ? form.anrede : form.agAnrede,
+      vorname: form.agGleich ? form.vorname : form.agVorname,
+      nachname: form.agGleich ? form.nachname : form.agNachname,
+    },
     // le=null wenn AG identisch mit LE → Vertrag zeigt „identisch mit Auftraggeber".
     le: form.agGleich
       ? null
