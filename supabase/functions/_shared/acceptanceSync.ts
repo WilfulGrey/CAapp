@@ -169,14 +169,16 @@ export interface AcceptanceSyncResult {
 // Verarbeitungs-Bramka für den Upload) + location_id des bestehenden
 // Contracts (kanonische "Lokalizacja opieki" aus dem Patientenbogen,
 // Bug #13d — wird in die neue patient_contact-Row übernommen, da Mamamia
-// die Contract-Liste beim Schreiben ERSETZT).
+// die Contract-Liste beim Schreiben ERSETZT). Gelesen wird die Zeile
+// `patient_contact` aus der Liste, NICHT der Singular: der liefert nach einer
+// Annahme oft die Zeile des Auftraggebers (Registry #131).
 const SYNC_CUSTOMER_QUERY = /* GraphQL */ `
   query AcceptanceSyncCustomer($id: Int!) {
     Customer(id: $id) {
       id
       equipments { id }
       patients { id tools { id } }
-      customer_contract { location_id }
+      customer_contracts { contact_type location_id }
       job_offers {
         id
         # application_id: Original-Bewerbung der Confirmation — für den
@@ -196,7 +198,7 @@ interface SyncCustomerData {
     id: number;
     equipments: Array<{ id: number }> | null;
     patients: Array<{ id: number; tools: Array<{ id: number }> | null }> | null;
-    customer_contract: { location_id: number | null } | null;
+    customer_contracts: Array<{ contact_type: string | null; location_id: number | null }> | null;
     job_offers: Array<{
       id: number;
       final_confirmation: { id: number; application_id: number | null; caregiver: { id: number } | null } | null;
@@ -687,7 +689,8 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
   // läuft auch im Retry erneut, kein eigener Stempel nötig. Achtung: Mamamia
   // ERSETZT die Listen — manuelle Panel-Korrekturen an diesen Rows werden bei
   // jedem Durchlauf (Chain-Stufe, Cron bis zum PDF-Upload) überschrieben.
-  const carriedLocationId = cust.Customer?.customer_contract?.location_id ?? null;
+  const carriedLocationId = (cust.Customer?.customer_contracts ?? [])
+    .find((c) => c?.contact_type === "patient_contact")?.location_id ?? null;
   const lePatient = mapContractPatient(row.contract_patient);
   const agContract = buildCustomerContract(row);
   const kpContact = mapContractContact(row.contract_contact);

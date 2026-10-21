@@ -23,7 +23,8 @@ Edge sync-acceptance → _shared/acceptanceSync.ts (współdzielony z cronem):
                          (location_id rozwiązywane z PLZ LE przez katalog
                          Locations — ta sama metoda co główna lokalizacja
                          klienta [Bug #13d]; fallback: carry z istniejącego
-                         contractu — MM REPLACES listę przy zapisie.
+                         wiersza patient_contact (nie z singulara — po akcepcie
+                         to bywa wiersz AG, Registry #131) — MM REPLACES listę.
                          Od Registry #65: tylko PLZ o DOKŁADNIE 5 cyfrach
                          i wiersz o DOKŁADNIE tej `zip_code` — `search`
                          matchuje prefiksy, więc „pierwszy trafiony DE"
