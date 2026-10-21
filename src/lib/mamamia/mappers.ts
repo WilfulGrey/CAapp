@@ -1371,7 +1371,8 @@ export function mapMamamiaCustomerToPatientForm(
     cust.pets, cust.is_pet_dog, cust.is_pet_cat, cust.is_pet_other,
   );
 
-  // Address z customer_contract (singular = pierwszy wiersz, patient_contact).
+  // Address z customer_contract (singular). Uwaga: po akcepcie singular bywa wierszem
+  // Auftraggebera (contract_contact), patrz types.ts MamamiaCustomer.customer_contract.
   const contract = cust.customer_contract;
   if (contract?.zip_code) out.plz = contract.zip_code;
   if (contract?.city) out.ort = contract.city;

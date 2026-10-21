@@ -925,6 +925,12 @@ nadpisujesz wiersza wpisanego ręką (Registry #75).
 `customer_contract`. Odczyt pola `customer_contracts` (plural) działa na obu
 tenantach (prod: proxy `getCustomerKontakte`, HTTP 200 21.10.2026).
 
+**Singular `customer_contract` NIE jest pewnym wierszem pacjenta** (beta e2e 21.10.2026,
+Customer 10076): przy ODCZYCIE MM zwraca pierwszy wiersz wg id — po akcepcie
+(`acceptanceSync` przepisuje listę, nowe id) to bywa `contract_contact` (Auftraggeber).
+Przy ZAPISIE singular trafia w `patient_contact`. Kto potrzebuje danych pacjenta albo
+Auftraggebera, czyta `customer_contracts` i wybiera po `contact_type`.
+
 ### 16. Dane przyjazdu opiekunki — tylko `final_confirmation.arrival`, osobne zapytanie, osobny cron
 
 Agencja wpisuje dojazd w rekordzie `ConfirmationArrival` (`arrival_date`,

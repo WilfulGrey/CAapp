@@ -178,7 +178,9 @@ export interface MamamiaCustomer {
   /** Patients — full shape for prefill, not just { id }. */
   patients?: MamamiaPatient[];
   customer_caregiver_wish?: MamamiaCaregiverWish | null;
-  // Singular = pierwszy wiersz z `customer_contracts` (patient_contact).
+  // Singular NIE jest pewnym wierszem pacjenta: przy ODCZYCIE Mamamia zwraca pierwszy
+  // wiersz wg id — po akcepcie bywa to contract_contact (Auftraggeber); przy ZAPISIE
+  // trafia w patient_contact (beta, 21.10.2026). Pewny odczyt: `customer_contracts` po contact_type.
   customer_contract?: MamamiaCustomerContract | null;
   /** Accommodation equipment — fetched by GET_CUSTOMER as `equipments { id equipment }`.
    *  id=1 = Own TV, id=2 = Own Bathroom. Used to prefill the `badezimmer` field. */
