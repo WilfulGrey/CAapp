@@ -730,6 +730,11 @@ export function mapPatientFormToUpdateCustomerInput(
        waehlt ihn aus patient_*), und die Zeile bekommt die expliziten
        Spiegel-Flags. Bei allen uebrigen Kunden bleibt der Patch bitgleich. */
     vermittler?: boolean;
+    /* Registry #131: ein Einsatz ist schon angenommen — Name, Anrede und Telefon
+       der betreuten Person kommen dann aus dem Vertragsformular (acceptanceSync)
+       und werden hier NICHT mehr mit der Kontaktperson ueberschrieben. Einsatzort
+       (location_id, zip_code, city) schreibt der Bogen weiter. */
+    vertragAusAnnahme?: boolean;
   } = {},
 ): MappedCustomerPatch {
   const patch: MappedCustomerPatch = {};
@@ -807,11 +812,12 @@ export function mapPatientFormToUpdateCustomerInput(
   if (plzTrim) cc.zip_code = plzTrim;
   const ortTrim = form.ort?.trim();
   if (ortTrim) cc.city = ortTrim;
-  const cSal = salutationToApi(opts.contact?.anrede);
+  const kontakt = opts.vertragAusAnnahme ? undefined : opts.contact;
+  const cSal = salutationToApi(kontakt?.anrede);
   if (cSal) cc.salutation = cSal;
-  const cVor = opts.contact?.vorname?.trim();
+  const cVor = kontakt?.vorname?.trim();
   if (cVor) cc.first_name = cVor;
-  const cNach = opts.contact?.nachname?.trim();
+  const cNach = kontakt?.nachname?.trim();
   if (cNach) cc.last_name = cNach;
   if (opts.vermittler) {
     cc.is_same_as_first_patient = false;
@@ -870,7 +876,9 @@ export function mapPatientFormToUpdateCustomerInput(
   const phoneTrimmed = form.phone?.trim();
   if (phoneTrimmed) {
     patch.phone = phoneTrimmed;
-    patch.customer_contract = { ...(patch.customer_contract ?? {}), phone: phoneTrimmed };
+    if (!opts.vertragAusAnnahme) {
+      patch.customer_contract = { ...(patch.customer_contract ?? {}), phone: phoneTrimmed };
+    }
   }
 
   // ── customer_caregiver_wish nested ───────────────────────────────────

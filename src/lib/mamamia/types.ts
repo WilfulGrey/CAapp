@@ -80,9 +80,9 @@ export interface MamamiaCaregiverWish {
 
 export interface MamamiaCustomerContract {
   id?: number;
-  // contact_type — beta-only field, prod nie zwraca (singular customer_contract
-  // jest 1:1 więc discriminator zbędny). Pole zostawione dla backward compat
-  // gdyby kod gdziekolwiek go odczytywał.
+  // contact_type — patient_contact (LE) | contract_contact (AG). GET_CUSTOMER liest
+  // es auch am Singular: der ist nach einer Annahme oft die AG-Zeile (Registry #131,
+  // mappers.ts patientenVertrag).
   contact_type?: string | null;
   salutation?: string | null;
   first_name?: string | null;

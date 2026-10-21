@@ -222,6 +222,20 @@ describe('AngebotCard – Schritte und Speichern', () => {
     await waitFor(() => expect(JSON.parse(localStorage.getItem(`patient_${TOKEN}`)!)._isDraft).toBe(false));
   });
 
+  it('Registry #131: Einsatzort aus dem zuletzt abgesendeten Bogen, nicht aus der Zeile des Auftraggebers', async () => {
+    // Neues Gerät: Entwurf ohne Einsatzort. Mamamia liefert als Singular die AG-Zeile (München).
+    const { plz: _plz, ort: _ort, ...ohneOrt } = VOLL;
+    entwurf(ohneOrt);
+    const mitBogen = { ...lead, patient_form: { plz: '94428', ort: 'Eichendorf' } } as unknown as Lead;
+    const agZeile = { id: 1, patients: [], customer_contract: { contact_type: 'contract_contact', zip_code: '80331', city: 'München' } };
+    const onSave = vi.fn(async () => {});
+    render(<AngebotCard lead={mitBogen} mmCustomer={agZeile as never} mamamiaEnabled onSaveToMamamia={onSave} />);
+    for (let i = 0; i < 3; i++) await weiter();
+    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen erhalten' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][0]).toMatchObject({ plz: '94428', ort: 'Eichendorf' });
+  });
+
   it('springt nach dem Absenden ohne Animation nach oben (Safari blieb sonst unten stehen, Registry #102)', async () => {
     entwurf(VOLL);
     const onSave = vi.fn(async () => {});

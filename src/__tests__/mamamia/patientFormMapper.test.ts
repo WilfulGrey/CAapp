@@ -214,6 +214,16 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(r.patients?.[0].height).toBe('155-165');
   });
 
+  it('Registry #131: nach einer Annahme kein Name/Anrede/Telefon der Kontaktperson im Patientenvertrag, Einsatzort schon', () => {
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ phone: '0151 1' }), {
+      locationId: 1148,
+      contact: { anrede: 'Frau', vorname: 'Anna', nachname: 'Probe' },
+      vertragAusAnnahme: true,
+    });
+    expect(r.customer_contract).toEqual({ location_id: 1148, zip_code: '10115', city: 'Berlin' });
+    expect(r.phone).toBe('0151 1');
+  });
+
   it('location_id preferred over plz/ort custom_text + customer_contract rides along', () => {
     // Bug #13l: locationId triggers customer_contract (singular)
     // emission so Mamamia panel "Lokalizacja opieki" renders.

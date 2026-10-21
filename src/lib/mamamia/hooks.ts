@@ -99,7 +99,8 @@ export function useCustomer(enabled = true) {
     {},
     enabled,
   );
-  return { ...state, data: state.data?.Customer ?? null };
+  // fertig: Antwort oder Fehler da (auch `Customer: null`) — Registry #131.
+  return { ...state, data: state.data?.Customer ?? null, fertig: state.data !== null || state.error !== null };
 }
 
 /** Registry #130: Personen der letzten Annahme für die Vorbelegung des
@@ -110,7 +111,7 @@ export function useCustomerKontakte(enabled = true) {
     {},
     enabled,
   );
-  return { ...state, data: state.data?.Customer ?? null };
+  return { ...state, data: state.data?.Customer ?? null, fertig: state.data !== null || state.error !== null };
 }
 
 export function useApplications(opts: { limit?: number; page?: number } = {}, enabled = true) {

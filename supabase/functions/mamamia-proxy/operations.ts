@@ -117,6 +117,7 @@ export const GET_CUSTOMER = /* GraphQL */ `
       }
       customer_contract {
         id
+        contact_type
         salutation
         first_name
         last_name

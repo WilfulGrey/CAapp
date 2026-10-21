@@ -14,6 +14,7 @@
 // Kunde prüft und ändert im Formular wie gewohnt.
 import type { ContractFormData } from '../components/portal/AngebotPruefenModal';
 import type { MamamiaCustomer, MamamiaCustomerContract, MamamiaCustomerJobOffer, MamamiaKontakte } from './mamamia/types';
+import { patientenVertrag } from './mamamia/mappers';
 
 /** Die Lead-Felder, die die bisherige Vorbelegung nutzt. */
 export interface VorbelegungLead {
@@ -56,15 +57,17 @@ export function fruehereBuchung(
 
 /** Bisherige Vorbelegung (unverändert): Lead (Patientenbogen vor Rechner) → mmCustomer. */
 export function bisherigeVorbelegung(lead: VorbelegungLead | null | undefined, mm: MamamiaCustomer | null | undefined): Partial<ContractFormData> {
+  // Nie die Zeile des Auftraggebers als Adresse der betreuten Person (Registry #131).
+  const vertrag = patientenVertrag(mm);
   const stageBStreet = lead?.patient_street ?? '';
-  const stageBZip = lead?.patient_zip ?? mm?.customer_contract?.zip_code ?? '';
-  const stageBCity = lead?.patient_city ?? mm?.customer_contract?.city ?? '';
+  const stageBZip = lead?.patient_zip ?? vertrag?.zip_code ?? '';
+  const stageBCity = lead?.patient_city ?? vertrag?.city ?? '';
   const ortLine = [stageBZip, stageBCity].filter(Boolean).join(', ');
   return {
     anrede: lead?.patient_anrede || lead?.anrede_text || 'Frau',
     vorname: lead?.patient_vorname || lead?.vorname || '',
     nachname: lead?.patient_nachname || lead?.nachname || '',
-    strasse: stageBStreet || mm?.customer_contract?.street_number || '',
+    strasse: stageBStreet || vertrag?.street_number || '',
     einsatzort: ortLine,
     // Patient hat meist KEINE eigene Telefon/E-Mail — die vorhandenen
     // Kontaktdaten gehören i.d.R. der Kontaktperson, daher dort vorausfüllen.
@@ -73,7 +76,7 @@ export function bisherigeVorbelegung(lead: VorbelegungLead | null | undefined, m
     kpAnrede: '',
     kpVorname: '',
     kpNachname: '',
-    kpTelefon: lead?.telefon || mm?.phone || mm?.customer_contract?.phone || '',
+    kpTelefon: lead?.telefon || mm?.phone || vertrag?.phone || '',
     kpEmail: lead?.email || mm?.email || '',
   };
 }

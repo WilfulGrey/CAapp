@@ -91,6 +91,8 @@ interface FakeNet {
   bridgeStatus?: number;
   // Kein bestehender Contract am Customer (kein location_id-Carry möglich).
   noExistingContract?: boolean;
+  // Eigene Contract-Liste am Customer (überschreibt die Standard-Liste).
+  contracts?: Array<{ contact_type: string; location_id: number }>;
   // PLZ→location_id Katalog (AcceptanceSyncLocations); fehlende PLZ ⇒ [].
   locationHits?: Record<string, number>;
   // Mamamia matcht `search` als PRÄFIX: eine unvollständige PLZ liefert echte
@@ -164,7 +166,11 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
               id: 7777,
               equipments: [{ id: 1 }, { id: 2 }],
               patients: [{ id: 42, tools: [{ id: 3 }] }],
-              customer_contract: net.noExistingContract ? null : { location_id: 13035 },
+              // AG-Zeile ZUERST — so liefert Mamamia nach einer Annahme (#131).
+              customer_contracts: net.contracts ?? (net.noExistingContract ? [] : [
+                { contact_type: "contract_contact", location_id: 999 },
+                { contact_type: "patient_contact", location_id: 13035 },
+              ]),
               job_offers: net.finalConfirmations!.length
                 ? net.finalConfirmations!.map((fc, i) => ({ id: fc.job_offer_id ?? 100 + i, final_confirmation: fc }))
                 : [{ id: 100, final_confirmation: null }],
@@ -291,6 +297,18 @@ Deno.test("buildCustomerContract: AG separat → Composed-Name-Split (letzte Lee
   assertEquals("salutation" in cc, false); // Composed-Form trägt keine Anrede
   assertEquals(cc.zip_code, "80333");
   assertEquals(cc.city, "München");
+});
+
+Deno.test("buildCustomerContract (#131): Snapshot mit Anrede + getrennten Namen ⇒ salutation, kein Split", () => {
+  const snap = makeRow().contract_snapshot!;
+  const row = makeRow({ contract_snapshot: { ...snap, ag: { ...(snap.ag as Record<string, unknown>), name: "Paul von Probe", anrede: "Herr", vorname: "Paul", nachname: "von Probe" } } });
+  const cc = buildCustomerContract(row)!;
+  assertEquals(cc.salutation, "Mr.");
+  assertEquals(cc.first_name, "Paul");
+  assertEquals(cc.last_name, "von Probe");
+  // „Divers" hat in Mamamia keinen Wert ⇒ Feld bleibt weg statt geraten
+  const divers = buildCustomerContract(makeRow({ contract_snapshot: { ...snap, ag: { ...(snap.ag as Record<string, unknown>), anrede: "Divers" } } }))!;
+  assertEquals("salutation" in divers, false);
 });
 
 Deno.test("isAgGleich: le=null ⇒ true; separater AG ⇒ false; kein Snapshot (Legacy) ⇒ true", () => {
@@ -627,6 +645,19 @@ Deno.test("sync: Katalog ohne Treffer ⇒ LE-Row fällt auf getragene location_i
   const pc = (uc.patient_contracts as Array<Record<string, unknown>>)[0];
   assertEquals(pc.location_id, 13035); // Carry aus bestehendem Contract (Patientenbogen)
   assertEquals("location_id" in (uc.invoice_contract as Record<string, unknown>), false);
+});
+
+Deno.test("sync (#131): Carry nur aus der patient_contact-Zeile — nie die location_id des Auftraggebers", async () => {
+  // Nur die Zeile des Auftraggebers steht am Customer (der alte Code las sie über den Singular).
+  const net = makeNet({ locationHits: {}, contracts: [{ contact_type: "contract_contact", location_id: 999 }] });
+  const stamps = makeStamps();
+  await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  const uc = net.ops.find((o) => o.op === "UpdateCustomerContract")!.variables;
+  const pc = (uc.patient_contracts as Array<Record<string, unknown>>)[0];
+  assertEquals("location_id" in pc, false); // kein Treffer, keine LE-Zeile ⇒ nichts geraten, nie 999
 });
 
 Deno.test("sync: Präfix-Treffer mit anderer PLZ wird verworfen (#65)", async () => {

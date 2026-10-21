@@ -704,13 +704,12 @@ const CustomerPortalPage: FC = () => {
   // Token lief WÄHREND der Sitzung ab (z. B. beim Speichern erkannt) —
   // gleiches Ziel wie mmExpired: Selbst-Service-Screen für neuen Link.
   const [saveTokenExpired, setSaveTokenExpired] = useState(false);
-  const { data: mmCustomer, loading: mmCustomerLoading, error: mmCustomerError } = useCustomer(mmReady);
+  const { data: mmCustomer, loading: mmCustomerLoading, error: mmCustomerError, fertig: mmCustomerFertig } = useCustomer(mmReady);
   // Registry #130: ab dem zweiten Einsatz die Personen der letzten Annahme aus
   // Mamamia lesen (nur wenn schon ein anderer Einsatz gebucht ist) — für die
   // Vorbelegung des Vertragsformulars. Fehler egal, dann wie bisher.
-  const { data: mmKontakte } = useCustomerKontakte(
-    mmReady && !IS_PREVIEW_ANY && fruehereBuchung(mmCustomer?.job_offers, session?.job_offer_id ?? null),
-  );
+  const kontakteNoetig = mmReady && !IS_PREVIEW_ANY && fruehereBuchung(mmCustomer?.job_offers, session?.job_offer_id ?? null);
+  const { data: mmKontakte, fertig: mmKontakteFertig } = useCustomerKontakte(kontakteNoetig);
   // Schon abgesendet: in dieser Sitzung, laut Lead oder laut mamamia.
   // `leads.patient_form_at` setzt der Proxy erst nach erfolgreichem
   // UpdateCustomer. Es kommt mit dem Lead, lange vor mamamia: Ohne das sahen
@@ -1484,6 +1483,11 @@ const CustomerPortalPage: FC = () => {
   // Vorbelegung des Vertragsformulars (AngebotPruefenModal, „Ihre Angaben"):
   // bisher Lead + mmCustomer, ab dem zweiten Einsatz die drei Personen der
   // letzten Annahme aus Mamamia — lib/vertragVorbelegung.ts (Registry #130).
+  // Registry #131: Das Modal liest die Vorbelegung nur beim Öffnen und legt sie
+  // sofort als Entwurf ab — also erst öffnen, wenn mmCustomer (und ggf. die
+  // Kontakte) geantwortet haben. Sonst nahm der Link aus Mail B die Vorbelegung
+  // ohne die Daten der letzten Annahme und behielt sie für die ganze Sitzung.
+  const vorbelegungBereit = !mmReady || IS_PREVIEW_ANY || (mmCustomerFertig && (!kontakteNoetig || mmKontakteFertig));
   const pruefenPrefill: Partial<ContractFormData> = vertragVorbelegung({
     lead,
     mmCustomer,
@@ -2812,6 +2816,10 @@ const CustomerPortalPage: FC = () => {
             const patch = mapPatientFormToUpdateCustomerInput(form, {
               existingPatientIds,
               locationId,
+              // Registry #131: Nach einer Annahme stehen Name/Anrede/Telefon der
+              // betreuten Person aus dem Vertragsformular in Mamamia — der Bogen
+              // überschreibt sie nicht mehr mit der Kontaktperson aus dem Lead.
+              vertragAusAnnahme: fruehereBuchung(mmCustomer?.job_offers, null),
               // Kontaktperson (Osoba Kontaktowa) aus dem Lead → customer_contract
               // (salutation/first_name/last_name), damit das Mamamia-Panel die
               // Kontaktdaten zeigt statt nur Customer.first_name top-level.
@@ -4588,7 +4596,7 @@ const CustomerPortalPage: FC = () => {
       )}
 
       {/* Angebot prüfen Modal */}
-      {selectedApp && (
+      {selectedApp && vorbelegungBereit && (
         <AngebotPruefenModal
           app={selectedApp}
           prefill={pruefenPrefill}
@@ -4602,7 +4610,7 @@ const CustomerPortalPage: FC = () => {
           (Vertragsformular). app.offer trägt die Eckdaten der gebuchten
           Kraft/des Jobs (Anreise/Abreise/Konditionen aus der fc-Synthese),
           pruefenPrefill die Personendaten aus Lead + mmCustomer. */}
-      {contractApp && (
+      {contractApp && vorbelegungBereit && (
         <AngebotPruefenModal
           app={contractApp}
           prefill={pruefenPrefill}
