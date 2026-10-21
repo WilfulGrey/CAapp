@@ -659,11 +659,8 @@ export interface MappedCustomerPatch {
   // zakwaterowania" is a required-looking multi-select; an empty list
   // surfaces as missing config to the agency.
   equipment_ids?: number[];
-  // Bug #13l + Bug #16: Mamamia panel "Lokalizacja opieki" reads z
+  // Bug #13l: Mamamia panel "Lokalizacja opieki" reads z
   // customer_contract.location_id (NIE z Customer.location_id top-level).
-  // Beta miała plural patient_contracts + invoice_contract — prod ma
-  // singular customer_contract (1:1). Refactor 2026-05-12 na singular
-  // który działa na obu środowiskach.
   // phone: Mamamia panel "Dane kontaktowe" reads from customer_contract.phone,
   // NOT Customer.phone top-level (same trap as Bug #13l with location_id).
   // We write to both so panel renders + agency tooling that queries the

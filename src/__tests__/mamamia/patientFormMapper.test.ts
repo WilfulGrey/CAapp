@@ -215,11 +215,8 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
   });
 
   it('location_id preferred over plz/ort custom_text + customer_contract rides along', () => {
-    // Bug #13l + Bug #16: locationId triggers customer_contract (singular)
-    // emission so Mamamia panel "Lokalizacja opieki" renders. Beta miała
-    // plural `patient_contracts` + `invoice_contract` (zweryfikowane live
-    // 2026-05-07 na Customer 7659) — prod ma legacy singular schema.
-    // Refactor 2026-05-12 na singular który działa na obu środowiskach.
+    // Bug #13l: locationId triggers customer_contract (singular)
+    // emission so Mamamia panel "Lokalizacja opieki" renders.
     const r = mapPatientFormToUpdateCustomerInput(makeForm(), { locationId: 1148 });
     expect(r.location_id).toBe(1148);
     expect(r.location_custom_text).toBeUndefined();

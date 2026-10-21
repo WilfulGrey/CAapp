@@ -178,11 +178,7 @@ export interface MamamiaCustomer {
   /** Patients — full shape for prefill, not just { id }. */
   patients?: MamamiaPatient[];
   customer_caregiver_wish?: MamamiaCaregiverWish | null;
-  // Beta Mamamia ma plural `customer_contracts` (1:n contracts z contact_type
-  // discriminator) — prod Mamamia ma legacy singular `customer_contract`
-  // (1:1 z customer). Refactor 2026-05-12 (Bug #16) na singular — działa
-  // na obu środowiskach. Beta zwraca tu pierwszy contract z plural array,
-  // prod jedyny dostępny.
+  // Singular = pierwszy wiersz z `customer_contracts` (patient_contact).
   customer_contract?: MamamiaCustomerContract | null;
   /** Accommodation equipment — fetched by GET_CUSTOMER as `equipments { id equipment }`.
    *  id=1 = Own TV, id=2 = Own Bathroom. Used to prefill the `badezimmer` field. */
