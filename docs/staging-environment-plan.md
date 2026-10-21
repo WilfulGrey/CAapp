@@ -374,7 +374,7 @@ End-to-end po wszystkim:
 
 ## Open questions / risks
 
-- **Mamamia beta schema drift** — staging passe może maskować prod-only bug (Bug #16 reverse: feature works on beta plural contracts, fails on prod singular). Mitigation: dla każdej zmiany dotykającej Mamamia GraphQL, w `/deploy-prod` Claude robi proactive schema introspection na prod (`__type(name: "...")`) i porównuje z założeniami feature'a. Dodać do skill steps.
+- **Mamamia beta schema drift** — staging passe może maskować prod-only bug. Mitigation: dla każdej zmiany dotykającej Mamamia GraphQL, w `/deploy-prod` Claude robi proactive schema introspection na prod (`__type(name: "...")`) i porównuje z założeniami feature'a. Dodać do skill steps.
 - **pg_cron cycle na staging Supabase** — codzienny analytics report + 15min detect-caregiver-events wystartują też na staging, więc bedą generować emails. Mitigation: ustawić `DAILY_REPORT_RECIPIENTS=null` (lub na test inbox) na staging Supabase secrets, żeby zespół nie był spammed dwa razy dziennie.
 - **Cross-env Mamamia customer ID collision** — gdyby ktoś przez pomyłkę odpalił staging-token na prod portal (token to losowy 32-char string, więc szansa kolizji ≈ 0 ale UI rendering może się rozjechać), proxy reject nie znajdzie customera w prod Mamamia. Akceptowalne — fail closed.
 - **Render slot rename ceremonii** — pomijamy. `caapp-beta` slug w Render = prod, `caapp-staging` = staging. Dokumentujemy w CLAUDE.md że to historyczne. Rename slot'a teoretycznie możliwy ale niewart ryzyka (DNS może się przerwać, GitHub Actions deploys mogą się zbluffować).

@@ -865,11 +865,8 @@ const RESYNC_IDENTITAET = /* GraphQL */ `
 
    Selektiert wird deshalb nur, was prod heute schon taeglich liest (Proxy
    GET_CUSTOMER bei jedem Portalbesuch, mamamia-proxy/operations.ts):
-   der SINGULARE customer_contract. `customer_contracts` (Plural) ist auf
-   prod als OBJEKTFELD unbewiesen — Bug #16 zeigt genau diese Ablehnung;
-   Registry #19 hat die Plural-ARGUMENTE der Mutation bewiesen, nicht das
-   Feld. Die Flags (contact_type/is_same_as_*) werden geschrieben, aber
-   nicht gelesen: als Feld hat sie auf prod noch nie jemand selektiert. */
+   der SINGULARE customer_contract. Die Flags (contact_type/is_same_as_*) werden geschrieben, hier aber
+   nicht gelesen. */
 const RESYNC_IDENTITY_READ = /* GraphQL */ `
   query ResyncIdentity($id: Int!) {
     Customer(id: $id) {

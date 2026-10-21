@@ -955,9 +955,8 @@ Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>          # Pflicht — sonst 4
   Kontaktpersonen und das Agentur-Passwort liest niemand aus.
   Bestehende Zeilen werden nur ersetzt, wenn sie **uns gehören** (Name leer oder aus
   `{patient_*, lead.*}`) — sonst `identity.hinweis` und die Zeile bleibt stehen.
-  Das Read-Query selektiert bewusst den **singularen** `customer_contract` (den liest
-  prod täglich über den Proxy); `customer_contracts` (Plural) ist als Objektfeld auf
-  prod unbewiesen — Bug #16 zeigt genau diese Ablehnung.
+  Das Read-Query selektiert den **singularen** `customer_contract` (den liest prod
+  täglich über den Proxy).
 
 #### ⑧ Sign session JWT + Set-Cookie
 
