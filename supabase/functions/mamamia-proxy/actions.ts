@@ -18,6 +18,7 @@ import {
   GET_CAREGIVER,
   CAREGIVER_DEPARTURES,
   GET_CUSTOMER,
+  GET_CUSTOMER_KONTAKTE,
   GET_JOB_OFFER,
   LIST_APPLICATIONS,
   LIST_INTERESTS,
@@ -134,6 +135,10 @@ const getJobOffer: ActionHandler = (session, _variables, deps) =>
 
 const getCustomer: ActionHandler = (session, _variables, deps) =>
   runGraphQL(deps, GET_CUSTOMER, { id: session.customer_id });
+
+// Registry #130: die drei Personen der letzten Annahme (nur lesen, nur der eigene Kunde).
+const getCustomerKontakte: ActionHandler = (session, _variables, deps) =>
+  runGraphQL(deps, GET_CUSTOMER_KONTAKTE, { id: session.customer_id });
 
 // Kill-Switch für den Rekruter-Hinweis (Michał 2026-07-31: „wyłącz/ukryj
 // wyświetlanie tego dodatkowego tekstu na razie u klientów — mamy jeszcze
@@ -819,12 +824,6 @@ const UPDATE_CUSTOMER_ALLOWED = new Set([
   // reads from customer_contract.location_id (NOT just Customer.location_id
   // top level). Patient form save propaguje resolved location_id na
   // customer_contract żeby panel renderował.
-  //
-  // Bug #16 (2026-05-12, prod Mamamia switch): pierwotnie pisaliśmy
-  // `patient_contracts: [...]` + `invoice_contract: {...}` (beta-only
-  // schema extension z N contracts per customer + contact_type discriminator).
-  // Prod ma legacy singular schema: `customer_contract` 1:1 z customer.
-  // Refactor na singular — universal, działa na obu środowiskach.
   "customer_contract",
 ]);
 
@@ -1344,6 +1343,7 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   searchLocations,
   getInviteRateState,
   listLeadJobs,
+  getCustomerKontakte,
   updateCustomer,
   updateJobDescription,
   updateJobOfferDates,

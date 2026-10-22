@@ -865,11 +865,8 @@ const RESYNC_IDENTITAET = /* GraphQL */ `
 
    Selektiert wird deshalb nur, was prod heute schon taeglich liest (Proxy
    GET_CUSTOMER bei jedem Portalbesuch, mamamia-proxy/operations.ts):
-   der SINGULARE customer_contract. `customer_contracts` (Plural) ist auf
-   prod als OBJEKTFELD unbewiesen — Bug #16 zeigt genau diese Ablehnung;
-   Registry #19 hat die Plural-ARGUMENTE der Mutation bewiesen, nicht das
-   Feld. Die Flags (contact_type/is_same_as_*) werden geschrieben, aber
-   nicht gelesen: als Feld hat sie auf prod noch nie jemand selektiert. */
+   der SINGULARE customer_contract. Die Flags (contact_type/is_same_as_*) werden geschrieben, hier aber
+   nicht gelesen. */
 const RESYNC_IDENTITY_READ = /* GraphQL */ `
   query ResyncIdentity($id: Int!) {
     Customer(id: $id) {
@@ -1192,6 +1189,14 @@ export async function resyncCustomerFromLead(args: {
 
       const hinweise: string[] = [];
       const anrede = anredeNachMamamia(lead.patient_anrede);
+      // BEKANNTE GRENZE (Registry #131): `vorher.customer_contract` ist der
+      // Singular — nach einer Annahme liefert Mamamia hier oft die Zeile des
+      // Auftraggebers (contract_contact). Dann prüft „gehört uns" die falsche
+      // Zeile und location_id kann die des AG sein. Betrifft nur den
+      // Identitäts-Resync (Vermittler-Eingang/Backfill, details: true), der
+      // praktisch vor der ersten Annahme läuft. Gleiches gilt für
+      // `customer_contract { location_id }` in RESYNC_READ (dort nicht genutzt).
+      // Richtig wäre `customer_contracts` nach contact_type — nicht umgebaut.
       if (zeileGehoertUns(vorher?.customer_contract, lead)) {
         const locationId = vorher?.customer_contract?.location_id ?? vorher?.location_id ?? null;
         iVars.patient_contracts = [{

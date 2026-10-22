@@ -620,7 +620,7 @@ Content-Type: application/json
   Przed formularzem (od Registry #109 słownictwo jak do 24.09., wygląd nowy): nad opiekunkami zdanie „Gefällt Ihnen eine Pflegekraft, laden Sie sie ein, sich bei Ihnen zu bewerben. Das ist kostenlos und unverbindlich: …“ i karta „Noch 2 Minuten bis zum Einladen“ (bez linii statusu) z przyciskiem „Jetzt vervollständigen →“ (`zurPflegesituation`); na każdej karcie opiekunki koralowy przycisk na całą szerokość „Profil vervollständigen & einladen“, który przez `canInviteNurse` skacze prosto do formularza (okno „Warum erst die Pflegesituation?“ i link „Warum? Mehr“ usunięte); nagłówek formularza „Pflegesituation · Unvollständig — Jetzt konkrete Bewerbungen erhalten“; „So geht es weiter“ krok 1 z przyciskiem „Jetzt vervollständigen →“. Do tego pływające `AngebotsFeedback` („Was sagen Sie zum Angebot?“, event `angebots_feedback`, po 45 s i gdy #patientendaten w widoku, nie nad formularzem). `AngebotFrage` nie jest renderowane. Po wysłaniu: `SucheStand`. Przy otwartej aplikacji: odliczanie 72 h (`src/lib/reservierung.ts`, ta sama reguła co auto-reject w `detect-caregiver-events`).
 - Chipy zapisują niezmienione wartości (`Pflegegrad 3`, `71-80 kg`); krótsze etykiety tylko w widoku (`ChipSelect labels`).
 - Szkic w `localStorage` pod `patient_<token>` (`_isDraft`), event `patient_form_step` (`metadata.step` = osiągnięty krok, 0-based: 1–3) raz na krok i sesję. Bridge `/api/lead-event` zapisuje od Registry #109 KAŻDY krok (`NON_DEDUPED_EVENTS`; wcześniej dedupe po (lead, typ) zostawiał tylko pierwszy krok na lead), bez maili. Od Registry #122 także klucz sesji w `reportLeadEvent` zawiera krok (`${token}:patient_form_step:${step}`) — wcześniej przeglądarka wysyłała na odsłonę tylko PIERWSZY krok. Brak eventu „formularz otwarty“: formularz stoi otwarty na stronie, a `step: 0` zafałszowałby „Formular begonnen“ w istniejących analizach (liczą każdy `patient_form_step`).
-- **Niewidoczne punkty pomiarowe (Registry #123):** tylko prawdziwe leady, nigdy w trybach podglądu (`IS_PREVIEW_ANY`), przez `reportLeadEvent` z `notify: false`; bridge przyjmuje je w `ALLOWED_EVENTS` i `NON_DEDUPED_EVENTS` z jednej listy `project 3/lib/messpunkte.ts` (lustro `MESSPUNKTE` w `src/lib/leadEvents.ts`), w ŻADNEJ liście maili, bez własnej gałęzi — czyli bez maila do zespołu, maila do klienta, remindera, Offline-Conversion i zmiany statusu. Zdarzenia: `profil_geoeffnet` {caregiver_id, quelle, vor_speichern}, `einladen_getippt` {caregiver_id, quelle, vor_speichern} (też tapnięcie w kłódkę przed zapisem), `warum_geoeffnet`, `bestpreis_geoeffnet`, `kosten_aufgeklappt`, `faq_geoeffnet` {frage: klucz z `FAQ_SCHLUESSEL`}, `kalender_geoeffnet`, `kalender_zu_ohne_datum` (żaden dzień nie wybrany i pole puste, także gdy pole znika otwarte). Raz na sesję; profil i „Einladen“ raz na opiekunkę (osobno przed i po zapisie), FAQ raz na pytanie. Bez danych osobowych. Kalendarz: `DateField` ma ogólne callbacki `onGeoeffnet`/`onGeschlossen(gewaehlt)`, znaczenie nadaje `AngebotCard` (`onMesspunkt`). `freischaltung` celowo nie zbudowane — portal po zapisie nie wie bez nowego wywołania Mamamii, kiedy klient jest aktywny. **Pomiar pól (Registry #130)** tą samą drogą: `formular_sichtbar` {schritt, vor_speichern} (pierwsze pole formularza w połowie widoczne — IntersectionObserver w `AngebotCard`, raz na sesję), `feld_beruehrt` {schritt, feld, vor_speichern} (tap lub fokus na polu kroku 1 „Zur Person“ i 3 „Einsatzort & Start“; `feld` = klucz `data-field`, nigdy wartość; raz na pole), `weiter_blockiert` {schritt, offen, vor_speichern} („Weiter“ / „Bewerbungen erhalten“ przy brakujących polach obowiązkowych; `offen` = klucze z `missingFields`; raz na krok i zestaw pól), `zur_pflegesituation` {quelle, vor_speichern} (przycisk do formularza: `kasten` = ramka nad opiekunkami, `warum` = okno „Warum erst die Pflegesituation?“, `karte` = przycisk na karcie, `schritte` = „So geht es weiter“, `frage` = pływające pytanie, `mail` = link `goto=anfragen`, `stand` = „Stand heute“ po zapisie; tylko kliknięcia klienta i link z maila, nigdy skok wywołany przez portal; raz na źródło). Krok 2 (diagnozy, demencja) i 4 celowo bez pomiaru pól.
+- **Niewidoczne punkty pomiarowe (Registry #123):** tylko prawdziwe leady, nigdy w trybach podglądu (`IS_PREVIEW_ANY`), przez `reportLeadEvent` z `notify: false`; bridge przyjmuje je w `ALLOWED_EVENTS` i `NON_DEDUPED_EVENTS` z jednej listy `project 3/lib/messpunkte.ts` (lustro `MESSPUNKTE` w `src/lib/leadEvents.ts`), w ŻADNEJ liście maili, bez własnej gałęzi — czyli bez maila do zespołu, maila do klienta, remindera, Offline-Conversion i zmiany statusu. Zdarzenia: `profil_geoeffnet` {caregiver_id, quelle, vor_speichern}, `einladen_getippt` {caregiver_id, quelle, vor_speichern} (też tapnięcie w kłódkę przed zapisem), `warum_geoeffnet`, `bestpreis_geoeffnet`, `kosten_aufgeklappt`, `faq_geoeffnet` {frage: klucz z `FAQ_SCHLUESSEL`}, `kalender_geoeffnet`, `kalender_zu_ohne_datum` (żaden dzień nie wybrany i pole puste, także gdy pole znika otwarte). Raz na sesję; profil i „Einladen“ raz na opiekunkę (osobno przed i po zapisie), FAQ raz na pytanie. Bez danych osobowych. Kalendarz: `DateField` ma ogólne callbacki `onGeoeffnet`/`onGeschlossen(gewaehlt)`, znaczenie nadaje `AngebotCard` (`onMesspunkt`). `freischaltung` celowo nie zbudowane — portal po zapisie nie wie bez nowego wywołania Mamamii, kiedy klient jest aktywny. **Pomiar pól (Registry #132)** tą samą drogą: `formular_sichtbar` {schritt, vor_speichern} (pierwsze pole formularza w połowie widoczne — IntersectionObserver w `AngebotCard`, raz na sesję), `feld_beruehrt` {schritt, feld, vor_speichern} (tap lub fokus na polu kroku 1 „Zur Person“ i 3 „Einsatzort & Start“; `feld` = klucz `data-field`, nigdy wartość; raz na pole), `weiter_blockiert` {schritt, offen, vor_speichern} („Weiter“ / „Bewerbungen erhalten“ przy brakujących polach obowiązkowych; `offen` = klucze z `missingFields`; raz na krok i zestaw pól), `zur_pflegesituation` {quelle, vor_speichern} (przycisk do formularza: `kasten` = ramka nad opiekunkami, `warum` = okno „Warum erst die Pflegesituation?“, `karte` = przycisk na karcie, `schritte` = „So geht es weiter“, `frage` = pływające pytanie, `mail` = link `goto=anfragen`, `stand` = „Stand heute“ po zapisie; tylko kliknięcia klienta i link z maila, nigdy skok wywołany przez portal; raz na źródło). Krok 2 (diagnozy, demencja) i 4 celowo bez pomiaru pól.
 
 ---
 
@@ -955,9 +955,8 @@ Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>          # Pflicht — sonst 4
   Kontaktpersonen und das Agentur-Passwort liest niemand aus.
   Bestehende Zeilen werden nur ersetzt, wenn sie **uns gehören** (Name leer oder aus
   `{patient_*, lead.*}`) — sonst `identity.hinweis` und die Zeile bleibt stehen.
-  Das Read-Query selektiert bewusst den **singularen** `customer_contract` (den liest
-  prod täglich über den Proxy); `customer_contracts` (Plural) ist als Objektfeld auf
-  prod unbewiesen — Bug #16 zeigt genau diese Ablehnung.
+  Das Read-Query selektiert den **singularen** `customer_contract` (den liest prod
+  täglich über den Proxy).
 
 #### ⑧ Sign session JWT + Set-Cookie
 
@@ -1000,9 +999,25 @@ applications/jobs zwracają 403.
 #### `getCustomer`
 GraphQL: `Customer(id: $id)` z całym setem pól potrzebnych do prefilla
 patient form (patrz [operations.ts:26](../supabase/functions/mamamia-proxy/operations.ts:26))
-— customer + patients[] + customer_caregiver_wish + customer_contracts[] + equipments[].
+— customer + patients[] + customer_caregiver_wish + singular `customer_contract` (z
+`contact_type`, Registry #131) + equipments[] + job_offers[].final_confirmation.
 
 `$id` wymuszany z `session.customer_id`.
+
+**Singular `customer_contract` NIE jest pewnym wierszem pacjenta** (beta e2e 21.10.2026):
+po akcepcie Mamamia zwraca przy odczycie często wiersz Auftraggebera
+(`contract_contact`). Front czyta go przez `patientenVertrag()` (mappers.ts), który
+ignoruje wiersz `contract_contact` — formularz pacjenta i fallback vorbelegungu umowy
+nie biorą wtedy adresu/telefonu Auftraggebera jako danych betreute Person.
+
+#### `getCustomerKontakte` (Registry #130)
+GraphQL: `Customer(id: $id) { customer_contracts { … contact_type … } customer_contacts { … } }`
+— osobne zapytanie (fail-soft), tylko odczyt, `$id` z `session.customer_id`. Front woła je
+tylko, gdy INNY job klienta ma `final_confirmation`, i wypełnia z niego formularz umowy
+(`vertragVorbelegung`): LE ← `patient_contact`, AG ← `contract_contact`, KP ←
+`customer_contacts`. Modal „Angebot prüfen" otwiera się dopiero, gdy `getCustomer` i (jeśli
+potrzebne) `getCustomerKontakte` odpowiedziały (Registry #131) — modal czyta vorbelegung
+tylko przy otwarciu i od razu zapisuje ją jako szkic w `sessionStorage`.
 
 #### `getJobOffer`
 GraphQL: `JobOffer(id: $id)` —
@@ -1223,6 +1238,7 @@ warunkiem że Customer ma `status='active'` ORAZ JobOffer też jest active
 | Action | Rodzaj | Endpoint mamamii | Auth |
 |---|---|---|---|
 | `getCustomer` | read | `/graphql` | agency-jwt |
+| `getCustomerKontakte` | read | `/graphql` | agency-jwt |
 | `getJobOffer` | read | `/graphql` | agency-jwt |
 | `listApplications` | read | `/graphql` | agency-jwt |
 | `listMatchings` | read | `/graphql` | agency-jwt |

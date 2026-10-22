@@ -222,6 +222,20 @@ describe('AngebotCard – Schritte und Speichern', () => {
     await waitFor(() => expect(JSON.parse(localStorage.getItem(`patient_${TOKEN}`)!)._isDraft).toBe(false));
   });
 
+  it('Registry #131: Einsatzort aus dem zuletzt abgesendeten Bogen, nicht aus der Zeile des Auftraggebers', async () => {
+    // Neues Gerät: Entwurf ohne Einsatzort. Mamamia liefert als Singular die AG-Zeile (München).
+    const { plz: _plz, ort: _ort, ...ohneOrt } = VOLL;
+    entwurf(ohneOrt);
+    const mitBogen = { ...lead, patient_form: { plz: '94428', ort: 'Eichendorf' } } as unknown as Lead;
+    const agZeile = { id: 1, patients: [], customer_contract: { contact_type: 'contract_contact', zip_code: '80331', city: 'München' } };
+    const onSave = vi.fn(async () => {});
+    render(<AngebotCard lead={mitBogen} mmCustomer={agZeile as never} mamamiaEnabled onSaveToMamamia={onSave} />);
+    for (let i = 0; i < 3; i++) await weiter();
+    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen erhalten' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][0]).toMatchObject({ plz: '94428', ort: 'Eichendorf' });
+  });
+
   it('springt nach dem Absenden ohne Animation nach oben (Safari blieb sonst unten stehen, Registry #102)', async () => {
     entwurf(VOLL);
     const onSave = vi.fn(async () => {});
@@ -317,7 +331,7 @@ describe('AngebotCard – Kalender-Messpunkte', () => {
     return onMesspunkt;
   };
   const feld = () => screen.getByRole('button', { name: /Datum wählen|\d{2}\.\d{2}\.\d{4}/ });
-  // Seit Registry #130 meldet ein Tipp ins Datumsfeld auch `feld_beruehrt` — hier zählen nur die Kalender-Meldungen.
+  // Seit Registry #132 meldet ein Tipp ins Datumsfeld auch `feld_beruehrt` — hier zählen nur die Kalender-Meldungen.
   const kalender = (m: ReturnType<typeof vi.fn>) => m.mock.calls.filter(([p]) => String(p).startsWith('kalender'));
 
   it('Feld leer: geöffnet, dann zu ohne Tag → „kalender_zu_ohne_datum“', async () => {
@@ -362,7 +376,7 @@ describe('AngebotCard – Kalender-Messpunkte', () => {
   });
 });
 
-// Feld-Messung (Registry #130): erstes Feld im Bild, angetippte Felder auf Seite 1 und 3, „Weiter“ mit offenen Pflichtfeldern.
+// Feld-Messung (Registry #132): erstes Feld im Bild, angetippte Felder auf Seite 1 und 3, „Weiter“ mit offenen Pflichtfeldern.
 // Gemeldet werden nur Schlüssel (`data-field`, Pflichtfeld-Namen), nie ein eingegebener Wert.
 describe('AngebotCard – Feld-Messung', () => {
   const meldungen = (m: ReturnType<typeof vi.fn>, punkt: string) => m.mock.calls.filter(([p]) => p === punkt);

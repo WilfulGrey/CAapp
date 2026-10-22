@@ -91,7 +91,7 @@ export const AngebotCard: FC<{
    *  festen Wert „Aus Ihrem Kostenrechner übernommen". Datenfluss, Prüfungen und Speichern bleiben wie heute. */
   stand75b8df8?: boolean;
   /** Unsichtbare Messpunkte des Patientenbogens: Kalender geöffnet / zu ohne Datum (Registry #123), Feld-Messung
-   *  (Registry #130): erstes Feld im Bild, Feld auf Seite 1 oder 3 angetippt, „Weiter“ mit offenen Pflichtfeldern.
+   *  (Registry #132): erstes Feld im Bild, Feld auf Seite 1 oder 3 angetippt, „Weiter“ mit offenen Pflichtfeldern.
    *  Das Portal meldet sie nur für echte Leads; ohne Rückruf passiert nichts. */
   onMesspunkt?: (
     punkt: 'kalender_geoeffnet' | 'kalender_zu_ohne_datum' | 'formular_sichtbar' | 'feld_beruehrt' | 'weiter_blockiert',
@@ -128,7 +128,18 @@ export const AngebotCard: FC<{
   // Final-saved localStorage (`_isDraft: false`) sits at level 1 too —
   // it's identical to Mamamia state by construction (the save is what
   // wrote both) so its position relative to (2) doesn't matter.
-  const prefill = lead ? prefillPatientFromLead(lead) : {};
+  // Registry #131: Einsatzort auch aus dem zuletzt abgesendeten Bogen
+  // (`leads.patient_form`) — Mamamia liefert ihn nach einer Annahme oft nicht
+  // mehr (Singular = Zeile des Auftraggebers, mappers.ts patientenVertrag).
+  const zuletzt = (lead?.patient_form ?? {}) as Record<string, unknown>;
+  const prefill = lead
+    ? {
+        ...prefillPatientFromLead(lead),
+        ...(typeof zuletzt.plz === 'string' && zuletzt.plz
+          ? { plz: zuletzt.plz, ort: typeof zuletzt.ort === 'string' ? zuletzt.ort : '' }
+          : {}),
+      }
+    : {};
   // Bug #13: onboard no longer ships patient.gender (kalkulator nie pyta);
   // Mamamia returns null until patient form save → reverse mapper outputs
   // '' for gender so dropdown stays empty. No more patientGenderKnown opt.
@@ -773,7 +784,7 @@ export const AngebotCard: FC<{
   // Eingebettet trägt der Kasten Rand und Innenabstand (px-6, passend zur mitlaufenden Knopfleiste mit `ruhig`).
   const Rahmen: ElementType = eingebettet ? 'div' : Card;
 
-  // ── Feld-Messung (Registry #130, für Kunden unsichtbar) ──────────────────────────────────────────────────────────────
+  // ── Feld-Messung (Registry #132, für Kunden unsichtbar) ──────────────────────────────────────────────────────────────
   // Wo steigen Kunden im Patientenbogen aus? Gemeldet wird, ob das erste Feld überhaupt ins Bild kommt, welche Felder auf
   // Seite 1 („Zur Person“) und Seite 3 („Einsatzort & Start“) angetippt werden, und welche Pflichtfelder bei „Weiter“
   // fehlen (oben in `weiter`/`speichern`). Nur Schlüssel (`data-field`), nie ein eingegebener Wert. Die Refs halten die

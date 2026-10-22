@@ -37,7 +37,7 @@ export const MESSPUNKTE = [
   'faq_geoeffnet',            // eine Häufige Frage aufgeklappt {frage}
   'kalender_geoeffnet',       // Kalender des Startdatums geöffnet
   'kalender_zu_ohne_datum',   // Kalender zu, ohne dass ein Tag gewählt wurde und das Feld leer ist
-  // Feld-Messung im Patientenbogen (Registry #130, Martin 16.10. „Ja“, 20.10. „mach was sinnvoll ist“):
+  // Feld-Messung im Patientenbogen (Registry #132, Martin 16.10. „Ja“, 20.10. „mach was sinnvoll ist“):
   'formular_sichtbar',        // erstes Feld des Patientenbogens zur Hälfte im Bild {schritt, vor_speichern}
   'feld_beruehrt',            // ein Feld auf Seite 1 oder 3 angetippt oder fokussiert {schritt, feld, vor_speichern}
   'weiter_blockiert',         // „Weiter“/„Speichern“ getippt, Pflichtangaben fehlen {schritt, offen, vor_speichern}
@@ -49,7 +49,7 @@ export type Messpunkt = typeof MESSPUNKTE[number];
 export type ProfilQuelle = 'karte' | 'liste' | 'interesse' | 'bewerbung' | 'bearbeitet' | 'gebucht' | 'mail' | 'sonstige';
 /** Wo „Einladen" getippt wurde. */
 export type EinladenQuelle = 'karte' | 'interesse' | 'profil';
-/** Welcher Weg ins Formular führte (Registry #130): Kasten über den Pflegekräften, Pop-up „Warum erst die
+/** Welcher Weg ins Formular führte (Registry #132): Kasten über den Pflegekräften, Pop-up „Warum erst die
  *  Pflegesituation?", Karte einer Pflegekraft, „So geht es weiter", schwebende Frage, Mail-Link `goto=anfragen`,
  *  „Stand heute" nach dem Absenden. */
 export type FormularQuelle = 'kasten' | 'warum' | 'karte' | 'schritte' | 'frage' | 'mail' | 'stand';
@@ -136,7 +136,7 @@ export interface LeadEventMetadata {
   vor_speichern?: boolean;
   // faq_geoeffnet: kurzer Schlüssel der Frage (FAQ_SCHLUESSEL in FaqListe), nie der Wortlaut.
   frage?: string;
-  // Feld-Messung (Registry #130): Schritt des Patientenbogens (0-basiert), Schlüssel des Felds (`data-field`, z. B.
+  // Feld-Messung (Registry #132): Schritt des Patientenbogens (0-basiert), Schlüssel des Felds (`data-field`, z. B.
   // 'geschlecht'), offene Pflichtfelder als Schlüssel. Nie ein eingegebener Wert.
   schritt?: number;
   feld?: string;
@@ -187,7 +187,7 @@ function dedupeKey(token: string, event: LeadEvent, metadata?: LeadEventMetadata
   if (event === 'faq_geoeffnet') {
     return `${token}:${event}:${metadata?.frage ?? ''}`;
   }
-  // Feld-Messung (Registry #130): je Feld einmal; „Weiter“ ohne Pflichtangaben je Schritt und Satz offener Felder
+  // Feld-Messung (Registry #132): je Feld einmal; „Weiter“ ohne Pflichtangaben je Schritt und Satz offener Felder
   // einmal (wer ein Feld nachträgt und wieder scheitert, ist eine neue Aussage).
   if (event === 'feld_beruehrt') {
     return `${token}:${event}:${metadata?.feld ?? ''}`;

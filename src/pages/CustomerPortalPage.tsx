@@ -10,7 +10,8 @@ import {
   setDeclinedCaregiver,
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
-import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers, useInviteRateState, useLeadJobs } from '../lib/mamamia/hooks';
+import { useCustomer, useCustomerKontakte, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers, useInviteRateState, useLeadJobs } from '../lib/mamamia/hooks';
+import { fruehereBuchung, vertragVorbelegung } from '../lib/vertragVorbelegung';
 import { rankComparator } from '../lib/mamamia/matchingsRanking';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { isAboutDeStale, regenerateGermanDescription } from '../lib/mamamia/caregiverAbout';
@@ -703,7 +704,12 @@ const CustomerPortalPage: FC = () => {
   // Token lief WÄHREND der Sitzung ab (z. B. beim Speichern erkannt) —
   // gleiches Ziel wie mmExpired: Selbst-Service-Screen für neuen Link.
   const [saveTokenExpired, setSaveTokenExpired] = useState(false);
-  const { data: mmCustomer, loading: mmCustomerLoading, error: mmCustomerError } = useCustomer(mmReady);
+  const { data: mmCustomer, loading: mmCustomerLoading, error: mmCustomerError, fertig: mmCustomerFertig } = useCustomer(mmReady);
+  // Registry #130: ab dem zweiten Einsatz die Personen der letzten Annahme aus
+  // Mamamia lesen (nur wenn schon ein anderer Einsatz gebucht ist) — für die
+  // Vorbelegung des Vertragsformulars. Fehler egal, dann wie bisher.
+  const kontakteNoetig = mmReady && !IS_PREVIEW_ANY && fruehereBuchung(mmCustomer?.job_offers, session?.job_offer_id ?? null);
+  const { data: mmKontakte, fertig: mmKontakteFertig } = useCustomerKontakte(kontakteNoetig);
   // Schon abgesendet: in dieser Sitzung, laut Lead oder laut mamamia.
   // `leads.patient_form_at` setzt der Proxy erst nach erfolgreichem
   // UpdateCustomer. Es kommt mit dem Lead, lange vor mamamia: Ohne das sahen
@@ -1474,34 +1480,20 @@ const CustomerPortalPage: FC = () => {
     return () => clearInterval(t);
   }, [mmReady, mmApplicationsError, refetchApplications]);
 
-  // Prefill for AngebotPruefenModal step 2 — replaces the previous
-  // hardcoded fixture (Hildegard/Müller/Rosenstraße/München) that bled
-  // through to every customer regardless of their actual data.
-  // Priority: stage-B patient_* fields → stage-A lead.* → mmCustomer →
-  // empty string. KP (Kontaktperson) fields stay fresh — first time we
-  // ask for them.
-  const pruefenPrefill: Partial<ContractFormData> = (() => {
-    const stageBStreet = lead?.patient_street ?? '';
-    const stageBZip = lead?.patient_zip ?? mmCustomer?.customer_contract?.zip_code ?? '';
-    const stageBCity = lead?.patient_city ?? mmCustomer?.customer_contract?.city ?? '';
-    const ortLine = [stageBZip, stageBCity].filter(Boolean).join(', ');
-    return {
-      anrede: lead?.patient_anrede || lead?.anrede_text || 'Frau',
-      vorname: lead?.patient_vorname || lead?.vorname || '',
-      nachname: lead?.patient_nachname || lead?.nachname || '',
-      strasse: stageBStreet || mmCustomer?.customer_contract?.street_number || '',
-      einsatzort: ortLine,
-      // Patient hat meist KEINE eigene Telefon/E-Mail — die vorhandenen
-      // Kontaktdaten gehören i.d.R. der Kontaktperson, daher dort vorausfüllen.
-      telefon: '',
-      email: '',
-      kpAnrede: '',
-      kpVorname: '',
-      kpNachname: '',
-      kpTelefon: lead?.telefon || mmCustomer?.phone || mmCustomer?.customer_contract?.phone || '',
-      kpEmail: lead?.email || mmCustomer?.email || '',
-    };
-  })();
+  // Vorbelegung des Vertragsformulars (AngebotPruefenModal, „Ihre Angaben"):
+  // bisher Lead + mmCustomer, ab dem zweiten Einsatz die drei Personen der
+  // letzten Annahme aus Mamamia — lib/vertragVorbelegung.ts (Registry #130).
+  // Registry #131: Das Modal liest die Vorbelegung nur beim Öffnen und legt sie
+  // sofort als Entwurf ab — also erst öffnen, wenn mmCustomer (und ggf. die
+  // Kontakte) geantwortet haben. Sonst nahm der Link aus Mail B die Vorbelegung
+  // ohne die Daten der letzten Annahme und behielt sie für die ganze Sitzung.
+  const vorbelegungBereit = !mmReady || IS_PREVIEW_ANY || (mmCustomerFertig && (!kontakteNoetig || mmKontakteFertig));
+  const pruefenPrefill: Partial<ContractFormData> = vertragVorbelegung({
+    lead,
+    mmCustomer,
+    kontakte: mmKontakte,
+    aktuellerJob: session?.job_offer_id ?? null,
+  });
 
   // Compute visible interests — drop rejected-by-caregiver and locally-
   // dismissed-by-customer entries. Also drop interests whose caregiver
@@ -1967,7 +1959,7 @@ const CustomerPortalPage: FC = () => {
     // Rückbau (Stand 75b8df8): Das Formular steht offen unter dem Abschnittskopf, weich dorthin wie damals.
     ziel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-  // Messpunkt (Registry #130): welcher Knopf ins Formular führte. Nur Tipps des Kunden und der Mail-Link, nie ein
+  // Messpunkt (Registry #132): welcher Knopf ins Formular führte. Nur Tipps des Kunden und der Mail-Link, nie ein
   // Sprung, den das Portal selbst auslöst. Ohne ihn wüssten wir nicht, ob jemand über einen Knopf kam oder selbst scrollte.
   const zurPflegesituationAus = (quelle: FormularQuelle) => () => {
     messen('zur_pflegesituation', { quelle, vor_speichern: vorSpeichern });
@@ -2830,6 +2822,10 @@ const CustomerPortalPage: FC = () => {
             const patch = mapPatientFormToUpdateCustomerInput(form, {
               existingPatientIds,
               locationId,
+              // Registry #131: Nach einer Annahme stehen Name/Anrede/Telefon der
+              // betreuten Person aus dem Vertragsformular in Mamamia — der Bogen
+              // überschreibt sie nicht mehr mit der Kontaktperson aus dem Lead.
+              vertragAusAnnahme: fruehereBuchung(mmCustomer?.job_offers, null),
               // Kontaktperson (Osoba Kontaktowa) aus dem Lead → customer_contract
               // (salutation/first_name/last_name), damit das Mamamia-Panel die
               // Kontaktdaten zeigt statt nur Customer.first_name top-level.
@@ -4606,7 +4602,7 @@ const CustomerPortalPage: FC = () => {
       )}
 
       {/* Angebot prüfen Modal */}
-      {selectedApp && (
+      {selectedApp && vorbelegungBereit && (
         <AngebotPruefenModal
           app={selectedApp}
           prefill={pruefenPrefill}
@@ -4620,7 +4616,7 @@ const CustomerPortalPage: FC = () => {
           (Vertragsformular). app.offer trägt die Eckdaten der gebuchten
           Kraft/des Jobs (Anreise/Abreise/Konditionen aus der fc-Synthese),
           pruefenPrefill die Personendaten aus Lead + mmCustomer. */}
-      {contractApp && (
+      {contractApp && vorbelegungBereit && (
         <AngebotPruefenModal
           app={contractApp}
           prefill={pruefenPrefill}

@@ -124,7 +124,7 @@ Przejście end-to-end: http://localhost:3000 → wypełnij wizard → po submit 
 
 > **Lokalny dev = ten sam backend co Render beta slot.** Nie mamy lokalnej Supabase instancji ani lokalnego Mamamia — wszystko idzie do `ycdwtrklpoqprabtwahi.supabase.co` + Mamamia preprod (`backend.prod.mamamia.app`). To znaczy: każdy lokalny submit tworzy realny lead w Supabase + realnego customer'a w Mamamia preprod tenant'cie. Używaj test'owych emaili (`mailinator.com` zalecane) i test'owych imion (`Test [Co-testujesz]`).
 >
-> **⚠️ "beta" vs "preprod" terminologia:** nasz Render slot nazywa się `caapp-beta` / `kostenrechner-beta` — to nasz staging deploy. Ale **Mamamia** ma dwa osobne tenanty: `backend.beta.mamamia.app` (Mamamia dev env, forward-going schema) i `backend.prod.mamamia.app` (Mamamia production-grade, legacy schema — to którego aktualnie używamy jako preprod). Patrz CLAUDE.md §"Naming convention" dla szczegółów + Bug #16 dla schema diff między nimi.
+> **⚠️ "beta" vs "preprod" terminologia:** nasz Render slot nazywa się `caapp-beta` / `kostenrechner-beta` — to nasz staging deploy. Ale **Mamamia** ma dwa osobne tenanty: `backend.beta.mamamia.app` (Mamamia dev env, forward-going schema) i `backend.prod.mamamia.app` (Mamamia production-grade, legacy schema — to którego aktualnie używamy jako preprod). Patrz CLAUDE.md §"Naming convention" dla szczegółów.
 
 ---
 
