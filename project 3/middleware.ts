@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-/* Kein Ersatzwert: das Repo ist öffentlich, ein Default-Passwort im Code wäre
-   für jeden lesbar. Fehlt die Variable, ist das Panel zu (siehe istAngemeldet). */
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+import { ALTES_COOKIE, istAdmin } from '@/lib/admin-sitzung';
 
 /* Admin-API-Routen mit EIGENEM Zugangsschutz — sie duerfen nicht am
    Browser-Cookie haengen:
@@ -18,16 +15,21 @@ const API_OHNE_ADMIN_COOKIE = [
   '/api/admin/resend-bewerbung-bcc',
 ];
 
-function istAngemeldet(request: NextRequest): boolean {
-  // Ohne ADMIN_PASSWORD wäre undefined === undefined (kein Cookie) ein Login.
-  return !!ADMIN_PASSWORD && request.cookies.get('admin_auth')?.value === ADMIN_PASSWORD;
+/* Angemeldet = gültiges, signiertes Cookie `admin_sitzung` (lib/admin-sitzung.ts,
+   Registry #132). Kein Ersatzwert: fehlt ADMIN_PASSWORD oder
+   ADMIN_SESSION_SECRET, ist das Panel zu. Das alte Cookie (ALTES_COOKIE) trug
+   das Klartext-Passwort; es zählt nicht mehr und wird bei jedem Admin-Aufruf
+   gelöscht — alle melden sich einmal neu an. */
+function ohneAltesCookie(request: NextRequest, antwort: NextResponse): NextResponse {
+  if (request.cookies.has(ALTES_COOKIE)) antwort.cookies.delete(ALTES_COOKIE);
+  return antwort;
 }
 
 /* Der A/B-Test mit Pria (Float auf der B-Seite) ist seit 13.09.2026
    beendet — Registry #67: A 500 Sitzungen / 25 Leads, B 421 / 24, der Chat
    selbst 1 Lead in drei Wochen. Die Weiche würfelt nicht mehr. */
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Telemetria optymalizatora obrazów (diagnoza OOM — plan 2026-08-09):
@@ -51,16 +53,17 @@ export function middleware(request: NextRequest) {
     const eigenerSchutz = API_OHNE_ADMIN_COOKIE.some(
       (p) => pathname === p || pathname.startsWith(`${p}/`),
     );
-    if (!eigenerSchutz && !istAngemeldet(request)) {
-      return NextResponse.json({ fehler: 'Nicht angemeldet.' }, { status: 401 });
+    if (!eigenerSchutz && !(await istAdmin(request))) {
+      return ohneAltesCookie(request, NextResponse.json({ fehler: 'Nicht angemeldet.' }, { status: 401 }));
     }
-    return NextResponse.next();
+    return ohneAltesCookie(request, NextResponse.next());
   }
 
   if (pathname.startsWith('/admin') && !pathname.startsWith('/admin-login')) {
-    if (!istAngemeldet(request)) {
-      return NextResponse.redirect(new URL('/admin-login', request.url));
+    if (!(await istAdmin(request))) {
+      return ohneAltesCookie(request, NextResponse.redirect(new URL('/admin-login', request.url)));
     }
+    return ohneAltesCookie(request, NextResponse.next());
   }
 
   /* Startseite: kein Rewrite mehr. Ein altes `pm_variante`-Cookie wird

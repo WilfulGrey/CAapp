@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { istAdmin } from '@/lib/admin-sitzung';
 import { createClient } from '@supabase/supabase-js';
 
 /**
@@ -14,9 +15,7 @@ import { createClient } from '@supabase/supabase-js';
  * Browser-Bundle: Schreibrechte gehoeren nicht dorthin, wo jeder sie liest.
  */
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  const cookie = request.cookies.get('admin_auth')?.value ?? '';
-  const erwartet = process.env.ADMIN_PASSWORD || 'primundus2026';
-  if (cookie !== erwartet) {
+  if (!(await istAdmin(request))) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 

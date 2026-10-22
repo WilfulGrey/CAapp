@@ -104,6 +104,10 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
+      # Signs the admin session cookie (Registry #132): random, >= 32 chars,
+      # own value per slot. Missing ⇒ admin login closed (no fallback).
+      - key: ADMIN_SESSION_SECRET
+        sync: false
       # Amazon SES (eu-central-1), port 587 + STARTTLS — replaces Ionos.
       # Host + From are non-secret and pinned here so a redeploy can't reset
       # them; only the SES SMTP user/pass are secrets (set in the dashboard).
