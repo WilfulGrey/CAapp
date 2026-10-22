@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Lead } from '../../lib/supabase';
 
@@ -331,13 +331,15 @@ describe('AngebotCard – Kalender-Messpunkte', () => {
     return onMesspunkt;
   };
   const feld = () => screen.getByRole('button', { name: /Datum wählen|\d{2}\.\d{2}\.\d{4}/ });
+  // Seit Registry #132 meldet ein Tipp ins Datumsfeld auch `feld_beruehrt` — hier zählen nur die Kalender-Meldungen.
+  const kalender = (m: ReturnType<typeof vi.fn>) => m.mock.calls.filter(([p]) => String(p).startsWith('kalender'));
 
   it('Feld leer: geöffnet, dann zu ohne Tag → „kalender_zu_ohne_datum“', async () => {
     const onMesspunkt = await zumKalender('');
     await userEvent.click(feld());
-    expect(onMesspunkt.mock.calls).toEqual([['kalender_geoeffnet']]);
+    expect(kalender(onMesspunkt)).toEqual([['kalender_geoeffnet']]);
     await userEvent.click(feld());
-    expect(onMesspunkt.mock.calls).toEqual([['kalender_geoeffnet'], ['kalender_zu_ohne_datum']]);
+    expect(kalender(onMesspunkt)).toEqual([['kalender_geoeffnet'], ['kalender_zu_ohne_datum']]);
   });
 
   it('Tag gewählt: keine Meldung „zu ohne Datum“', async () => {
@@ -346,14 +348,14 @@ describe('AngebotCard – Kalender-Messpunkte', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Nächster Monat' }));
     await userEvent.click(screen.getAllByRole('button', { name: '15' })[0]);
     expect(feld()).toHaveTextContent(/^15\.\d{2}\.\d{4}$/);
-    expect(onMesspunkt.mock.calls).toEqual([['kalender_geoeffnet']]);
+    expect(kalender(onMesspunkt)).toEqual([['kalender_geoeffnet']]);
   });
 
   it('Datum schon gesetzt: nur angesehen und zu → keine Meldung „zu ohne Datum“', async () => {
     const onMesspunkt = await zumKalender('2099-12-01');
     await userEvent.click(feld());
     await userEvent.click(feld());
-    expect(onMesspunkt.mock.calls).toEqual([['kalender_geoeffnet']]);
+    expect(kalender(onMesspunkt)).toEqual([['kalender_geoeffnet']]);
   });
 
   it('Kalender offen, Schritt verlassen („Zurück“), Feld leer → „kalender_zu_ohne_datum“', async () => {
@@ -361,7 +363,7 @@ describe('AngebotCard – Kalender-Messpunkte', () => {
     await userEvent.click(feld());
     await userEvent.click(screen.getByRole('button', { name: 'Zurück' }));
     schritt(2);
-    expect(onMesspunkt.mock.calls).toEqual([['kalender_geoeffnet'], ['kalender_zu_ohne_datum']]);
+    expect(kalender(onMesspunkt)).toEqual([['kalender_geoeffnet'], ['kalender_zu_ohne_datum']]);
   });
 
   it('ohne Rückruf passiert nichts (und reportLeadEvent bekommt keine Kalender-Meldung)', async () => {
@@ -371,5 +373,90 @@ describe('AngebotCard – Kalender-Messpunkte', () => {
     await userEvent.click(feld());
     await userEvent.click(feld());
     expect(vi.mocked(reportLeadEvent).mock.calls.map((c) => c[1])).not.toContain('kalender_geoeffnet');
+  });
+});
+
+// Feld-Messung (Registry #132): erstes Feld im Bild, angetippte Felder auf Seite 1 und 3, „Weiter“ mit offenen Pflichtfeldern.
+// Gemeldet werden nur Schlüssel (`data-field`, Pflichtfeld-Namen), nie ein eingegebener Wert.
+describe('AngebotCard – Feld-Messung', () => {
+  const meldungen = (m: ReturnType<typeof vi.fn>, punkt: string) => m.mock.calls.filter(([p]) => p === punkt);
+
+  it('Tipp auf ein Feld auf Seite 1 → „feld_beruehrt“ mit Schritt und Feldschlüssel', async () => {
+    const onMesspunkt = vi.fn();
+    render(<AngebotCard lead={lead} onMesspunkt={onMesspunkt} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Weiblich' }));
+    expect(meldungen(onMesspunkt, 'feld_beruehrt')).toContainEqual(
+      ['feld_beruehrt', { schritt: 0, feld: 'geschlecht', vor_speichern: true }],
+    );
+  });
+
+  it('Seite 3 meldet, Seite 2 nicht', async () => {
+    entwurf(VOLL);
+    const onMesspunkt = vi.fn();
+    const { container } = render(<AngebotCard lead={lead} onMesspunkt={onMesspunkt} />);
+    await weiter();
+    schritt(2);
+    await userEvent.click(within(container.querySelector('[data-field="heben"]') as HTMLElement).getAllByRole('button')[0]);
+    expect(meldungen(onMesspunkt, 'feld_beruehrt')).toEqual([]);
+    await weiter();
+    schritt(3);
+    await userEvent.click(within(container.querySelector('[data-field="wohnungstyp"]') as HTMLElement).getAllByRole('button')[0]);
+    expect(meldungen(onMesspunkt, 'feld_beruehrt').map(([, m]) => m)).toContainEqual(
+      { schritt: 2, feld: 'wohnungstyp', vor_speichern: true },
+    );
+  });
+
+  it('„Weiter“ mit offenem Pflichtfeld → „weiter_blockiert“ mit den offenen Schlüsseln', async () => {
+    const onMesspunkt = vi.fn();
+    render(<AngebotCard lead={lead} onMesspunkt={onMesspunkt} />);
+    await weiter();
+    expect(meldungen(onMesspunkt, 'weiter_blockiert')).toEqual([
+      ['weiter_blockiert', { schritt: 0, offen: ['geschlecht'], vor_speichern: true }],
+    ]);
+  });
+
+  it('„Bewerbungen erhalten“ mit offenem Pflichtfeld → „weiter_blockiert“ statt Absenden', async () => {
+    entwurf({ ...VOLL, wunschGeschlecht: '' });
+    const onMesspunkt = vi.fn();
+    const onSave = vi.fn(async () => {});
+    render(<AngebotCard lead={lead} mamamiaEnabled onSaveToMamamia={onSave} onMesspunkt={onMesspunkt} />);
+    for (let i = 0; i < 3; i++) await weiter();
+    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen erhalten' }));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(meldungen(onMesspunkt, 'weiter_blockiert')).toEqual([
+      ['weiter_blockiert', { schritt: 3, offen: ['wunschGeschlecht'], vor_speichern: true }],
+    ]);
+  });
+
+  it('erstes Feld zur Hälfte im Bild → „formular_sichtbar“ genau einmal', async () => {
+    const beobachter: Array<(e: Array<{ isIntersecting: boolean }>) => void> = [];
+    const vorher = (window as unknown as { IntersectionObserver?: unknown }).IntersectionObserver;
+    (window as unknown as { IntersectionObserver: unknown }).IntersectionObserver = class {
+      constructor(cb: (e: Array<{ isIntersecting: boolean }>) => void) { beobachter.push(cb); }
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    };
+    try {
+      const onMesspunkt = vi.fn();
+      render(<AngebotCard lead={lead} onMesspunkt={onMesspunkt} />);
+      expect(beobachter.length).toBeGreaterThan(0);
+      beobachter.at(-1)!([{ isIntersecting: false }]);
+      expect(meldungen(onMesspunkt, 'formular_sichtbar')).toEqual([]);
+      beobachter.at(-1)!([{ isIntersecting: true }]);
+      beobachter.at(-1)!([{ isIntersecting: true }]);
+      expect(meldungen(onMesspunkt, 'formular_sichtbar')).toEqual([
+        ['formular_sichtbar', { schritt: 0, vor_speichern: true }],
+      ]);
+    } finally {
+      (window as unknown as { IntersectionObserver: unknown }).IntersectionObserver = vorher;
+    }
+  });
+
+  it('nach dem ersten Absenden: vor_speichern ist false', async () => {
+    const onMesspunkt = vi.fn();
+    render(<AngebotCard lead={lead} schonAbgesendet onMesspunkt={onMesspunkt} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Weiblich' }));
+    expect(meldungen(onMesspunkt, 'feld_beruehrt')[0]?.[1]).toMatchObject({ vor_speichern: false });
   });
 });
