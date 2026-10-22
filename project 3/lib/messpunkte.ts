@@ -22,6 +22,7 @@
 //   formular_sichtbar       { schritt, vor_speichern }   erstes Feld des Patientenbogens zur Hälfte im Bild (Registry #130)
 //   feld_beruehrt           { schritt, feld, vor_speichern }   Feld auf Seite 1 oder 3 angetippt; `feld` = data-field-Schlüssel
 //   weiter_blockiert        { schritt, offen, vor_speichern }  „Weiter“/„Speichern“ mit offenen Pflichtfeldern (Schlüssel)
+//   zur_pflegesituation     { quelle: kasten|warum|karte|schritte|frage|mail|stand, vor_speichern }  Knopf ins Formular
 // `vor_speichern` = die Pflegesituation wurde noch nie gespeichert (Portal: !patientSaved && !schonAbgesendet).
 export const MESSPUNKTE = [
   'profil_geoeffnet',
@@ -35,6 +36,7 @@ export const MESSPUNKTE = [
   'formular_sichtbar',
   'feld_beruehrt',
   'weiter_blockiert',
+  'zur_pflegesituation',
 ] as const;
 
 export type Messpunkt = typeof MESSPUNKTE[number];

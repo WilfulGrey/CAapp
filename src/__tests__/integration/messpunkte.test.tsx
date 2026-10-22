@@ -103,6 +103,36 @@ describe('Messpunkte vor dem ersten Speichern (Rückbau, Registry #122/#123)', (
     }
   }, 20_000);
 
+  it('Weg ins Formular: Kasten und Warum-Fenster melden ihre Quelle', async () => {
+    const meldungen: Meldung[] = [];
+    server.use(
+      bridgeHandler((b) => { meldungen.push(b as Meldung); }),
+      ...lesen,
+      ...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }),
+    );
+    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await screen.findByText('Noch 2 Minuten bis zu Ihren Bewerbungen', {}, { timeout: 5000 });
+
+    // Knopf im Kasten über den Pflegekräften, zweimal → eine Meldung
+    const kasten = () => screen.getAllByRole('button', { name: 'Pflegesituation vervollständigen' })[0];
+    await user.click(kasten());
+    await user.click(kasten());
+    // „Einladen" mit Schloss → Warum-Fenster → Knopf darin
+    await user.click(screen.getAllByRole('button', { name: 'Einladen' })[0]);
+    const warum = await screen.findByRole('dialog', { name: 'Warum erst die Pflegesituation?' });
+    await user.click(within(warum).getByRole('button', { name: 'Pflegesituation vervollständigen' }));
+
+    const wege = () => meldungen.filter((m) => m.event === 'zur_pflegesituation');
+    await waitFor(() => expect(wege()).toHaveLength(2));
+    expect(wege().map((m) => m.metadata)).toEqual([
+      { quelle: 'kasten', vor_speichern: true },
+      { quelle: 'warum', vor_speichern: true },
+    ]);
+    for (const m of wege()) expect(m.notify).toBe(false);
+  }, 20_000);
+
   it('Kalender im Patientenbogen: geöffnet und ohne Datum wieder zu', async () => {
     const meldungen: Meldung[] = [];
     server.use(

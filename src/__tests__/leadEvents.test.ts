@@ -219,6 +219,14 @@ describe('Messpunkte (Registry #123)', () => {
     ]);
   });
 
+  it('zur_pflegesituation: je Quelle einmal', () => {
+    reportLeadEvent('tok-m', 'zur_pflegesituation', { quelle: 'kasten', vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'zur_pflegesituation', { quelle: 'kasten', vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'zur_pflegesituation', { quelle: 'warum', vor_speichern: true }, false);
+    expect(calls()).toHaveLength(2);
+    expect([0, 1].map((i) => bodyOf(i).metadata.quelle)).toEqual(['kasten', 'warum']);
+  });
+
   it('Vorschau-Token sendet nichts', () => {
     reportLeadEvent('preview-token', 'profil_geoeffnet', { caregiver_id: 1, quelle: 'karte', vor_speichern: true }, false);
     reportLeadEvent('preview-token', 'kalender_geoeffnet', undefined, false);

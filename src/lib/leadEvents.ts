@@ -41,6 +41,7 @@ export const MESSPUNKTE = [
   'formular_sichtbar',        // erstes Feld des Patientenbogens zur Hälfte im Bild {schritt, vor_speichern}
   'feld_beruehrt',            // ein Feld auf Seite 1 oder 3 angetippt oder fokussiert {schritt, feld, vor_speichern}
   'weiter_blockiert',         // „Weiter“/„Speichern“ getippt, Pflichtangaben fehlen {schritt, offen, vor_speichern}
+  'zur_pflegesituation',      // Knopf oder Link ins Formular getippt {quelle, vor_speichern}
 ] as const;
 export type Messpunkt = typeof MESSPUNKTE[number];
 
@@ -48,6 +49,10 @@ export type Messpunkt = typeof MESSPUNKTE[number];
 export type ProfilQuelle = 'karte' | 'liste' | 'interesse' | 'bewerbung' | 'bearbeitet' | 'gebucht' | 'mail' | 'sonstige';
 /** Wo „Einladen" getippt wurde. */
 export type EinladenQuelle = 'karte' | 'interesse' | 'profil';
+/** Welcher Weg ins Formular führte (Registry #130): Kasten über den Pflegekräften, Pop-up „Warum erst die
+ *  Pflegesituation?", Karte einer Pflegekraft, „So geht es weiter", schwebende Frage, Mail-Link `goto=anfragen`,
+ *  „Stand heute" nach dem Absenden. */
+export type FormularQuelle = 'kasten' | 'warum' | 'karte' | 'schritte' | 'frage' | 'mail' | 'stand';
 
 // Mini-Snapshot der Nurse-Daten, die wir brauchen um eine declined-from-
 // Interest Pflegekraft im bearbeitet-Bereich als virtuelle MatchCard zu
@@ -127,7 +132,7 @@ export interface LeadEventMetadata {
   feedback_final?: string;
   // Messpunkte (Registry #123) — keine Personendaten, nur Kennungen und Zustände.
   // profil_geoeffnet / einladen_getippt: woher, und ob die Pflegesituation noch nie gespeichert wurde.
-  quelle?: ProfilQuelle | EinladenQuelle;
+  quelle?: ProfilQuelle | EinladenQuelle | FormularQuelle;
   vor_speichern?: boolean;
   // faq_geoeffnet: kurzer Schlüssel der Frage (FAQ_SCHLUESSEL in FaqListe), nie der Wortlaut.
   frage?: string;
@@ -189,6 +194,10 @@ function dedupeKey(token: string, event: LeadEvent, metadata?: LeadEventMetadata
   }
   if (event === 'weiter_blockiert') {
     return `${token}:${event}:${metadata?.schritt ?? ''}:${(metadata?.offen ?? []).join(',')}`;
+  }
+  // Weg ins Formular: je Quelle einmal (wer erst den Kasten, später den Karten-Knopf nimmt, zählt bei beiden).
+  if (event === 'zur_pflegesituation') {
+    return `${token}:${event}:${metadata?.quelle ?? ''}`;
   }
   return `${token}:${event}`;
 }
