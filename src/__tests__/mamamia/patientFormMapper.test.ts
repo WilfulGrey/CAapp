@@ -214,12 +214,19 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(r.patients?.[0].height).toBe('155-165');
   });
 
+  it('Registry #131: nach einer Annahme kein Name/Anrede/Telefon der Kontaktperson im Patientenvertrag, Einsatzort schon', () => {
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ phone: '0151 1' }), {
+      locationId: 1148,
+      contact: { anrede: 'Frau', vorname: 'Anna', nachname: 'Probe' },
+      vertragAusAnnahme: true,
+    });
+    expect(r.customer_contract).toEqual({ location_id: 1148, zip_code: '10115', city: 'Berlin' });
+    expect(r.phone).toBe('0151 1');
+  });
+
   it('location_id preferred over plz/ort custom_text + customer_contract rides along', () => {
-    // Bug #13l + Bug #16: locationId triggers customer_contract (singular)
-    // emission so Mamamia panel "Lokalizacja opieki" renders. Beta miała
-    // plural `patient_contracts` + `invoice_contract` (zweryfikowane live
-    // 2026-05-07 na Customer 7659) — prod ma legacy singular schema.
-    // Refactor 2026-05-12 na singular który działa na obu środowiskach.
+    // Bug #13l: locationId triggers customer_contract (singular)
+    // emission so Mamamia panel "Lokalizacja opieki" renders.
     const r = mapPatientFormToUpdateCustomerInput(makeForm(), { locationId: 1148 });
     expect(r.location_id).toBe(1148);
     expect(r.location_custom_text).toBeUndefined();
@@ -246,6 +253,33 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
       location_id: 1148, zip_code: '10115', city: 'Berlin',
       salutation: 'Mrs.', first_name: 'Anna', last_name: 'Schmidt',
     });
+  });
+
+  it('vermittler: Spiegel-Flags explizit, damit der Vermittler nicht in die Patientenzeile rutscht', () => {
+    /* Registry #67: Das MM-Team fuellt diesen Bogen bei Vermittler-Faellen
+       ueber den gespiegelten Token aus. Ohne die Flags defaultet Mamamia auf
+       true und zieht beim naechsten UpdateCustomer die Daten der ersten
+       Kontaktperson (= der Vermittler) in die Zeile des Patienten — der
+       Server-Fix wuerde sich selbst zurueckdrehen. */
+    const r = mapPatientFormToUpdateCustomerInput(makeForm(), {
+      locationId: 1148,
+      vermittler: true,
+      contact: { anrede: 'Frau', vorname: 'Berta', nachname: 'Muster' },
+    });
+    expect(r.customer_contract).toEqual({
+      location_id: 1148, zip_code: '10115', city: 'Berlin',
+      salutation: 'Mrs.', first_name: 'Berta', last_name: 'Muster',
+      is_same_as_first_patient: false, is_same_as_contact: false,
+    });
+  });
+
+  it('ohne vermittler bleibt der Patch bitgleich — keine Flags fuer die uebrigen Kunden', () => {
+    const r = mapPatientFormToUpdateCustomerInput(makeForm(), {
+      locationId: 1148,
+      contact: { anrede: 'Frau', vorname: 'Anna', nachname: 'Schmidt' },
+    });
+    expect('is_same_as_first_patient' in (r.customer_contract ?? {})).toBe(false);
+    expect('is_same_as_contact' in (r.customer_contract ?? {})).toBe(false);
   });
 
   it('maps familieNahe + internet yes/no (live-verified working enums)', () => {

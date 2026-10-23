@@ -14,6 +14,7 @@ import {
   isValidationError,
   mapContractPatient,
   splitEinsatzort,
+  nurVertragsdaten,
   syncAcceptance,
 } from "../../_shared/acceptanceSync.ts";
 import { handleRequest as syncHandler, runRetryChain, type SyncStore } from "../../sync-acceptance/index.ts";
@@ -71,11 +72,14 @@ interface FakeNet {
   fetch: typeof fetch;
   ops: Array<{ op: string; variables: Record<string, unknown> }>;
   pdfBody?: Uint8Array | string;
-  finalConfirmations?: Array<{ id: number; application_id?: number | null; caregiver: { id: number } | null }>;
+  // final_confirmations, je eine auf einem eigenen Job (job_offer_id, default 100+i).
+  finalConfirmations?: Array<{ id: number; application_id: number | null; caregiver: { id: number } | null; job_offer_id?: number }>;
   // Fehler-Injektion für StoreConfirmation (Alarm-Policy-Tests):
   //   "graphql" = GraphQL-Fehler (⇒ permanent), "http500" = HTTP 500 (⇒ transient).
   // confirmFailTimes = wie viele Versuche fehlschlagen (undefined ⇒ alle).
   confirmFailMode?: "graphql" | "http500";
+  /** Registry #88: eigenes validation-Objekt für den "graphql"-Fall (Standard: application_id). */
+  confirmValidation?: Record<string, string[]>;
   // UpdateCustomerContract (Schritt 1): "graphql" = Laravel-Validation (⇒ permanent,
   // Sequenz läuft weiter), "graphql-plain" = GraphQL-Fehler OHNE extensions.validation
   // (⇒ throw), "http500" (⇒ throw). ucFailSequence: pro Aufruf ein Modus (Chain-Tests).
@@ -87,8 +91,14 @@ interface FakeNet {
   bridgeStatus?: number;
   // Kein bestehender Contract am Customer (kein location_id-Carry möglich).
   noExistingContract?: boolean;
+  // Eigene Contract-Liste am Customer (überschreibt die Standard-Liste).
+  contracts?: Array<{ contact_type: string; location_id: number }>;
   // PLZ→location_id Katalog (AcceptanceSyncLocations); fehlende PLZ ⇒ [].
   locationHits?: Record<string, number>;
+  // Mamamia matcht `search` als PRÄFIX: eine unvollständige PLZ liefert echte
+  // Zeilen mit ANDERER zip_code. Damit lässt sich prüfen, dass wir sie
+  // verwerfen statt eine fremde Stadt auf den Vertrag zu schreiben (#65).
+  locationPraefixTreffer?: { id: number; zip_code: string };
   // Kanonischer PDF im Storage-Bucket; null/undefined ⇒ 404 (Fallback-Render).
   storageBody?: Uint8Array | string | null;
 }
@@ -135,12 +145,15 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
       if (q.includes("AcceptanceSyncLocations")) {
         net.ops.push({ op: "AcceptanceSyncLocations", variables: v });
         const hit = net.locationHits?.[String(v.search)];
+        const praefix = net.locationPraefixTreffer;
         return new Response(JSON.stringify({
           data: {
             LocationsWithPagination: {
-              data: hit
-                ? [{ id: hit, location: "Fake", zip_code: v.search, country_code: "DE" }]
-                : [],
+              data: praefix
+                ? [{ id: praefix.id, location: "Fake", zip_code: praefix.zip_code, country_code: "DE" }]
+                : hit
+                  ? [{ id: hit, location: "Fake", zip_code: v.search, country_code: "DE" }]
+                  : [],
             },
           },
         }), { status: 200 });
@@ -153,10 +166,14 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
               id: 7777,
               equipments: [{ id: 1 }, { id: 2 }],
               patients: [{ id: 42, tools: [{ id: 3 }] }],
-              customer_contract: net.noExistingContract ? null : { location_id: 13035 },
-              job_offers: [
-                { id: 100, final_confirmation: net.finalConfirmations!.length ? net.finalConfirmations![0] : null },
-              ],
+              // AG-Zeile ZUERST — so liefert Mamamia nach einer Annahme (#131).
+              customer_contracts: net.contracts ?? (net.noExistingContract ? [] : [
+                { contact_type: "contract_contact", location_id: 999 },
+                { contact_type: "patient_contact", location_id: 13035 },
+              ]),
+              job_offers: net.finalConfirmations!.length
+                ? net.finalConfirmations!.map((fc, i) => ({ id: fc.job_offer_id ?? 100 + i, final_confirmation: fc }))
+                : [{ id: 100, final_confirmation: null }],
             },
           },
         }), { status: 200 });
@@ -186,7 +203,7 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
           return new Response(JSON.stringify({
             errors: [{
               message: "Anwendungs-ID ungültig.",
-              extensions: { validation: { application_id: ["Anwendungs-ID ungültig."] } },
+              extensions: { validation: net.confirmValidation ?? { application_id: ["Anwendungs-ID ungültig."] } },
             }],
           }), { status: 200 });
         }
@@ -194,6 +211,17 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
       }
       if (q.includes("UpdateConfirmation")) {
         net.ops.push({ op: "UpdateConfirmation", variables: v });
+        // Mamamia seit 2026-09-17 (Fall Berg, #78): application_id MUSS die
+        // Bewerbung der Confirmation selbst sein — sonst Validation-Fehler.
+        const fc = net.finalConfirmations!.find((f) => f.id === v.id);
+        if (fc?.application_id != null && v.application_id !== fc.application_id) {
+          return new Response(JSON.stringify({
+            errors: [{
+              message: "The selected application id is invalid.",
+              extensions: { validation: { application_id: ["The selected application id is invalid."] } },
+            }],
+          }), { status: 200 });
+        }
         return new Response(JSON.stringify({ data: { UpdateConfirmation: { id: v.id, signed_contract: { id: 9, original_name: "x.pdf" } } } }), { status: 200 });
       }
       throw new Error(`fake fetch: unrouted call ${url} ${q.slice(0, 60)}`);
@@ -203,11 +231,13 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
   return net;
 }
 
-function makeStamps() {
+// jobOfferId = Job der Row laut Akzept-Event (Guard-Weg 3); null = altes Event ohne Spalte.
+function makeStamps(jobOfferId: number | null = 100) {
   const calls: Array<{ kind: string; confirmationId?: number | null; sha?: string | null }> = [];
   return {
     calls,
     supabase: {
+      fetchAcceptanceJobOfferId: () => Promise.resolve(jobOfferId),
       stampConfirmed(_l: string, _a: number, confirmationId: number | null) {
         calls.push({ kind: "confirmed", confirmationId });
         return Promise.resolve();
@@ -267,6 +297,18 @@ Deno.test("buildCustomerContract: AG separat → Composed-Name-Split (letzte Lee
   assertEquals("salutation" in cc, false); // Composed-Form trägt keine Anrede
   assertEquals(cc.zip_code, "80333");
   assertEquals(cc.city, "München");
+});
+
+Deno.test("buildCustomerContract (#131): Snapshot mit Anrede + getrennten Namen ⇒ salutation, kein Split", () => {
+  const snap = makeRow().contract_snapshot!;
+  const row = makeRow({ contract_snapshot: { ...snap, ag: { ...(snap.ag as Record<string, unknown>), name: "Paul von Probe", anrede: "Herr", vorname: "Paul", nachname: "von Probe" } } });
+  const cc = buildCustomerContract(row)!;
+  assertEquals(cc.salutation, "Mr.");
+  assertEquals(cc.first_name, "Paul");
+  assertEquals(cc.last_name, "von Probe");
+  // „Divers" hat in Mamamia keinen Wert ⇒ Feld bleibt weg statt geraten
+  const divers = buildCustomerContract(makeRow({ contract_snapshot: { ...snap, ag: { ...(snap.ag as Record<string, unknown>), anrede: "Divers" } } }))!;
+  assertEquals("salutation" in divers, false);
 });
 
 Deno.test("isAgGleich: le=null ⇒ true; separater AG ⇒ false; kein Snapshot (Legacy) ⇒ true", () => {
@@ -360,7 +402,7 @@ Deno.test("sync: frischer Akzept — Reihenfolge UpdateCustomer→StoreConfirmat
 });
 
 Deno.test("sync: Retry — final_confirmation verarbeitet ⇒ PDF wird hochgeladen + SHA gestempelt", async () => {
-  const net = makeNet({ finalConfirmations: [{ id: 555, caregiver: { id: 501 } }] });
+  const net = makeNet({ finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }] });
   const stamps = makeStamps();
   const r = await syncAcceptance({
     lead: LEAD,
@@ -402,7 +444,7 @@ Deno.test("sync: Adoptions-Row (application_id == confirmation_id) ⇒ Upload mi
 });
 
 Deno.test("sync: Adoptions-Row und Confirmation OHNE application_id ⇒ defer (kein blinder Upload)", async () => {
-  const net = makeNet({ finalConfirmations: [{ id: 667, caregiver: { id: 501 } }] });
+  const net = makeNet({ finalConfirmations: [{ id: 667, application_id: null, caregiver: { id: 501 } }] });
   const stamps = makeStamps();
   const r = await syncAcceptance({
     lead: LEAD,
@@ -414,9 +456,11 @@ Deno.test("sync: Adoptions-Row und Confirmation OHNE application_id ⇒ defer (k
   assertStringIncludes(r.deferred.join("|"), "original application_id");
 });
 
-Deno.test("sync: Adoption — final_confirmation existiert (SA-Portal/Alt-Client) ⇒ KEIN doppelter Accept", async () => {
-  const net = makeNet({ finalConfirmations: [{ id: 777, caregiver: { id: 501 } }] });
-  const stamps = makeStamps();
+Deno.test("sync: Adoption Weg 3 — SA-Portal buchte eine ANDERE Bewerbung derselben Kraft auf DEMSELBEN Job ⇒ KEIN doppelter Accept, Upload mit application_id der Confirmation", async () => {
+  // Pfad 3 des Portals (mappers.ts): die noch gelistete Bewerbung 9001 wird als
+  // accepted gepatcht, die Confirmation 777 hängt an Bewerbung 9002 (Panel).
+  const net = makeNet({ finalConfirmations: [{ id: 777, application_id: 9002, caregiver: { id: 501 }, job_offer_id: 100 }] });
+  const stamps = makeStamps(100);
   const r = await syncAcceptance({
     lead: LEAD, row: makeRow(), secrets: SECRETS,
     supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
@@ -425,6 +469,53 @@ Deno.test("sync: Adoption — final_confirmation existiert (SA-Portal/Alt-Client
   assertEquals(r.confirmation_id, 777);
   assertEquals(stamps.calls[0], { kind: "confirmed", confirmationId: 777 });
   assertEquals(r.pdf_uploaded, true); // verarbeitet ⇒ Upload läuft direkt durch
+  const upd = net.ops.find((o) => o.op === "UpdateConfirmation")!.variables;
+  assertEquals(upd.application_id, 9002); // NIE 9001 — sonst hängt UpdateConfirmation die Confirmation um
+});
+
+Deno.test("sync (#78): Pflegekraft kommt zum nächsten Turnus wieder ⇒ alte Confirmation wird NICHT adoptiert, StoreConfirmation für die NEUE Bewerbung", async () => {
+  // Fall Berg 9753: Confirmation 4296 (Job 32952, Bewerbung 11198) — die Row
+  // ist die neue Bewerbung 13074 derselben Kraft auf Job 36300.
+  const net = makeNet({ finalConfirmations: [{ id: 4296, application_id: 11198, caregiver: { id: 501 }, job_offer_id: 32952 }] });
+  const stamps = makeStamps(36300);
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow({ application_id: 13074 }), secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  const store = net.ops.find((o) => o.op === "StoreConfirmation")!;
+  assertEquals(store.variables.application_id, 13074);
+  assertEquals(r.confirmation_id, 555); // die NEUE Confirmation, nicht 4296
+  assertEquals(stamps.calls[0], { kind: "confirmed", confirmationId: 555 });
+  assertEquals(net.ops.some((o) => o.op === "UpdateConfirmation"), false); // 4296 wird nie angefasst
+  assertStringIncludes(r.deferred.join("|"), "not processed"); // neue Confirmation noch nicht sichtbar ⇒ Cron
+});
+
+Deno.test("sync (#78): fremder Stempel (Confirmation einer anderen Bewerbung) ⇒ kein StoreFile, kein UpdateConfirmation, defer mit Grund", async () => {
+  const net = makeNet({
+    finalConfirmations: [{ id: 4296, application_id: 11198, caregiver: { id: 501 }, job_offer_id: 32952 }],
+    storageBody: new TextEncoder().encode("%PDF-1.7 canon"),
+  });
+  const stamps = makeStamps(36300);
+  const r = await syncAcceptance({
+    lead: LEAD,
+    row: makeRow({ application_id: 13074, mamamia_confirmed_at: "2026-09-15T13:05:08Z", mamamia_confirmation_id: 4296 }),
+    secrets: SECRETS, supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(r.pdf_uploaded, false);
+  assertEquals(net.ops.some((o) => o.op === "StoreFile"), false);
+  assertEquals(net.ops.some((o) => o.op === "UpdateConfirmation"), false);
+  assertStringIncludes(r.deferred.join("|"), "gehört zu Bewerbung 11198 auf Job 32952");
+});
+
+Deno.test("sync (#78): ohne Job-Kenntnis (altes Event) zählt nur die Bewerbung — andere Bewerbung derselben Kraft wird NICHT adoptiert", async () => {
+  const net = makeNet({ finalConfirmations: [{ id: 777, application_id: 9002, caregiver: { id: 501 }, job_offer_id: 100 }] });
+  const stamps = makeStamps(null);
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(net.ops.some((o) => o.op === "StoreConfirmation"), true); // lieber laut doppelt als still fremd
+  assertEquals(r.confirmation_id, 555);
 });
 
 Deno.test("sync: skipConfirm (Alt-Bundle hat akzeptiert, noch unverarbeitet) ⇒ weder Store noch Stempel", async () => {
@@ -448,7 +539,7 @@ async function shaHex(bytes: Uint8Array): Promise<string> {
 Deno.test("sync: KANON aus dem Storage ⇒ genau diese Bytes zu Mamamia, KEIN Re-Render", async () => {
   const canon = new TextEncoder().encode("%PDF-1.7 canonical");
   const net = makeNet({
-    finalConfirmations: [{ id: 555, caregiver: { id: 501 } }],
+    finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }],
     storageBody: canon,
   });
   const stamps = makeStamps();
@@ -468,7 +559,7 @@ Deno.test("sync: KANON aus dem Storage ⇒ genau diese Bytes zu Mamamia, KEIN Re
 
 Deno.test("sync: Kanon-Bytes ≠ pdf_sha256 ⇒ Integritäts-Gate blockt Upload (deferred)", async () => {
   const net = makeNet({
-    finalConfirmations: [{ id: 555, caregiver: { id: 501 } }],
+    finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }],
     storageBody: new TextEncoder().encode("%PDF-1.7 tampered"),
   });
   const stamps = makeStamps();
@@ -483,7 +574,7 @@ Deno.test("sync: Kanon-Bytes ≠ pdf_sha256 ⇒ Integritäts-Gate blockt Upload 
 });
 
 Deno.test("sync: kein Kanon im Storage (404) ⇒ Fallback-Render via Kostenrechner (Alt-Rows)", async () => {
-  const net = makeNet({ finalConfirmations: [{ id: 555, caregiver: { id: 501 } }] }); // storageBody undefined ⇒ 404
+  const net = makeNet({ finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }] }); // storageBody undefined ⇒ 404
   const stamps = makeStamps();
   const r = await syncAcceptance({
     lead: LEAD,
@@ -498,7 +589,7 @@ Deno.test("sync: kein Kanon im Storage (404) ⇒ Fallback-Render via Kostenrechn
 
 Deno.test("sync: HTML-Fallback vom Renderer ⇒ Magic-Byte-Gate blockt Upload (deferred)", async () => {
   const net = makeNet({
-    finalConfirmations: [{ id: 555, caregiver: { id: 501 } }],
+    finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }],
     pdfBody: "<!DOCTYPE html><html>fallback</html>",
   });
   const stamps = makeStamps();
@@ -556,6 +647,53 @@ Deno.test("sync: Katalog ohne Treffer ⇒ LE-Row fällt auf getragene location_i
   assertEquals("location_id" in (uc.invoice_contract as Record<string, unknown>), false);
 });
 
+Deno.test("sync (#131): Carry nur aus der patient_contact-Zeile — nie die location_id des Auftraggebers", async () => {
+  // Nur die Zeile des Auftraggebers steht am Customer (der alte Code las sie über den Singular).
+  const net = makeNet({ locationHits: {}, contracts: [{ contact_type: "contract_contact", location_id: 999 }] });
+  const stamps = makeStamps();
+  await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  const uc = net.ops.find((o) => o.op === "UpdateCustomerContract")!.variables;
+  const pc = (uc.patient_contracts as Array<Record<string, unknown>>)[0];
+  assertEquals("location_id" in pc, false); // kein Treffer, keine LE-Zeile ⇒ nichts geraten, nie 999
+});
+
+Deno.test("sync: Präfix-Treffer mit anderer PLZ wird verworfen (#65)", async () => {
+  // `search: "80331"` liefert eine echte DE-Zeile — aber zu 80339. Vor
+  // Registry #65 stand diese fremde Stadt auf dem unterschriebenen Vertrag.
+  const net = makeNet({ locationPraefixTreffer: { id: 999, zip_code: "80339" } });
+  const stamps = makeStamps();
+  await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  const uc = net.ops.find((o) => o.op === "UpdateCustomerContract")!.variables;
+  const pc = (uc.patient_contracts as Array<Record<string, unknown>>)[0];
+  assertEquals(pc.location_id, 13035); // Carry, nicht 999
+  assertEquals("location_id" in (uc.invoice_contract as Record<string, unknown>), false);
+});
+
+Deno.test("sync: 4-stellige PLZ wird gar nicht erst gesucht (#65)", async () => {
+  // Österreichischer Einsatzort: der Katalog wird für diese PLZ nie befragt.
+  const net = makeNet({ locationHits: { "6130": 777, "80333": 222 } });
+  const stamps = makeStamps();
+  const row = makeRow();
+  await syncAcceptance({
+    lead: LEAD,
+    row: { ...row, contract_patient: { ...row.contract_patient, einsatzort: "6130, Schwaz" } },
+    secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  const gesucht = net.ops.filter((o) => o.op === "AcceptanceSyncLocations")
+    .map((o) => String((o.variables as Record<string, unknown>).search));
+  assertEquals(gesucht.includes("6130"), false);
+  const uc = net.ops.find((o) => o.op === "UpdateCustomerContract")!.variables;
+  const pc = (uc.patient_contracts as Array<Record<string, unknown>>)[0];
+  assertEquals(pc.location_id, 13035); // Carry statt geratenem 06130 = Halle
+});
+
 // ─── Confirm-Fehlerklassifikation + interne Retries (Alarm-Policy) ────────
 
 Deno.test("sync: StoreConfirmation GraphQL-Fehler ⇒ permanent, KEIN Retry, kein Throw", async () => {
@@ -584,18 +722,18 @@ Deno.test("sync: StoreConfirmation GraphQL-Fehler ⇒ permanent, KEIN Retry, kei
 const contactPosts = (net: FakeNet) => net.bridgePosts.filter((p) => p.event === "acceptance_contact_alarm");
 
 Deno.test("cleanEmail: Doppel-Domain / Leerzeichen ⇒ null, sonst getrimmt; droppedEmailFields meldet nur nicht-leere Rohwerte", () => {
-  const p = mapContractPatient({ vorname: "Elsa", email: "catarina-stein@t-online.de@t-online.de", telefon: "0176" })!;
+  const p = mapContractPatient({ vorname: "Elsa", email: "kunde@example.com@example.com", telefon: "0176" })!;
   assertEquals(p.email, null);
   assertEquals(p.first_name, "Elsa");
   assertEquals(mapContractContact({ email: " ok@example.de " })!.email, "ok@example.de");
-  assertEquals(mapContractContact({ email: "Michael.kopka @ Freenet.de" })!.email, null);
+  assertEquals(mapContractContact({ email: "vorname.nachname @ example.de" })!.email, null);
   // leer ⇒ null, aber NICHT "dropped" (LE-Prefill ist bewusst leer)
   const none = droppedEmailFields(makeRow({ contract_patient: { ...makeRow().contract_patient, email: "" } }));
   assertEquals(none.fields, []);
   // KP unbrauchbar ⇒ kp.email + Rohwert
-  const kp = droppedEmailFields(makeRow({ contract_contact: { ...makeRow().contract_contact, email: "Michael.kopka @ Freenet.de" } }));
+  const kp = droppedEmailFields(makeRow({ contract_contact: { ...makeRow().contract_contact, email: "vorname.nachname @ example.de" } }));
   assertEquals(kp.fields, ["kp.email"]);
-  assertEquals(kp.values["kp.email"], "Michael.kopka @ Freenet.de");
+  assertEquals(kp.values["kp.email"], "vorname.nachname @ example.de");
   // agGleich (le=null): AG nimmt LE-Mail ⇒ EIN Formularfeld ⇒ nur le.email
   const row = makeRow({ contract_patient: { ...makeRow().contract_patient, email: "x@y.de@y.de" } });
   row.contract_snapshot = { ...row.contract_snapshot, le: null, ag: { ...(row.contract_snapshot!.ag as Record<string, unknown>), email: "x@y.de@y.de" } };
@@ -691,7 +829,7 @@ Deno.test("sync: Fall Kopka — UC Validation + final_confirmation der Pflegekra
 Deno.test("sync: unbrauchbare KP-Mail + UC OK ⇒ contact_fields_dropped=['kp.email'], Row ohne email, Contact-Alarm mit Rohwert", async () => {
   const net = makeNet();
   const r = await syncAcceptance({
-    lead: LEAD, row: makeRow({ contract_contact: { ...makeRow().contract_contact, email: "Michael.kopka @ Freenet.de" } }), secrets: SECRETS,
+    lead: LEAD, row: makeRow({ contract_contact: { ...makeRow().contract_contact, email: "vorname.nachname @ example.de" } }), secrets: SECRETS,
     supabase: makeStamps().supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
   });
   assertEquals(r.customer_updated, true);
@@ -702,7 +840,7 @@ Deno.test("sync: unbrauchbare KP-Mail + UC OK ⇒ contact_fields_dropped=['kp.em
   assertEquals(posts.length, 1);
   const meta = (posts[0] as { metadata: Record<string, unknown> }).metadata;
   assertEquals(meta.dropped, ["kp.email"]);
-  assertEquals((meta.dropped_values as Record<string, string>)["kp.email"], "Michael.kopka @ Freenet.de");
+  assertEquals((meta.dropped_values as Record<string, string>)["kp.email"], "vorname.nachname @ example.de");
   assertEquals(meta.error, null);
 });
 
@@ -829,7 +967,7 @@ function makeCronDeps(net: FakeNet, pending: PendingAcceptanceSync[], alerted: s
 }
 
 Deno.test("retryAcceptanceSyncs: Retry repariert den Row ⇒ completed, KEIN Alarm (auch wenn alt)", async () => {
-  const net = makeNet({ finalConfirmations: [{ id: 555, caregiver: { id: 501 } }] });
+  const net = makeNet({ finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }] });
   const alerted: string[] = [];
   const pending = makePending({
     mamamia_confirmed_at: "2026-07-20T10:00:00Z",
@@ -893,8 +1031,15 @@ Deno.test("retryAcceptanceSyncs: Bridge-Mail schlägt fehl ⇒ KEIN Stempel (Re-
 });
 
 Deno.test("retryAcceptanceSyncs: Confirm ok, nur PDF offen ⇒ Alarm erst nach 24h (kein Kundenrisiko)", async () => {
-  // final_confirmation NICHT sichtbar ⇒ PDF-Upload bleibt deferred.
-  const net = makeNet();
+  // ECHTER PDF-Fall (Registry #82): die Confirmation IST am Job sichtbar und
+  // gehört zur Row — nur der Upload scheitert (Renderer liefert kein PDF).
+  // Kein Kundenrisiko ⇒ 24h. Früher stand hier ein leeres finalConfirmations,
+  // also "Mamamia zeigt die Buchung nicht" — das ist seit #79 ein eigener,
+  // roter Fall mit 15-Min-Schwelle und kein PDF-Thema.
+  const net = makeNet({
+    finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }],
+    pdfBody: "<html>kein PDF</html>",
+  });
   const alerted: string[] = [];
   const confirmedRow = {
     mamamia_confirmed_at: "2026-07-20T10:00:00Z" as string | null,
@@ -913,6 +1058,108 @@ Deno.test("retryAcceptanceSyncs: Confirm ok, nur PDF offen ⇒ Alarm erst nach 2
   const post = net.bridgePosts[0] as { metadata: Record<string, unknown> };
   assertEquals(post.metadata.confirmed, true);
   assertEquals(post.metadata.pdf_uploaded, false);
+});
+
+// ─── Registry #82: Buchung nicht in Mamamia sichtbar ───────────────────────
+// Fall Berg: beide Stempel gesetzt, Mamamia hatte die Confirmation aber am
+// FALSCHEN Job. Der Alarm fragte nur "haben WIR gestempelt?" und schwieg
+// 7 Tage. Jetzt entscheidet der Nachlese-Befund der Upload-Bramka.
+
+Deno.test("#82: Confirmation nicht am Job ⇒ Buchungs-Alarm nach 15 Min (nicht erst nach 24h)", async () => {
+  const net = makeNet(); // finalConfirmations leer ⇒ Mamamia zeigt nichts
+  const alerted: string[] = [];
+  const row = makePending({
+    mamamia_confirmed_at: "2026-09-15T13:05:08Z",
+    mamamia_confirmation_id: 4296,
+    accepted_at: new Date(Date.now() - 30 * 60_000).toISOString(), // 30 Min
+  });
+  const r = await retryAcceptanceSyncs(makeCronDeps(net, [row], alerted));
+  assertEquals(r.alerts, 1);
+  const post = net.bridgePosts[0] as { metadata: Record<string, unknown> };
+  assertEquals(post.metadata.booking_not_visible, "not_processed");
+  // confirmed=true UND trotzdem Alarm — das ist der ganze Punkt von #79.
+  assertEquals(post.metadata.confirmed, true);
+});
+
+Deno.test("#82: unter 15 Min bleibt es still (Mamamia darf ein paar Sekunden brauchen)", async () => {
+  const net = makeNet();
+  const alerted: string[] = [];
+  const row = makePending({
+    mamamia_confirmed_at: "2026-09-15T13:05:08Z",
+    mamamia_confirmation_id: 4296,
+    accepted_at: new Date(Date.now() - 5 * 60_000).toISOString(), // 5 Min
+  });
+  const r = await retryAcceptanceSyncs(makeCronDeps(net, [row], alerted));
+  assertEquals(r.alerts, 0);
+  assertEquals(net.bridgePosts.length, 0);
+});
+
+Deno.test("#82: fremde Confirmation (Mur aus #78) ⇒ eigener Grund im Alarm", async () => {
+  // Stempel zeigt auf Confirmation 4296, die zu einer anderen Bewerbung auf
+  // einem anderen Job gehört — exakt die Lage des Falls Berg am 15.09.
+  const net = makeNet({
+    finalConfirmations: [{ id: 4296, application_id: 11198, caregiver: { id: 501 }, job_offer_id: 32952 }],
+  });
+  const alerted: string[] = [];
+  const row = makePending({
+    mamamia_confirmed_at: "2026-09-15T13:05:08Z",
+    mamamia_confirmation_id: 4296,
+    accepted_at: new Date(Date.now() - 30 * 60_000).toISOString(),
+  });
+  const r = await retryAcceptanceSyncs(makeCronDeps(net, [row], alerted));
+  assertEquals(r.alerts, 1);
+  const post = net.bridgePosts[0] as { metadata: Record<string, unknown> };
+  assertEquals(post.metadata.booking_not_visible, "foreign_confirmation");
+});
+
+Deno.test("#82: schon alarmiert ⇒ kein zweiter Alarm", async () => {
+  const net = makeNet();
+  const alerted: string[] = [];
+  const row = makePending({
+    mamamia_confirmed_at: "2026-09-15T13:05:08Z",
+    mamamia_confirmation_id: 4296,
+    accepted_at: new Date(Date.now() - 30 * 60_000).toISOString(),
+    mamamia_sync_alerted_at: "2026-09-15T13:30:00Z",
+  });
+  const r = await retryAcceptanceSyncs(makeCronDeps(net, [row], alerted));
+  assertEquals(r.alerts, 0);
+  assertEquals(net.bridgePosts.length, 0);
+});
+
+// ─── Registry #88: Vertragsdaten abgelehnt ≠ Bewerbung zurückgezogen ──────
+// Fall #88: „Divers" ⇒ salutation null ⇒ Mamamia lehnt StoreConfirmation
+// mit contract_patient.salutation ab. Der Alarm vermutete „von der Agentur
+// zurückgezogen" — falsch; die Bewerbung war in Ordnung.
+
+Deno.test("#88: nurVertragsdaten — nur contract_patient/contract_contact zählen", () => {
+  assertEquals(nurVertragsdaten(["contract_patient.salutation"]), true);
+  assertEquals(nurVertragsdaten(["contract_patient.salutation", "contract_contact.email"]), true);
+  assertEquals(nurVertragsdaten(["application_id"]), false);
+  assertEquals(nurVertragsdaten(["contract_patient.salutation", "application_id"]), false);
+  assertEquals(nurVertragsdaten([]), false);
+});
+
+Deno.test("#88: salutation abgelehnt ⇒ confirm_error.ursache = vertragsdaten", async () => {
+  const net = makeNet({
+    confirmFailMode: "graphql",
+    confirmValidation: { "contract_patient.salutation": ["Das Feld contract patient.salutation ist erforderlich."] },
+  });
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: makeStamps().supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(r.confirm_error?.permanent, true);
+  assertEquals(r.confirm_error?.ursache, "vertragsdaten");
+});
+
+Deno.test("#88: application_id abgelehnt ⇒ keine Ursache (bisheriger Alarmtext)", async () => {
+  const net = makeNet({ confirmFailMode: "graphql" }); // Standard: application_id
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: makeStamps().supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(r.confirm_error?.permanent, true);
+  assertEquals(r.confirm_error?.ursache, undefined);
 });
 
 // ─── sync-acceptance Edge Fn: Auth ─────────────────────────────────────────
@@ -1056,7 +1303,15 @@ Deno.test("retry-chain (Registry #52): Erstversuch HTTP 500 in Schritt 1, Stufe 
   const posts = net.bridgePosts.filter((p) => p.event === "acceptance_contact_alarm");
   assertEquals(posts.length >= 1, true); // jede Stufe POSTet, die Bridge dedupet pro application_id
   assertEquals(net.ops.filter((o) => o.op === "StoreConfirmation").length, 1);
-  assertEquals(net.bridgePosts.filter((p) => p.event === "acceptance_sync_alarm").length, 0);
+  // In diesem Fake veröffentlicht Mamamia die Confirmation nie am Job, also
+  // meldet die Chain seit #79 zusätzlich "Buchung nicht sichtbar" — genau der
+  // Befund, der im Fall Berg 7 Tage lang fehlte.
+  const syncAlarms = net.bridgePosts.filter((p) => p.event === "acceptance_sync_alarm");
+  assertEquals(syncAlarms.length, 1);
+  assertEquals(
+    (syncAlarms[0] as { metadata: Record<string, unknown> }).metadata.booking_not_visible,
+    "not_processed",
+  );
 });
 
 Deno.test("sync-acceptance handler (Registry #52): customer_update_error ändert weder complete noch retries_scheduled", async () => {
@@ -1081,7 +1336,7 @@ Deno.test("sync-acceptance handler (Registry #52): customer_update_error ändert
 Deno.test("retry-chain: PDF dopięty w pierwszej stufie ⇒ stop, bez alarmu", async () => {
   // Zwischen Erstversuch und +15s hat Mamamia die Confirmation verarbeitet.
   const net = makeNet({
-    finalConfirmations: [{ id: 555, caregiver: { id: 501 } }],
+    finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }],
     storageBody: new TextEncoder().encode("%PDF-1.7 canon"),
   });
   const row = makeRow({ mamamia_confirmed_at: "2026-07-21T20:00:00Z", mamamia_confirmation_id: 555 });
@@ -1135,8 +1390,12 @@ Deno.test("retry-chain: wyczerpana bez confirm (transient) ⇒ NATYCHMIAST alarm
 });
 
 Deno.test("retry-chain: confirm OK, tylko PDF wisi ⇒ wyczerpana BEZ alarmu (cron-backstop, 24h-próg)", async () => {
-  // finalConfirmations leer ⇒ Verarbeitungs-Bramka defer't den Upload in jeder Stufe.
-  const net = makeNet();
+  // Confirmation IST sichtbar (gehört zur Row), nur der Upload scheitert —
+  // Archiv-Thema, 24h-Schwelle des Crons, kein Alarm aus der Chain.
+  const net = makeNet({
+    finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }],
+    pdfBody: "<html>kein PDF</html>",
+  });
   const row = makeRow({ mamamia_confirmed_at: "2026-07-21T20:00:00Z", mamamia_confirmation_id: 555 });
   await runRetryChain(
     {

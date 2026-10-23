@@ -43,8 +43,7 @@ export interface SchutzErgebnis {
 }
 
 /* Der Einwilligungs-Zeitstempel kommt vom Portal im DEUTSCHEN Format
- * ("01.09.2026 11:05 Uhr" — so stand es in der ersten echten Mail, Zauner
- * prod uid 14) — `new Date()` liest das nicht, und der Guard lehnte JEDE
+ * ("01.09.2026 11:05 Uhr" — so stand es in der ersten echten Mail (prod uid 14) — `new Date()` liest das nicht, und der Guard lehnte JEDE
  * echte Portal-Mail als "Datum nicht lesbar" ab (der Testlauf schickte
  * ISO und kaschierte das). Zeitzone bewusst grob (Serverzeit): bei einer
  * 60-Tage-Grenze spielen zwei Stunden keine Rolle. */

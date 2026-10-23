@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { MatchCard } from '../../components/portal/MatchCard';
-import { DeutschZeile, SprachBalken } from '../../components/portal/SprachBalken';
+import { SprachBalken } from '../../components/portal/SprachBalken';
 import type { Nurse } from '../../types';
 
 function kraft(overrides: Partial<Nurse> = {}): Nurse {
@@ -29,22 +29,6 @@ describe('SprachBalken', () => {
       unmount();
     }
   });
-
-  it('Reihenfolge wie im SA-Portal und in der Mail: Label, Balken, Wert', () => {
-    const { container } = render(<DeutschZeile nurse={kraft()} />);
-    // Kein „Deutsch Gut" mehr am Stück — die Balken stehen dazwischen.
-    expect(container.textContent).toBe('DeutschGut');
-    const kinder = Array.from(container.firstElementChild!.childNodes);
-    expect(kinder[0].textContent).toContain('Deutsch');
-    expect((kinder[1] as HTMLElement).querySelectorAll('span').length).toBe(3);
-    expect(kinder[2].textContent).toBe('Gut');
-  });
-
-  it('ohne bekannte Stufe keine leeren Kästchen', () => {
-    const { container } = render(<DeutschZeile nurse={kraft({ language: { level: '—', bars: 0 } })} />);
-    expect(container.textContent).toBe('Deutsch—');
-    expect(container.querySelectorAll('.rounded-full').length).toBe(0);
-  });
 });
 
 describe('Pflegekraft-Karte', () => {
@@ -57,11 +41,18 @@ describe('Pflegekraft-Karte', () => {
     expect(karte.className).not.toContain('#F4F4F6');
   });
 
-  it('zeigt die Sprachbalken auf der Karte', () => {
+  it('zeigt Deutsch als Punkte im Profil („V", 27.09.2026)', () => {
     const { container } = render(
       <MatchCard nurse={kraft()} status="pending" onNurseClick={() => {}} />,
     );
-    expect(container.textContent).toContain('DeutschGut');
-    expect(gefuellt(container)).toBe(3);
+    expect(container.textContent).toContain('Deutsch gut');
+    expect(container.querySelectorAll('.bg-pm-taupe').length).toBe(3);
+  });
+
+  it('ohne bekannte Stufe keine leeren Punkte', () => {
+    const { container } = render(
+      <MatchCard nurse={kraft({ language: { level: 'Gut', bars: 0 } })} status="pending" onNurseClick={() => {}} />,
+    );
+    expect(container.querySelectorAll('.bg-pm-taupe, .bg-pm-profil-linie').length).toBe(0);
   });
 });

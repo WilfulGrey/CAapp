@@ -68,7 +68,7 @@ export const ExpiredLinkScreen: FC<{
       >
         <Phone className="w-4 h-4" /> 089 200 000 830
       </a>
-      <p className="text-xs text-gray-400">Mo–So, 8:00–18:00 Uhr</p>
+      <p className="text-xs text-gray-400">Mo–So, 8–20 Uhr</p>
     </>
   );
 

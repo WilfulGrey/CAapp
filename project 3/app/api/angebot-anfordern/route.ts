@@ -7,6 +7,7 @@ import {
   getTeamNotificationTemplate,
   getAngebotsEmailTemplate,
 } from '@/lib/email';
+import { holeBewertungsStand } from '@/lib/bewertungen-stand';
 import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { parseCustomerName } from '@/lib/calculation';
 import { scheduleEmail, flushScheduledEmails } from '@/lib/lead-mails';
@@ -53,10 +54,22 @@ async function handlePost(request: NextRequest) {
       adParams,
       quelle,
       websitePfad,
+      websiteEinstieg,
+      telefonSpaeter,
+      kontaktVariante,
+      ablauf,
     }: {
       vorname?: string;
       email: string;
       telefon?: string;
+      /* Kontakt in drei Schritten (Registry #76): der Lead entsteht schon
+         nach Name + E-Mail, die Nummer folgt über /api/lead-telefon oder
+         im Patientenprofil. Nur dieser Weg darf ohne Telefon anlegen. */
+      telefonSpaeter?: boolean;
+      /* Welche Kontakt-Variante der Kunde sah (stufen | alt) — als
+         lead_event, damit Leads und Profile je Variante vergleichbar sind. */
+      kontaktVariante?: string;
+      ablauf?: string;
       careStartTiming?: string;
       kalkulation: Kalkulation;
       acceptPrivacy?: boolean;
@@ -67,11 +80,14 @@ async function handlePost(request: NextRequest) {
       quelle?: string;
       /* Pfad der verweisenden Website-Seite (nur bei quelle website:…). */
       websitePfad?: string | null;
+      /* Erste Seite und Herkunft des Besuchs auf primundus.de (Registry #120), vom Server geprüft. */
+      websiteEinstieg?: unknown;
     } = body;
     /* Der Client schickt die Quelle, der Server entscheidet, was gültig ist —
        sonst landet beliebiger Text in leads.source (Martin, 04.09.2026). */
     const quelleSicher = quelleBereinigen(quelle) ?? 'rechner';
     const websitePfadSicher = typeof websitePfad === 'string' && /^\/[a-z0-9\-\/]{0,80}$/i.test(websitePfad) ? websitePfad : null;
+    const einstiegSicher = websiteEinstiegBereinigen(websiteEinstieg);
 
     // Google-Klick-IDs für den späteren Offline-Conversion-Import
     // (docs/google-ads-tracking.md). Strikt allowlisted + gekappt — der
@@ -109,10 +125,21 @@ async function handlePost(request: NextRequest) {
       );
     }
     // Mild geprüft (≥6 Ziffern), siehe MultiStepForm.validateForm()-Kommentar.
+    // Ausnahme seit 16.09.2026 (Registry #76, Martin: „schon mit der
+    // E-Mail-Adresse den Lead speichern und auch ohne Nummer senden"): mit
+    // `telefonSpaeter` darf die Nummer fehlen; eine mitgeschickte muss
+    // trotzdem plausibel sein.
+    const ohneTelefon = telefonSpaeter === true;
     const phoneDigits = (telefon ?? '').replace(/\D/g, '');
-    if (!telefon || phoneDigits.length < 6) {
+    if (!ohneTelefon && (!telefon || phoneDigits.length < 6)) {
       return NextResponse.json(
         { error: 'Telefonnummer erforderlich' },
+        { status: 400 }
+      );
+    }
+    if (ohneTelefon && telefon && phoneDigits.length < 6) {
+      return NextResponse.json(
+        { error: 'Telefonnummer ungültig' },
         { status: 400 }
       );
     }
@@ -170,6 +197,16 @@ async function handlePost(request: NextRequest) {
       }
     }
 
+    // Einstieg auf primundus.de (Registry #120): erste Seite und Herkunft des Besuchs, zu JEDER Absendung —
+    // auch beim Duplikat, dessen Lead die erste Quelle behält. Best-effort: darf die Anfrage nie blockieren.
+    if (einstiegSicher) {
+      try {
+        await logEvent(lead.id, 'website_einstieg', websiteEinstiegEreignis(einstiegSicher, { isNew, isUpgrade }, quelleSicher));
+      } catch (e) {
+        console.error('website_einstieg nicht gespeichert (Lead existiert trotzdem):', e instanceof Error ? e.message : String(e));
+      }
+    }
+
     // DSGVO Art. 7 Abs. 1 — Einwilligung nachweisbar protokollieren. Als
     // append-only lead_event (Zeitpunkt = created_at, Text + Version + Quelle
     // in den Metadaten). Best-effort: ein Fehler hier darf die Lead-Erstellung
@@ -189,6 +226,15 @@ async function handlePost(request: NextRequest) {
       }
     } else {
       console.warn(`angebot-anfordern: Lead ${lead.id} ohne acceptPrivacy=true angelegt (sollte durch Formular-Pflichtfeld nicht vorkommen).`);
+    }
+
+    // Kontakt-Variante am Lead festhalten (Registry #76): der 50/50-Test
+    // wird nicht nur im anonymen Zähler, sondern auch je Lead lesbar
+    // (Profile, Buchungen, Anteil mit Nummer je Variante).
+    if (kontaktVariante === 'stufen' || kontaktVariante === 'alt') {
+      // `ablauf` (Registry #77): `preis` = Preisseite vor der Kontaktabfrage, `alt` = heutiger Weg.
+      const ablaufWert = ablauf === 'preis' || ablauf === 'alt' ? ablauf : null;
+      await logEvent(lead.id, 'kontakt_variante', { variante: kontaktVariante, ablauf: ablaufWert, telefon_spaeter: ohneTelefon, telefon_dabei: Boolean(lead.telefon) });
     }
 
     // Re-Submit-Dedupe: wenn der Kunde dasselbe Formular nochmal schickt UND
@@ -246,7 +292,13 @@ async function handlePost(request: NextRequest) {
     // nach Versand der Eingangsbestätigung gestartet.
 
     if (shouldSendMails) {
-      const teamEmail = getTeamNotificationTemplate(lead, 'angebot_requested', { quelle: quelleSicher, websitePfad: websitePfadSicher });
+      const teamEmail = getTeamNotificationTemplate(lead, 'angebot_requested', {
+        quelle: quelleSicher,
+        websitePfad: websitePfadSicher,
+        // Ohne Nummer angelegt: das Team soll wissen, dass sie noch kommen
+        // kann (Telefon-Schritt, sonst Patientenprofil) — nicht „N/A".
+        telefonHinweis: ohneTelefon && !lead.telefon ? 'noch nicht angegeben – kommt per Nachtrag oder Patientenprofil' : undefined,
+      });
       sendEmail('info@primundus.de', teamEmail)
         .then(async (r) => {
           if (r.success) {
@@ -317,7 +369,7 @@ async function handleSendAngebotsEmailOnly(leadId: string) {
       );
     }
 
-    const angebotsEmail = getAngebotsEmailTemplate(lead, lead.kalkulation);
+    const angebotsEmail = getAngebotsEmailTemplate(lead, lead.kalkulation, await holeBewertungsStand());
     // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
     const umlA = testphaseUmleitung(lead, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
     const emailResult = await sendEmail(
@@ -358,12 +410,15 @@ async function handleSendAngebotsEmailOnly(leadId: string) {
 import { withMem } from '@/lib/memlog';
 import { PORTAL_BASIS } from '@/lib/portal-url';
 import { kundenEmpfaenger } from '@/lib/empfaenger';
+import { websiteEinstiegBereinigen, websiteEinstiegEreignis } from '@/lib/website-einstieg';
 
 /* Was vom Client-`adParams` (sessionStorage `_prim_ad_params`) den Lead
-   erreichen darf: Google-Klick-IDs für den Offline-Import und die fünf
-   UTM-Werte für die Kanal-Attribution. Alles andere wird verworfen. */
+   erreichen darf: Google-Klick-IDs für den Offline-Import, die
+   ChatGPT-Klick-Kennung `oppref` für die OpenAI Conversions API (Migration
+   20260911123000) und die fünf UTM-Werte für die Kanal-Attribution. Alles
+   andere wird verworfen. */
 const HERKUNFT_KEYS = [
-  'gclid', 'wbraid', 'gbraid',
+  'gclid', 'wbraid', 'gbraid', 'oppref',
   'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
 ] as const;
 export const POST = withMem('angebot-anfordern', handlePost);

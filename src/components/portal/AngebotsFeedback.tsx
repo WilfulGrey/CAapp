@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FC } from 'react';
 import { X } from 'lucide-react';
+import { TELEFON_HREF, WHATSAPP_HREF } from '../../lib/kontakt';
 
 // Rückmeldung zum Angebot — als schwebende Frage von Marta, unten rechts.
 //
@@ -29,8 +30,7 @@ export type FeedbackAnswer = 'passt_nicht' | 'spaeter' | 'loslegen';
 const GRUENDE = ['Zu teuer', 'Pflegekräfte passen nicht', 'Doch ein Heim', 'Anders gelöst'];
 const ZEITPUNKTE = ['In 2–4 Wochen', 'In 1–3 Monaten', 'Noch unklar'];
 
-const PHONE_HREF = 'tel:+4989200000830';
-const WHATSAPP_HREF = 'https://wa.me/4989200000830';
+const PHONE_HREF = TELEFON_HREF;
 
 const chip =
   'text-[15px] px-3.5 py-2 rounded-full border transition-colors text-left ' +
@@ -132,7 +132,8 @@ export const AngebotsFeedback: FC<{
             type="button"
             onClick={schliessen}
             aria-label="Nicht jetzt"
-            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-md"
+            // 44-px-Tippfläche um den 32-px-Kreis (Portal-Redesign, Messung 24.09.)
+            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-md relative after:absolute after:-inset-1.5 after:content-['']"
             style={{ background: '#FFFFFF', border: '1px solid #D4D4D8' }}
           >
             <X className="w-4 h-4" style={{ color: '#71717A' }} />

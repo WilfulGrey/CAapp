@@ -3,9 +3,9 @@ import {
   buildCaregiverWish,
   buildCustomerInput,
   buildJobOfferTitle,
+  panelIdentitaet,
   buildPatients,
   computeArrivalDate,
-  extractPlzFromFormularDaten,
   extractPlzFromLead,
   mapCareLevel,
   mapDementia,
@@ -323,6 +323,47 @@ Deno.test("computeArrivalDate: unknown timing falls back to 'sofort'", () => {
   assertEquals(computeArrivalDate("nieznane", NOW_2026_04_23), "2026-04-30");
 });
 
+// ─── panelIdentitaet (Registry #67) ─────────────────────────────────────────
+
+const VERMITTLER = {
+  vermittler: "pflegena.com",
+  vorname: "Bernd",
+  nachname: "Walde",
+  patient_anrede: "Frau",
+  patient_vorname: "Berta",
+  patient_nachname: "Muster",
+};
+
+Deno.test("panelIdentitaet: Rechner-Lead — der Besteller ist der Kunde (unveraendert)", () => {
+  assertEquals(panelIdentitaet(makeLead({ patient_vorname: "Berta", patient_nachname: "Muster" })), {
+    first_name: "hildegard", last_name: "von norman", istPatient: false,
+  });
+});
+
+Deno.test("panelIdentitaet: Rechner-Lead ohne Kontaktnamen faellt weiter auf patient_* zurueck", () => {
+  // Bitgleich mit dem Verhalten vor dieser Funktion (`?? lead.patient_*`).
+  assertEquals(
+    panelIdentitaet(makeLead({ vorname: null, nachname: null, patient_vorname: "Berta", patient_nachname: "Muster" })),
+    { first_name: "Berta", last_name: "Muster", istPatient: false },
+  );
+});
+
+Deno.test("panelIdentitaet: Vermittler-Lead — der Haushalt ist die Identitaet", () => {
+  /* Prod 16.09.: acht Pflegena-Kunden hiessen in Mamamia "Bernd Walde" —
+     der Ansprechpartner der Agentur, bei jeder Anfrage derselbe. */
+  assertEquals(panelIdentitaet(makeLead(VERMITTLER)), {
+    first_name: "Berta", last_name: "Muster", istPatient: true,
+  });
+});
+
+Deno.test("panelIdentitaet: Vermittler ohne Nachnamen des Haushalts bleibt beim Ansprechpartner", () => {
+  // Lieber der immer gleiche Name als gar keiner.
+  assertEquals(
+    panelIdentitaet(makeLead({ ...VERMITTLER, patient_vorname: null, patient_nachname: null })),
+    { first_name: "Bernd", last_name: "Walde", istPatient: false },
+  );
+});
+
 // ─── buildJobOfferTitle ──────────────────────────────────────────────────────
 
 Deno.test("buildJobOfferTitle: nachname only (no city yet)", () => {
@@ -332,6 +373,12 @@ Deno.test("buildJobOfferTitle: nachname only (no city yet)", () => {
 Deno.test("buildJobOfferTitle: missing nachname falls back to 'Primundus' + lead id prefix", () => {
   const l = makeLead({ nachname: null });
   assertEquals(buildJobOfferTitle(l), "Primundus — aaaaaaaa");
+});
+
+Deno.test("buildJobOfferTitle: Vermittler-Lead traegt den Haushalt, nicht die Agentur", () => {
+  // Sonst heissen alle Jobs eines Vermittlers gleich, waehrend die Kunden
+  // unterscheidbar sind — dieselbe Verwechslung eine Ebene tiefer.
+  assertEquals(buildJobOfferTitle(makeLead(VERMITTLER)), "Primundus — Muster");
 });
 
 // ─── buildPatients (post-Bug-#13 minimal payload) ───────────────────────────
@@ -547,9 +594,25 @@ Deno.test("extractPlzFromLead: lead.patient_zip is preferred (Primundus stage-B 
   assertEquals(extractPlzFromLead(lead), "10115");
 });
 
-Deno.test("extractPlzFromLead: 4-digit zip on patient_zip is padded", () => {
-  const lead = makeLead({ patient_zip: "1067" });
-  assertEquals(extractPlzFromLead(lead), "01067");
+Deno.test("extractPlzFromLead: 4-stellige PLZ ⇒ null, NICHT aufgefüllt (#65)", () => {
+  // Bis Registry #65 wurde daraus "01067" (Halle/Saale) — aus dem
+  // österreichischen 6130 also still ein deutscher Einsatzort.
+  assertEquals(extractPlzFromLead(makeLead({ patient_zip: "1067" })), null);
+  assertEquals(extractPlzFromLead(makeLead({ patient_zip: "6130" })), null);
+});
+
+Deno.test("extractPlzFromLead: PLZ als JSON-Zahl wird ignoriert (#65)", () => {
+  // Eine Zahl kann die führende Null nicht tragen, ist also mehrdeutig.
+  // Auf prod trägt kein Lead die PLZ als Zahl.
+  const lead = makeLead({
+    patient_zip: null,
+    kalkulation: {
+      bruttopreis: 0,
+      eigenanteil: 0,
+      formularDaten: { ...makeFormularDaten(), plz: 80331 as unknown as string },
+    },
+  });
+  assertEquals(extractPlzFromLead(lead), null);
 });
 
 Deno.test("extractPlzFromLead: missing patient_zip falls back to formularDaten.plz", () => {
@@ -567,25 +630,6 @@ Deno.test("extractPlzFromLead: missing patient_zip falls back to formularDaten.p
 Deno.test("extractPlzFromLead: no PLZ anywhere → null", () => {
   const lead = makeLead({ patient_zip: null });
   assertEquals(extractPlzFromLead(lead), null);
-});
-
-// ─── extractPlzFromFormularDaten (legacy / fallback helper) ────────────────
-
-Deno.test("extractPlzFromFormularDaten: plz key (string)", () => {
-  assertEquals(extractPlzFromFormularDaten({ plz: "10115" } as FormularDaten), "10115");
-});
-
-Deno.test("extractPlzFromFormularDaten: postleitzahl key (number)", () => {
-  assertEquals(extractPlzFromFormularDaten({ postleitzahl: 80331 } as FormularDaten), "80331");
-});
-
-Deno.test("extractPlzFromFormularDaten: pads 4-digit PLZ to 5 (e.g. 1067 → 01067)", () => {
-  assertEquals(extractPlzFromFormularDaten({ plz: "1067" } as FormularDaten), "01067");
-});
-
-Deno.test("extractPlzFromFormularDaten: no PLZ → null", () => {
-  assertEquals(extractPlzFromFormularDaten({} as FormularDaten), null);
-  assertEquals(extractPlzFromFormularDaten({ plz: "abc" } as FormularDaten), null);
 });
 
 // ─── Patient identity helpers ──────────────────────────────────────────────
@@ -639,7 +683,7 @@ Deno.test("buildCustomerInput: identity + business defaults + real formularDaten
   // Business defaults — NOT pytania do klienta
   assertEquals(input.language_id, 1);
   assertEquals(input.visibility, "public");
-  assertEquals(input.commission_agent_salary, 10);
+  assertEquals(input.commission_agent_salary, 0);
 
   // Real from kalkulation
   assertEquals(input.care_budget, 3200);

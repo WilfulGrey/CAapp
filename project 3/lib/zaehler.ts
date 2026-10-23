@@ -17,31 +17,82 @@
 export const ZAEHLER_EREIGNISSE = [
   'schritt_1', 'schritt_2', 'schritt_3', 'schritt_4', 'schritt_5', 'schritt_6', 'schritt_7', 'schritt_8', 'schritt_9',
   'cta_geklickt', 'abgeschickt',
+  'garantie_geoeffnet', // Pop-up der Bestpreisgarantie geöffnet (12.09.2026)
+  'garantie_weiter', // aus dem Pop-up in den Rechner (Knopf statt Verstanden, 13.09.2026)
+  // Kontakt in drei Schritten (Registry #76, 16.09.2026): Teilschritte und
+  // Ausgang. `abgeschickt` = Lead gespeichert (in `stufen` schon nach der
+  // E-Mail), `absenden_geklickt`/`absenden_fehler` trennen „nie geklickt"
+  // von „geklickt, Server-Fehler", `telefon_angegeben`/`ohne_telefon` den
+  // Anteil mit Rückrufnummer.
+  'kontakt_email', 'kontakt_telefon', 'absenden_geklickt', 'absenden_fehler', 'telefon_angegeben', 'ohne_telefon',
+  // Preis zuerst (Registry #77, 17.09.2026): Preisseite gesehen, Knopf zur
+  // Kontaktabfrage geklickt, Preisberechnung gescheitert (dann läuft der
+  // Besucher den heutigen Weg).
+  'preis_gesehen', 'kontakt_geoeffnet', 'preis_fehler',
+  // Kontakt-Schritt (Registry #121, 09.10.2026): erstes Antippen eines Feldes und
+  // ein Tipp auf den Knopf, solange Angaben fehlen. Je Seitenaufruf einmal, also
+  // ungefähr je Person: Der Verlust liegt vor dem ersten Tastendruck, und das
+  // sahen wir bisher nur bei den ca. 2 Einwilligenden am Tag.
+  'feld_angetippt', 'knopf_unvollstaendig',
 ] as const;
 export type ZaehlerEreignis = (typeof ZAEHLER_EREIGNISSE)[number];
 
-export const ZAEHLER_VARIANTEN = ['vorschau', 'alt'] as const;
+// `preis` = Preisseite vor dem Kontakt (Registry #77), `stufen` = kein Preis,
+// Kontakt in drei Schritten — die beiden Arme des Ablauf-Tests (Registry #80,
+// das Los fällt beim Laden, die Fragen 1–8 laufen also schon unter dem Los);
+// `alt` = das alte Formular (nur noch erzwungen), `vorschau` = Karten-Seite (?kraefte=1).
+export const ZAEHLER_VARIANTEN = ['vorschau', 'alt', 'stufen', 'preis'] as const;
 export type ZaehlerVariante = (typeof ZAEHLER_VARIANTEN)[number];
+
+/**
+ * Woher der Besucher kam — drei grobe Töpfe, kein Personenbezug (seit
+ * 11.09.2026): google = Google-Ads-Klick (gclid/wbraid/gbraid oder
+ * utm_source=google), chatgpt = ChatGPT-Anzeige (utm_source=chatgpt oder
+ * oppref), sonst = alles andere. Grund: 72 ChatGPT-Sitzungen, 0 Leads, aber
+ * nur 6 davon mit Einwilligung — ob diese Besucher den Rechner überhaupt
+ * beginnen, war ohne diese Aufteilung nicht zu sehen.
+ */
+export const ZAEHLER_QUELLEN = ['google', 'chatgpt', 'sonst'] as const;
+export type ZaehlerQuelle = (typeof ZAEHLER_QUELLEN)[number];
+
+/** Quelle aus den gemerkten Anzeigen-Parametern (sessionStorage `_prim_ad_params`) und der URL. */
+export function zaehlerQuelle(params: Record<string, unknown> | null | undefined, search = ''): ZaehlerQuelle {
+  const p = (params && typeof params === 'object' ? params : {}) as Record<string, unknown>;
+  let q: URLSearchParams;
+  try { q = new URLSearchParams(search); } catch { q = new URLSearchParams(); }
+  const wert = (k: string) => String(p[k] ?? q.get(k) ?? '').toLowerCase();
+  if (wert('utm_source') === 'chatgpt' || wert('oppref')) return 'chatgpt';
+  if (wert('gclid') || wert('wbraid') || wert('gbraid') || wert('utm_source') === 'google') return 'google';
+  return 'sonst';
+}
+
+function quelleImBrowser(): ZaehlerQuelle {
+  if (typeof window === 'undefined') return 'sonst';
+  let params: Record<string, unknown> | null = null;
+  try { params = JSON.parse(sessionStorage.getItem('_prim_ad_params') || 'null'); } catch { params = null; }
+  return zaehlerQuelle(params, window.location.search);
+}
 
 export const ZAEHLER_PFAD = '/api/analytics/zaehler';
 
 /** Prüft den Body der Route — nur bekannte Werte, sonst null. */
-export function pruefeZaehler(body: unknown): { ereignis: ZaehlerEreignis; variante: ZaehlerVariante } | null {
+export function pruefeZaehler(body: unknown): { ereignis: ZaehlerEreignis; variante: ZaehlerVariante; quelle: ZaehlerQuelle } | null {
   if (!body || typeof body !== 'object') return null;
   const o = body as Record<string, unknown>;
   const ereignis = ZAEHLER_EREIGNISSE.find((e) => e === o.ereignis);
   const variante = ZAEHLER_VARIANTEN.find((v) => v === o.variante);
-  return ereignis && variante ? { ereignis, variante } : null;
+  const quelle = o.quelle === undefined ? 'sonst' : ZAEHLER_QUELLEN.find((q) => q === o.quelle);
+  return ereignis && variante && quelle ? { ereignis, variante, quelle } : null;
 }
 
 const gezaehlt = new Set<string>();
 
 /** Schickt einen Zähl-Beacon; überlebt Navigation (sendBeacon / keepalive). Einmal je Ereignis und Seitenaufruf. */
-export function zaehle(ereignis: ZaehlerEreignis, variante: ZaehlerVariante, sender: { sendBeacon?: (url: string, data: Blob) => boolean; fetch?: typeof fetch } = typeof navigator !== 'undefined' ? { sendBeacon: navigator.sendBeacon?.bind(navigator), fetch: typeof fetch === 'function' ? fetch.bind(globalThis) : undefined } : {}): boolean {
+export function zaehle(ereignis: ZaehlerEreignis, variante: ZaehlerVariante, sender: { sendBeacon?: (url: string, data: Blob) => boolean; fetch?: typeof fetch } = typeof navigator !== 'undefined' ? { sendBeacon: navigator.sendBeacon?.bind(navigator), fetch: typeof fetch === 'function' ? fetch.bind(globalThis) : undefined } : {}, quelle: ZaehlerQuelle = quelleImBrowser()): boolean {
   const key = `${ereignis}|${variante}`;
   if (gezaehlt.has(key)) return false;
   gezaehlt.add(key);
-  const body = JSON.stringify({ ereignis, variante });
+  const body = JSON.stringify({ ereignis, variante, quelle });
   try {
     if (sender.sendBeacon) {
       const ok = sender.sendBeacon(ZAEHLER_PFAD, new Blob([body], { type: 'application/json' }));

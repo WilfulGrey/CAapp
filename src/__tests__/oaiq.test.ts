@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 // (project 3/lib/oaiq.ts — pures Modul ohne Next-Imports), weil dort die
 // Anfrage abgeschickt wird. Der Test steht hier, weil das die Suite ist, die
 // als Pflicht-Check vor jedem Merge laeuft.
-import { meldeAnfrage, WERT_ANFRAGE_EUR, OAIQ_PIXEL_ID } from '../../project 3/lib/oaiq';
+import { meldeAnfrage, WERT_ANFRAGE_EUR, WERT_ANFRAGE_MINOR, OAIQ_PIXEL_ID } from '../../project 3/lib/oaiq';
 
 describe('meldeAnfrage (OpenAI-Ads-Pixel)', () => {
   it('meldet lead_created als customer_action in Euro', () => {
@@ -14,7 +14,7 @@ describe('meldeAnfrage (OpenAI-Ads-Pixel)', () => {
     expect(oaiq).toHaveBeenCalledWith(
       'measure',
       'lead_created',
-      { type: 'customer_action', amount: WERT_ANFRAGE_EUR, currency: 'EUR' },
+      { type: 'customer_action', amount: WERT_ANFRAGE_MINOR, currency: 'EUR' },
       { event_id: 'lead-123' },
     );
   });
@@ -46,6 +46,9 @@ describe('meldeAnfrage (OpenAI-Ads-Pixel)', () => {
     // das Gebotssystem teure Pflegefaelle bevorzugen — fuer uns ist aber jede
     // Anfrage gleich viel wert. Dieser Test ist die Bremse dagegen.
     expect(WERT_ANFRAGE_EUR).toBe(20);
+    // … und im Pixel steht der Wert in Cent (Doku: „4200 = $42.00"). Bis zum
+    // 11.09.2026 ging `20` mit, OpenAI las 0,20 €.
+    expect(WERT_ANFRAGE_MINOR).toBe(2000);
   });
 
   it('haelt Pixel-ID und Ereignisnamen an das aus, was das SDK kennt', () => {

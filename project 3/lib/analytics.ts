@@ -64,9 +64,19 @@ interface SessionData {
 // sessionStorage gemerkt, damit der Angebot-Submit Klick-IDs UND Kanal
 // (utm_source …) Minuten später noch an den Lead hängen kann — erst damit
 // lassen sich Leads je Kanal (Google / ChatGPT / organisch) auswerten.
+// `oppref` ist die Klick-Kennung der ChatGPT-Anzeigen (OpenAI hängt sie an
+// jeden Anzeigenklick, GA4 11.09.2026: 41 von 42 Landings). Sie geht wie die
+// gclid an den Lead und von dort serverseitig an die OpenAI Conversions API
+// (Edge Function openai-conversions) — der Browser-Pixel allein sieht nur
+// die ~6 % mit Marketing-Einwilligung.
+// `src` (23.09.2026): Herkunft eines Rechner-Starts von primundus.de — Seite UND
+// Knopfposition (ort-worms-kopf, apex-kosten-schluss). Der Parameter stand seit
+// Monaten in jeder Knopf-URL, gespeichert wurde er nie: 0 von 2.303 Sitzungen der
+// letzten 30 Tage tragen einen. Ohne ihn ist keine Knopf-Frage beantwortbar.
 const AD_PARAM_KEYS = [
-  'gclid', 'wbraid', 'gbraid',
+  'gclid', 'wbraid', 'gbraid', 'oppref',
   'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+  'src',
 ] as const;
 type AdParams = Partial<Record<(typeof AD_PARAM_KEYS)[number], string>>;
 const AD_PARAMS_KEY = '_prim_ad_params';
@@ -90,7 +100,12 @@ function websiteAusUrlUndReferrer(): WebsiteHerkunft | null {
       if (ref.pathname && ref.pathname !== '/') pfad = ref.pathname.slice(0, 80);
     }
   } catch { /* kaputter Referrer — dann eben ohne */ }
-  if (/^apex-[a-z-]{1,30}$/.test(src)) return { src, pfad };
+  // Bis 23.09.2026 galt nur `apex-…` — `ort-worms` von den 207 Ortsseiten wurde still
+  // verworfen, deshalb gab es nie einen Lead mit Quelle website:ort-…. Jetzt gelten beide
+  // Familien, mit Positionssuffix (-kopf, -kosten, -leiste, -schluss).
+  // Länge 40 wie quelleBereinigen() auf dem Server (lib/lead-quelle.ts) — längere Werte würden dort
+  // still zu „rechner" werden.
+  if (/^(apex|ort)-[a-z0-9-]{1,36}$/.test(src)) return { src, pfad };
   if (vonWebsite) return { src: 'apex-referrer', pfad };
   return null;
 }
@@ -113,11 +128,9 @@ export function websiteHerkunft(): WebsiteHerkunft | null {
 /** Pfad der ausgelieferten Test-Variante (siehe middleware.ts). */
 export function variantenSeite(): string {
   if (typeof document === 'undefined') return '/';
-  const echt = window.location.pathname;
-  // Nur auf der Startseite greift die Weiche — Unterseiten bleiben sie selbst.
-  if (echt !== '/') return echt;
-  const v = /(?:^|;\s*)pm_variante=([ABC])(?:;|$)/.exec(document.cookie || '');
-  return v ? ({ A: '/', B: '/kosten-berechnen', C: '/sofortangebot' } as Record<string, string>)[v[1]] : echt;
+  /* Der A/B-Test mit Pria ist beendet (13.09.2026, Registry #67): keine
+     Ableitung aus einem Cookie mehr — die Adresse ist die Herkunft. */
+  return window.location.pathname;
 }
 
 export interface CriticalSubmitInput {
@@ -256,13 +269,8 @@ class Analytics {
       fingerprint: this.fingerprint!,
       userAgent: ua,
       referrer: document.referrer || 'direct',
-      /* Welche Variante der Besucher gesehen hat — NICHT die Adresse.
-         Die Weiche in middleware.ts liefert A/B/C alle unter „/" aus
-         (Rewrite, damit Google dieselbe Landingpage sieht wie in der
-         Anzeige). window.location.pathname wäre deshalb für alle drei „/"
-         und der Test nicht auswertbar. Das Cookie `pm_variante` trägt die
-         Wahrheit; ohne Cookie (Direktaufruf einer Unterseite) bleibt es
-         beim echten Pfad. */
+      /* Herkunft = Adresse der Seite (der Varianten-Test ist seit 13.09.2026
+         beendet, Registry #67). */
       landingPage: variantenSeite(),
       utmSource: urlParams.get('utm_source') || undefined,
       utmMedium: urlParams.get('utm_medium') || undefined,

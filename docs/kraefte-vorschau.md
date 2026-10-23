@@ -151,6 +151,37 @@ der Kopf sagt es); Verlauf 76 px; eine Zeile „+ 3 weitere Pflegekräfte & Ihr
 Sofortangebot"; Knopf einzeilig „Sofortangebot & Pflegekräfte ansehen →"
 (auch als Absendeknopf); kein „Zurück" unter dem Ergebnis-Screen.
 
+**Strecke v2 (11.09., Martin: „Kommunikation passt nicht in die
+Gesamtstory mit Anzeigen, Page, Formular, Kundenportal"):** Ein Wort für das
+Ergebnis auf der ganzen Strecke: **„Preis"** (nicht „Kosten", nicht
+„Sofortangebot"). Landingpage-Knöpfe „Preis & Pflegekräfte ansehen",
+Kopfzeile „In 2 Minuten zu Ihrem Preis", Hero-Pill ohne Zahl („Passende
+Pflegekräfte sofort verfügbar" — die tagesabhängige Zahl samt
+`counter-drift.ts` ist weg; sie lebt nur noch als Startwert der
+Warte-Animation). Warten: „Wir berechnen Ihren Preis und suchen passende
+Pflegekräfte." / „Preis berechnet", sonst unverändert (inkl. „Verfügbarkeit
+geprüft", Martin). Vorschau: „+ 3 weitere passende Pflegekräfte", neue Zeile
+„Ihr persönlicher Preis ist ebenfalls berechnet.", Knopf „Preis & alle 5
+Pflegekräfte ansehen →". Kontakt-Schritt: Kopf „✓ Ihr Preis ist berechnet",
+ohne Foto-Kasten und ohne Frage, ein Satz „Damit wir Preis und Profile für
+Sie speichern und zusenden können, brauchen wir kurz Ihre Kontaktdaten.",
+unter dem Telefonfeld „Nur bei Rückfragen zum Angebot", derselbe Knopf, Fußzeile „Sofort
+sichtbar · kostenlos · unverbindlich". Kein Schrittzähler. Test hält fest:
+Knopf auf Vorschau und Kontakt identisch, ≤ 38 Zeichen, kein „Werbeanruf"
+und kein „Sofortangebot" in den Texten. Portal im selben PR: Hero ohne
+Untertitel, „Passende Pflegekräfte" mit Erklärung, was Einladen bedeutet,
+und über dem Patientenbogen „Jetzt konkrete Bewerbungen erhalten".
+Der Preis bleibt hinter den Kontaktdaten (Martin).
+
+**Karten-Seite aus (11.09. nachmittags, Martin: „so sollte das doch sein" zum
+Kontakt-Schritt mit Fotokasten):** Nach den Fragen kommt für alle direkt der
+Kontakt-Schritt — grüner Kopf mit Haken-Symbol, „Ihr Preis ist berechnet",
+„6× Preis-Leistungssieger", WELT-Siegel rechts; darunter der Fotokasten „5
+passende Pflegekräfte für Sie gefunden". Die Karten-Seite (zwei Karten ganz,
+dritte im Verlauf) läuft nur noch mit `?kraefte=1`; ohne sie ruft der Rechner
+die Function gar nicht auf. Der Warte-Screen behält die drei WARTE-Schritte.
+Zähler-Variante ist damit für alle `alt` — Schnitt am Deploy-Zeitpunkt.
+
 **Zählung ohne Einwilligung (Registry #63, 11.09.):** `wizard_zaehler` zählt je
 Tag/Stunde/Variante die Schritt-Aufrufe 1–9, „cta_geklickt" und „abgeschickt"
 — anonym, ohne Cookie, Sitzungs-ID, IP oder User-Agent. Auswertung:
@@ -178,3 +209,16 @@ wartet nie auf die Function.
 `supabase functions deploy kraefte-vorschau --project-ref ycdwtrklpoqprabtwahi`.
 Braucht dieselben Secrets wie onboard-to-mamamia (MAMAMIA_ENDPOINT,
 MAMAMIA_AUTH_ENDPOINT, MAMAMIA_AGENCY_EMAIL, MAMAMIA_AGENCY_PASSWORD).
+
+## Kontakt in drei Schritten (16.09.2026, Registry #76)
+
+Der Kontakt-Schritt läuft seit dem 16.09. als 50/50: `alt` = der Stand oben (drei Felder,
+Frage/Satz aus `SCHRANKE`), `stufen` = Name → E-Mail → Telefon einzeln, Lead schon nach der
+E-Mail, Nummer danach (Texte in `lib/kontakt-stufen.ts`, Ablauf in CLAUDE.md Registry #76 und
+docs/customer-portal-flow.md). Der Satz-Stand von `SCHRANKE` in diesem Dokument beschreibt
+nur noch die Variante `alt` (seit 12.09.: „Für wen dürfen wir Ihre persönliche
+Preisberechnung ausstellen?" + „Ihren Preis sehen Sie direkt im nächsten Schritt.").
+
+## Preis zuerst (Registry #77, 17.09.2026)
+
+Der Platz der früheren Karten-Seite (Ergebnis vor der Kontaktschranke) trägt im Ablauf `preis` die Preisseite (`PreisSeite.tsx`, Texte in `lib/preis-zuerst.ts`). `?kraefte=1` bleibt beim heutigen Weg — keine Kreuzung der Tests. Details: CLAUDE.md Registry #77, docs/customer-portal-flow.md §„Preis zuerst“.

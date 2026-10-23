@@ -20,9 +20,11 @@
 // Idempotenz-Anker:
 //   - mamamia_confirmed_at / mamamia_confirmation_id  (Phase 1+2 erledigt)
 //   - mamamia_pdf_uploaded_at                          (Phase 3+4 erledigt)
-//   - final_confirmation-Guard: hat der Kunde für DIESE Pflegekraft schon
-//     eine Confirmation (z.B. vom alten Client-Bundle oder SA-Portal), wird
-//     sie übernommen — StoreConfirmation feuert NIE doppelt.
+//   - final_confirmation-Guard: gibt es schon eine Confirmation, die zu DIESER
+//     Row gehört (dieselbe Bewerbung / Row ankert auf ihr / derselbe Job mit
+//     derselben Pflegekraft — `gehoertZurRow`, Registry #78), wird sie
+//     übernommen — StoreConfirmation feuert NIE doppelt. NIE nur über die
+//     Pflegekraft: dieselbe Kraft kommt zum nächsten Turnus wieder.
 //   - skipConfirm: Alt-Bundle-Kompat (metadata.mamamia_accepted === true ⇒
 //     der Client hat den Akzept bereits selbst gemacht).
 
@@ -65,6 +67,14 @@ export interface AcceptanceSyncSupabase {
     applicationId: number,
     sha256: string | null,
   ): Promise<void>;
+  /**
+   * Mamamia-Job der Bewerbung dieser Row — aus dem Akzept-Event
+   * (lead_events.application_accepted_internal.mamamia_job_offer_id, Spalte
+   * der Bridge seit #25; das Portal schickt den Session-Job mit). Optional
+   * für alte Test-Fakes; fehlt der Job, matcht der Guard nur noch über die
+   * Bewerbung (Registry #78).
+   */
+  fetchAcceptanceJobOfferId?(leadId: string, applicationId: number): Promise<number | null>;
 }
 
 export interface AcceptanceSyncSecrets {
@@ -104,7 +114,19 @@ export interface AcceptanceSyncResult {
    * Alarm nach 5 Min. Feld fehlt, wenn Confirm gar nicht dran war
    * (schon bestätigt / skipConfirm / Adoption) oder gelungen ist.
    */
-  confirm_error?: { message: string; permanent: boolean };
+  confirm_error?: {
+    message: string;
+    permanent: boolean;
+    /**
+     * Registry #88: Mamamia hat UNSERE Vertragsdaten abgelehnt — alle
+     * Validation-Keys liegen unter contract_patient.* / contract_contact.*
+     * (Fall #88: contract_patient.salutation bei „Divers"). Dann ist die
+     * Bewerbung selbst sehr wahrscheinlich in Ordnung, und der Alarm darf
+     * nicht „von der Agentur zurückgezogen" vermuten. Fehlt das Feld, gilt
+     * die bisherige Vermutung. Klassifiziert nach Struktur, nicht nach Text.
+     */
+    ursache?: "vertragsdaten";
+  };
   /**
    * Schritt 1 (UpdateCustomer mit den Kontakt-Rows) von Mamamia DETERMINISTISCH
    * abgelehnt (Validation). Die Buchung darf daran nicht hängen — Sequenz läuft
@@ -120,6 +142,24 @@ export interface AcceptanceSyncResult {
   contact_fields_dropped?: Array<"le.email" | "ag.email" | "kp.email">;
   /** Rohwerte zu contact_fields_dropped (fürs Team lesbar, ohne DB-Blick). */
   dropped_values?: Record<string, string>;
+  /**
+   * Die Upload-Bramka hat NACHGELESEN und Mamamia zeigt unsere Confirmation
+   * NICHT am Job dieser Row (Registry #82). Das ist ein BUCHUNGS-Problem, kein
+   * Archiv-Problem: der Kunde hat "Neue Buchung" bekommen, in Mamamia bestätigt
+   * das nichts. Deshalb eigener Alarm (Chain ~T+2 Min, Cron 15 Min) statt der
+   * 24-h-Schwelle von pdfOverdue.
+   *
+   * "not_processed"        — gar keine passende final_confirmation am Job.
+   *                          Direkt nach StoreConfirmation normal (Sekunden),
+   *                          nach der Retry-Chain ein Befund.
+   * "foreign_confirmation" — der Stempel zeigt auf eine Confirmation, die zu
+   *                          einer ANDEREN Bewerbung/einem anderen Job gehört
+   *                          (Mur aus #78, Fall Berg).
+   *
+   * Typisiert statt String-Matching auf `deferred` — Klassifikation NUR über
+   * die Struktur, nie über den Meldungstext (Święta zasada 1.5).
+   */
+  booking_not_visible?: "not_processed" | "foreign_confirmation";
 }
 
 // ─── GraphQL ────────────────────────────────────────────────────────────────
@@ -129,14 +169,16 @@ export interface AcceptanceSyncResult {
 // Verarbeitungs-Bramka für den Upload) + location_id des bestehenden
 // Contracts (kanonische "Lokalizacja opieki" aus dem Patientenbogen,
 // Bug #13d — wird in die neue patient_contact-Row übernommen, da Mamamia
-// die Contract-Liste beim Schreiben ERSETZT).
+// die Contract-Liste beim Schreiben ERSETZT). Gelesen wird die Zeile
+// `patient_contact` aus der Liste, NICHT der Singular: der liefert nach einer
+// Annahme oft die Zeile des Auftraggebers (Registry #131).
 const SYNC_CUSTOMER_QUERY = /* GraphQL */ `
   query AcceptanceSyncCustomer($id: Int!) {
     Customer(id: $id) {
       id
       equipments { id }
       patients { id tools { id } }
-      customer_contract { location_id }
+      customer_contracts { contact_type location_id }
       job_offers {
         id
         # application_id: Original-Bewerbung der Confirmation — für den
@@ -156,12 +198,20 @@ interface SyncCustomerData {
     id: number;
     equipments: Array<{ id: number }> | null;
     patients: Array<{ id: number; tools: Array<{ id: number }> | null }> | null;
-    customer_contract: { location_id: number | null } | null;
+    customer_contracts: Array<{ contact_type: string | null; location_id: number | null }> | null;
     job_offers: Array<{
       id: number;
-      final_confirmation: { id: number; application_id?: number | null; caregiver: { id: number } | null } | null;
+      final_confirmation: { id: number; application_id: number | null; caregiver: { id: number } | null } | null;
     }> | null;
   } | null;
+}
+
+// final_confirmation eines Jobs, um den Job ergänzt (ein Job hat genau eine).
+interface FinalConfirmation {
+  id: number;
+  application_id: number | null;
+  caregiver: { id: number } | null;
+  job_offer_id: number;
 }
 
 // Schmaler UpdateCustomer — die DREI Personen aus dem Konfirmationsformular
@@ -364,9 +414,11 @@ export function buildCustomerContract(row: AcceptanceRow): Record<string, unknow
   const ag = (snap.ag ?? null) as Record<string, unknown> | null;
   if (!ag) return mapContractPatient(row.contract_patient);
   const name = String(ag.name ?? "").trim();
-  let first: string | null = null;
-  let last: string | null = null;
-  if (name) {
+  // Registry #131: neuere Snapshots tragen Anrede + Vor-/Nachname getrennt.
+  // Ohne sie (Rows vor #131) bleibt der Split an der letzten Leerstelle.
+  let first: string | null = clean(ag.vorname);
+  let last: string | null = clean(ag.nachname);
+  if (!first && !last && name) {
     const idx = name.lastIndexOf(" ");
     if (idx > 0) {
       first = name.slice(0, idx).trim() || null;
@@ -376,8 +428,10 @@ export function buildCustomerContract(row: AcceptanceRow): Record<string, unknow
     }
   }
   const { zip, city } = splitEinsatzort(ag.ort);
+  const salutation = sal(ag.anrede);
   return {
-    // salutation: nicht verfügbar (Composed-Form ohne Anrede) → weglassen.
+    // Anrede nur, wenn der Snapshot sie trägt (Rows vor #131: weglassen).
+    ...(salutation ? { salutation } : {}),
     first_name: first,
     last_name: last,
     street_number: clean(ag.strasse),
@@ -404,7 +458,9 @@ async function resolveLocationId(
   ctx: { endpoint: string; token: string; fetchFn: typeof fetch },
 ): Promise<number | null> {
   const z = String(zip ?? "").trim();
-  if (!/^\d{4,5}$/.test(z)) return null;
+  // Genau 5 Ziffern (Registry #65) — eine 4-stellige Angabe ist keine deutsche
+  // PLZ, und `search` würde sie als PRÄFIX behandeln.
+  if (!/^\d{5}$/.test(z)) return null;
   try {
     const res = await mamamiaRequest<{
       LocationsWithPagination: {
@@ -418,7 +474,10 @@ async function resolveLocationId(
       fetchFn: ctx.fetchFn,
     });
     const rows = res.LocationsWithPagination?.data ?? [];
-    return rows.find((l) => l.country_code === "DE")?.id ?? null;
+    // Exakte PLZ, nicht „erster DE-Treffer": `search` matcht PRÄFIXE (Sonde
+    // 11.09.2026: '503' → 50321 Brühl). Hier steht der Einsatzort auf einem
+    // UNTERSCHRIEBENEN Vertrag — eine fremde Stadt ist schlimmer als keine.
+    return rows.find((l) => l.country_code === "DE" && l.zip_code === z)?.id ?? null;
   } catch {
     return null;
   }
@@ -482,6 +541,24 @@ function isPermanentMamamiaError(e: unknown): boolean {
 export function isValidationError(e: unknown): boolean {
   const errs = (e as { graphqlErrors?: Array<{ extensions?: Record<string, unknown> }> } | null)?.graphqlErrors;
   return Array.isArray(errs) && errs.some((x) => x?.extensions?.validation != null);
+}
+
+// Registry #88: Keys aus `extensions.validation` — „contract_patient.salutation"
+// usw. Strukturell (Laravel-Validation), nie aus dem Meldungstext.
+export function validationKeys(e: unknown): string[] {
+  const errs = (e as { graphqlErrors?: Array<{ extensions?: Record<string, unknown> }> } | null)?.graphqlErrors;
+  if (!Array.isArray(errs)) return [];
+  return errs.flatMap((x) => {
+    const v = x?.extensions?.validation;
+    return v && typeof v === "object" ? Object.keys(v as Record<string, unknown>) : [];
+  });
+}
+
+// Nur Felder aus unserem Vertragsformular ⇒ Ursache „vertragsdaten".
+// application_id oder ein fremdes Feld ⇒ keine Aussage (bisheriger Text).
+export function nurVertragsdaten(keys: string[]): boolean {
+  return keys.length > 0 &&
+    keys.every((k) => k.startsWith("contract_patient.") || k.startsWith("contract_contact."));
 }
 
 // Kurze interne Retries NUR für transiente Confirm-Fehler — "jakieś retry
@@ -579,9 +656,30 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
     id: p.id,
     tool_ids: (p.tools ?? []).map((t) => t.id),
   }));
-  const finalConfirmations = (cust.Customer?.job_offers ?? [])
-    .map((j) => j?.final_confirmation)
-    .filter((fc): fc is { id: number; application_id?: number | null; caregiver: { id: number } | null } => !!fc);
+  const finalConfirmations: FinalConfirmation[] = (cust.Customer?.job_offers ?? [])
+    .flatMap((j) => j?.final_confirmation ? [{ ...j.final_confirmation, job_offer_id: j.id }] : []);
+  const rowJobOfferId = (await supabase.fetchAcceptanceJobOfferId?.(row.lead_id, row.application_id)) ?? null;
+  // Gehört eine Confirmation zu DIESER Row? (Registry #78 — Fall Berg, Customer
+  // 9753: dieselbe Pflegekraft kam zum dritten Turnus wieder; ein Match nur
+  // über caregiver_id nahm ihre ALTE Confirmation für die neue Bewerbung, und
+  // der Upload hängte sie per UpdateConfirmation(application_id) an die neue
+  // Bewerbung um.) Drei legitime Wege:
+  //   1. dieselbe Bewerbung — Retry nach verlorener Response, Alt-Client
+  //      (skipConfirm), Panel buchte genau die Bewerbung, die der Kunde signierte;
+  //   2. die Row ankert auf der Confirmation — Vertrag nachträglich nach
+  //      Panel-Buchung (Portal: 'fc-<id>' → acceptanceApplicationId);
+  //   3. derselbe JOB mit derselben Pflegekraft — Panel buchte eine ANDERE
+  //      Bewerbung derselben Kraft, das Portal patchte die noch gelistete als
+  //      accepted (mappers.ts, Pfad 3). Ein Job hat genau eine
+  //      final_confirmation, also eindeutig. Ohne Job-Kenntnis (Event ohne
+  //      Spalte, vor #25) entfällt dieser Weg — dann lieber ein lauter
+  //      Doppel-Store (Validation ⇒ permanent ⇒ Alarm) als eine stille
+  //      Fremd-Adoption.
+  const gehoertZurRow = (fc: FinalConfirmation): boolean =>
+    fc.application_id === row.application_id
+    || fc.id === row.application_id
+    || (rowJobOfferId != null && fc.job_offer_id === rowJobOfferId
+      && row.caregiver_id != null && fc.caregiver?.id === row.caregiver_id);
 
   // ── 1. UpdateCustomer: die DREI Personen aus dem Konfirmationsformular ──
   // LE → patient_contracts[patient_contact] (+ location_id-Übernahme aus dem
@@ -591,7 +689,8 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
   // läuft auch im Retry erneut, kein eigener Stempel nötig. Achtung: Mamamia
   // ERSETZT die Listen — manuelle Panel-Korrekturen an diesen Rows werden bei
   // jedem Durchlauf (Chain-Stufe, Cron bis zum PDF-Upload) überschrieben.
-  const carriedLocationId = cust.Customer?.customer_contract?.location_id ?? null;
+  const carriedLocationId = (cust.Customer?.customer_contracts ?? [])
+    .find((c) => c?.contact_type === "patient_contact")?.location_id ?? null;
   const lePatient = mapContractPatient(row.contract_patient);
   const agContract = buildCustomerContract(row);
   const kpContact = mapContractContact(row.contract_contact);
@@ -676,11 +775,10 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
 
   // ── 2. StoreConfirmation (Akzept) — mit Guards ──
   if (!result.confirmed) {
-    // Guard A: existiert bereits eine final_confirmation für DIESE Pflegekraft
-    // (alter Client / SA-Portal / früherer Retry nach verlorener Response)?
-    const adopted = row.caregiver_id != null
-      ? finalConfirmations.find((fc) => fc.caregiver?.id === row.caregiver_id)
-      : undefined;
+    // Guard A: existiert bereits eine final_confirmation, die zu DIESER Row
+    // gehört (alter Client / SA-Portal / früherer Retry nach verlorener
+    // Response)? Siehe gehoertZurRow — nie nur über die Pflegekraft.
+    const adopted = finalConfirmations.find(gehoertZurRow);
     if (adopted) {
       result.confirmed = true;
       result.confirmation_id = adopted.id;
@@ -696,7 +794,7 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
       // SOFORT (Kunde glaubt sonst an eine Buchung, die es nicht gibt,
       // z.B. weil die Agentur die Bewerbung zurückgezogen hat).
       let conf: { StoreConfirmation: { id: number; application_id: number } | null } | null = null;
-      let confErr: { message: string; permanent: boolean } | null = null;
+      let confErr: AcceptanceSyncResult["confirm_error"] | null = null;
       for (let attempt = 0; ; attempt++) {
         try {
           conf = await mamamiaRequest<{
@@ -718,6 +816,7 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
         } catch (e) {
           const permanent = isPermanentMamamiaError(e);
           confErr = { message: (e as Error).message.slice(0, 300), permanent };
+          if (permanent && nurVertragsdaten(validationKeys(e))) confErr.ursache = "vertragsdaten";
           if (permanent || attempt >= CONFIRM_TRANSIENT_RETRIES) break;
           await sleep(CONFIRM_RETRY_DELAYS_MS[attempt] ?? 4000);
         }
@@ -749,14 +848,37 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
   // hat — d.h. final_confirmation ist am Job sichtbar. Direkt nach
   // StoreConfirmation ist sie das oft noch nicht → dann übernimmt der Cron.
   if (result.confirmed && !result.pdf_uploaded) {
-    const confirmationId = result.confirmation_id
-      ?? (row.caregiver_id != null
-        ? finalConfirmations.find((fc) => fc.caregiver?.id === row.caregiver_id)?.id ?? null
-        : null);
-    const processed = confirmationId != null
-      && finalConfirmations.some((fc) => fc.id === confirmationId);
-    if (!processed) {
+    const confirmationId = result.confirmation_id ?? finalConfirmations.find(gehoertZurRow)?.id ?? null;
+    const fc = confirmationId != null ? finalConfirmations.find((f) => f.id === confirmationId) : undefined;
+    if (!fc) {
       result.deferred.push("pdf: confirmation not processed yet (final_confirmation missing)");
+      result.booking_not_visible = "not_processed";
+      return;
+    }
+    // Stempel-Mur (Registry #78): der Upload hängt die Datei an EINE
+    // Confirmation und schickt deren application_id mit — wäre der Stempel
+    // fremd (Confirmation einer anderen Bewerbung / eines anderen Jobs), würde
+    // UpdateConfirmation sie UMHÄNGEN. Nicht unsere ⇒ kein Upload, Stempel von
+    // Hand prüfen. VOR StoreFile, sonst legt jeder Cron-Lauf eine verwaiste
+    // Datei in Mamamia ab.
+    if (!gehoertZurRow(fc)) {
+      result.deferred.push(
+        `pdf: confirmation ${fc.id} gehört zu Bewerbung ${fc.application_id} auf Job ${fc.job_offer_id}, nicht zu Bewerbung ${row.application_id} — kein Upload, Stempel prüfen`,
+      );
+      result.booking_not_visible = "foreign_confirmation";
+      return;
+    }
+    // application_id: mamamias Validator VERLANGT das Feld („erforderlich")
+    // UND validiert es gegen Applications („ungültig" für IDs, die nie eine
+    // Application waren) — beides live gelernt, staging 2026-08-06, app=667.
+    // Immer der Wert, den die Confirmation SELBST trägt (soft-deleted IDs
+    // akzeptiert mamamia, nie-existente nicht) — so ist der Aufruf nie ein
+    // Umhängen. Seit 2026-09-17 (Mamamia-Team, nach Fall Berg) lehnt
+    // UpdateConfirmation jede ANDERE application_id ab („The selected
+    // application id is invalid") — Umhängen ist API-seitig unmöglich, das
+    // Feld bleibt Pflicht. Fehlt es (Confirmation ohne Bewerbung) ⇒ defer.
+    if (fc.application_id == null) {
+      result.deferred.push("pdf: confirmation without original application_id — cannot attach file");
       return;
     }
 
@@ -817,28 +939,13 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
       "Dienstleistungsvertrag-signiert.pdf",
       fetchFn,
     );
-    // application_id: mamamias Validator VERLANGT das Feld („erforderlich")
-    // UND validiert es gegen Applications („ungültig" für IDs, die nie eine
-    // Application waren) — beides live gelernt, staging 2026-08-06, app=667.
-    // Adoptions-Rows (Vertrag nachträglich nach Panel-Buchung) ankern auf der
-    // Confirmation-ID ⇒ die ORIGINAL-Bewerbung der Confirmation mitschicken
-    // (final_confirmation.application_id; soft-deleted IDs akzeptiert mamamia,
-    // nie-existente nicht). Echte Rows: weiterhin row.application_id.
-    const isAdoptionAnchor = row.application_id === confirmationId;
-    const uploadApplicationId = isAdoptionAnchor
-      ? finalConfirmations.find((fc) => fc.id === confirmationId)?.application_id ?? null
-      : row.application_id;
-    if (uploadApplicationId == null) {
-      result.deferred.push("pdf: adoption row without original application_id on confirmation — cannot attach file");
-      return;
-    }
     await mamamiaRequest({
       endpoint: secrets.mamamiaEndpoint,
       token: agencyToken,
       query: UPDATE_CONFIRMATION_FILES,
       variables: {
-        id: confirmationId,
-        application_id: uploadApplicationId,
+        id: fc.id,
+        application_id: fc.application_id,
         is_confirm_binding: true,
         file_tokens: [fileToken],
       },

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, FC } from 'react';
-import { Check, Bell, Phone, AlertCircle, AlertTriangle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
+import { Check, Bell, Clock, Phone, AlertCircle, ChevronDown, X, ArrowLeft, ArrowRight, Heart, FileText, ClipboardCheck } from 'lucide-react';
 import { Nurse } from '../types';
-import { displayName } from '../components/portal/shared';
+import { displayName, initials } from '../components/portal/shared';
 import {
   fetchLeadByToken,
   Lead,
@@ -10,12 +10,13 @@ import {
   setDeclinedCaregiver,
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
-import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers, useInviteRateState, useLeadJobs } from '../lib/mamamia/hooks';
+import { useCustomer, useCustomerKontakte, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers, useInviteRateState, useLeadJobs } from '../lib/mamamia/hooks';
+import { fruehereBuchung, vertragVorbelegung } from '../lib/vertragVorbelegung';
 import { rankComparator } from '../lib/mamamia/matchingsRanking';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { isAboutDeStale, regenerateGermanDescription } from '../lib/mamamia/caregiverAbout';
 import { feedbackInRuhezeit, reportLeadEvent, fetchLeadEvents, KOSTENRECHNER_URL } from '../lib/leadEvents';
-import type { CaregiverSnapshot } from '../lib/leadEvents';
+import type { CaregiverSnapshot, EinladenQuelle, FormularQuelle, LeadEventMetadata, Messpunkt, ProfilQuelle } from '../lib/leadEvents';
 import { identifyClarity } from '../lib/clarity';
 import {
   useRejectApplication,
@@ -44,6 +45,7 @@ import { buildMonthlyBreakdown, formatDeDate } from '../lib/pricing/monthlyBreak
 import {
   type Application,
   type NurseStatus,
+  type PatientForm,
 } from '../components/portal/shared';
 import { BookedScreen } from '../components/portal/BookedScreen';
 import { VertragSignieren } from '../components/portal/VertragSignieren';
@@ -51,9 +53,18 @@ import { AngebotCard } from '../components/portal/AngebotCard';
 import { AppCard } from '../components/portal/AppCard';
 import { AppCardDone } from '../components/portal/AppCardDone';
 import { BeratungCTA } from '../components/portal/BeratungCTA';
+// Einstieg wie am 25.09. mittags (Registry #102): Kasten „Noch 2 Minuten“ + schwebende Rückmeldung statt `AngebotFrage`.
 import { AngebotsFeedback } from '../components/portal/AngebotsFeedback';
-import type { FeedbackAnswer } from '../components/portal/AngebotsFeedback';
+import { SucheStand } from '../components/portal/SucheStand';
+import { HERO_PUNKTE } from '../lib/heroPunkte';
+import { kalenderTag } from '../components/portal/DateField';
+import { reserviertBis as berechneReservierung, RESERVIERUNG_STUNDEN, nochReserviertText } from '../lib/reservierung';
+import type { FetchedLeadEvent } from '../lib/leadEvents';
 import { MatchCard } from '../components/portal/MatchCard';
+// Rückbau Registry #122: vor dem ersten Speichern wieder der Einstieg aus Stand 75b8df8 (Kostenkarte, Kasten
+// „Noch 2 Minuten“, Karten mit „Einladen“ + Schloss, offenes Formular mit „Speichern“); Kopf und Häufige Fragen wie heute.
+import { EinstiegVorSpeichern, WarumSheetVorSpeichern } from '../components/portal/EinstiegVorSpeichern';
+import { MatchCardVorSpeichern } from '../components/portal/MatchCardVorSpeichern';
 import { MatchCardDone } from '../components/portal/MatchCardDone';
 import { InterestCard, type InterestActionStatus } from '../components/portal/InterestCard';
 import { ExpiredLinkScreen } from '../components/portal/ExpiredLinkScreen';
@@ -66,6 +77,26 @@ import { AngebotPruefenModal, buildVertragsDaten } from '../components/portal/An
 import { CustomerNurseModal } from '../components/portal/CustomerNurseModal';
 import { zeigtSommerzuschlag } from '../components/portal/konditionen';
 import { PflegekraftChat } from '../components/portal/PflegekraftChat';
+import { TELEFON_HREF } from '../lib/kontakt';
+import { useSterneStand } from '../lib/sterne';
+import { BestpreisSheet } from '../components/portal/PortalSheets';
+import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
+import { FaqListe } from '../components/portal/FaqListe';
+import { MartaBox } from '../components/portal/MartaBox';
+import { BewertungsZeile } from '../components/portal/BewertungsZeile';
+import { ANGEBOT_ANSEHEN, AngebotAbschnitt, AngebotAblaufStand, BEREICH_TITEL, PFLEGE_ANSEHEN, PFLEGE_STATUS, PFLEGE_TITEL, AngebotEinleitung, AngebotKopfleiste, AngebotLeistung, AngebotPerson, AngebotSicherheit, AngebotSterne, AngebotTestsieger, EINLADEN_TITEL, EINLADEN_ZEILE, KOMPAKT_LOOK, SUCHE_LAEUFT_SATZ, interesseText, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
+import { StatusBadge } from '../components/ui/StatusBadge';
+
+// vdek-Auswertung zum 01.07.2026: bundesweiter Durchschnitt des Eigenanteils im ERSTEN
+// Heimjahr. Bewusst das erste Jahr — später sinkt es durch den Leistungszuschlag, und wer
+// jetzt entscheidet, vergleicht mit dem, was er zuerst zahlt. Beim nächsten vdek-Update
+// (jeweils 01.01. und 01.07.) nachziehen. EINE Konstante für Kostenkarte und Aufklapper
+// (bis Teil 3 des Redesigns stand die Zahl zweimal, einmal als Literal).
+const HEIM_EIGENANTEIL = 3364;
+const HEIM_QUELLE = 'vdek-Auswertung, Stand 1. Juli 2026';
 
 // ─── Dev-Only Preview-Mode (NICHT für Production) ──────────────────────────
 // Aktiviert via ?preview=bewerbung oder ?preview=interesse. Skipped den
@@ -93,11 +124,21 @@ const IS_PREVIEW_CHAT = PREVIEW_PARAM === 'chat';
 // die Karte sobald entweder Bewerbungen offen sind oder das Profil als
 // gespeichert gilt.
 const IS_PREVIEW_PATIENT = PREVIEW_PARAM === 'patient';
+// Dev-only: ?preview=patient&telefon=0 zeigt den Patientenbogen für einen Lead
+// OHNE Rückrufnummer (Kontakt in drei Schritten, Registry #76) — dann steht das
+// Pflichtfeld „Telefonnummer für Rückfragen" in „Einsatzort & Start" leer.
+const PREVIEW_OHNE_TELEFON =
+  typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('telefon') === '0'
+    : false;
 // Dev-only preview: Profil erfasst, 0 Bewerbungen, 0 Interest → der
 // "ready"-State ("Profil vollständig. Bewerbungen werden für Sie
 // vorbereitet. ✨"). Wird vom Multi-Job-Vorschau (?preview=jobs) als
 // Detail-View für geplante Jobs ohne Bewerbungen genutzt.
 const IS_PREVIEW_WARTET = PREVIEW_PARAM === 'wartet';
+// ?preview=wartet&leer=1 — keine sichtbaren Pflegekräfte (Leer-Zustand prüfen, 25.09.).
+const IS_PREVIEW_LEER =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('leer') === '1';
 const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIEW_GEBUCHT || IS_PREVIEW_CHAT || IS_PREVIEW_PATIENT || IS_PREVIEW_WARTET;
 
 // Sub-Nav-Zeile mit Job-Kontext (Status-Badge + Zeitraum links) +
@@ -189,7 +230,7 @@ const PREVIEW_LEAD: Lead = {
   nachname: 'Müller',
   anrede: 'Frau',
   anrede_text: 'Frau',
-  telefon: '+49 89 1234567',
+  telefon: PREVIEW_OHNE_TELEFON ? null : '+49 89 1234567',
   status: 'angebot_angefordert',
   token: 'preview-token',
   token_expires_at: null,
@@ -265,8 +306,8 @@ const PREVIEW_INTEREST_PROFILE = {
 };
 
 const PREVIEW_INTEREST_ASSIGNMENTS = [
-  { startDate: '10.01.2026', endDate: '20.03.2026', postalCode: '80331', city: 'München', patientCount: 1, duration: '10 Wochen' },
-  { startDate: '01.09.2025', endDate: '15.11.2025', postalCode: '50667', city: 'Köln', patientCount: 1, duration: '10 Wochen' },
+  { startDate: '10.01.2026', endDate: '20.03.2026', postalCode: '80331', city: 'München', duration: '10 Wochen' },
+  { startDate: '01.09.2025', endDate: '15.11.2025', postalCode: '50667', city: 'Köln', duration: '10 Wochen' },
 ];
 
 const PREVIEW_INTEREST = {
@@ -360,6 +401,11 @@ const PREVIEW_MATCHINGS: Array<{ nurse: Nurse; caregiverId: number }> = [
   { caregiverId: 999011, nurse: { caregiverId: 999011, name: 'Ewa Lewandowski', age: 65, experience: '12 J. Erfahrung', experienceYears: 12, availability: 'verfügbar ab 02.06.', availableSoon: true, language: { level: 'Gut', bars: 3 }, color: '#A18973', addedTime: 'gestern', isLive: true, gender: 'female', image: 'https://i.pravatar.cc/200?img=49', history: { assignments: 35, avgDurationMonths: 3.6 } } },
   { caregiverId: 999012, nurse: { caregiverId: 999012, name: 'Helena Wiśniewska', age: 54, experience: '4 J. Erfahrung', experienceYears: 4, availability: 'sofort verfügbar', availableSoon: true, language: { level: 'Mittel', bars: 2 }, color: '#B5A184', addedTime: 'vor 2 Tagen', isLive: true, gender: 'female', image: 'https://i.pravatar.cc/200?img=45', history: { assignments: 9, avgDurationMonths: 2.4 } } },
   { caregiverId: 999013, nurse: { caregiverId: 999013, name: 'Pavel Kowalski', age: 61, experience: '7 J. Erfahrung', experienceYears: 7, availability: 'verfügbar ab 26.05.', availableSoon: true, language: { level: 'Grund', bars: 1 }, color: '#6B5444', addedTime: 'heute', isLive: true, gender: 'male', image: 'https://i.pravatar.cc/200?img=12', history: { assignments: 18, avgDurationMonths: 2.9 } } },
+  // Fünfte Kraft nur in ?preview=patient (Kompakt-Einstieg, 03.10.): „5 passende Pflegekräfte" wie in
+  // der Angebotsmail. Die übrigen Vorschau-Zustände bleiben bei vier und damit vergleichbar.
+  ...(IS_PREVIEW_PATIENT
+    ? [{ caregiverId: 999014, nurse: { caregiverId: 999014, name: 'Irena Pawlak', age: 57, experience: '7 J. Erfahrung', experienceYears: 7, availability: 'sofort verfügbar', availableSoon: true, language: { level: 'Mittel', bars: 2 }, color: '#A18973', addedTime: 'heute', isLive: true, gender: 'female' as const, image: 'https://i.pravatar.cc/200?img=32', history: { assignments: 2, avgDurationMonths: 2.2 } } }]
+    : []),
 ];
 
 // Rekonstruiert eine Nurse aus einem gespeicherten CaregiverSnapshot (volle
@@ -462,6 +508,9 @@ const CustomerPortalPage: FC = () => {
         setLeadError('Ihr Angebot konnte nicht geladen werden. Bitte öffnen Sie den Link aus Ihrer E-Mail erneut.');
       } else {
         setLead(l);
+        // Im selben Render wie der Lead: kein einziges Bild im Ausgangszustand
+        // für Kunden, die schon abgesendet haben (siehe `schonAbgesendet`).
+        if (l.patient_form_at) setPatientSaved(true);
         // Report back to the kostenrechner lead so the Nachfass emails know
         // the customer reached the portal. Fire-and-forget. `m` ist die
         // Quell-Markierung aus den Nachfass-Mail-Links (pn1/pn2/pn3/wp) —
@@ -542,9 +591,15 @@ const CustomerPortalPage: FC = () => {
   // Karte explizit — Profile-Card direkt geöffnet, damit man den Wizard
   // visuell testen kann.
   const [patientSaved, setPatientSaved] = useState(IS_PREVIEW_ANY && !IS_PREVIEW_PATIENT);
+  // In DIESER Sitzung erfolgreich abgesendet. `mmCustomer` wird nach dem
+  // Speichern nicht neu geladen, sein Status bleibt bis zum Neuladen „draft"
+  // (Review 25.09.): Ohne diesen Vermerk kippte die Seite beim Ändern direkt
+  // nach dem ersten Absenden zurück in den Ausgangszustand.
+  const [abgesendetInSitzung, setAbgesendetInSitzung] = useState(false);
   const [triggerOpenPatient, setTriggerOpenPatient] = useState(IS_PREVIEW_PATIENT);
 
-  // Rückmeldung zum Angebot: einmal beantwortet oder weggeklickt, ist Ruhe —
+  // Rückmeldung zum Angebot (seit 25.09. die Frage „Passt Ihnen das Angebot?"
+  // unter der Kostenkarte, vorher eine schwebende Blase): einmal beantwortet, ist Ruhe —
   // und zwar RUHEZEIT_TAGE lang, nicht nur für diese Sitzung (Martin, 12.08.:
   // „wann zeigen wir das eigentlich?"). Vorher stand hier bewusst KEIN
   // localStorage, mit dem Gedanken „beim nächsten Besuch kann sich die Lage
@@ -571,28 +626,12 @@ const CustomerPortalPage: FC = () => {
     if (IS_PREVIEW_ANY) return;
     try { if (feedbackKey) localStorage.setItem(feedbackKey, String(Date.now())); } catch { /* s.o. */ }
   };
-  // Sie erscheint NICHT sofort: Erst wenn der Kunde am Angebot und an den
-  // Pflegekräften vorbei ist. Eine Frage, die über dem Preis aufpoppt,
-  // unterbricht mitten im Lesen und bietet einen Ausstieg an, bevor er die
-  // Pflegekräfte überhaupt gesehen hat.
-  //
-  // Ausgelöst wird sie, sobald der Pflegesituation-Abschnitt ins Bild kommt —
-  // NICHT über eine Pixelschwelle am Scroll-Ereignis. Der Abschnitt IST die
-  // Grenze („alles gesehen, jetzt käme die Arbeit"), das ist also die
-  // ehrliche Bedingung statt einer geratenen Zahl. Und es funktioniert
-  // unabhängig davon, WIE der Kunde dorthin kam: wischen, Sprungmarke,
-  // wiederhergestellte Scroll-Position nach Reload. (Ein scroll-Listener
-  // verpasst genau die letzten beiden — beim Prüfen am 12.08. feuerte
-  // programmatisches Scrollen gar kein Ereignis.)
-  //
-  // In der Vorschau von Anfang an „reif": Dort soll die Blase sofort zu sehen
-  // sein, ohne erst hinscrollen zu müssen — und die Vorschau-Umgebung meldet
-  // ohnehin weder scroll- noch Intersection-Ereignisse (12.08. geprüft: auch
-  // ein manuell gesetzter Observer feuert dort nie).
-  // Zweite Bedingung neben dem Scrollen: eine Mindest-Verweildauer. Scrollen
-  // allein beweist nicht, dass jemand gelesen hat — wer einmal schnell
-  // durchwischt, hat zum Angebot noch keine Meinung, und eine Frage danach
-  // erzeugt eine Zufallsantwort statt einer echten (Martin, 12.08.).
+
+  // ── Schwebende Rückmeldung „Was sagen Sie zum Angebot?“ (zurück seit Registry #102, Stand 25.09. mittags) ──
+  // Sie erscheint erst, wenn der Kunde am Angebot und an den Pflegekräften vorbei ist (`feedbackReif`: der
+  // Abschnitt #patientendaten kommt ins Bild) UND mindestens 45 s auf der Seite war (`feedbackVerweilt`) —
+  // Scrollen allein beweist nicht, dass jemand gelesen hat (Martin, 12.08.). In der Vorschau sofort „reif“,
+  // die Vorschau-Umgebung meldet weder Scroll- noch Intersection-Ereignisse (12.08. geprüft).
   const VERWEILDAUER_MS = 45_000;
   const [feedbackVerweilt, setFeedbackVerweilt] = useState(IS_PREVIEW_ANY);
   useEffect(() => {
@@ -603,26 +642,50 @@ const CustomerPortalPage: FC = () => {
 
   const [feedbackReif, setFeedbackReif] = useState(IS_PREVIEW_ANY);
   useEffect(() => {
-    if (feedbackReif) return;
-    const el = document.getElementById('patientendaten');
-    if (!el || typeof IntersectionObserver === 'undefined') return;
+    if (feedbackReif || typeof IntersectionObserver === 'undefined') return;
     const io = new IntersectionObserver(
       entries => { if (entries.some(e => e.isIntersecting)) setFeedbackReif(true); },
       { rootMargin: '0px 0px -20% 0px' },
     );
-    io.observe(el);
-    return () => io.disconnect();
-    // `patientSaved` in den Abhängigkeiten, weil der beobachtete Abschnitt
-    // erst existiert, wenn er gerendert ist. `hasPending` bewusst NICHT —
-    // es ist hier oben noch nicht deklariert, und wenn Bewerbungen offen
-    // sind, blendet die Render-Bedingung die Blase ohnehin aus.
-  }, [feedbackReif, patientSaved]);
+    // Den Abschnitt erst suchen, wenn er dasteht (Befund 06.10.): Beim ersten Render zeigt die Seite „Ihr Angebot wird
+    // geladen…“, #patientendaten fehlt noch. Bis dahin gab der Beobachter auf und versuchte es nie wieder; von echten
+    // Kunden kam seit dem 12.08. keine Antwort. Deshalb hängt er sich an, sobald der Abschnitt im DOM erscheint, und
+    // wechselt mit, wenn React ihn neu einsetzt (Absenden, offene Bewerbungen).
+    let beobachtet: Element | null = null;
+    const anhaengen = () => {
+      const el = document.getElementById('patientendaten');
+      if (el === beobachtet) return;
+      if (beobachtet) io.unobserve(beobachtet);
+      beobachtet = el;
+      if (el) io.observe(el);
+    };
+    anhaengen();
+    const mo = typeof MutationObserver === 'undefined' ? null : new MutationObserver(anhaengen);
+    mo?.observe(document.body, { childList: true, subtree: true });
+    return () => { mo?.disconnect(); io.disconnect(); };
+  }, [feedbackReif]);
 
   // Sektion „Pflegesituation" klappt wie „Ihr persönliches Angebot" ueber die
   // Kopfzeile (Martin, 2026-07-12): offen solange nicht gespeichert,
   // danach eingeklappt mit Status-Pill; manueller Toggle gewinnt.
   const [patientExpandedManual, setPatientExpandedManual] = useState<boolean | null>(null);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
+
+  // Formular im Blick → Rückmeldung ausblenden: Sie säße unten rechts genau über der mitlaufenden Knopfleiste des
+  // Formulars. AngebotCard meldet das selbst (onImBlick), weil sie neu gemountet werden kann.
+  const [formularImBlick, setFormularImBlick] = useState(false);
+
+  // Pop-up der Angebotsseite (Portal-Redesign Teil 3). Das zweite, „Warum erst die
+  // Pflegesituation?", ist seit Registry #109 weg: Jeder Knopf springt direkt ins Formular.
+  const [bestpreisOffen, setBestpreisOffen] = useState(false);
+  // Rückbau Registry #122: „Warum erst die Pflegesituation?" (Stand 75b8df8) — hinter „Warum? Mehr" und dem Einladen-Knopf
+  // mit Schloss, nur vor dem ersten Speichern.
+  const [warumOffen, setWarumOffen] = useState(false);
+  // `?einstieg=kompakt`: vor dem Speichern der Kompakt-Einstieg (#780) statt des Rückbaus — nur zum Vergleich und als
+  // Rückweg, kein Kunde bekommt den Schalter. Einmal beim Laden gelesen.
+  const [einstiegKompakt] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('einstieg') === 'kompakt'; } catch { return false; }
+  });
+  const sterne = useSterneStand();
   // Manual override for the "Ihr Angebot" expand/collapse. null = follow
   // the auto rule below (expanded only in initial state). Toggling sets
   // an explicit value that wins over the auto rule.
@@ -633,31 +696,80 @@ const CustomerPortalPage: FC = () => {
   // Kostenaufstellung IM Kasten auf. Beim Umbau war das kurzzeitig derselbe
   // Schalter — dadurch fehlte das Einklappen des Abschnitts ganz.
   const [costsExpanded, setCostsExpanded] = useState(false);
-  // Erstbesuch pro Lead (localStorage): beim ERSTEN Reingehen ins Portal soll
-  // "Ihr Angebot" aufgeklappt sein — danach folgt es der Fortschritts-Regel
-  // (collapsed sobald Patientendaten erfasst sind). In Preview immer true,
-  // damit der Erstbesuch-Zustand sichtbar ist. iOS-WebKit-localStorage kann
-  // fehlschlagen → Fallback "kein Erstbesuch" (greift dann nur die Auto-Regel).
-  const [offerFirstVisit] = useState<boolean>(() => {
-    if (IS_PREVIEW_ANY) return true;
-    try {
-      const token = new URLSearchParams(window.location.search).get('token');
-      if (!token) return false;
-      const key = `pm_portal_offer_seen_${token}`;
-      const seen = localStorage.getItem(key) === '1';
-      if (!seen) localStorage.setItem(key, '1');
-      return !seen;
-    } catch {
-      return false;
-    }
-  });
+  // (Der Erstbesuch-Schalter `offerFirstVisit` ist seit 25.09. weg: vor dem Absenden ist das
+  // Angebot immer offen, danach eingeklappt mit Preis in der Zeile.)
 
   // ─── Mamamia session + queries (K2-K4 integration) ───────────────────────
   const { session, ready: mmReady, error: mmError, expired: mmExpired } = useMamamiaSession(lead?.token ?? null, JOB_ID_PARAM);
   // Token lief WÄHREND der Sitzung ab (z. B. beim Speichern erkannt) —
   // gleiches Ziel wie mmExpired: Selbst-Service-Screen für neuen Link.
   const [saveTokenExpired, setSaveTokenExpired] = useState(false);
-  const { data: mmCustomer, loading: mmCustomerLoading, error: mmCustomerError } = useCustomer(mmReady);
+  const { data: mmCustomer, loading: mmCustomerLoading, error: mmCustomerError, fertig: mmCustomerFertig } = useCustomer(mmReady);
+  // Registry #130: ab dem zweiten Einsatz die Personen der letzten Annahme aus
+  // Mamamia lesen (nur wenn schon ein anderer Einsatz gebucht ist) — für die
+  // Vorbelegung des Vertragsformulars. Fehler egal, dann wie bisher.
+  const kontakteNoetig = mmReady && !IS_PREVIEW_ANY && fruehereBuchung(mmCustomer?.job_offers, session?.job_offer_id ?? null);
+  const { data: mmKontakte, fertig: mmKontakteFertig } = useCustomerKontakte(kontakteNoetig);
+  // Schon abgesendet: in dieser Sitzung, laut Lead oder laut mamamia.
+  // `leads.patient_form_at` setzt der Proxy erst nach erfolgreichem
+  // UpdateCustomer. Es kommt mit dem Lead, lange vor mamamia: Ohne das sahen
+  // wiederkehrende Kunden auf einem neuen Gerät erst den Ausgangszustand mit
+  // offenem Formular, bis mamamia antwortete (Review 25.09.).
+  const schonAbgesendet = abgesendetInSitzung || !!lead?.patient_form_at || (!!mmCustomer?.status && mmCustomer.status !== 'draft');
+  // Auf DIESEM Gerät schon einmal abgesendet (AngebotCard-Vermerk `_isDraft: false`). Solche Kunden
+  // gehen am Kompakt-Einstieg vorbei: Dort ist das Formular erst nach einem Tipp gemountet, und nur
+  // das gemountete Formular meldet diesen Vermerk als „gespeichert" nach oben (wie bisher).
+  const lokalAbgesendet = useMemo(() => {
+    if (!lead?.token) return false;
+    try {
+      const roh = localStorage.getItem(`patient_${lead.token}`);
+      return !!roh && (JSON.parse(roh) as { _isDraft?: boolean })._isDraft !== true;
+    } catch { return false; }
+  }, [lead?.token]);
+
+  // ── Unsichtbare Messpunkte (Registry #123, Martin 14.10.2026: „1,2,3 ja") ──────────────────────────────────────────
+  // Was Kunden vor und nach dem ersten Speichern ansehen und antippen: Profil, „Einladen", die Pop-ups „Warum erst die
+  // Pflegesituation?" und Bestpreisgarantie, „Alle Kosten im Überblick", Häufige Fragen, Kalender des Startdatums. Für
+  // Kunden unsichtbar. Nur echte Leads, nie in den Vorschau-Modi. Reine Aufzeichnung über die Bridge mit `notify: false`:
+  // keine Team-Mail, keine Kundenmail, kein Status-Wechsel (project 3/lib/messpunkte.ts). Einmal je Sitzung, Profil und
+  // Einladen je Pflegekraft, Fragen je Frage (Schlüssel in leadEvents.ts). Keine Personendaten in metadata.
+  // `vor_speichern` = Pflegesituation noch nie gespeichert (weder in dieser Sitzung noch laut Lead oder mamamia).
+  const vorSpeichern = !patientSaved && !schonAbgesendet;
+  const messen = (punkt: Messpunkt, metadata?: LeadEventMetadata) => {
+    if (IS_PREVIEW_ANY) return;
+    reportLeadEvent(lead?.token, punkt, metadata, false);
+  };
+  // Woher das nächste Profil geöffnet wird, wo der Zustand es nicht verrät (Liste im Kompakt-Einstieg, Mail-Link `cg=`,
+  // „Bereits bearbeitet", gebucht). Sonst folgt die Quelle aus dem Zustand, den derselbe Klick setzt.
+  const profilQuelleRef = useRef<ProfilQuelle | null>(null);
+  useEffect(() => {
+    if (!selectedNurse) return;
+    const quelle: ProfilQuelle = profilQuelleRef.current
+      ?? (nurseModalApp ? 'bewerbung' : selectedFromInterestId !== null ? 'interesse' : nurseMatchIdx !== null ? 'karte' : 'sonstige');
+    profilQuelleRef.current = null;
+    messen('profil_geoeffnet', { caregiver_id: selectedNurse.caregiverId, quelle, vor_speichern: vorSpeichern });
+    // Nur beim Öffnen eines Profils; die übrigen Zustände setzt derselbe Klick mit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedNurse]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (warumOffen) messen('warum_geoeffnet'); }, [warumOffen]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (bestpreisOffen) messen('bestpreis_geoeffnet'); }, [bestpreisOffen]);
+  // Kostenaufstellung der Angebotskarte (nach dem Speichern, Kompakt-Einstieg); vor dem Speichern meldet sie
+  // KostenkarteVorSpeichern selbst.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (costsExpanded) messen('kosten_aufgeklappt'); }, [costsExpanded]);
+  const messeEinladen = (nurse: Nurse, quelle: EinladenQuelle) =>
+    messen('einladen_getippt', { caregiver_id: nurse.caregiverId, quelle, vor_speichern: vorSpeichern });
+  const messeFrage = (frage: string) => messen('faq_geoeffnet', { frage });
+  // Formular im Hinweis „Ihre Pflegesituation ist noch nicht vollständig" aufgeklappt (Kompakt-Einstieg).
+  const [formImKasten, setFormImKasten] = useState(false);
+  // Startdatum NUR aus dem Formular des Kunden (Martin 25.09.: „Das einzige
+  // Datum, was zählt, ist das, was hier im Formular angegeben wird"), nie aus
+  // mamamia `arrival_at` (dort kann noch die Onboard-Schätzung stehen).
+  // In dieser Sitzung abgesendet → dieses Formular, sonst der gespeicherte Bogen.
+  const [abgesendetesFormular, setAbgesendetesFormular] = useState<PatientForm | null>(null);
+  const formularStart = kalenderTag(abgesendetesFormular?.startDate ?? (lead?.patient_form?.startDate as string | undefined));
   const { data: mmJobOffer, loading: mmJobOfferLoading, error: mmJobOfferError, refetch: refetchJobOffer } = useJobOffer(mmReady);
   const { data: mmApplications, loading: mmApplicationsLoading, error: mmApplicationsError, refetch: refetchApplications } = useApplications({ limit: 20 }, mmReady);
   // limit=20 is intentional — client-side ranking (see `effectiveMatched`)
@@ -725,7 +837,12 @@ const CustomerPortalPage: FC = () => {
   // info@primundus.de team mail with contract data, no Mamamia call.
   // On portal load we flip the matching app's status to 'accepted' →
   // existing BookedScreen renders. Persists across reload.
-  const { data: acceptedApplications, refetch: refetchAcceptedApplications } = useAcceptedApplications(mmReady);
+  const { data: acceptedApplications, error: acceptedApplicationsError, refetch: refetchAcceptedApplications } = useAcceptedApplications(mmReady);
+  // Erst wenn die Annahmen da sind (oder ihr Abruf scheiterte, fail-soft), steht
+  // fest, dass eine „neue" Bewerbung nicht längst gebucht ist (Review 25.09.):
+  // Sonst sah ein gebuchter Kunde kurz „Sie haben eine aktive Bewerbung", und
+  // der Link aus Mail B öffnete „Angebot prüfen" über dem Gebucht-Bildschirm.
+  const annahmenBekannt = IS_PREVIEW_ANY || !!acceptedApplications || !!acceptedApplicationsError;
 
   // Multi-Job (Opcja B, Dachs 8899): die Jobs des Leads — speist den
   // "Alle meine Einsätze"-Link auch OHNE ?job=-Deeplink (vorher war die
@@ -737,7 +854,7 @@ const CustomerPortalPage: FC = () => {
   const { data: leadJobs } = useLeadJobs(mmReady);
   const hasMultipleJobs = (leadJobs?.length ?? 0) > 1;
 
-  // Gebucht-Ableitung aus dem Mamamia-Stand (Fix Hagedorn 2026-07-15):
+  // Gebucht-Ableitung aus dem Mamamia-Stand (Fix 2026-07-15):
   // akzeptiert die AGENTUR die Bewerbung im SA-Portal, gibt es keine
   // lead_application_acceptances-Zeile — der einzige Beleg ist
   // JobOffer.final_confirmation (via GET_CUSTOMER job_offers). Fail-soft:
@@ -777,7 +894,12 @@ const CustomerPortalPage: FC = () => {
   // (caregiver_invite_attempts). Read on portal load, refetched after
   // every successful invite. Backend hard-gate in mamamia-proxy.inviteCaregiver
   // is the security boundary; this hook drives UX (disable button + modal).
-  const { data: inviteRate, refetch: refetchInviteRate } = useInviteRateState(mmReady);
+  const { data: inviteRate, error: inviteRateError, refetch: refetchInviteRate } = useInviteRateState(mmReady);
+  // Einladungen, die der Server-Stand `inviteRate` noch nicht mitzählt:
+  // caregiverId → der `inviteRate`-Stand beim Einladen. Kommt ein neuer Stand,
+  // zählt der Server sie selbst (Review 25.09.: sonst rückte nach dem Einladen
+  // kurz eine 6. Karte nach und verschwand wieder).
+  const einladungStand = useRef(new Map<number, unknown>());
   const [inviteRateModalState, setInviteRateModalState] = useState<{
     retryAfterSeconds: number;
     limit: number;
@@ -930,7 +1052,7 @@ const CustomerPortalPage: FC = () => {
       const fromInterest = [...previewInvitedFromInterest.entries()].map(
         ([caregiverId, nurse]) => ({ caregiverId, nurse }),
       );
-      return [...PREVIEW_MATCHINGS, ...fromInterest];
+      return IS_PREVIEW_LEER ? fromInterest : [...PREVIEW_MATCHINGS, ...fromInterest];
     }
     if (!mmReady || !mmMatchings?.data) return [];
     const now = new Date();
@@ -1054,10 +1176,10 @@ const CustomerPortalPage: FC = () => {
   // the source of truth and only ever flip TO true, never back to false
   // (so an in-progress mid-edit doesn't accidentally clear the badge).
   useEffect(() => {
-    if (mmCustomer?.status && mmCustomer.status !== 'draft' && !patientSaved) {
+    if (schonAbgesendet && !patientSaved) {
       setPatientSaved(true);
     }
-  }, [mmCustomer?.status, patientSaved]);
+  }, [schonAbgesendet, patientSaved]);
 
   // Sync real applications from Mamamia → local state (keeps existing mutation flow).
   useEffect(() => {
@@ -1092,7 +1214,7 @@ const CustomerPortalPage: FC = () => {
   //      rendern (Bug Michael Dachs / lead 39def7b2, 11.06.2026).
   //   3) KEINE Portal-Annahme, aber ein Job hat eine Mamamia-
   //      final_confirmation (die Agentur hat im SA-Portal akzeptiert —
-  //      Bug Hagedorn, 15.07.2026) → synthetische accepted-App aus dem
+  //      Bug 15.07.2026) → synthetische accepted-App aus dem
   //      Job-Stand, damit acceptedApp + BookedScreen trotzdem greifen.
   //
   // mmApplications ist bewusst in den Deps: der Sync-Effect oben ersetzt
@@ -1187,7 +1309,13 @@ const CustomerPortalPage: FC = () => {
     setSelectedNurse(nurse);
   };
 
-  const pendingApps = applications.filter((a) => a.status === 'new');
+  // Angenommene direkt über die IDs ausschließen: Die Überlagerung auf
+  // „accepted" läuft erst im Effekt NACH dem Render, in dem die Annahmen
+  // eintreffen. In genau diesem Render öffnete sonst `view=application`.
+  const angenommeneIds = new Set((acceptedApplications?.application_ids ?? []).map(Number));
+  const pendingApps = annahmenBekannt
+    ? applications.filter((a) => a.status === 'new' && !angenommeneIds.has(Number(a.id)))
+    : [];
 
   // Mail-Deeplink goto=bewerbungen: sobald die Bewerbungen geladen sind,
   // EINMAL zur Sektion scrollen (ref-Guard gegen Re-Scroll bei Refetches).
@@ -1226,6 +1354,7 @@ const CustomerPortalPage: FC = () => {
     // setzen, sonst versucht es jeder Refetch erneut.
     cgOpenedRef.current = true;
     if (idx < 0) return;
+    profilQuelleRef.current = 'mail';
     openNurseFromMatch(effectiveMatched[idx].nurse, idx);
   }, [effectiveMatched.length]);
   const doneApps = applications.filter((a) => a.status !== 'new');
@@ -1236,6 +1365,91 @@ const CustomerPortalPage: FC = () => {
   const acceptedApp = applications.find((a) => a.status === 'accepted') ?? null;
   const hasPending = pendingApps.length > 0;
   const matchesUnlocked = !hasPending;
+  // Kompakt-Einstieg (KompaktEinstieg.tsx): nur VOR dem ersten Absenden der Pflegesituation, ohne
+  // offene Bewerbung. Nie für Kunden, die schon abgesendet haben — auch nicht kurz (`schonAbgesendet`).
+  const kompakt = !hasPending && !patientSaved && !schonAbgesendet && !lokalAbgesendet;
+  // Rückbau Registry #122 (Martin 10.10.: „wir wollen ändern dass wieder mehr patientenprofil machen“): In genau diesem
+  // Zustand — vor dem ersten Speichern — zeigt das Portal wieder den Stand 75b8df8 (EinstiegVorSpeichern) statt des
+  // Kompakt-Einstiegs. Seit #748 speicherten Google-Kunden in Stunde 1 nur noch 2 von 48 (vorher 42 von 151).
+  // Alles nach dem ersten Speichern bleibt wie bisher. Zurück zum Kompakt-Einstieg: hier `false` (oder `?einstieg=kompakt`).
+  const rueckbau = kompakt && !einstiegKompakt;
+  // Fassung 31 (Martin 06.10.: „alle 4 ja, aber die anderen screens will ich vorher absegnen"): die Ansicht NACH dem Absenden
+  // im Aufbau von Fassung 30 — Kopf wie dort, „So geht es weiter" mit Stand, Pflegekräfte zum Einladen, Angebot und
+  // Pflegesituation zugeklappt. Vorerst nur mit `?look=angebot`; ohne Schalter bleibt die heutige Ansicht.
+  const nachAbsendenNeu = !kompakt && KOMPAKT_LOOK === 'angebot';
+
+  // „Ihre Suche läuft" (Martin 25.09.): gespeichert, keine offene Bewerbung und
+  // die Bewerbungen sind geladen — sonst zeigt der Kopf „Einen Moment …" und
+  // die Stand-Karte würde kurz „noch keine Bewerbung" behaupten.
+  const sucheLaeuft =
+    patientSaved && !hasPending && (IS_PREVIEW_ANY || (mmReady && !mmApplicationsLoading && !!mmApplications && annahmenBekannt));
+
+  // Bewerbungs-Ereignisse für „Für Sie reserviert bis …" (src/lib/reservierung.ts).
+  // Neu laden, sobald sich die Zahl der Bewerbungen ändert.
+  const [bewerbungsEvents, setBewerbungsEvents] = useState<FetchedLeadEvent[]>([]);
+  useEffect(() => {
+    if (!lead?.token || IS_PREVIEW_ANY || !hasPending) return;
+    let aktiv = true;
+    fetchLeadEvents(lead.token, ['application_received', 'application_accepted_internal', 'application_rejected'])
+      .then((ev) => { if (aktiv) setBewerbungsEvents(ev); });
+    return () => { aktiv = false; };
+  }, [lead?.token, hasPending, pendingApps.map((a) => a.id).join(',')]);
+  // Countdown „Noch N Stunden" zählt ohne Neuladen weiter.
+  const [uhr, setUhr] = useState(0);
+  useEffect(() => {
+    if (!hasPending) return;
+    const t = setInterval(() => setUhr((x) => x + 1), 60_000);
+    return () => clearInterval(t);
+  }, [hasPending]);
+  const reservierungsPaar = (app: Application) => ({
+    caregiverId: app.nurse.caregiverId,
+    jobOfferId: mmJobOffer?.id,
+    standardJobId: lead?.mamamia_job_offer_id ?? null,
+  });
+  const reservierungFuer = (app: Application): Date | null => {
+    // Vermittler-Leads sagt der Server nie automatisch ab (detect-caregiver-events).
+    if (lead?.vermittler) return null;
+    if (IS_PREVIEW_ANY) {
+      // Vorschau: so, als wäre die Bewerbung vor 20 Stunden gekommen.
+      const std = 60 * 60 * 1000;
+      return new Date(Math.floor((Date.now() + (RESERVIERUNG_STUNDEN - 20) * std) / std) * std);
+    }
+    return berechneReservierung(bewerbungsEvents, reservierungsPaar(app));
+  };
+
+  // Nach Ablauf sagt der Server die Bewerbung ab (Cron, bis ~15 Min. später).
+  // Ein offener Tab hätte bis zum Neuladen weiter „Angebot prüfen" für eine
+  // vergebene Bewerbung gezeigt (Review 25.09.): Solange eine abgelaufene offen
+  // ist, alle 5 Minuten nachladen, und beim Zurückkehren in den Tab sofort.
+  useEffect(() => {
+    if (IS_PREVIEW_ANY || !hasPending || uhr === 0 || uhr % 5 !== 0) return;
+    const jetzt = Date.now();
+    // jetzt = 0 → das Ende auch dann, wenn es schon vorbei ist.
+    const abgelaufen = pendingApps.some((a) => {
+      const ende = berechneReservierung(bewerbungsEvents, reservierungsPaar(a), 0);
+      return ende !== null && ende.getTime() <= jetzt;
+    });
+    if (abgelaufen) refetchApplications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uhr]);
+  useEffect(() => {
+    if (IS_PREVIEW_ANY || !hasPending) return;
+    const sichtbar = () => { if (document.visibilityState === 'visible') refetchApplications(); };
+    document.addEventListener('visibilitychange', sichtbar);
+    return () => document.removeEventListener('visibilitychange', sichtbar);
+  }, [hasPending, refetchApplications]);
+
+  // Mail B verlinkt `&view=application`: bei genau einer offenen Bewerbung
+  // direkt „Angebot prüfen" öffnen, sonst zu den Bewerbungen springen. Einmal.
+  const viewApplicationErledigt = useRef(false);
+  useEffect(() => {
+    if (viewApplicationErledigt.current || !hasPending) return;
+    if (new URLSearchParams(window.location.search).get('view') !== 'application') return;
+    viewApplicationErledigt.current = true;
+    if (pendingApps.length === 1) setSelectedApp(pendingApps[0]);
+    else setTimeout(() => document.getElementById('bewerbungen')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasPending, pendingApps.length]);
 
   // Mamamia-Matchings vorübergehend nicht erreichbar (Upstream-500/Netzwerk)
   // ODER noch am Laden — UND wir haben (noch) keine Daten. Dann zeigt das
@@ -1243,6 +1457,9 @@ const CustomerPortalPage: FC = () => {
   // Seite (2026-06-26: Mamamia-Matchings 500'ten kurz → Kunden sahen 0 PKs).
   // Bei echtem "0 Treffer" ist mmMatchings.data = [] (truthy) → NICHT hier.
   const matchingsLoadingOrError = mmReady && !mmMatchings?.data && (!!mmMatchingsError || mmMatchingsLoading);
+  // Die Liste zeigt 5 − Einladungen der letzten 24 h. Bis dieser Stand da ist,
+  // lädt sie: sonst standen erst 5 Karten da und dann verschwanden welche.
+  const listeLaedt = matchingsLoadingOrError || (mmReady && !IS_PREVIEW_ANY && !inviteRate && !inviteRateError);
 
   // Auto-Retry, solange die Matchings-Abfrage fehlerhaft ist: alle 8s im
   // Hintergrund nachladen, bis Mamamia wieder antwortet — der Kunde muss
@@ -1253,34 +1470,30 @@ const CustomerPortalPage: FC = () => {
     return () => clearInterval(t);
   }, [mmReady, mmMatchingsError, refetchMatchings]);
 
-  // Prefill for AngebotPruefenModal step 2 — replaces the previous
-  // hardcoded fixture (Hildegard/Müller/Rosenstraße/München) that bled
-  // through to every customer regardless of their actual data.
-  // Priority: stage-B patient_* fields → stage-A lead.* → mmCustomer →
-  // empty string. KP (Kontaktperson) fields stay fresh — first time we
-  // ask for them.
-  const pruefenPrefill: Partial<ContractFormData> = (() => {
-    const stageBStreet = lead?.patient_street ?? '';
-    const stageBZip = lead?.patient_zip ?? mmCustomer?.customer_contract?.zip_code ?? '';
-    const stageBCity = lead?.patient_city ?? mmCustomer?.customer_contract?.city ?? '';
-    const ortLine = [stageBZip, stageBCity].filter(Boolean).join(', ');
-    return {
-      anrede: lead?.patient_anrede || lead?.anrede_text || 'Frau',
-      vorname: lead?.patient_vorname || lead?.vorname || '',
-      nachname: lead?.patient_nachname || lead?.nachname || '',
-      strasse: stageBStreet || mmCustomer?.customer_contract?.street_number || '',
-      einsatzort: ortLine,
-      // Patient hat meist KEINE eigene Telefon/E-Mail — die vorhandenen
-      // Kontaktdaten gehören i.d.R. der Kontaktperson, daher dort vorausfüllen.
-      telefon: '',
-      email: '',
-      kpAnrede: '',
-      kpVorname: '',
-      kpNachname: '',
-      kpTelefon: lead?.telefon || mmCustomer?.phone || mmCustomer?.customer_contract?.phone || '',
-      kpEmail: lead?.email || mmCustomer?.email || '',
-    };
-  })();
+  // Dasselbe für die Bewerbungen (Review 25.09.): Ohne Nachladen blieb der Kopf
+  // nach einem kurzen mamamia-500 dauerhaft auf „Einen Moment — Ihre
+  // Bewerbungen werden geladen". Raten („Ihre Suche läuft") wäre falsch, der
+  // Kunde kann eine Bewerbung haben, also: ruhig laden, bis mamamia antwortet.
+  useEffect(() => {
+    if (!mmReady || !mmApplicationsError) return;
+    const t = setInterval(() => { refetchApplications(); }, 8000);
+    return () => clearInterval(t);
+  }, [mmReady, mmApplicationsError, refetchApplications]);
+
+  // Vorbelegung des Vertragsformulars (AngebotPruefenModal, „Ihre Angaben"):
+  // bisher Lead + mmCustomer, ab dem zweiten Einsatz die drei Personen der
+  // letzten Annahme aus Mamamia — lib/vertragVorbelegung.ts (Registry #130).
+  // Registry #131: Das Modal liest die Vorbelegung nur beim Öffnen und legt sie
+  // sofort als Entwurf ab — also erst öffnen, wenn mmCustomer (und ggf. die
+  // Kontakte) geantwortet haben. Sonst nahm der Link aus Mail B die Vorbelegung
+  // ohne die Daten der letzten Annahme und behielt sie für die ganze Sitzung.
+  const vorbelegungBereit = !mmReady || IS_PREVIEW_ANY || (mmCustomerFertig && (!kontakteNoetig || mmKontakteFertig));
+  const pruefenPrefill: Partial<ContractFormData> = vertragVorbelegung({
+    lead,
+    mmCustomer,
+    kontakte: mmKontakte,
+    aktuellerJob: session?.job_offer_id ?? null,
+  });
 
   // Compute visible interests — drop rejected-by-caregiver and locally-
   // dismissed-by-customer entries. Also drop interests whose caregiver
@@ -1466,9 +1679,13 @@ const CustomerPortalPage: FC = () => {
     return true;
   });
 
+  // Nur der Timer des LETZTEN Toasts blendet aus: Vorher schloss der Timer
+  // eines älteren Toasts einen neueren zu früh (z. B. 7-s-Dank nach 4 s).
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = (msg: string, durationMs = 4000) => {
     setToast(msg);
-    setTimeout(() => setToast(null), durationMs);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), durationMs);
   };
 
   // Annahme-Pfad (seit 2026-07-15 automatisch — vorher MVP mit manueller
@@ -1656,8 +1873,10 @@ const CustomerPortalPage: FC = () => {
       refetchAcceptedApplications();
       // PDF-Upload zu Mamamia übernimmt jetzt die Server-Sequenz
       // (sync-acceptance, von der Bridge getriggert): der Guard adoptiert die
-      // längst existierende final_confirmation (Caregiver-Match) und hängt den
-      // Vertrag dort an — wichtig für PK-Wechsel-Fälle (Schiffer/Dachs 15.07.).
+      // längst existierende final_confirmation (Match über die Bewerbung, die
+      // fc-Kotwica oder Job+Pflegekraft — NIE nur über die Pflegekraft, Registry
+      // #78) und hängt den Vertrag dort an — wichtig für PK-Wechsel-Fälle
+      // (Schiffer/Dachs 15.07.).
       // Team-Mail-Resend, best-effort: Fehler nur loggen — die kritische
       // Persistenz (Upsert oben) ist bereits erfolgreich gelaufen.
       fetch(`${KOSTENRECHNER_URL}/api/lead-event`, {
@@ -1726,17 +1945,86 @@ const CustomerPortalPage: FC = () => {
   const zurPflegesituation = () => {
     setPatientExpandedManual(true);
     setTriggerOpenPatient(true);
-    document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const ziel = document.getElementById('patientendaten');
+    // Kompakt-Einstieg: Das Formular steht im Hinweis „Ihre Pflegesituation ist noch nicht vollständig"
+    // (id patientendaten) und klappt erst jetzt auf. Darum ZUERST ohne Animation zum Hinweis, DANN
+    // aufklappen — das Formular kommt so unter dem oberen Bildrand dazu. Weich gescrollt bricht WebKit
+    // ab, sobald oberhalb Inhalt dazukommt (wie Registry #102): Vom Hinweis bei den Pflegekräften aus
+    // landete die Seite einmal 2.326 px unter dem Ziel.
+    if (kompakt && !rueckbau) {
+      ziel?.scrollIntoView({ block: 'start' });
+      setFormImKasten(true);
+      return;
+    }
+    // Rückbau (Stand 75b8df8): Das Formular steht offen unter dem Abschnittskopf, weich dorthin wie damals.
+    ziel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+  // Messpunkt (Registry #132): welcher Knopf ins Formular führte. Nur Tipps des Kunden und der Mail-Link, nie ein
+  // Sprung, den das Portal selbst auslöst. Ohne ihn wüssten wir nicht, ob jemand über einen Knopf kam oder selbst scrollte.
+  const zurPflegesituationAus = (quelle: FormularQuelle) => () => {
+    messen('zur_pflegesituation', { quelle, vor_speichern: vorSpeichern });
+    zurPflegesituation();
+  };
+
+  // Kompakt-Einstieg (Runde 14): der Textlink „Alle Kosten im Überblick ›" unter der kleinen Schrift
+  // öffnet die Kostenaufstellung (samt „Was bleibt für Sie übrig" mit dem Eigenanteil) und springt an
+  // ihren Anfang. Sie kommt UNTER dem Link dazu, also ohne Verschiebung über dem Blick; gesprungen wird
+  // nach dem Aufklappen, ohne Animation (WebKit, Registry #102).
+  const zuAllenKosten = () => {
+    setCostsExpanded(true);
+    setTimeout(() => document.getElementById('kosten-ueberblick')?.scrollIntoView({ block: 'start' }), 60);
+  };
+
+  // Mail-Deeplink goto=anfragen (Knopf „Bewerbungen erhalten" in den Mails, 26.09.):
+  // noch nicht abgesendet → Formular öffnen; schon abgesendet → zum Stand; offene
+  // Bewerbung → zu den Bewerbungen. Erst wenn feststeht, ob abgesendet wurde
+  // (Lead geladen und `patient_form_at` oder mamamia bekannt), und nur einmal.
+  // Erst springen, wenn das Ziel wirklich gerendert ist (Staging 26.09.: direkt nach dem
+  // Laden des Leads stand weder #stand noch #patientendaten, der Sprung ging ins Leere und
+  // der Ref verhinderte jeden zweiten Versuch). Ohne Ziel: beim nächsten Render erneut.
+  const anfragenErledigtRef = useRef(false);
+  useEffect(() => {
+    // Aus der aktuellen URL lesen (wie view=application), nicht aus der Modul-Konstante.
+    if (anfragenErledigtRef.current || new URLSearchParams(window.location.search).get('goto') !== 'anfragen') return;
+    if (!lead || !(IS_PREVIEW_ANY || lead.patient_form_at || mmCustomer)) return;
+    const ziel = hasPending ? document.getElementById('bewerbungen')
+      : !schonAbgesendet ? document.getElementById('patientendaten')
+      : document.getElementById('stand');
+    if (!ziel) return;
+    // Rückbau (Registry #122): Das Formular steht UNTER den Pflegekräften. Erst springen, wenn die Liste steht (oder
+    // mamamia hakt) — sonst schieben die nachgeladenen Karten das Formular nach dem Sprung um ca. 1.000 px nach unten.
+    if (rueckbau && listeLaedt && !mmMatchingsError) return;
+    anfragenErledigtRef.current = true;
+    // Kompakt-Einstieg: Formular im Hinweis öffnen und EINMAL ohne Animation zum Hinweis. Er steht über
+    // den Zeilen, spät geladene Zeilen schieben ihn also nicht mehr weg.
+    if (kompakt && !rueckbau) {
+      setFormImKasten(true);
+      setTimeout(() => ziel.scrollIntoView({ block: 'start' }), 60);
+      return;
+    }
+    requestAnimationFrame(() => {
+      if (!hasPending && !schonAbgesendet) zurPflegesituationAus('mail')();
+      else ziel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead, mmCustomer, mmReady, hasPending, schonAbgesendet, sucheLaeuft, pendingApps.length, listeLaedt]);
 
   const canInviteNurse = (_idx: number): boolean => {
     // Strict gate: no invitations until patient profile is complete.
     // Without it, the caregiver can't prepare a meaningful application
     // and we get back-and-forth queries that frustrate both sides.
+    if (!patientSaved && rueckbau) {
+      // Rückbau Registry #122 (Stand 75b8df8): „Einladen" mit Schloss öffnet „Warum erst die Pflegesituation?" mit dem
+      // Knopf zum Formular (Teil 3 des Redesigns, Martin 24.09.).
+      setWarumOffen(true);
+      return false;
+    }
     if (!patientSaved) {
-      // Kein wegklickbarer Hinweis mehr (Clarity 07.09.: Kunden tippten den
-      // Hinweis weg und weiter auf Karten) — direkt zum Formular.
-      zurPflegesituation();
+      // „Profil vervollständigen & einladen" springt direkt ins Formular, wie bis
+      // 24.09. (Registry #109, Martin 02.10.). Das Fenster „Warum erst die
+      // Pflegesituation?" aus Teil 3 (24.09.) ist weg: Seitdem speicherte nur noch
+      // jeder 20. Neukunde die Pflegesituation in der ersten Stunde, vorher 28 %.
+      zurPflegesituationAus('karte')();
       return false;
     }
     // Serialize concurrent invite clicks. Backend gate is per-request
@@ -1789,6 +2077,7 @@ const CustomerPortalPage: FC = () => {
     // 10s (3 attempts × 5s), only surface the toast if every retry fails.
     // 10s covers the worst-case warm-up (translator wipe + a just-opened job
     // needing 3-5s); longer just makes a genuine failure feel laggy.
+    einladungStand.current.set(id, inviteRate);
     setStatusOverrides((prev) => {
       const next = new Map(prev);
       next.set(id, 'invited');
@@ -1900,6 +2189,7 @@ const CustomerPortalPage: FC = () => {
             nowYear: new Date().getFullYear(),
           })
         : null;
+      einladungStand.current.set(caregiverId, inviteRate);
       setInterestStatusOverrides((prev) => {
         const next = new Map(prev);
         next.set(caregiverId, 'invited');
@@ -2066,30 +2356,6 @@ const CustomerPortalPage: FC = () => {
       showToast('Konnte nicht ablehnen. Bitte erneut versuchen.');
       throw err;
     }
-  };
-
-  // Undo der Interest-Ablehnung: feuert caregiver_declined_undone-Event
-  // (überschreibt die letzte Decline in der lead_events-Historie) +
-  // entfernt lokales Override damit die Interest-Karte wieder oben
-  // auftaucht. Wenn Mamamia eine "restoreCaregiver"-Mutation hätte
-  // würden wir die auch rufen — gibt's aber nicht, also kann die Karte
-  // erst nach dem nächsten mmInterests-Refetch wieder sichtbar sein
-  // (Mamamia muss sie zurückbringen). Best-effort.
-  const undoDismissInterest = (caregiverId: number): void => {
-    setDeclinedFromInterest((prev) => {
-      const next = new Map(prev);
-      next.delete(caregiverId);
-      return next;
-    });
-    setInterestStatusOverrides((prev) => {
-      const next = new Map(prev);
-      next.delete(caregiverId);
-      return next;
-    });
-    reportLeadEvent(lead?.token, 'caregiver_declined_undone', {
-      caregiver_id: caregiverId,
-    });
-    refetchInterests?.();
   };
 
   // Used by modal (calls after own animation). Modal doesn't await — it just
@@ -2280,7 +2546,7 @@ const CustomerPortalPage: FC = () => {
                     style={{color:'#8B7355', borderColor:'#C4B49A', background:'white'}}>
               Erneut versuchen
             </button>
-            <a href="tel:+4989200000830"
+            <a href={TELEFON_HREF}
                className="inline-flex items-center gap-2 text-sm font-bold text-white rounded-2xl px-5 py-3"
                style={{background:'#8B7355'}}>
               <Phone className="w-4 h-4" /> Kontakt
@@ -2375,6 +2641,355 @@ const CustomerPortalPage: FC = () => {
   // Bewerbungen, und wenn nicht da, dann Pflegekräfte"). Dieselbe Sektion
   // an zwei möglichen Stellen — deshalb einmal gebaut und unten je nach
   // Zustand eingehängt, statt 300 Zeilen zu duplizieren.
+  // Die vier Punkte der Startseite (Martin 26.09.: „die müssen doch überall gleich sein"):
+  // dieselbe Liste wie unter „Angebot prüfen" (AppCard) und in den Mails. Bestpreisgarantie ist
+  // der vierte Punkt und öffnet das Pop-up.
+  const punktKlasse = 'flex items-center gap-1.5 text-[14px] min-[375px]:text-[14.5px] min-[390px]:gap-2 min-[390px]:text-[15px] leading-snug text-pm-ink';
+  const vierPunkte = (listenKlasse: string) => (
+    <ul className={listenKlasse}>
+      {HERO_PUNKTE.map((punkt) => (
+        <li key={punkt} className={punktKlasse}>
+          <Check className="h-[17px] w-[17px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
+          {punkt}
+        </li>
+      ))}
+      <li className={punktKlasse}>
+        <Check className="h-[17px] w-[17px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
+        <span>
+          Bestpreisgarantie{' '}
+          <button type="button" onClick={() => setBestpreisOffen(true)} className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-green-deep underline underline-offset-[3px]">
+            Mehr Infos
+          </button>
+        </span>
+      </li>
+    </ul>
+  );
+
+  // Kompakt-Einstieg (Runde 15, Designdurchgang): dieselben vier Punkte, aber ruhig gesetzt — feiner
+  // Haken im Marken-Grün statt Koralle (Koralle bleibt dem Hauptknopf), 16 px, 12 px Abstand; ein
+  // umbrechender Punkt hängt sauber unter seinem Text. „Mehr Infos" als leiser Textlink wie überall im
+  // Einstieg (Stil des Link-Knopfs).
+  const LINK_RUHIG = 'font-semibold text-pm-taupe-ink underline underline-offset-4 decoration-pm-taupe/40 hover:decoration-pm-taupe-ink';
+  const punktKlasseRuhig = 'flex items-start gap-3 text-[16px] leading-[1.45] text-pm-ink';
+  const hakenRuhig = <Check className="mt-[3px] h-[18px] w-[18px] flex-none text-pm-green" strokeWidth={2} aria-hidden="true" />;
+  const vierPunkteRuhig = (
+    <ul className="mt-5 flex flex-col gap-3 border-t border-pm-line pt-5">
+      {HERO_PUNKTE.map((punkt) => (
+        <li key={punkt} className={punktKlasseRuhig}>
+          {hakenRuhig}
+          {punkt}
+        </li>
+      ))}
+      <li className={punktKlasseRuhig}>
+        {hakenRuhig}
+        <span>
+          Bestpreisgarantie{' '}
+          <button type="button" onClick={() => setBestpreisOffen(true)} className={`inline-flex min-h-[44px] -my-3 items-center ${LINK_RUHIG}`}>
+            Mehr Infos
+          </button>
+        </span>
+      </li>
+    </ul>
+  );
+
+      // Fassung 33: das Formular der Pflegesituation an EINER Stelle gebaut. Vor dem Absenden steht es wie bisher im Hinweis
+      // bzw. unter „Pflegesituation", nach dem Absenden (Look „angebot") in der Karte „Angebot und Pflegesituation".
+      // `stand75b8df8` (Rückbau Registry #122): Formularschluss und Wortlaut wie im Stand 75b8df8 — nur vor dem ersten Speichern.
+      const patientFormular = (eingebettet: boolean, stand75b8df8 = false) => (
+        <AngebotCard
+          eingebettet={eingebettet}
+          stand75b8df8={stand75b8df8}
+          onMesspunkt={messen}
+          lead={lead}
+          mmCustomer={mmCustomer}
+          onPatientSaved={(saved) => {
+            // Angaben ändern nach dem Absenden (Martin 25.09.: „sobald man
+            // irgendwas anklickt, lädt die ganze Seite neu"): Jede Eingabe
+            // meldete „nicht gespeichert", der Server-Abgleich unten
+            // (mmCustomer.status ≠ draft) setzte sofort zurück — die Seite
+            // kippte bei jedem Tipp in den Ausgangszustand und wieder zurück.
+            // Führt mamamia den Kunden als aktiv, bleibt die Seite „gespeichert".
+            if (!saved && schonAbgesendet) return;
+            if (saved && !patientSaved) {
+              // Hauptweg zuerst (Martin 24.09.): Bewerbungen, Einladen ist die Zugabe.
+              showToast('✓ Vielen Dank! Passende Pflegekräfte können sich jetzt bei Ihnen bewerben.', 7000);
+              // Frisch gespeichert → Abschnitt klappt zu (Referenz-Zustand).
+              // Ohne den Reset würde ein früher gesetzter manual-Wert den
+              // Bogen offen halten, obwohl die Aufgabe erledigt ist.
+              setPatientExpandedManual(null);
+            }
+            setPatientSaved(saved);
+          }}
+          triggerOpenPatient={triggerOpenPatient}
+          onTriggerHandled={() => setTriggerOpenPatient(false)}
+          // Im Kompakt-Einstieg meldet der Kasten selbst, ob er im Bild ist (er umschließt das Formular).
+          onImBlick={eingebettet ? undefined : setFormularImBlick}
+          schonAbgesendet={schonAbgesendet}
+          onAbgesendet={(nurAenderung) => {
+            setAbgesendetInSitzung(true);
+            // Angaben geändert (nicht die erste Anfrage): bestätigen und zuklappen.
+            if (!nurAenderung) return;
+            showToast('✓ Ihre Angaben sind gespeichert.', 5000);
+            setPatientExpandedManual(null);
+          }}
+          gewaehlterStart={formularStart}
+          mamamiaEnabled={mmReady}
+          onSaveToMamamia={async (form) => {
+            const existingPatientIds = mmCustomer?.patients?.map(p => p.id) ?? [];
+
+            // ── Save flow ──────────────────────────────────────────────────
+            //
+            // One write to land the full patient profile, then a separate
+            // narrow write to overlay the AI-generated job_description.
+            //
+            // Why narrow overlay (proxy action `updateJobDescription`)
+            // instead of re-sending the whole patch with AI text spread:
+            //   - re-sending the full patch a second time bounces every
+            //     association through Mamamia's resolver again — the
+            //     resolver takes ~10-15 s to fully validate, during which
+            //     panel-side StoreRequest (invite) returns Unauthorized.
+            //   - a thin `{ job_description }` payload would trip Mamamia's
+            //     "omitted associations = wipe" rule AND the proxy's
+            //     defensive `patches=[]` workaround → wipes patients.
+            //   - the dedicated proxy action re-fetches current patient
+            //     and equipment ids and re-passes them as bare-id stubs,
+            //     which Mamamia merges into the existing rows. Nothing
+            //     else is touched, no wipe, no 10s lag.
+            //
+            // Sonnet (generateJobDescription) is fire-and-forget after the
+            // gating write so the invite gate opens in ~1 s instead of
+            // ~5 s. Mechanical job_description from the mapper is already
+            // persisted by the gating write — if AI fails or never lands,
+            // the customer profile still has a usable summary.
+
+            // ── Einsatzort-Wall (Registry #65) ───────────────────────────
+            // Ohne `location_id` NICHT speichern. Mamamia stempelt bei einem
+            // unauflösbaren `location_custom_text` einen Platzhalter (prod:
+            // id 16480 für JEDE solche PLZ), kippt den Kunden auf
+            // `status='active'` und das Portal zeigt „Vollständig" für ein
+            // Profil, das nirgends steht — schlimmer als gar kein Speichern.
+            // Der Lookup steht als ERSTES im Handler, also hinterlässt ein
+            // Wurf hier nichts: kein Mamamia-Write, kein Snapshot in
+            // leads.patient_form, keine Mails. Die Arbeit des Kunden bleibt
+            // im localStorage-Entwurf.
+            let locationId: number | undefined;
+            let lookupDown = false;
+            const plz = form.plz?.trim() ?? '';
+            const ortEingabe = form.ort?.trim() ?? '';
+            if (/^\d{5}$/.test(plz)) {
+              try {
+                const r = await callMamamia<{
+                  LocationsWithPagination: {
+                    data: Array<{ id: number; location: string; zip_code: string; country_code: string }>;
+                  };
+                  // limit 50, nicht 10: eine PLZ kann viele Ortsteile haben
+                  // ('04916' → 6 Zeilen), und die Wahl des Kunden muss auf die
+                  // Seite passen.
+                }>('searchLocations', { search: plz, limit: 50, page: 1 });
+                const de = r.LocationsWithPagination.data
+                  .filter(l => l.country_code === 'DE' && l.zip_code === plz);
+                // Exakte PLZ, nicht „erster Treffer": `search` matcht PRÄFIXE —
+                // '503' liefert 50321 Brühl (Sonde 11.09.2026). Unter den
+                // Ortsteilen derselben PLZ zuerst den, den der Kunde gewählt hat.
+                locationId = (de.find(l => l.location === ortEingabe) ?? de[0])?.id;
+              } catch (e) {
+                const raw = e instanceof Error ? e.message : String(e ?? '');
+                // Abgelaufene Sitzung ist KEIN Suchausfall. Diese Meldung ist die
+                // einzige Erkennung eines abgelaufenen Tokens mitten in der
+                // Sitzung; sie sitzt sonst im catch der Mutation weiter unten,
+                // den ein Wurf von HIER nicht erreicht (der try umschliesst nur
+                // die Mutation). Also hier melden und erst dann werfen.
+                if (/401|unauthorized|unauthenticated|token/i.test(raw)) {
+                  showToast('Ihr Zugangslink ist abgelaufen. Sie können sich gleich einen neuen Link zusenden lassen.');
+                  setSaveTokenExpired(true);
+                  throw e;
+                }
+                lookupDown = true;
+              }
+            }
+            if (locationId == null) {
+              reportLeadEvent(
+                lead?.token,
+                'patient_form_location_unresolved',
+                { plz, ort: ortEingabe, ...(lookupDown ? { lookup_down: '1' } : {}) },
+                // Proxy-Ausfall: Zeile ja, Team-Mail nein — sonst schickt eine
+                // 20-Minuten-Störung eine Mail pro Speichern pro Kunde.
+                !lookupDown,
+              );
+              throw new Error(lookupDown ? 'EINSATZORT_LOOKUP' : 'EINSATZORT:' + plz);
+            }
+
+            const patch = mapPatientFormToUpdateCustomerInput(form, {
+              existingPatientIds,
+              locationId,
+              // Registry #131: Nach einer Annahme stehen Name/Anrede/Telefon der
+              // betreuten Person aus dem Vertragsformular in Mamamia — der Bogen
+              // überschreibt sie nicht mehr mit der Kontaktperson aus dem Lead.
+              vertragAusAnnahme: fruehereBuchung(mmCustomer?.job_offers, null),
+              // Kontaktperson (Osoba Kontaktowa) aus dem Lead → customer_contract
+              // (salutation/first_name/last_name), damit das Mamamia-Panel die
+              // Kontaktdaten zeigt statt nur Customer.first_name top-level.
+              //
+              // Vermittler-Lead (Registry #67): die Kontaktspalten tragen dort
+              // den Ansprechpartner der Agentur — er gehoert NICHT unter die
+              // Adresse des Patienten. Das MM-Team fuellt diesen Bogen ueber den
+              // gespiegelten Token aus (gotcha #10), also ist das hier der
+              // einzige Weg, auf dem das Formular bei solchen Leads ueberhaupt
+              // laeuft; ohne die Fallunterscheidung wuerde es den Server-Fix
+              // wieder ueberschreiben.
+              ...(lead?.vermittler
+                ? {
+                    vermittler: true,
+                    contact: {
+                      anrede: lead?.patient_anrede ?? null,
+                      vorname: lead?.patient_vorname ?? null,
+                      nachname: lead?.patient_nachname ?? null,
+                    },
+                  }
+                : {
+                    contact: {
+                      anrede: lead?.anrede_text ?? lead?.anrede ?? null,
+                      vorname: lead?.vorname ?? null,
+                      nachname: lead?.nachname ?? null,
+                    },
+                  }),
+            });
+
+            // ── Gating write: full mechanical patch. Awaited so the caller
+            // (AngebotCard) keeps patientSaved=false until Mamamia has the
+            // complete profile — invite gate opens only on success.
+            // portal_form_snapshot: der ROHE Patientenbogen — der Proxy friert ihn
+            // nach erfolgreichem Write an leads.patient_form ein (SA-Portal zeigt
+            // ihn im Anfrage-Block); Mamamia erreicht das Feld nie (Allowlist).
+            try {
+              await updateCustomerMutation.mutate({
+                ...(patch as Record<string, unknown>),
+                portal_form_snapshot: form,
+              });
+              setAbgesendetesFormular(form);
+            } catch (err) {
+              const raw = err instanceof Error ? err.message : String(err ?? '');
+              // Token während des Ausfüllens abgelaufen → ehrlich sagen und in
+              // den Selbst-Service (neuen Link anfordern) leiten statt eines
+              // ratlosen „fehlgeschlagen".
+              if (/401|unauthorized|unauthenticated|token/i.test(raw)) {
+                showToast('Ihr Zugangslink ist abgelaufen. Sie können sich gleich einen neuen Link zusenden lassen.');
+                setSaveTokenExpired(true);
+              } else {
+                // Sprechende Meldung statt Ratespiel — häufige mamamia-Ablehnungen übersetzt.
+                const friendly = /location/i.test(raw)
+                  ? 'Die Postleitzahl konnte nicht zugeordnet werden — bitte PLZ und Ort prüfen.'
+                  : /too long|exceeds|max/i.test(raw)
+                    ? 'Eine Angabe ist zu lang (z. B. Diagnosen) — bitte etwas kürzen und erneut speichern.'
+                    : `Speichern fehlgeschlagen: ${raw.slice(0, 140)}`;
+                showToast(friendly);
+              }
+              // Fürs Team sichtbar machen, WORAN Kunden scheitern (Dashboard/Report).
+              reportLeadEvent(lead?.token, 'patient_form_save_failed', { error: raw.slice(0, 200) });
+              throw err;
+            }
+
+            // Report back to the kostenrechner lead — patient data complete
+            // unlocks invites/applications, so the Nachfass switches to the
+            // "last step: invite" variant. Fire-and-forget.
+            //
+            // Pass phone so the kostenrechner endpoint can refresh
+            // leads.telefon (kept in sync with Mamamia Customer.phone after
+            // a step-4 edit). Dedupe key includes phone, so a follow-up
+            // save with an edited number re-fires.
+            const phoneForLead = form.phone?.trim();
+            const startDateForLead = form.startDate?.trim();
+            // Vorname/Nachname für den Bridge-Sync nach leads.vorname/nachname.
+            // Identischer Split wie im Mapper (splitCustomerName) → Mamamia
+            // Customer.first_name/last_name und die leads-Spalten bleiben
+            // konsistent. Der Mapper hat den Namen bereits in den updateCustomer-
+            // Patch gelegt; hier nur für die Bridge-Metadaten wiederverwendet.
+            const { vorname: vornameForLead, nachname: nachnameForLead } = splitCustomerName(form.name);
+            const leadEventMeta: Record<string, string> = {};
+            if (phoneForLead) leadEventMeta.phone = phoneForLead;
+            if (startDateForLead) leadEventMeta.startDate = startDateForLead;
+            if (vornameForLead) leadEventMeta.vorname = vornameForLead;
+            if (nachnameForLead) leadEventMeta.nachname = nachnameForLead;
+            reportLeadEvent(
+              lead?.token,
+              'patient_data_saved',
+              Object.keys(leadEventMeta).length > 0 ? leadEventMeta : undefined,
+            );
+            // Patient form save flippa customer na active + dorzuca pełne
+            // patient/wish dane. Mamamia matching engine re-scoreuje całą
+            // listę z nowymi inputami — początkowo zwrócone caregivers
+            // (na bazie minimal onboard payload) mogą już nie pasować lub
+            // mogą się pojawić nowi. Refetch listę żeby user widział
+            // aktualny scoring, nie stale wynik z czasu onboardu.
+            refetchMatchings();
+
+            // ── JobOffer.arrival_at sync (fire-and-forget).
+            // Form Step 5 collects "Voraussichtliches Startdatum" — push it
+            // to Mamamia's JobOffer.arrival_at via UpdateJobOfferDates.
+            // Onboard set arrival_at as a fuzzy offset from care_start_timing
+            // (e.g. "sofort" → +7d); the customer's explicit pick wins.
+            //
+            // Only fire when the user's pick actually differs from what
+            // Mamamia currently holds — avoid no-op writes that would log
+            // noise + reload the JobOffer.
+            const pickedStartDate = form.startDate?.trim();
+            // mamamia liefert „2026-10-15 00:00:00", das Formular „2026-10-15":
+            // nur den Tag vergleichen, sonst schreibt jedes Speichern neu.
+            const currentArrival = kalenderTag(mmJobOffer?.arrival_at);
+            if (pickedStartDate && pickedStartDate !== currentArrival) {
+              void (async () => {
+                try {
+                  await updateJobOfferDatesMutation.mutate({ arrival_at: pickedStartDate });
+                  refetchJobOffer();
+                } catch (err) {
+                  // Best-effort. Customer profile is saved; only the
+                  // arrival_at didn't update. Surface a soft toast so the
+                  // user knows to retry the form Save if the date was
+                  // critical, but don't block the flow.
+                  console.warn('updateJobOfferDates failed:', err);
+                  showToast('Startdatum konnte nicht aktualisiert werden. Ihre Angaben wurden gespeichert.');
+                }
+              })();
+            }
+
+            // ── AI overlay (fire-and-forget). Only writes job_description.
+            // Sonnet polishes the mechanical summary into a 2-3 sentence
+            // German text. The proxy's `updateJobDescription` action
+            // preserves patients + equipments by re-fetching their ids,
+            // so nothing else in the customer state is touched.
+            void (async () => {
+              try {
+                const aiResult = await callMamamia<{ description: string | null }>(
+                  'generateJobDescription',
+                  {
+                    anzahl: form.anzahl,
+                    geschlecht: form.geschlecht, geburtsjahr: form.geburtsjahr,
+                    pflegegrad: form.pflegegrad, mobilitaet: form.mobilitaet,
+                    heben: form.heben, demenz: form.demenz,
+                    inkontinenz: form.inkontinenz, nacht: form.nacht,
+                    diagnosen: form.diagnosen,
+                    p2_geschlecht: form.p2_geschlecht, p2_geburtsjahr: form.p2_geburtsjahr,
+                    p2_pflegegrad: form.p2_pflegegrad, p2_mobilitaet: form.p2_mobilitaet,
+                    p2_demenz: form.p2_demenz,
+                    ort: form.ort, wohnungstyp: form.wohnungstyp,
+                    urbanisierung: form.urbanisierung, familieNahe: form.familieNahe,
+                    haushalt: form.haushalt, pflegedienst: form.pflegedienst,
+                    aufgaben: form.aufgaben, sonstigeWuensche: form.sonstigeWuensche,
+                  },
+                );
+                if (aiResult.description) {
+                  await updateJobDescriptionMutation.mutate({ text: aiResult.description });
+                }
+              } catch (err) {
+                // AI overlay is best-effort. Mechanical job_description
+                // from the mapper is already persisted by the gating write.
+                console.warn('AI job_description overlay failed (mechanical retained):', err);
+              }
+            })();
+          }}
+        />
+      );
+
       const angebotSection = (() => {
         // Seit 11.08. steuert dieser Toggle NUR noch die Konditionen und den
         // Mustervertrag — der Preis steht immer. Default zu: Der Kunde soll
@@ -2385,142 +3000,152 @@ const CustomerPortalPage: FC = () => {
         // fehlen; sobald eine Bewerbung da ist, hat die Vorrang. Manueller
         // Toggle gewinnt. (Wieder die Regel von vor dem 11.08.-Umbau —
         // Martin: „muss einklappbar sein für spätere Zustände".)
+        // Nach dem Absenden eingeklappt, mit dem Preis in der Zeile (Martin 25.09.:
+        // dann zählen Bewerbungen, das Angebot ist Nachschlagewerk).
+        // Kompakt-Einstieg: kein Einklappen der ganzen Karte, nur „Alle Kosten im Überblick".
+        // Fassung 31: nach dem Absenden im Look „angebot" dieselbe Karte wie vorher (Kopfleiste, Leistung, Preis, vier Punkte),
+        // zugeklappt mit dem Preis in der Zeile („Angebot ansehen ›"). `k` = Darstellung wie vor dem Absenden.
+        const neu = nachAbsendenNeu;
+        const k = kompakt || neu;
+        // Fassung 32/33: nach dem Absenden zu Beginn zugeklappt (eine Zeile im Bereich „Angebot und Pflegesituation").
         const offerExpanded =
-          offerExpandedManual ?? (!hasPending && (offerFirstVisit || !patientSaved));
+          kompakt || (neu ? (offerExpandedManual ?? false) : (offerExpandedManual ?? (!hasPending && !patientSaved)));
+        // Schrift im Kompakt-Einstieg: Fließtext 16 px, kleine Schrift 14 px (sonst wie bisher).
+        const grund = k ? 'text-[16px]' : 'text-[15px]';
+        const klein = k ? 'text-[14px]' : 'text-[13px]';
         const brutto = lead?.kalkulation?.bruttopreis ?? 3050;
         const tagessatz = Math.round(brutto / 30);
-        // Gekürzt (Martin, 11.08.: „die Punkte schöner darstellen"). Zwei der
-        // vier Texte brachen auf 375 px um — eine Liste, in der die Hälfte der
-        // Zeilen zweizeilig ist, wirkt unruhig, egal wie sie gestylt ist.
-        // Inhalt unverändert, nur knapper gesagt; die Langfassung steht im
-        // Snapshot, falls eine Formulierung so nicht stimmt.
-        const items = [
-          { text: 'Täglich kündbar' },
-          { text: 'Tagesgenaue Abrechnung' },
-          // „Zahlung erst ab Anreise" → „Kein Vertrag vor Auswahl nötig"
-          // (Martin, 12.08.): Im Ausgangszustand steht der Kunde vor der
-          // Frage, ob er sich mit dem Weiterklicken schon bindet — nicht vor
-          // einer Zahlungsfrage.
-          { text: 'Erst auswählen, dann buchen' },
-          { text: 'Keine Vermittlungsgebühr' },
-        ];
-        return (
-        <div style={{background:'#FFFFFF', borderBottom:'1px solid #E9E9EB'}}>
-        <div className="max-w-3xl mx-auto">
-          {/* „Ihr persönliches Angebot" steht im Header unter dem Namen
-              (Martin, 11.08.) — der Abschnitt heißt deshalb nach seinem
-              Inhalt und wiederholt den Titel nicht. Der Chevron klappt den
-              ganzen Abschnitt zu, sobald er nur noch Referenz ist. */}
-          <button
-            onClick={() => setOfferExpandedManual(!offerExpanded)}
-            className={`w-full px-5 pt-6 flex items-center justify-between gap-3 text-left ${offerExpanded ? 'pb-3' : 'pb-6'}`}
-          >
-            <div>
-              <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>{hasPending ? 'Ihr Angebot' : 'Ihre Betreuungskosten'}</h2>
-            </div>
-            <ChevronDown className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 ${offerExpanded ? 'rotate-180' : ''}`} style={{color:'#71717A'}} />
-          </button>
-
-          {/* Die Kosten stehen IMMER (Martin, 11.08.). Der Kunde kam für den
-              Preis; ihn hinter einen Toggle zu legen wäre die teuerste
-              Ersparnis an Bildschirmhöhe.
-
-              Der MONATSBETRAG führt, nicht der Tagessatz: Angehörige rechnen
-              in Monaten, und der Tagessatz allein (Brutto/30) lässt die
-              Zuschüsse unsichtbar — der Kunde überschätzt seine Belastung um
-              genau deren Summe. `eigenanteil` und `zuschüsse` liegen im Lead
-              und wurden bis 11.08. nirgends angezeigt; im Kostenrechner sieht
-              er sie auch nicht (der Ergebnis-Block dort ist seit dem
-              Direct-Redirect toter Code, setShowResults(true) existiert
-              nicht). Das Portal ist die EINZIGE Stelle. */}
-          {offerExpanded && (
-          <div className="px-4 pb-4">
+        // Heimvergleich EINMAL berechnet (Karte + Aufklapper): Eigenanteil aus dem
+        // ANGEZEIGTEN Brutto minus Posten mit `in_kalkulation` (wie `zuschüsse.gesamt`
+        // serverseitig). Nur zeigen, wenn wir wirklich günstiger sind.
+        const zuschussPosten = (lead?.kalkulation?.['zuschüsse']?.items ?? [])
+          .filter(z => z.in_kalkulation && z.betrag_monatlich > 0);
+        const eigenanteil = zuschussPosten.length > 0
+          ? Math.max(0, brutto - zuschussPosten.reduce((a, z) => a + z.betrag_monatlich, 0))
+          : null;
+        const heimErsparnis = eigenanteil !== null ? HEIM_EIGENANTEIL - eigenanteil : 0;
+        // Absätze, die im Kompakt-Einstieg nicht am Preis stehen: „Kosten erst …" und der
+        // Heimvergleich in der Aufstellung hinter „Alle Kosten im Überblick ›", der Testsieger unten in
+        // der Karte (KompaktVertrauen; sonst alle drei unverändert an ihrer Stelle).
+        // Kein fünfter Haken (Martin, 09.09.): „Kosten erst, wenn die
+        // Pflegekraft da ist" ist eine Erklärung, kein Punkt der Liste.
+        const kostenErst = (
+          <p className={`mt-3 ${k ? 'text-[14px]' : 'text-[14.5px]'} leading-[1.5] text-pm-muted`}>
+            Kosten erst, wenn die Pflegekraft da ist.
+          </p>
+        );
+        // Pflegeheim-Vergleich am Preis (Martin, 07.09.) — ein Satz,
+        // Herkunft der Zahl direkt darunter.
+        const heimVergleich = eigenanteil !== null && heimErsparnis > 0 && (
+          <div className="mt-3 pt-3 border-t border-pm-line-soft">
+            <p className={`${k ? 'text-[16px]' : 'text-[14.5px]'} leading-[1.5] text-pm-ink`}>
+              Zuhause statt Pflegeheim: rund <b className="text-pm-green-deep">{formatEuro(heimErsparnis)} weniger</b> im Monat.
+            </p>
+            <p className={`mt-1 ${klein} leading-snug text-pm-muted`}>
+              Heim-Eigenanteil im 1. Jahr {formatEuro(HEIM_EIGENANTEIL)}, zuhause mit Primundus nach Zuschüssen etwa {formatEuro(eigenanteil)}. Quelle: {HEIM_QUELLE}.
+            </p>
+          </div>
+        );
+        // Beweis-Zeile am Preis (Martin, 13.08.): Welt-Siegel + EIN
+        // Satz — Wortlaut von Martin.
+        const testsieger = (
+          <div className="mt-3 pt-3 border-t border-pm-line-soft flex items-center gap-3">
+            <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-11 w-auto flex-shrink-0 object-contain" />
+            <p className="text-[13.5px] leading-snug text-pm-muted">
+              <b className="text-[15px] text-pm-ink">6× Testsieger DIE&nbsp;WELT</b><br/>20&nbsp;Jahre Erfahrung · 60.000+ Einsätze
+            </p>
+          </div>
+        );
+        // Runde 17 (`?look=angebot`): die Karte als Angebot — Kopf mit Datum und Grundlage, Zeilen statt „Inklusive …".
+        const angebotLook = k && KOMPAKT_LOOK === 'angebot';
+        const angebotInhalt = (
+          <>
                 {/* NUR unser Angebot (Martin, 11.08.). Pflegegeld,
-                    Steuerersparnis und der daraus gebildete Eigenanteil sind
-                    bewusst NICHT hier: Das sind fremde Leistungen mit eigenen
-                    Voraussetzungen — wir nennen unseren Preis, nicht eine
-                    Rechnung über das Geld anderer. `eigenanteil` und
-                    `zuschüsse` bleiben unangetastet im Lead. */}
-                <div className="rounded-2xl border px-5 py-5" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
-                  <p className="text-[2.5rem] font-bold leading-none tracking-tight tabular-nums" style={{color:'#18181B'}}>{formatEuro(brutto)}</p>
-                  <p className="text-[15px] mt-2.5 leading-relaxed" style={{color:'#71717A'}}>
+                    Steuerersparnis und der daraus gebildete Eigenanteil stehen
+                    nicht am Preis — das sind fremde Leistungen mit eigenen
+                    Voraussetzungen. */}
+                  {k ? (
+                    <>
+                      {angebotLook && (
+                        // Runde 30: EIN Angebot — Kopfleiste mit Datum, Leistung mit Grundlage, was der Kunde bekommt,
+                        // dann (Haarlinie) der Preis, am Ende der Karte die vier festen Punkte und das Siegel.
+                        <>
+                          {!neu && <AngebotKopfleiste datum={angebotDatum(lead?.created_at)} />}
+                          <AngebotLeistung fuer={angebotFuer((lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined)} />
+                          {/* Runde 32 (Martin zu Fassung 26: „nach Rund-um-Betreuung zu Hause muss schon der Preis kommen und
+                              nicht, wie es funktioniert"): kein Beschreibungstext mehr in der Karte, der steht in den Fragen. */}
+                        </>
+                      )}
+                      <p className={`${angebotLook ? 'mt-4 ' : ''}flex items-baseline gap-2 whitespace-nowrap`}>
+                        <span className={`text-[44px] ${angebotLook ? 'font-extrabold tracking-[-0.04em]' : 'font-bold tracking-[-0.03em]'} leading-none tabular-nums text-pm-ink`}>{formatEuro(brutto)}</span>
+                        <span className="text-[16px] text-pm-muted">im Monat</span>
+                      </p>
+                      {angebotLook ? (
+                        // Runde 18: „Alles im Preis" steht oben bei den Vorteilen; am Preis nur, was dazukommt.
+                        <p className="mt-3 text-[15px] leading-[1.5] text-pm-muted">
+                          {/* Feiertage am Preis, damit „Alles im Preis" oben ehrlich bleibt (Vertrag § 4 Nr. 8: neun Feiertage). */}
+                          {/* Runde 25: „alles drin" (Martins Wort) als Satz am Preis. */}
+                          Lohn, Steuern, Gebühren: alles drin. Dazu kommen Kost und Logis,{' '}
+                          <span className="whitespace-nowrap">125 € Reisekosten</span> pro Fahrt und{' '}
+                          <span className="whitespace-nowrap">Feiertagszuschläge.</span>
+                        </p>
+                      ) : (
+                      <p className="mt-3 text-[14px] leading-[1.5] text-pm-muted">
+                        {/* Wortlaut der Geschäftsführung (Runde 14). Betrag und Wort zusammen,
+                            „pro Fahrt." nie allein in der letzten Zeile. */}
+                        Inklusive Lohn, Steuern, Sozialabgaben und Gebühren. Dazu kommen Kost und Logis und{' '}
+                        <span className="whitespace-nowrap">125 € Reisekosten</span>{' '}
+                        <span className="whitespace-nowrap">pro Fahrt.</span>
+                      </p>
+                      )}
+                      {/* Runde 14: statt der Eigenanteil-Zeilen EIN leiser Textlink, kein Kasten. Er öffnet
+                          die Aufstellung unten in der Karte (mit „Was bleibt für Sie übrig" und dem
+                          Eigenanteil) und springt an ihren Anfang — einziger Weg dorthin. */}
+                      <p className="mt-3 text-[15px] leading-[1.4]">
+                        <button
+                          type="button"
+                          onClick={zuAllenKosten}
+                          className={`inline-flex min-h-[44px] -my-3 items-center ${angebotLook ? 'font-semibold text-pm-taupe-ink hover:text-pm-ink' : LINK_RUHIG}`}
+                        >
+                          {/* Runde 17: ohne „Alle" — die Aufstellung nennt den Feiertagszuschlag nicht. */}
+                          {angebotLook ? 'Kosten im Überblick ›' : 'Alle Kosten im Überblick ›'}
+                        </button>
+                      </p>
+                    </>
+                  ) : (
+                  <>
+                  <p className="mt-1 text-[46px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-pm-ink">{formatEuro(brutto)}</p>
+                  <p className="text-[14.5px] mt-2 leading-[1.5] text-pm-muted">
                     Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).
                   </p>
-
-                  {/* Konditionen stehen OFFEN unter dem Preis (Martin, 11.08.):
-                      Sie sind das Verkaufsargument — hinter einem Toggle
-                      erreichen sie niemanden. Die Zahlen (Reisekosten, Kost &
-                      Logis, Sommerzuschlag) sind umgekehrt Nachschlagewerk und
-                      liegen im Aufklapper.
-
-                      Einspaltig, nicht im 2er-Raster: Auf 375 px bleiben pro
-                      Spalte ~18 Zeichen, „Tagesgenaue Abrechnung" und „Ohne
-                      Vermittlungsgebühr" brachen dort erneut um — vier
-                      umbrechende Halbzeilen sind unruhiger als vier ganze.
-                      Mit den gekürzten Texten passt jetzt jede Zeile. */}
-                  <div className="mt-5 pt-5 space-y-3" style={{borderTop:'1px solid #E9E9EB'}}>
-                    {items.map((item, i) => (
-                      <div key={i} className="flex items-center gap-2.5">
-                        <Check className="w-4 h-4 flex-shrink-0" strokeWidth={3} style={{color:'#2A9D5C'}} />
-                        <span className="text-[15px]" style={{color:'#18181B'}}>{item.text}</span>
-                      </div>
-                    ))}
-                    {/* Kein fünfter Haken (Martin, 09.09.): Die Häkchen sind
-                        Konditionen des Angebots. „Kosten erst, wenn die
-                        Pflegekraft da ist" beantwortet die Sorge, ob man
-                        schon zahlt — das ist eine Erklärung, kein Punkt der
-                        Liste, und steht deshalb als schlichte Zeile darunter. */}
-                    <p className="text-[15px] leading-relaxed" style={{color:'#71717A'}}>
-                      Kosten erst, wenn die Pflegekraft da ist.
-                    </p>
-                  </div>
-
-                  {/* Beweis-Zeile direkt am Preis (Martin, 13.08.): die vier
-                      Checks sind Konditionen, hier steht, WER das verspricht.
-                      Form nach zwei verworfenen Anläufen (graue Textzeile,
-                      Statistik-Spalten): echtes Welt-Siegel + EIN Fließsatz —
-                      Wortlaut von Martin. Die ausführlichen Kacheln bleiben
-                      unten im Kontakt-Block. */}
-                  <div className="mt-4 pt-4 flex items-center gap-3" style={{borderTop:'1px solid #E9E9EB'}}>
-                    <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-11 w-auto flex-shrink-0 object-contain" />
-                    <p className="text-[15px] leading-snug" style={{color:'#52525B'}}>
-                      <span className="font-semibold" style={{color:'#18181B'}}>6× Testsieger DIE&nbsp;WELT</span><br/>20&nbsp;Jahre Erfahrung · 60.000+ Einsätze
-                    </p>
-                  </div>
-                  {/* Pflegeheim-Vergleich sichtbar am Preis (Martin, 07.09.):
-                      dieselbe Rechnung wie im Aufklapper „Was bleibt für Sie
-                      übrig" (aus dem angezeigten Brutto, nur Posten mit
-                      in_kalkulation) — hier als ein Satz. Nur wenn wir
-                      wirklich günstiger sind. */}
-                  {(() => {
-                    const posten = (lead?.kalkulation?.['zuschüsse']?.items ?? [])
-                      .filter(z => z.in_kalkulation && z.betrag_monatlich > 0);
-                    if (posten.length === 0) return null;
-                    const eigen = Math.max(0, brutto - posten.reduce((a, z) => a + z.betrag_monatlich, 0));
-                    const guenstiger = 3364 - eigen;
-                    if (guenstiger <= 0) return null;
-                    return (
-                      <div className="mt-4 rounded-xl px-4 py-3" style={{background:'#EEF7F1', border:'1px solid #CFE8D8'}}>
-                        <p className="text-[14px] leading-relaxed" style={{color:'#1F6B41'}}>
-                          <span className="font-semibold">Zuhause statt Pflegeheim:</span> Im Pflegeheim zahlen Sie im ersten Jahr durchschnittlich 3.364 € im Monat selbst. Zuhause mit Primundus sind es nach Zuschüssen etwa {formatEuro(eigen)} — <span className="font-semibold">rund {formatEuro(guenstiger)} weniger im Monat.</span>
-                          <span className="block mt-1 text-[12px]" style={{color:'#4C7A5F'}}>Quelle: vdek-Auswertung, Stand 1. Juli 2026.</span>
-                        </p>
-                      </div>
-                    );
-                  })()}
+                  </>
+                  )}
+                  {/* Kompakt-Einstieg: Haarlinie, die vier Punkte der Startseite (Runde 15: feiner grüner Haken,
+                      16 px), Haarlinie, Testsieger-Siegel mit Testsieger/Erfahrung und darunter die Sterne. */}
+                  {/* Runde 25: im Look „angebot" die Konditionen (kündbar, Bestpreisgarantie) als Teil des Angebots. */}
+                  {/* Runde 29: die Konditionen stehen jetzt unter „Ihre Sicherheit". */}
+                  {k ? (angebotLook ? null : vierPunkteRuhig) : vierPunkte('mt-4 flex flex-col gap-2.5')}
+                  {/* Runde 19: Im Look „angebot" stehen Siegel und Sterne oben unter dem Titel. */}
+                  {kompakt && !angebotLook && <KompaktVertrauen sterne={sterne} />}
+                  {!k && kostenErst}
+                  {!k && heimVergleich}
+                  {!k && testsieger}
 
                   {/* Der Toggle sitzt IM Kasten (Martin, 11.08.) — er gehört
-                      zum Angebot, nicht daneben. */}
+                      zum Angebot, nicht daneben. Kompakt-Einstieg: keine eigene Zeile „Alle Kosten
+                      im Überblick" — der Textlink unter der kleinen Schrift öffnet die Aufstellung,
+                      die Zeile erscheint nur offen als „Weniger anzeigen". */}
+                  {(!k || (costsExpanded && !neu)) && (
                   <button
                     type="button"
                     onClick={() => setCostsExpanded(!costsExpanded)}
-                    className="mt-5 -mb-1 w-full flex items-center justify-center gap-1.5 pt-4 pb-1 text-[15px] font-semibold"
-                    style={{color:'#8B7355', borderTop:'1px solid #E9E9EB'}}
+                    aria-expanded={costsExpanded}
+                    className={`w-full flex items-center justify-between gap-2 border-t pt-2 ${k ? 'mt-5 border-pm-line min-h-[48px] text-[16px]' : 'border-pm-line-soft mt-3 min-h-[48px] text-[15px]'} font-semibold text-pm-taupe-ink`}
                   >
                     {costsExpanded ? 'Weniger anzeigen' : 'Alle Kosten im Überblick'}
-                    <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${costsExpanded ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-5 h-5 text-pm-taupe transition-transform duration-200 ${costsExpanded ? 'rotate-180' : ''}`} />
                   </button>
-                </div>
+                  )}
 
                 {costsExpanded && (<>
 
@@ -2576,11 +3201,14 @@ const CustomerPortalPage: FC = () => {
                   );
                 })()}
 
-                {/* „Alle Kosten im Überblick" — die Aufstellung, die vorher als
-                    Fließtext-Zeile unter dem Preis stand. Keine zweite
-                    Überschrift im Kasten: der Toggle darüber benennt ihn schon
-                    (Martin, 11.08.: „nicht doppeln"). */}
-                <div className="rounded-2xl border mt-3 px-5 py-4 space-y-3" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
+                {/* „Alle Kosten im Überblick" — die Aufstellung. Keine zweite
+                    Überschrift: der Toggle darüber benennt sie schon (Martin,
+                    11.08.: „nicht doppeln"). */}
+                {/* id = Sprungziel des Textlinks „Alle Kosten im Überblick ›" (nur Kompakt-Einstieg). */}
+                <div
+                  id={k ? 'kosten-ueberblick' : undefined}
+                  className={`mt-1 rounded-[16px] bg-pm-paper px-4 py-3.5 space-y-3${k ? ' scroll-mt-16' : ''}`}
+                >
                   {[
                     { label: 'Betreuung', value: `${formatEuro(brutto)} / Monat`, note: '' },
                     { label: 'Entspricht', value: `${formatEuro(tagessatz)} / Tag`, note: 'tagesgenau abgerechnet' },
@@ -2593,140 +3221,420 @@ const CustomerPortalPage: FC = () => {
                     ...(zeigtSommerzuschlag()
                       ? [{ label: 'Sommerzuschlag', value: '6,67 € / Tag', note: 'Juli + August' }]
                       : []),
+                    // Runde 18: Die Aufstellung nannte die Feiertage nicht (Vertrag § 4 Nr. 8). Vorerst nur im Look
+                    // „angebot"; mit der Freigabe für alle Zustände.
+                    ...(angebotLook
+                      ? [{ label: 'Feiertage', value: 'doppelter Tagessatz', note: 'an 9 Feiertagen im Jahr' }]
+                      : []),
                   ].map((row, i) => (
                     <div key={i} className="flex items-baseline justify-between gap-4">
-                      <span className="text-[15px] flex-shrink-0" style={{color:'#71717A'}}>{row.label}</span>
+                      <span className={`${grund} flex-shrink-0 text-pm-muted`}>{row.label}</span>
                       <span className="text-right">
-                        <span className="block text-[15px] tabular-nums" style={{color:'#18181B'}}>{row.value}</span>
-                        {row.note && <span className="block text-[13px] mt-0.5" style={{color:'#71717A'}}>{row.note}</span>}
+                        <span className={`block ${grund} tabular-nums text-pm-ink`}>{row.value}</span>
+                        {row.note && <span className={`block ${klein} mt-0.5 text-pm-muted`}>{row.note}</span>}
                       </span>
                     </div>
                   ))}
                 </div>
+                {k && kostenErst}
 
-                {/* ── Was bleibt für Sie übrig ──────────────────────────────
-                    Martin, 12.08.: Eigenanteil doch zeigen — aber HIER, nicht
-                    am Hauptpreis. Die Regel vom 11.08. („wir nennen unseren
-                    Preis, nicht eine Rechnung über das Geld anderer") gilt für
-                    den Betrag oben; der Aufklapper ist ausdrücklich
-                    Nachschlagewerk, dort gehört die Rechnung hin.
-
-                    Der Eigenanteil wird AUS DEM ANGEZEIGTEN BRUTTO gerechnet,
-                    nicht aus `kalkulation.eigenanteil` gelesen: Der gespeicherte
-                    Wert stammt vom Kostenrechner-Zeitpunkt und driftet, sobald
-                    das Angebot nachträglich angepasst wird — dann stünden oben
-                    3.050 € und hier ein Eigenanteil zu einem anderen Brutto.
-                    Summiert werden nur Posten mit `in_kalkulation`, genau wie
-                    `zuschüsse.gesamt` es serverseitig tut. */}
-                {(() => {
-                  const posten = (lead?.kalkulation?.['zuschüsse']?.items ?? [])
-                    .filter(z => z.in_kalkulation && z.betrag_monatlich > 0);
-                  if (posten.length === 0) return null;
-                  const summe = posten.reduce((a, z) => a + z.betrag_monatlich, 0);
-                  const eigen = Math.max(0, brutto - summe);
-                  // vdek-Auswertung zum 01.07.2026: bundesweiter Durchschnitt
-                  // des Eigenanteils im ERSTEN Heimjahr. Bewusst das erste Jahr
-                  // — später sinkt es durch den Leistungszuschlag, und wer jetzt
-                  // entscheidet, vergleicht mit dem, was er zuerst zahlt.
-                  // Stand + Quelle stehen mit in der Zeile: Ohne sie wäre es
-                  // eine Behauptung. Beim nächsten vdek-Update (jeweils 01.01.
-                  // und 01.07.) nachziehen.
-                  const HEIM_EIGENANTEIL = 3364;
-                  const guenstiger = HEIM_EIGENANTEIL - eigen;
-                  return (
-                    <div className="rounded-2xl border mt-3 px-5 py-4" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
-                      <p className="text-[12px] font-semibold uppercase tracking-widest mb-3" style={{color:'#8B7355'}}>
-                        Was bleibt für Sie übrig
-                      </p>
+                {/* ── Was bleibt für Sie übrig (Martin, 12.08.): Eigenanteil HIER,
+                    nicht am Hauptpreis. Gerechnet aus dem ANGEZEIGTEN Brutto
+                    (siehe `eigenanteil` oben), nicht aus `kalkulation.eigenanteil`
+                    — der gespeicherte Wert driftet, sobald das Angebot angepasst
+                    wird. Der Heimvergleich steht seit Teil 3 nur noch an der Karte. */}
+                {eigenanteil !== null && (
+                    <div className="mt-2.5 rounded-[16px] bg-pm-paper px-4 py-3.5">
+                      <p className={k ? 'mb-3 text-[15px] font-semibold text-pm-ink' : `${EYEBROW} mb-3`}>Was bleibt für Sie übrig</p>
                       <div className="space-y-3">
                         <div className="flex items-baseline justify-between gap-4">
-                          <span className="text-[15px] flex-shrink-0" style={{color:'#71717A'}}>Betreuung</span>
-                          <span className="text-[15px] tabular-nums" style={{color:'#18181B'}}>{formatEuro(brutto)}</span>
+                          <span className={`${grund} flex-shrink-0 text-pm-muted`}>Betreuung</span>
+                          <span className={`${grund} tabular-nums text-pm-ink`}>{formatEuro(brutto)}</span>
                         </div>
-                        {posten.map((z, i) => (
+                        {zuschussPosten.map((z, i) => (
                           <div key={i} className="flex items-baseline justify-between gap-4">
-                            <span className="text-[15px] min-w-0" style={{color:'#71717A'}}>
+                            <span className={`${grund} min-w-0 text-pm-muted`}>
                               {/* `label` kommt aus subsidies_config und ist für
-                                  die Admin-Oberfläche geschrieben — das
-                                  Entlastungsbudget heisst dort „Entlastungs-
-                                  budget (3.539 Euro/Jahr ab Pflegegrad 2)".
-                                  Neben „− 295 €" gelesen widerspricht sich das.
-                                  Die Klammer fliegt raus; die Jahreszahl steht
-                                  ohnehin im `hinweis` darunter. */}
+                                  die Admin-Oberfläche geschrieben — die Klammer
+                                  („(3.539 Euro/Jahr ab Pflegegrad 2)") fliegt
+                                  raus; die Jahreszahl steht im `hinweis`. */}
                               {z.label.replace(/\s*\([^)]*\)\s*$/, '')}
                               {/* Der Vorbehalt steht AM Posten, nicht im FAQ. */}
                               {(z.hinweis || z.name === 'steuervorteil') && (
-                                <span className="block text-[13px] mt-0.5 leading-snug">
+                                <span className={`block ${klein} mt-0.5 leading-snug`}>
                                   {/* Fallback nur, falls jemand den hinweis in
-                                      subsidies_config leert. NICHT „hängt vom
-                                      Steuersatz ab": §35a ist ein direkter
-                                      Abzug von der Steuerschuld, nicht vom zu
-                                      versteuernden Einkommen — die Voraussetzung
-                                      ist, dass überhaupt so viel Steuer anfällt. */}
+                                      subsidies_config leert. §35a ist ein direkter
+                                      Abzug von der Steuerschuld. */}
                                   {z.hinweis ?? 'Setzt voraus, dass entsprechend Steuern anfallen.'}
                                 </span>
                               )}
                             </span>
-                            <span className="text-[15px] tabular-nums whitespace-nowrap flex-shrink-0" style={{color:'#18181B'}}>
+                            <span className={`${grund} tabular-nums whitespace-nowrap flex-shrink-0 text-pm-ink`}>
                               − {formatEuro(z.betrag_monatlich)}
                             </span>
                           </div>
                         ))}
-                        <div className="flex items-baseline justify-between gap-4 pt-3" style={{borderTop:'1px solid #E9E9EB'}}>
-                          <span className="text-[15px] font-semibold flex-shrink-0" style={{color:'#18181B'}}>Ihr Eigenanteil</span>
-                          <span className="text-[17px] font-bold tabular-nums" style={{color:'#18181B'}}>{formatEuro(eigen)}</span>
+                        <div className="flex items-baseline justify-between gap-4 pt-3 border-t border-pm-line">
+                          <span className={`${grund} font-semibold flex-shrink-0 text-pm-ink`}>Ihr Eigenanteil</span>
+                          <span className="text-[17px] font-bold tabular-nums text-pm-ink">{formatEuro(eigenanteil)}</span>
                         </div>
                       </div>
-
-                      {/* Heim-Vergleich: die einzige Zeile, die „ist das viel?"
-                          beantwortet. Nur zeigen, wenn wir wirklich günstiger
-                          sind — sonst wäre es ein Argument gegen uns. */}
-                      {guenstiger > 0 && (
-                        <p className="text-[14px] leading-relaxed mt-4 pt-4" style={{color:'#71717A', borderTop:'1px solid #E9E9EB'}}>
-                          Im Pflegeheim liegt der Eigenanteil im ersten Jahr bundesweit bei
-                          durchschnittlich <span className="font-semibold" style={{color:'#18181B'}}>{formatEuro(HEIM_EIGENANTEIL)}</span> im Monat
-                          {/* Nur die Ersparnis grün (#22A06B, das Portal-Grün
-                              aus den Verfügbarkeits-Chips). Der Heim-Betrag
-                              bleibt schwarz — grün wäre er ein Gütesiegel für
-                              die Zahl, gegen die wir argumentieren. */}
-                          — bei Ihnen zu Hause sind es <span className="font-bold" style={{color:'#22A06B'}}>{formatEuro(guenstiger)} weniger</span>.
-                          <span className="block mt-1 text-[13px]">Quelle: vdek-Auswertung, Stand 1. Juli 2026.</span>
-                        </p>
-                      )}
-
-                      <p className="text-[13px] leading-snug mt-3" style={{color:'#71717A'}}>
+                      <p className={`${klein} leading-snug mt-3 text-pm-muted`}>
                         Pflegegeld, Entlastungsbudget und Steuervorteil sind Leistungen
                         Dritter mit eigenen Voraussetzungen — die Beträge sind eine
                         Orientierung, keine Zusage. Jahresbeträge sind auf den Monat umgelegt.
                       </p>
                     </div>
-                  );
-                })()}
+                )}
+                {k && heimVergleich}
 
-                <div className="mt-2 flex justify-center">
-                  <a
-                    href="/primundus-mustervertrag.pdf"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 transition-opacity hover:opacity-70"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14,color:'#18181B'}}>
-                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><polyline points="9 15 12 18 15 15"/>
-                    </svg>
-                    <span className="text-[13px] underline" style={{color:'#18181B'}}>Mustervertrag als PDF herunterladen</span>
-                  </a>
-                </div>
+                <a
+                  href="/primundus-mustervertrag.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 flex min-h-[44px] items-center justify-center gap-1.5 text-[14px] text-pm-ink underline underline-offset-2"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><polyline points="9 15 12 18 15 15"/>
+                  </svg>
+                  Mustervertrag als PDF herunterladen
+                </a>
                 </>)}
+                {/* Runde 30: Martins „Hemmnisnehmer" als Abschluss derselben Karte (keine eigene Überschrift mehr). */}
+                {angebotLook && <AngebotSicherheit onBestpreis={() => setBestpreisOffen(true)} />}
+          </>
+        );
+        // Fassung 33 (Martin zu 32: „Vielleicht kann man Ihr Angebot und die Patientensituation irgendwie zusammen machen, so ein
+        // bisschen in so einen eigenen Bereich darunter"): nach dem Absenden EIN Bereich „Angebot und Pflegesituation" mit zwei
+        // aufklappbaren Zeilen in einer Karte. Zeile 1 klappt die Angebotskarte auf (mit offener Bewerbung ohne Preis in der Zeile:
+        // Die Bewerbung nennt ihren eigenen Tagessatz, Review 25.09.), Zeile 2 das Formular (eingebettet, „Änderungen speichern").
+        // Kein Link zum Ändern oben in den Schritten (Martin zu 31). Keine `overflow-hidden` an der Karte: Die mitlaufende
+        // Knopfleiste des Formulars (sticky) bliebe sonst in der Karte hängen.
+        if (neu) {
+          const mitPflege = patientSaved || schonAbgesendet;
+          const pflegeOffen = patientExpandedManual ?? false;
+          const datum = angebotDatum(lead?.created_at);
+          // Drei Zeilen je Eintrag: Titel, Stand, Aktion (die Aktion brach sonst bei 390 px mitten im Wortpaar um).
+          const zeileKlasse = '-mx-5 flex w-[calc(100%+2.5rem)] min-h-[64px] items-start gap-3 px-5 py-4 text-left';
+          const symbol = 'mt-0.5 flex h-9 w-9 flex-none items-center justify-center rounded-[10px]';
+          const aktion = 'mt-1 block text-[15px] font-semibold leading-[1.35] text-pm-taupe-ink';
+          return (
+            <div id="angebot" className="max-w-3xl mx-auto px-5 pt-10 scroll-mt-20">
+              {mitPflege
+                ? <h2 className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">{BEREICH_TITEL}</h2>
+                : <h2 className="sr-only">Ihr Angebot</h2>}
+              <Card ton="hervorgehoben" className={`${mitPflege ? 'mt-4 ' : ''}px-5`}>
+                <button
+                  type="button"
+                  onClick={() => setOfferExpandedManual(!offerExpanded)}
+                  aria-expanded={offerExpanded}
+                  className={`${zeileKlasse} ${offerExpanded ? 'mb-5 rounded-t-[18.5px] bg-pm-shell' : ''}`}
+                >
+                  <span aria-hidden="true" className={`${symbol} ${offerExpanded ? 'bg-white' : 'bg-pm-shell'} text-pm-taupe-ink`}>
+                    <FileText className="h-[18px] w-[18px]" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[16px] font-semibold leading-[1.3] tabular-nums text-pm-ink">
+                      {datum ? `Ihr Angebot vom ${datum}` : 'Ihr Angebot'}
+                    </span>
+                    {!offerExpanded && !hasPending && (
+                      <span className="mt-0.5 block text-[15px] leading-[1.35] tabular-nums text-pm-muted">{formatEuro(brutto)} im Monat</span>
+                    )}
+                    {!offerExpanded && <span className={aktion}>{ANGEBOT_ANSEHEN}</span>}
+                  </span>
+                  <ChevronDown className={`mt-2 h-5 w-5 flex-none text-pm-taupe transition-transform duration-200 ${offerExpanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </button>
+                {offerExpanded && <div className="pb-6">{angebotInhalt}</div>}
+                {mitPflege && (
+                  <div id="patientendaten" className="-mx-5 scroll-mt-20 border-t border-pm-line px-5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !pflegeOffen;
+                        setPatientExpandedManual(next);
+                        // Gleich im bearbeitbaren Formular landen, ohne zweiten Tipp (wie bisher beim Aufklappen).
+                        if (next) setTriggerOpenPatient(true);
+                      }}
+                      aria-expanded={pflegeOffen}
+                      className={zeileKlasse}
+                    >
+                      <span aria-hidden="true" className={`${symbol} bg-pm-mint text-pm-green-deep`}>
+                        <ClipboardCheck className="h-[18px] w-[18px]" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[16px] font-semibold leading-[1.3] text-pm-ink">{PFLEGE_TITEL}</span>
+                        <span className="mt-0.5 flex items-center gap-1 text-[15px] font-semibold leading-[1.35] text-pm-green-deep">
+                          <Check className="h-4 w-4 flex-none" strokeWidth={3} aria-hidden="true" />
+                          {PFLEGE_STATUS}
+                        </span>
+                        {!pflegeOffen && <span className={aktion}>{PFLEGE_ANSEHEN}</span>}
+                      </span>
+                      <ChevronDown className={`mt-2 h-5 w-5 flex-none text-pm-taupe transition-transform duration-200 ${pflegeOffen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                    </button>
+                    {pflegeOffen && <div className="border-t border-pm-line-soft">{patientFormular(true)}</div>}
+                  </div>
+                )}
+              </Card>
             </div>
-          )}
-        </div>
+          );
+        }
+        return (
+        <div id={angebotLook ? 'angebot' : undefined} className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'scroll-mt-20 pt-7' : 'pt-10'}` : neu ? 'px-5 pt-10 scroll-mt-20' : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
+          {/* Karte im Look des Rechners (Teil 3, Martin 24.09.). „Ihr persönliches
+              Angebot" steht im Kopf — der Abschnitt heißt nach seinem Inhalt. Der
+              Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
+              (Martin: „muss einklappbar sein für spätere Zustände"). */}
+          {/* Kompakt-Einstieg (Runde 15): weiß, 20 px Radius, ohne Rand, weicher zweilagiger Schatten, 24 px Innenabstand. */}
+          <Card ton={angebotLook ? 'hervorgehoben' : 'standard'} className={`relative ${angebotLook ? 'overflow-hidden px-5 pt-6 pb-6' : kompakt ? `shadow-lift !border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'shadow-lift px-5 pt-3 pb-4'}`}>
+            {k ? (
+              // Runde 13: keine Versalien-Zeile mehr — die Karte beginnt mit dem Preis; der Name bleibt
+              // für Screenreader.
+              <h2 className="sr-only">{neu ? 'Ihr Angebot' : 'Ihre Betreuungskosten'}</h2>
+            ) : (
+            <button
+              type="button"
+              onClick={() => setOfferExpandedManual(!offerExpanded)}
+              aria-expanded={offerExpanded}
+              className="w-full min-h-[44px] flex items-center justify-between gap-3 text-left"
+            >
+              {/* Preis UNTER dem Label: Nebeneinander brach bei 360 px beides um
+                  („Ihre Betreuungs-/kosten", „3.050 € /" „Monat"). */}
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className={EYEBROW}>{hasPending ? 'Ihr Angebot' : 'Ihre Betreuungskosten'}</span>
+                {/* Preis nur ohne offene Bewerbung: Die Bewerbung nennt ihren eigenen
+                    Tagessatz, zwei Preise nebeneinander widersprächen sich (Review 25.09.). */}
+                {!offerExpanded && !hasPending && (
+                  <span className="whitespace-nowrap text-[17px] font-bold tabular-nums text-pm-ink">
+                    {formatEuro(brutto)}<span className="text-[15px] font-normal text-pm-muted"> / Monat</span>
+                  </span>
+                )}
+              </span>
+              <ChevronDown className={`w-5 h-5 flex-shrink-0 text-pm-taupe transition-transform duration-200 ${offerExpanded ? 'rotate-180' : ''}`} />
+            </button>
+            )}
+
+          {/* Die Kosten stehen IMMER (Martin, 11.08.), solange der Abschnitt offen
+              ist. Der MONATSBETRAG führt, nicht der Tagessatz: Angehörige rechnen
+              in Monaten. */}
+          {offerExpanded && angebotInhalt}
+          </Card>
         </div>
         );
       })();
 
+  // Sichtbare Vorschläge (Batch-Reveal, Empfehlung zuerst) — EINMAL berechnet: für die Karten
+  // (abgesendet) und für die Zeilen des Kompakt-Einstiegs, damit beide dieselbe Auswahl zeigen.
+  const pflegekraftAuswahl = (() => {
+    // Interest-Pflegekräfte (sowohl invited als auch declined)
+    // werden NICHT in der Matching-Liste gerendert sondern unten
+    // in der "Bereits bearbeitet"-Sektion (User-Wunsch: gleiche
+    // Behandlung wie bei Bewerbungen). Filter: caregiverId raus
+    // wenn interestOriginIds das hat UND Status invited/declined.
+    const allVisible = effectiveMatched
+      .map((m, i) => ({ nurse: m.nurse, i, caregiverId: m.caregiverId, status: nurseStatusById.get(m.caregiverId) ?? 'pending' as NurseStatus, virtualDeclinedFromInterest: false as const }))
+      .filter(({ status, caregiverId }) => {
+        if (status === 'pending') return true;
+        // invited/declined ausschließen wenn aus Interest stammt
+        return !interestOriginIds.has(caregiverId);
+      });
+    // Order: pending (cap 5, oben) → invited → declined (ganz unten,
+    // ausgegraut mit "Abgelehnt"-Pill + Undo-Link). User-Wunsch:
+    // bearbeitete (normale) Pflegekräfte rutschen nach unten in der
+    // Matching-Liste. Interest-Aktionen leben in "Bereits bearbeitet"
+    // (siehe unten — InterestActionCards in der doneApps-Sektion).
+    // Oben NUR die frischen Vorschläge (max 3). Bereits bearbeitete
+    // Matchings (invited/declined) wandern in die gedämpfte
+    // "Bereits bearbeitet"-Sektion unten (MatchCardDone) — sonst
+    // wirken sie zu prominent / zu ähnlich wie die offenen Vorschläge.
+    type VisibleNurse = {
+      nurse: Nurse;
+      i: number;
+      caregiverId: number;
+      status: NurseStatus;
+      virtualDeclinedFromInterest: boolean;
+    };
+    // Batch-Reveal (User-Wunsch 25.06.): sichtbarer Pool = 5 −
+    // Einladungen der letzten 24h. Einladen hält den Slot 24h (die
+    // Pflegekraft wartet auf Antwort); nach 24h ohne Reaktion füllt sich
+    // der Pool wieder auf 5 + die "neue Pflegekräfte"-Mail geht raus.
+    // Ablehnen zählt NICHT mit (caregiver_invite_attempts erfasst nur
+    // echte Einladungen) → rückt sofort nach. used_24h aus getInviteRateState.
+    const unbestaetigt = [...einladungStand.current].filter(([id, stand]) =>
+      stand === inviteRate
+      && (statusOverrides.get(id) === 'invited' || interestStatusOverrides.get(id) === 'invited')).length;
+    const heldInvites = (inviteRate?.used_24h ?? 0) + unbestaetigt;
+    const visibleCount = Math.max(0, 5 - heldInvites);
+    const pendingNurses: VisibleNurse[] = allVisible.filter(({ status }) => status === 'pending').slice(0, visibleCount);
+    // Die Empfehlung (höchste Badge-Bewertung, Score = Erfahrungsjahre +
+    // Einsätze) nach ganz oben ziehen — die anderen behalten ihre
+    // Reihenfolge. So steht "Empfehlung des Beraters" immer zuoberst.
+    const badgeScore = (n: Nurse) => nurseBadgeScore(n.history?.assignments);
+    let bestIdx = -1;
+    let bestScore = -Infinity;
+    pendingNurses.forEach((p, idx) => {
+      const s = badgeScore(p.nurse);
+      if (s > bestScore) { bestScore = s; bestIdx = idx; }
+    });
+    const visibleNurses: VisibleNurse[] = bestIdx > 0
+      ? [pendingNurses[bestIdx], ...pendingNurses.filter((_, idx) => idx !== bestIdx)]
+      : pendingNurses;
+    return { allVisible, heldInvites, visibleNurses };
+  })();
+
+  // Runde 28 (Look „angebot", Martin 06.10.: „Fokus auf die Pflegekräfte"): die Empfehlung steht direkt unter der Einleitung,
+  // die übrigen Vorschläge unter „So geht es weiter". Dieselbe Karte wie im Portal (MatchCard „V"). `geladen`: echte Liste da.
+  const kartenGeladen = !listeLaedt && (IS_PREVIEW_ANY || (mmReady && !!mmMatchings?.data));
+  const angebotKarten = (() => {
+    const { visibleNurses } = pflegekraftAuswahl;
+    let recIdx = -1;
+    let recBest = -Infinity;
+    visibleNurses.forEach(({ nurse, status }, idx) => {
+      if (status !== 'pending') return;
+      const sc = nurseBadgeScore(nurse.history?.assignments);
+      if (sc > recBest) { recBest = sc; recIdx = idx; }
+    });
+    const karte = (idx: number) => {
+      const { nurse, i, status } = visibleNurses[idx];
+      return (
+        <MatchCard
+          profilFehlt={!patientSaved}
+          key={`k-${i}`}
+          nurse={nurse}
+          status={status}
+          isRecommended={idx === recIdx}
+          onNurseClick={() => openNurseFromMatch(nurse, i)}
+          onStufeClick={() => { setNurseModalStufe(true); openNurseFromMatch(nurse, i); }}
+          onInvite={() => { messeEinladen(nurse, 'karte'); return canInviteNurse(i); }}
+          onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
+          onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
+          globalInviteLocked={inviteInFlight}
+        />
+      );
+    };
+    const obenIdx = visibleNurses.length ? (recIdx >= 0 ? recIdx : 0) : -1;
+    return {
+      alle: visibleNurses.map((_, idx) => karte(idx)),
+      oben: obenIdx >= 0 ? karte(obenIdx) : null,
+      // Vorname der Empfehlung für den Satz unter ihrem Knopf („… dann kann sich Ewa bei Ihnen bewerben").
+      obenVorname: obenIdx >= 0 ? (displayName(visibleNurses[obenIdx].nurse.name).split(' ')[0] || null) : null,
+      rest: visibleNurses.map((_, idx) => idx).filter((idx) => idx !== obenIdx).map(karte),
+    };
+  })();
+
+  // Rückbau Registry #122: die Karten vor dem ersten Speichern wie im Stand 75b8df8 (MatchCardVorSpeichern) — dieselbe
+  // Auswahl wie oben (Batch-Reveal, Empfehlung zuerst), genau EINE „Unsere Empfehlung für Sie": die mit der höchsten
+  // Badge-Bewertung (Erfahrungsjahre + Einsätze).
+  const kartenVorSpeichern = !rueckbau ? [] : (() => {
+    const { visibleNurses } = pflegekraftAuswahl;
+    let recIdx = -1;
+    let recBest = -Infinity;
+    visibleNurses.forEach(({ nurse, status }, idx) => {
+      if (status !== 'pending') return;
+      const sc = nurseBadgeScore(nurse.history?.assignments);
+      if (sc > recBest) { recBest = sc; recIdx = idx; }
+    });
+    return visibleNurses.map(({ nurse, i, status }, idx) => (
+      <MatchCardVorSpeichern
+        profilFehlt={!patientSaved}
+        key={`m-${i}`}
+        nurse={nurse}
+        status={status}
+        isRecommended={idx === recIdx}
+        onNurseClick={() => openNurseFromMatch(nurse, i)}
+        onStufeClick={() => { setNurseModalStufe(true); openNurseFromMatch(nurse, i); }}
+        onInvite={() => { messeEinladen(nurse, 'karte'); return canInviteNurse(i); }}
+        onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
+        onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
+        globalInviteLocked={inviteInFlight}
+      />
+    ));
+  })();
+
+  // ── SECTION: Bereits bearbeitet ──
+  // Immer unten sichtbar wenn doneApps ODER bearbeitete Matchings
+  // existieren. Bewusst gedämpft (MatchCardDone: kompakt, grau) +
+  // klar getrennt unter den frischen Vorschlägen — sonst wirken die
+  // bearbeiteten Karten zu ähnlich wie die offenen. Sammelt:
+  // - bearbeitete Bewerbungen (AppCardDone)
+  // - eingeladene Pflegekräfte (normal + aus Interesse) — kein Undo
+  //   (Mamamia kennt keine uninvite-Mutation)
+  // - abgelehnte Pflegekräfte (normal + aus Interesse) — mit Undo
+  // Reihenfolge: eingeladen zuerst, abgelehnt (ausgegraut) zuletzt.
+  // Steht im Kompakt-Einstieg unter den Zeilen der Pflegekräfte, sonst am Ende der Liste.
+  const bereitsBearbeitet = (() => {
+    // Normale Matchings (NICHT aus Interesse) nach Status, mit
+    // effectiveMatched-Index für die Undo-/Detail-Handler.
+    const matchInvited = effectiveMatched
+      .map((m, i) => ({ m, i }))
+      .filter(({ m }) => nurseStatusById.get(m.caregiverId) === 'invited' && !interestOriginIds.has(m.caregiverId))
+      .map(({ m, i }) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'invited' as const, key: `mi-${m.caregiverId}`, matchIdx: i, interest: false }));
+    const matchDeclined = effectiveMatched
+      .map((m, i) => ({ m, i }))
+      .filter(({ m }) => nurseStatusById.get(m.caregiverId) === 'declined' && !interestOriginIds.has(m.caregiverId))
+      .map(({ m, i }) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'declined' as const, key: `md-${m.caregiverId}`, matchIdx: i, interest: false }));
+    // Aktionen die aus einer Interest-Karte stammen (♥ Interesse-Label).
+    const interestInvited = effectiveMatched
+      .filter((m) => nurseStatusById.get(m.caregiverId) === 'invited' && interestOriginIds.has(m.caregiverId))
+      .map((m) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'invited' as const, key: `ii-${m.caregiverId}`, matchIdx: -1, interest: true }));
+    const interestDeclined = Array.from(declinedFromInterest.entries())
+      .map(([cgId, nurse]) => ({ nurse, caregiverId: cgId, status: 'declined' as const, key: `id-${cgId}`, matchIdx: -1, interest: true }));
+    // Eingeladen zuerst, abgelehnt zuletzt. Aus effectiveMatched (volle
+    // Daten + Undo-Handler).
+    const fromMatched = [...matchInvited, ...interestInvited, ...matchDeclined, ...interestDeclined]
+      .map((d) => ({ ...d, fromEvent: false as const }));
+    // Bearbeitete PKs, die Mamamia NICHT mehr in den Matchings liefert →
+    // aus unseren Events rekonstruiert (Snapshot/Name). Dedupe gegen das,
+    // was schon aus effectiveMatched kommt + Interesse-Aktionen.
+    const matchedIds = new Set(fromMatched.map((d) => d.caregiverId));
+    const fromEvents = extraProcessed
+      .filter((p) => !matchedIds.has(p.caregiverId) && !interestOriginIds.has(p.caregiverId))
+      .map((p) => ({ nurse: p.nurse, caregiverId: p.caregiverId, status: p.status, key: `ev-${p.caregiverId}`, matchIdx: -1, interest: false, fromEvent: true as const }));
+    // Eingeladene zuerst, dann Abgelehnte (über beide Quellen).
+    const allDone = [...fromMatched, ...fromEvents]
+      .sort((a, b) => (a.status === b.status ? 0 : a.status === 'invited' ? -1 : 1));
+    const hasAny = doneApps.length > 0 || allDone.length > 0;
+    if (!hasAny) return null;
+    // 3 sichtbar, Rest hinter "Weitere anzeigen" (User-Wunsch 26.06.).
+    const VISIBLE_DONE = 3;
+    const shownDone = showAllDone ? allDone : allDone.slice(0, VISIBLE_DONE);
+    const moreCount = allDone.length - shownDone.length;
+    return (
+      <div className="space-y-2">
+        <p className={kompakt && !rueckbau ? 'px-1 text-[15px] font-semibold text-pm-ink' : 'text-[11.5px] font-bold uppercase tracking-[.15em] text-pm-mute px-1'}>Bereits bearbeitet</p>
+        {doneApps.map((app) => (
+          <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { profilQuelleRef.current = 'bearbeitet'; setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
+        ))}
+        {shownDone.map(({ nurse, caregiverId, status, key, matchIdx, interest, fromEvent }) => (
+          <MatchCardDone
+            key={key}
+            nurse={nurse}
+            status={status}
+            hasInterestOrigin={interest}
+            onNurseClick={() => { profilQuelleRef.current = 'bearbeitet'; if (fromEvent || interest) setSelectedNurse(nurse); else openNurseFromMatch(nurse, matchIdx); }}
+            // Kein „Rückgängig" für abgelehnte Interessenten (Review 25.09.): Die
+            // Ablehnung steht serverseitig in lead_dismissed_caregivers, und der
+            // Proxy kennt kein Zurücknehmen. Das lokale Rückgängig ließ die Karte
+            // verschwinden, statt sie zurückzubringen, auch nach dem Neuladen.
+            onUndo={(!fromEvent && status === 'declined' && !interest) ? () => undoDeclinedMatch(matchIdx) : undefined}
+          />
+        ))}
+        {!showAllDone && moreCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAllDone(true)}
+            className="w-full text-center text-[13px] font-semibold py-2.5 rounded-xl transition-colors"
+            style={{ color: '#8B7355', background: '#F6F2EC' }}
+          >
+            Weitere anzeigen ({moreCount})
+          </button>
+        )}
+      </div>
+    );
+  })();
+
   return (
     <>
-    <div className="min-h-screen bg-gray-100 md:flex md:items-start md:justify-center md:py-10">
+    <div className="min-h-screen bg-gray-100 font-pm md:flex md:items-start md:justify-center md:py-10">
     <div className="min-h-screen md:min-h-0 bg-white w-full md:w-[390px] md:min-h-[844px] md:rounded-[48px] md:shadow-2xl md:overflow-hidden md:border-[8px] md:border-gray-800 md:ring-4 md:ring-gray-900/10 relative" style={{fontFamily: 'inherit'}}>
     <div id="portal-scroll-container" className="md:h-[844px] md:overflow-y-auto md:overflow-x-hidden">
       {/* Toast */}
@@ -2751,7 +3659,8 @@ const CustomerPortalPage: FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowContactPopup(true)}
-              className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F6] text-[#8B7355] border border-[#E9E9EB] rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+              // Tippfläche ≥ 44 px über ein unsichtbares ::before, die Pille bleibt 32 px hoch.
+              className="relative flex items-center gap-1.5 bg-white hover:bg-[#F5F5F6] text-[#8B7355] border border-[#E9E9EB] rounded-full px-3 py-1.5 text-xs font-semibold transition-colors before:absolute before:-inset-y-2 before:inset-x-0 before:content-['']"
             >
               <Phone className="w-3.5 h-3.5" />
               Hilfe
@@ -2845,9 +3754,17 @@ const CustomerPortalPage: FC = () => {
             && !!lead?.token
             && contractAppId !== null;
           return (
+            <div className="bg-pm-paper">
             <BookedScreen
+              kopf={{
+                name: lead ? customerSalutation(lead) : 'Herr Mustermann',
+                kuerzel: lead && (lead.vorname || lead.nachname)
+                  ? initials([lead.vorname, lead.nachname].filter(Boolean).join(' ').trim()).toUpperCase().slice(0, 2)
+                  : null,
+              }}
+              sterne={sterne}
               app={acceptedApp}
-              onNurseClick={setSelectedNurse}
+              onNurseClick={(n) => { profilQuelleRef.current = 'gebucht'; setSelectedNurse(n); }}
               vertragSigned={vertragSigned}
               onSignContract={
                 canCompleteContract ? () => setContractApp(acceptedApp) : undefined
@@ -2867,11 +3784,37 @@ const CustomerPortalPage: FC = () => {
               // "📋 Einsatz beendet" statt "🎊 Vielen Dank gebucht".
               einsatzBeendet={IS_EINSATZ_BEENDET}
             />
+            </div>
           );
         })()
+      ) : rueckbau ? (
+        // Rückbau Registry #122: vor dem ersten Speichern die Seite aus Stand 75b8df8 (EinstiegVorSpeichern.tsx), Kopf und
+        // Häufige Fragen wie heute (Martin 10.10.); Initialen wie im Kopf des Kompakt-Einstiegs.
+        <EinstiegVorSpeichern
+          anrede={lead ? customerSalutation(lead) : 'Herr Mustermann'}
+          kuerzel={lead && (lead.vorname || lead.nachname)
+            ? initials([lead.vorname, lead.nachname].filter(Boolean).join(' ').trim()).toUpperCase().slice(0, 2)
+            : null}
+          lead={lead}
+          onBestpreis={() => setBestpreisOffen(true)}
+          heimEigenanteil={HEIM_EIGENANTEIL}
+          heimQuelle={HEIM_QUELLE}
+          onWarum={() => setWarumOffen(true)}
+          onVervollstaendigen={zurPflegesituationAus('kasten')}
+          laedt={listeLaedt}
+          karten={kartenVorSpeichern}
+          gehalteneEinladungen={pflegekraftAuswahl.heldInvites}
+          vorschlaegeVorhanden={pflegekraftAuswahl.allVisible.length > 0}
+          bereitsBearbeitet={bereitsBearbeitet}
+          formular={patientFormular(false, true)}
+          sterne={sterne}
+          onKostenAufgeklappt={() => messen('kosten_aufgeklappt')}
+          onFaqGeoeffnet={messeFrage}
+        />
       ) : (
-      <>
-      {/* ── Hero (full-width gradient) — state-aware copy ── */}
+      // Angebotsseite auf „paper" wie primundus.de; Karten weiß (Teil 3 des Redesigns).
+      <div className="bg-pm-paper">
+      {/* ── Hero — state-aware copy ── */}
       {(() => {
         // Einheitliche formale Anrede (Herr/Frau Nachname), abgeleitet via
         // Geschlechts-Erkennung wenn das anrede-Feld leer ist; sonst neutral
@@ -2887,18 +3830,28 @@ const CustomerPortalPage: FC = () => {
         //              → explain what the portal does next
         const n = pendingApps.length;
 
+        // Offene Bewerbung = Druck, damit der Kunde reagiert (Martin 25.09.:
+        // „Maria möchte Sie betreuen ist Schwachsinn … aktive Bewerbung,
+        // reagieren Sie … wir brauchen mehr Druck"). Frist aus der frühesten
+        // Reservierung (gleiche Regel wie die Auto-Absage); ohne Frist kein Datum.
+        const fristen = pendingApps
+          .map((a) => reservierungFuer(a))
+          .filter((d): d is Date => d !== null)
+          .sort((a, b) => a.getTime() - b.getTime());
+        const frist = fristen[0] ?? null;
         const heroCopy = hasPending
           ? {
               title: n > 1
-                ? `Sie haben ${n} neue Bewerbungen. 📨`
-                : 'Sie haben eine neue Bewerbung. 📨',
-              subtitle: n > 1
-                ? 'Schauen Sie sich die Pflegekräfte in Ruhe an und entscheiden Sie, welche am besten passt.'
-                : 'Schauen Sie sich die Bewerbung in Ruhe an und entscheiden Sie, ob die Pflegekraft passt.',
-              pill: n > 1 ? `${n} Bewerbungen aktiv` : '1 Bewerbung aktiv',
+                ? `Sie haben ${n} aktive Bewerbungen`
+                : 'Sie haben eine aktive Bewerbung',
+              // Menschlich, ohne Datum (Martin 25.09.: „hält sich frei … zu viele
+              // Daten, zu unmenschlich"); die Zeit steht nur im Countdown.
+              subtitle: '',
+              pill: '',
+              frist,
               steps: null as 'initial' | 'saved' | null,
             }
-          : patientSaved && !IS_PREVIEW_ANY && (!mmReady || mmApplicationsLoading || !mmApplications)
+          : patientSaved && !IS_PREVIEW_ANY && (!mmReady || mmApplicationsLoading || !mmApplications || !annahmenBekannt)
           ? {
               // Mamamia-Daten laden noch (oder der Abruf hakt) — hier NICHT
               // "werden vorbereitet" behaupten: Wer aus der Bewerbungs-Mail
@@ -2908,6 +3861,7 @@ const CustomerPortalPage: FC = () => {
               // mamamia wird `mmReady` nie true, dadurch hing JEDER gespeicherte
               // Zustand lokal auf "Einen Moment" fest — auch ?preview=wartet,
               // das genau den Zweig darunter zeigen soll (Übergabe 11.08.).
+              frist: null as Date | null,
               title: 'Einen Moment — Ihre Bewerbungen werden geladen.',
               subtitle: 'Wir holen gerade den aktuellen Stand Ihrer Anfrage. Das dauert nur wenige Sekunden.',
               pill: 'Portal wird geladen',
@@ -2919,9 +3873,11 @@ const CustomerPortalPage: FC = () => {
               // der Arbeitsplatz des Kunden (Martin, 13.08.: „Ihr
               // Betreuungsportal" — „Ihr persönliches Angebot" passte nicht
               // mehr, das Angebot rutscht in diesem Zustand auch nach unten).
-              title: 'Ihr Betreuungsportal',
-              subtitle:
-                'Hier sehen Sie eingehende Bewerbungen und können in der Zwischenzeit passende Pflegekräfte zur Bewerbung einladen — es bleibt alles unverbindlich.',
+              // Martin 25.09.: nach dem Absenden zählt, dass die Suche läuft und
+              // Bewerbungen kommen („Ihr Betreuungsportal" sagte nichts davon).
+              frist: null as Date | null,
+              title: 'Ihre Suche läuft',
+              subtitle: nachAbsendenNeu ? SUCHE_LAEUFT_SATZ : 'Sobald sich eine Pflegekraft bewirbt, bekommen Sie eine E\u2011Mail.',
               // Kein Pill (Martin, 13.08.): „unverbindlich" steht schon im
               // Satz darüber — die Zeile war eine Wiederholung.
               pill: '',
@@ -2932,17 +3888,18 @@ const CustomerPortalPage: FC = () => {
               // keine Statusmeldung („fertig"), sondern die Sache selbst. Der
               // Abschnitt darunter heißt deshalb „Ihre Betreuungskosten" und
               // wiederholt den Titel nicht.
+              frist: null as Date | null,
               title: 'Ihr persönliches Angebot',
               // Wird im Ausgangszustand NICHT im Hero gerendert: Die Begründung
               // steht dort, wo gehandelt wird — als Einleitung über dem
               // Formular (Martin, 11.08.: erst Angebot und Pflegekräfte
               // zeigen, dann um die Pflegesituation bitten).
-              subtitle:
-                // "beschrieben" — dasselbe Verb wie über dem Formular, im
-                // Text über den Pflegekräften und in der Schritt-Liste
-                // ("Pflegesituation vervollständigen"). "vervollständigt" klang
-                // nach einem zweiten, anderen Schritt (Übergabe 11.08.).
-                'Preis, Konditionen und passende Pflegekräfte auf einen Blick.',
+              // Strecke v2 (Martin, 11.09.): keine Unterzeile im
+              // Ausgangszustand. Der nächste Schritt steht dort, wo gehandelt
+              // wird — als Block „Jetzt konkrete Bewerbungen erhalten" über dem
+              // Formular. Vorher stand hier „Preis, Konditionen … Als Nächstes:
+              // …" mit drei Aufgaben in einem Satz.
+              subtitle: '',
               // Kein Pill hier: Der Einleitungssatz darüber sagt bereits, was
               // den Kunden erwartet. In den anderen Zuständen trägt die Zeile
               // echten Status („1 Bewerbung aktiv") — dort bleibt sie.
@@ -2960,61 +3917,122 @@ const CustomerPortalPage: FC = () => {
         // der Reihenfolge der Abschnitte selbst:
         //   Angebot → Passende Pflegekräfte → Pflegesituation → Vorteile/FAQ
 
+        // Look wie primundus.de (Teil 3 des Redesigns): Fläche „shell", Begrüßung in
+        // Taupe, Titel in 800. Im Ausgangszustand liegt die Kostenkarte leicht über
+        // der Unterkante (pb-10 + -mt-6 an der Karte).
+        // Kompakt-Einstieg (Runde 15, Designdurchgang): KEINE Fläche — der Kopf steht auf dem Seitengrund
+        // (paper), 20 px Rand wie alle Abschnitte; Begrüßung 16 px muted, Titel 30 px (bis 375 px: 28) in 700,
+        // die Kostenkarte folgt mit 40 px Abstand (statt über der Kante zu liegen).
         return (
-          <div className="relative" style={{background:'#FFFFFF', borderBottom:'1px solid #E9E9EB'}}>
-            <div className="relative max-w-3xl mx-auto px-5 pt-8 pb-3">
-              <p className="text-[15px] font-medium mb-3" style={{color:'#71717A'}}>
+          <div className={kompakt || nachAbsendenNeu ? '' : 'bg-pm-shell'}>
+            <div className={`max-w-3xl mx-auto ${kompakt || nachAbsendenNeu ? 'px-5 pt-6' : `px-[18px] pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}`}>
+              {/* Runde 22 (`?look=angebot`): Kopf wie ein Konto — Initialen, Begrüßung, „Ihr persönlicher Bereich". */}
+              {(kompakt || nachAbsendenNeu) && KOMPAKT_LOOK === 'angebot' ? (
+                <AngebotPerson
+                  name={heroNameLine}
+                  kuerzel={lead && (lead.vorname || lead.nachname)
+                    ? initials([lead.vorname, lead.nachname].filter(Boolean).join(' ').trim()).toUpperCase().slice(0, 2)
+                    : null}
+                />
+              ) : (
+              <p className={`text-[16px] ${kompakt ? 'text-pm-muted' : 'text-pm-taupe-ink'}`}>
                 Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
               </p>
-              <h1 className="text-[1.75rem] font-bold leading-tight tracking-tight mb-2" style={{color:'#18181B'}}>
-                {heroCopy.title}
-              </h1>
-              {/* Im Ausgangszustand steht hier NICHTS mehr außer der
-                  Bestätigung — kein Erklärabsatz, keine Checkliste, kein
-                  Button. Alle drei waren Kopien dessen, was die Abschnitte
-                  darunter ohnehin tragen (Abschnitt „Pflegesituation" hat
-                  einen eigenen Karten-Kopf mit genau diesem Aufruf). */}
-              <p className="text-[16px] leading-relaxed mb-4" style={{color:'#71717A'}}>
-                {heroCopy.subtitle}
-                {/* „Als Nächstes" im selben Absatz, unterstrichen (Martin, 08.09.) —
-                    nur im Ausgangszustand. */}
-                {heroCopy.steps === 'initial' && (
-                  <> <span className="font-semibold underline underline-offset-4" style={{color:'#18181B'}}>Als Nächstes:</span> Kurz die Pflegesituation vervollständigen, Pflegekräfte einladen und Bewerbungen erhalten — alles unverbindlich.</>
-                )}
-              </p>
-
-              {/* Vertrauen steht seit 08.09. in der Kosten-Karte (Siegel-Zeile),
-                  nicht mehr im Kopf (Martin: zwei Anläufe im Kopf wirkten
-                  unruhig). Der Kopf trägt nur Begrüßung, Titel und den Satz
-                  mit den drei Schritten. */}
-              {/* Trust-Zeile: ohne Fläche und Rahmen im schlanken Hero — als
-                  Pill wirkte sie wie der Primärbutton und war ein
-                  Fehlklick-Magnet, der nichts tut. */}
-              {heroCopy.pill && (
-              <div
-                className={`inline-flex items-center gap-2 ${heroCopy.steps ? '' : 'rounded-full px-4 py-2'}`}
-                style={heroCopy.steps ? undefined : {background:'#F5F5F6', border:'1px solid #E9E9EB'}}
-              >
-                <Check className="w-4 h-4 flex-shrink-0" strokeWidth={3} style={{color:'#8B7355'}} />
-                <span className="text-[15px]" style={{color:'#18181B'}}>{heroCopy.pill}</span>
-              </div>
               )}
+              {/* Kompakt-Einstieg (Runde 5): Titel wie der Betreff der Angebotsmail; höchstens zwei Zeilen —
+                  „24-Stunden-Betreuung" bricht nicht um (sonst „24-" allein am Zeilenende). */}
+              <h1 className={kompakt || nachAbsendenNeu
+                ? `${KOMPAKT_LOOK === 'angebot' ? 'mt-6 text-[28px] min-[376px]:text-[31px] font-extrabold leading-[1.1] tracking-[-0.035em]' : 'mt-2 text-[28px] min-[376px]:text-[30px] font-bold leading-[1.15] tracking-[-0.025em]'} text-pm-ink`
+                : 'mt-1 font-extrabold leading-[1.08] tracking-[-0.035em] text-pm-ink text-[31px]'}>
+                {kompakt ? (
+                  <>Ihr Angebot zur <span className="whitespace-nowrap">24-Stunden-Betreuung</span></>
+                ) : heroCopy.title}
+              </h1>
+              {/* Kompakt-Einstieg (Runde 13, „ruhig"): nur die Einleitung — keine Fakten-Zeile, kein Knopf,
+                  keine Haken. Betont sind auf der Seite nur Kostenkarte und Hinweis. */}
+              {/* Runde 19 (`?look=angebot`): oben nur unsere Vorteile — Siegel, Testsieger, Erfahrung, Sterne und vier
+                  Punkte. Die Situation (Personen, Pflegegrad) steht unten in der Preiskarte. */}
+              {kompakt && KOMPAKT_LOOK === 'angebot' ? (
+                <>
+                  {/* Runde 25 (Martin zu Fassung 19: „ein Angebot inkl. Einleitung und Beschreibung dessen, was der Kunde
+                      bekommt"): Siegel und Sterne am Titel, dann seine Einleitung; direkt darunter die Kosten. Der Weg in
+                      vier Schritten steht erst unter dem Angebot (KompaktPflegekraefteBereich). */}
+                  {/* Runde 26: Sterne unter dem Titel, das Siegel steht neben dem Testsieger-Satz der Einleitung. */}
+                  <AngebotSterne sterne={sterne} />
+                  <AngebotEinleitung />
+                  {/* Runde 32 (Martin zu Fassung 26: „das mit dem Testsieger hätte ich vielleicht hier"): Siegel mit Satz direkt
+                      unter der Einleitung, getrennt von den Sternen über ihr (Martin zu Fassung 20). */}
+                  <AngebotTestsieger className="mt-5" klein />
+                </>
+              ) : kompakt && <KompaktEinleitung />}
+              {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
+                  danach die Bewerbung; „Angebot prüfen" und die Vorteile der
+                  Kostenrechner-Startseite stehen IN der Karte (AppCard `vorteile`). */}
+              {hasPending && heroCopy.frist && (
+                <p className="mt-3 inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[14.5px] font-bold bg-pm-amber-tint text-pm-amber-ink">
+                  <Clock className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+                  {nochReserviertText(heroCopy.frist)}
+                </p>
+              )}
+              {heroCopy.subtitle && (
+                <p className={nachAbsendenNeu ? 'mt-4 text-pretty text-[17px] leading-[1.55] text-pm-body' : 'mt-3 text-[16px] leading-[1.55] text-pm-muted'}>
+                  {heroCopy.subtitle}
+                </p>
+              )}
+              {/* Status-Zeile ohne Fläche (z. B. „Portal wird geladen"). */}
+              {!hasPending && heroCopy.pill && (
+                <p className="mt-3 inline-flex items-center gap-2 text-[15px] text-pm-ink">
+                  <Check className="w-4 h-4 flex-shrink-0 text-pm-taupe" strokeWidth={3} />
+                  {heroCopy.pill}
+                </p>
+              )}
+
             </div>
-            {/* Die geschwungene Welle als Übergang zum Body ist am 11.08.
-                entfallen (Martin: „diese Trennung zwischen Header und Rest ist
-                krass unpassend"). Sie war das einzige verspielte Element in
-                einem sonst sachlichen Layout und ließ den Hero wie einen
-                aufgeklebten Banner wirken. Jetzt: gerade Kante, der Header
-                sitzt als Block auf der Seite. */}
           </div>
         );
       })()}
 
+      {/* ── Stand heute (Martin 25.09.): nach dem Absenden liegt diese Karte über
+           der Kante des Kopfs, wie vorher die Kostenkarte. ── */}
+      {sucheLaeuft && nachAbsendenNeu && (
+        <div id="stand" className="max-w-3xl mx-auto px-5 pt-9 scroll-mt-20">
+          <AngebotAbschnitt id="so-geht-es-weiter" titel="So geht es weiter" className="">
+            <AngebotAblaufStand
+              bisherigeBewerbungen={applications.length}
+              wunschstart={formularStart}
+              onEinladen={() => document.getElementById('pflegekraefte')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            />
+          </AngebotAbschnitt>
+        </div>
+      )}
+      {sucheLaeuft && !nachAbsendenNeu && (
+        <div id="stand" className="max-w-3xl mx-auto px-3.5 -mt-6 scroll-mt-24">
+          <SucheStand
+            // Abgelehnte zählen nicht als „gefunden" — sonst widerspräche die Zahl
+            // der Liste darunter (Review 25.09.).
+            passende={IS_PREVIEW_ANY || (mmReady && !matchingsLoadingOrError)
+              ? effectiveMatched.filter((m) => (nurseStatusById.get(m.caregiverId) ?? 'pending') !== 'declined').length
+              : null}
+            bisherigeBewerbungen={applications.length}
+            wunschstart={formularStart}
+            onAngaben={zurPflegesituationAus('stand')}
+          />
+        </div>
+      )}
+
       {/* ── SECTION: Ihr Angebot (collapsible) ── */}
       {!patientSaved && angebotSection}
 
+      {/* Die Frage „Passt Ihnen das Angebot?“ (#748/#751, 25./26.09.) stand hier. Seit Registry #102 wieder raus
+          (Martin 28.09.: „alle 3 machen und dabei 1a“): Danach speicherte kein Neukunde mehr die Pflegesituation
+          (0 von 6, vorher 30 %; 80 % der Patientendaten entstehen beim ersten Besuch). Der Weg zum Formular ist
+          wieder der Kasten „Noch 2 Minuten“ über den Pflegekräften, die Rückmeldung wieder die schwebende Frage.
+          Die Komponente `AngebotFrage` bleibt für einen späteren, gemessenen Versuch liegen. */}
 
-      <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4" style={{background:'#FFFFFF'}}>
+      {/* Im Kompakt-Einstieg stehen die Profile und „Bereits bearbeitet" UNTER der Pflegekräfte-Karte
+          (weiter unten); Bewerbungen und Interesse gibt es dort nicht. */}
+      {!kompakt && (
+      <div className={`max-w-3xl mx-auto ${nachAbsendenNeu ? 'px-5 pt-6 pb-2' : 'px-3.5 pt-1 pb-6'} space-y-4`}>
 
 
         {/* ── SECTION HEADER: Ihre Bewerbungen — NUR bei offenen
@@ -3024,11 +4042,9 @@ const CustomerPortalPage: FC = () => {
              Interesse, dann die Matching-Liste. Vorher stand die
              Interesse-Karte VOR der Bewerbung — der Hero sagte „Sie haben
              eine neue Bewerbung" und das Erste im Bild war etwas anderes. */}
-        {hasPending && (
-          <div className="px-1 pt-2">
-            <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Ihre Bewerbungen</h2>
-          </div>
-        )}
+        {/* Keine zweite Überschrift „Ihre Bewerbungen" mehr (Martin 25.09.):
+            Der Kopf sagt „Sie haben eine aktive Bewerbung", danach kommt direkt
+            die Karte. */}
 
 
         {/* ── SECTION: Pending Applications ──
@@ -3036,9 +4052,6 @@ const CustomerPortalPage: FC = () => {
              vom Kunden — die kommen ZUERST, vor allem anderen. */}
         {hasPending && (
           <div id="bewerbungen" className="space-y-3 scroll-mt-4">
-            <p className="text-[16px] leading-relaxed px-1" style={{color:'#18181B'}}>
-              Tippen Sie auf <span className="font-semibold">"Angebot prüfen"</span>, um die Details der Pflegekraft zu sehen und über das Angebot zu entscheiden.
-            </p>
             {pendingApps.map((app) => (
               <AppCard
                 key={app.id}
@@ -3048,6 +4061,8 @@ const CustomerPortalPage: FC = () => {
                 onDecline={() => setDeclineConfirmApp(app)}
                 onNurseClick={(n) => openNurseFromApp(n, app)}
                 onChat={CHAT_ENABLED ? (n) => setChatNurse(n) : undefined}
+                reserviertBis={pendingApps.length > 1 ? reservierungFuer(app) : null}
+                vorteile={app.id === pendingApps[0].id ? { onBestpreis: () => setBestpreisOffen(true), sterne } : undefined}
               />
             ))}
             {/* Beratungs-CTA direkt unter den Bewerbungen — Bewerbungen sind
@@ -3079,8 +4094,16 @@ const CustomerPortalPage: FC = () => {
           {/* Kleine Abschnitts-Überschrift wie bei den Nachbarn (Martin,
               13.08.) — der Kasten hing vorher ohne Einordnung zwischen
               Kosten und Pflegekräften. */}
+          {nachAbsendenNeu ? (
+            <div className="pt-4">
+              <h2 className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">
+                {visibleInterests.length === 1 ? 'Interessierte Pflegekraft' : 'Interessierte Pflegekräfte'}
+              </h2>
+              <p className="mt-2 text-pretty text-[16px] leading-[1.55] text-pm-muted">{interesseText(visibleInterests.length)}</p>
+            </div>
+          ) : (<>
           <div className="px-1 pt-2">
-            <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>
+            <h2 className={H2}>
               {visibleInterests.length === 1 ? 'Interessierte Pflegekraft' : 'Interessierte Pflegekräfte'}
             </h2>
           </div>
@@ -3094,6 +4117,7 @@ const CustomerPortalPage: FC = () => {
               ? 'Diese Pflegekraft hat Ihre Anfrage gesehen und würde die Betreuung gerne übernehmen. Wenn Sie sie einladen, stößt ein Mitarbeiter von uns die offizielle Bewerbung an — für Sie ganz unverbindlich.'
               : 'Diese Pflegekräfte haben Ihre Anfrage gesehen und würden die Betreuung gerne übernehmen. Wenn Sie eine einladen, stößt ein Mitarbeiter von uns die offizielle Bewerbung an — für Sie ganz unverbindlich.'}
           </p>
+          </>)}
           {/* Eigener, hervorgehobener Kasten ÜBER den passenden Pflegekräften
              (Martin, 11.08.): Proaktives Interesse ist mehr wert als ein
              Matching — vorher lag es optisch gleichauf in derselben Liste und
@@ -3142,7 +4166,7 @@ const CustomerPortalPage: FC = () => {
                     setSelectedNurse(nurse);
                     setSelectedFromInterestId(i.caregiver_id);
                   }}
-                  onInvite={() => canInviteNurse(0)}
+                  onInvite={() => { messeEinladen(nurse, 'interesse'); return canInviteNurse(0); }}
                   onInviteConfirm={() => confirmInviteInterest(i.caregiver_id, label)}
                   onDismiss={() => confirmDismissInterest(i.caregiver_id)}
                   globalInviteLocked={inviteInFlight}
@@ -3161,9 +4185,27 @@ const CustomerPortalPage: FC = () => {
              genau da, wo der Kunde landen soll. Deshalb KEIN zweiter Anker
              weiter unten: doppelte ids sind ungueltig, und getElementById
              nimmt ohnehin den ersten. */}
-        {!hasPending && (
-          <div className="px-1 pt-2" id="pflegekraefte" style={{scrollMarginTop:96}}>
-            <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Passende Pflegekräfte einladen</h2>
+        {!hasPending && nachAbsendenNeu && (
+          <div className="pt-6" id="pflegekraefte" style={{scrollMarginTop:96}}>
+            <h2 className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">{EINLADEN_TITEL}</h2>
+            <p className="mt-2 text-pretty text-[16px] leading-[1.55] text-pm-muted">{EINLADEN_ZEILE}</p>
+          </div>
+        )}
+        {!hasPending && !nachAbsendenNeu && (
+          <div className="px-1 pt-6" id="pflegekraefte" style={{scrollMarginTop:96}}>
+            {/* Vor dem Absenden wieder der Wortlaut der guten Phase bis 24.09. (Registry #109,
+                Martin 02.10.: „4 ja“): Was „Einladen“ heißt und dass es nichts kostet und
+                nicht bindet. Der Link „Warum? Mehr“ und sein Pop-up sind weg. Keine feste
+                Zahl in der Überschrift: bereits eingeladene Kräfte zählen nicht mit. */}
+            <SectionHeader
+              // Nach dem Absenden ist Einladen die Zugabe für die Wartezeit
+              // (Martin 24./25.09.) — der Stand oben trägt die Bewerbungen.
+              eyebrow={patientSaved ? 'In der Zwischenzeit' : 'Für Sie ausgewählt'}
+              titel={patientSaved ? 'Selbst einladen' : 'Passende Pflegekräfte'}
+              zeile={patientSaved
+                ? 'Laden Sie ein, wer Ihnen gefällt. Die Pflegekraft meldet sich meist innerhalb von 1–2 Tagen.'
+                : 'Gefällt Ihnen eine Pflegekraft, laden Sie sie ein, sich bei Ihnen zu bewerben. Das ist kostenlos und unverbindlich: Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen und im Portal unterschreiben.'}
+            />
           </div>
         )}
 
@@ -3175,65 +4217,16 @@ const CustomerPortalPage: FC = () => {
         {/* Mamamia-Matchings vorübergehend nicht erreichbar / noch am Laden →
             ruhiger Lade-Zustand STATT einer leeren "keine Pflegekräfte"-Seite.
             Auto-Retry (useEffect oben) lädt im Hintergrund nach. */}
-        {!hasPending && matchingsLoadingOrError && (
-          <div className="rounded-3xl px-5 py-8 border text-center" style={{ background: '#F5F5F6', borderColor: '#D4D4D8' }}>
+        {!hasPending && listeLaedt && (
+          <div className="rounded-card px-5 py-8 border border-[#EFEBE4] bg-white text-center">
             <div className="inline-block w-6 h-6 rounded-full border-2 animate-spin mb-3" style={{ borderColor: '#C4B49A', borderTopColor: 'transparent' }} />
             <p className="text-[15px] font-semibold mb-1" style={{ color: '#18181B' }}>Wir laden Ihre Pflegekräfte …</p>
             <p className="text-[14px] leading-relaxed" style={{ color: '#71717A' }}>Einen Moment bitte — gleich sehen Sie Ihre persönlichen Vorschläge.</p>
           </div>
         )}
 
-        {!hasPending && !matchingsLoadingOrError && (() => {
-          // Interest-Pflegekräfte (sowohl invited als auch declined)
-          // werden NICHT in der Matching-Liste gerendert sondern unten
-          // in der "Bereits bearbeitet"-Sektion (User-Wunsch: gleiche
-          // Behandlung wie bei Bewerbungen). Filter: caregiverId raus
-          // wenn interestOriginIds das hat UND Status invited/declined.
-          const allVisible = effectiveMatched
-            .map((m, i) => ({ nurse: m.nurse, i, caregiverId: m.caregiverId, status: nurseStatusById.get(m.caregiverId) ?? 'pending' as NurseStatus, virtualDeclinedFromInterest: false as const }))
-            .filter(({ status, caregiverId }) => {
-              if (status === 'pending') return true;
-              // invited/declined ausschließen wenn aus Interest stammt
-              return !interestOriginIds.has(caregiverId);
-            });
-          // Order: pending (cap 5, oben) → invited → declined (ganz unten,
-          // ausgegraut mit "Abgelehnt"-Pill + Undo-Link). User-Wunsch:
-          // bearbeitete (normale) Pflegekräfte rutschen nach unten in der
-          // Matching-Liste. Interest-Aktionen leben in "Bereits bearbeitet"
-          // (siehe unten — InterestActionCards in der doneApps-Sektion).
-          // Oben NUR die frischen Vorschläge (max 3). Bereits bearbeitete
-          // Matchings (invited/declined) wandern in die gedämpfte
-          // "Bereits bearbeitet"-Sektion unten (MatchCardDone) — sonst
-          // wirken sie zu prominent / zu ähnlich wie die offenen Vorschläge.
-          type VisibleNurse = {
-            nurse: Nurse;
-            i: number;
-            caregiverId: number;
-            status: NurseStatus;
-            virtualDeclinedFromInterest: boolean;
-          };
-          // Batch-Reveal (User-Wunsch 25.06.): sichtbarer Pool = 5 −
-          // Einladungen der letzten 24h. Einladen hält den Slot 24h (die
-          // Pflegekraft wartet auf Antwort); nach 24h ohne Reaktion füllt sich
-          // der Pool wieder auf 5 + die "neue Pflegekräfte"-Mail geht raus.
-          // Ablehnen zählt NICHT mit (caregiver_invite_attempts erfasst nur
-          // echte Einladungen) → rückt sofort nach. used_24h aus getInviteRateState.
-          const heldInvites = inviteRate?.used_24h ?? 0;
-          const visibleCount = Math.max(0, 5 - heldInvites);
-          const pendingNurses: VisibleNurse[] = allVisible.filter(({ status }) => status === 'pending').slice(0, visibleCount);
-          // Die Empfehlung (höchste Badge-Bewertung, Score = Erfahrungsjahre +
-          // Einsätze) nach ganz oben ziehen — die anderen behalten ihre
-          // Reihenfolge. So steht "Empfehlung des Beraters" immer zuoberst.
-          const badgeScore = (n: Nurse) => nurseBadgeScore(n.history?.assignments);
-          let bestIdx = -1;
-          let bestScore = -Infinity;
-          pendingNurses.forEach((p, idx) => {
-            const s = badgeScore(p.nurse);
-            if (s > bestScore) { bestScore = s; bestIdx = idx; }
-          });
-          const visibleNurses: VisibleNurse[] = bestIdx > 0
-            ? [pendingNurses[bestIdx], ...pendingNurses.filter((_, idx) => idx !== bestIdx)]
-            : pendingNurses;
+        {!hasPending && !listeLaedt && (() => {
+          const { allVisible, heldInvites, visibleNurses } = pflegekraftAuswahl;
           const hasAnyCard = visibleNurses.length > 0;
           return (
             <>
@@ -3246,30 +4239,28 @@ const CustomerPortalPage: FC = () => {
                 {/* Der eine Schritt, markant und positiv (Martin, 08.09.): steht
                     nur hier über den Pflegekräften, nicht mehr zusätzlich unter
                     den Kosten. Kein „Kostenrechner", kein „erst danach" —
-                    Erwartung statt Schranke. */}
-                {!patientSaved && (
-                <div className="rounded-2xl px-5 py-5 mb-4" style={{background:'#FAF8F4', border:'1px solid #EBE2D2'}}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{background:'#FDF1E2'}}>
-                      <AlertTriangle className="w-4 h-4" style={{color:'#D97706'}} />
-                    </div>
-                    <p className="text-[17px] font-bold leading-snug" style={{color:'#3D2B1F'}}>Noch 2 Minuten bis zum Einladen</p>
-                  </div>
-                  <p className="text-[15px] leading-relaxed mt-2.5" style={{color:'#3A3A3A'}}>Vervollständigen Sie kurz Ihre Pflegesituation — dann können Sie diese Pflegekräfte einladen und erhalten unverbindliche Bewerbungen mit Foto, Erfahrung und Anreisedatum. Vieles ist schon ausgefüllt.</p>
-                  <button
-                    type="button"
-                    onClick={zurPflegesituation}
-                    className="mt-4 w-full rounded-xl py-3.5 text-[16px] font-bold text-white active:scale-[0.99] transition-transform"
-                    style={{background:'#2A9D5C'}}
-                  >
+                    Erwartung statt Schranke. Wortlaut seit Registry #109 wieder wie
+                    bis 24.09. (Einladen + Bewerbungen, „Jetzt vervollständigen →“),
+                    ohne die Statuszeile „Pflegesituation unvollständig“; der Look
+                    (Hinweis-Karte, Koralle-Knopf) bleibt. Nie für Kunden, die schon
+                    abgeschickt haben — auch nicht kurz, bis mamamia antwortet
+                    (`schonAbgesendet`, Review 25.09.). */}
+                {!patientSaved && !schonAbgesendet && (
+                <Card ton="hinweis" className="p-5 mb-5">
+                  <p className="text-[17.5px] font-extrabold leading-[1.25] text-pm-ink">Noch 2 Minuten bis zum Einladen</p>
+                  <p className="mt-2 mb-4 text-[14.5px] leading-[1.5] text-pm-muted">
+                    Vervollständigen Sie kurz Ihre Pflegesituation. Danach können Sie diese Pflegekräfte einladen und erhalten Bewerbungen mit Foto, Erfahrung, Anreisedatum und Preis. Vieles ist schon ausgefüllt.
+                  </p>
+                  {/* Einziger Hauptknopf der Pflegekräfte (Koralle); einzeilig bei
+                      360 px — deshalb schmale Innenabstände. */}
+                  <Button breit onClick={zurPflegesituationAus('kasten')} className="px-2 whitespace-nowrap">
                     Jetzt vervollständigen →
-                  </button>
-                </div>
+                  </Button>
+                </Card>
                 )}
-                <div
-                  className="rounded-3xl px-3 py-4 border"
-                  style={{ background: '#F5F5F6', borderColor: '#D4D4D8' }}
-                >
+                {/* Kein grauer Kasten mehr um die Karten (Teil 3): jede Karte
+                    bekommt so ~26 px mehr Breite. */}
+                <div>
                   <div className="space-y-3">
                     {/* Interest-Karten werden jetzt OBEN in einer eigenen
                         always-visible Section gerendert (siehe oben), nicht
@@ -3300,10 +4291,11 @@ const CustomerPortalPage: FC = () => {
                             isRecommended={isRecommended}
                             onNurseClick={() => openNurseFromMatch(nurse, i)}
                             onStufeClick={() => { setNurseModalStufe(true); openNurseFromMatch(nurse, i); }}
-                            onInvite={() => canInviteNurse(i)}
+                            onInvite={() => { messeEinladen(nurse, 'karte'); return canInviteNurse(i); }}
                             onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
                             onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
                             globalInviteLocked={inviteInFlight}
+                            breit={nachAbsendenNeu}
                           />
                         );
                       });
@@ -3313,7 +4305,7 @@ const CustomerPortalPage: FC = () => {
                   {/* Beratungs-CTA — direkt unter den 3 Match-Karten.
                        Fängt Kunden ab die überfordert oder unsicher sind
                        und sonst still abspringen würden. */}
-                  {patientSaved && (
+                  {patientSaved && !nachAbsendenNeu && (
                     <div className="mt-4">
                       <BeratungCTA
                         headline="Unsicher bei der Auswahl?"
@@ -3331,9 +4323,9 @@ const CustomerPortalPage: FC = () => {
                   auf + die "neue Pflegekräfte"-Mail geht raus. Nur zeigen, wenn
                   wirklich gehalten (heldInvites > 0), nicht wenn der Pool leer ist. */}
               {!hasAnyCard && heldInvites > 0 && (
-                <div className="rounded-3xl px-5 py-5 border text-center" style={{ background: '#F5F5F6', borderColor: '#D4D4D8' }}>
-                  <p className="text-[15px] font-semibold mb-1" style={{color:'#18181B'}}>Ihre Auswahl ist eingeladen</p>
-                  <p className="text-[14px] leading-relaxed" style={{color:'#71717A'}}>
+                <div className="rounded-card px-5 py-5 border border-[#EFEBE4] bg-white text-center">
+                  <p className="text-[15.5px] font-bold text-pm-ink">Ihre Auswahl ist eingeladen</p>
+                  <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">
                     Die Pflegekräfte melden sich meist innerhalb von 1&ndash;2 Tagen. Sobald Rückmeldungen da sind, sehen Sie sie hier &mdash; meldet sich niemand, schlagen wir Ihnen automatisch weitere Pflegekräfte vor.
                   </p>
                 </div>
@@ -3344,11 +4336,31 @@ const CustomerPortalPage: FC = () => {
                   Überschrift ohne Karten (wirkt wie ein Bug). Ruhiger Hinweis,
                   dass weitere folgen (Martin, 18.08.). */}
               {!hasAnyCard && heldInvites === 0 && allVisible.length > 0 && (
-                <div className="rounded-3xl px-5 py-5 border text-center" style={{ background: '#F5F5F6', borderColor: '#D4D4D8' }}>
-                  <p className="text-[15px] font-semibold mb-1" style={{color:'#18181B'}}>Alle aktuellen Vorschläge bearbeitet</p>
-                  <p className="text-[14px] leading-relaxed" style={{color:'#71717A'}}>
+                <div className="rounded-card px-5 py-5 border border-[#EFEBE4] bg-white text-center">
+                  <p className="text-[15.5px] font-bold text-pm-ink">Alle aktuellen Vorschläge bearbeitet</p>
+                  <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">
                     Sie haben alle passenden Pflegekräfte durchgesehen. Wir schlagen Ihnen in Kürze weitere vor &mdash; Sie hören von uns.
                   </p>
+                </div>
+              )}
+
+              {/* Keine sichtbare Pflegekraft und nichts eingeladen (z. B. strenger
+                  Deutsch-Filter, Martin 25.09.: Filter bleibt). Vorher stand dann
+                  nur die Überschrift da. */}
+              {/* Nur mit wirklich geladenen Matchings — nicht, solange die Sitzung
+                  lädt oder hakt (Święta zasada nr 1, Review 25.09.). */}
+              {!hasAnyCard && heldInvites === 0 && allVisible.length === 0 && (IS_PREVIEW_ANY || (mmReady && !!mmMatchings?.data)) && (
+                <div className="rounded-card px-5 py-6 border border-[#EFEBE4] bg-white text-center">
+                  <p className="text-[15.5px] font-bold text-pm-ink">Gerade keine weiteren Vorschläge</p>
+                  <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">
+                    Neue passende Pflegekräfte erscheinen hier.{patientSaved ? ' Bewerbungen bekommen Sie trotzdem per E\u2011Mail.' : ''}
+                  </p>
+                  <a
+                    href={TELEFON_HREF}
+                    className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-full border-[1.5px] border-pm-chip px-5 text-[15px] font-bold text-pm-taupe-ink hover:border-pm-taupe"
+                  >
+                    Mit Marta sprechen
+                  </a>
                 </div>
               )}
 
@@ -3359,99 +4371,53 @@ const CustomerPortalPage: FC = () => {
           );
         })()}
 
-        {/* ── SECTION: Bereits bearbeitet ──
-             Immer unten sichtbar wenn doneApps ODER bearbeitete Matchings
-             existieren. Bewusst gedämpft (MatchCardDone: kompakt, grau) +
-             klar getrennt unter den frischen Vorschlägen — sonst wirken die
-             bearbeiteten Karten zu ähnlich wie die offenen. Sammelt:
-             - bearbeitete Bewerbungen (AppCardDone)
-             - eingeladene Pflegekräfte (normal + aus Interesse) — kein Undo
-               (Mamamia kennt keine uninvite-Mutation)
-             - abgelehnte Pflegekräfte (normal + aus Interesse) — mit Undo
-             Reihenfolge: eingeladen zuerst, abgelehnt (ausgegraut) zuletzt. */}
-        {(() => {
-          // Normale Matchings (NICHT aus Interesse) nach Status, mit
-          // effectiveMatched-Index für die Undo-/Detail-Handler.
-          const matchInvited = effectiveMatched
-            .map((m, i) => ({ m, i }))
-            .filter(({ m }) => nurseStatusById.get(m.caregiverId) === 'invited' && !interestOriginIds.has(m.caregiverId))
-            .map(({ m, i }) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'invited' as const, key: `mi-${m.caregiverId}`, matchIdx: i, interest: false }));
-          const matchDeclined = effectiveMatched
-            .map((m, i) => ({ m, i }))
-            .filter(({ m }) => nurseStatusById.get(m.caregiverId) === 'declined' && !interestOriginIds.has(m.caregiverId))
-            .map(({ m, i }) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'declined' as const, key: `md-${m.caregiverId}`, matchIdx: i, interest: false }));
-          // Aktionen die aus einer Interest-Karte stammen (♥ Interesse-Label).
-          const interestInvited = effectiveMatched
-            .filter((m) => nurseStatusById.get(m.caregiverId) === 'invited' && interestOriginIds.has(m.caregiverId))
-            .map((m) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'invited' as const, key: `ii-${m.caregiverId}`, matchIdx: -1, interest: true }));
-          const interestDeclined = Array.from(declinedFromInterest.entries())
-            .map(([cgId, nurse]) => ({ nurse, caregiverId: cgId, status: 'declined' as const, key: `id-${cgId}`, matchIdx: -1, interest: true }));
-          // Eingeladen zuerst, abgelehnt zuletzt. Aus effectiveMatched (volle
-          // Daten + Undo-Handler).
-          const fromMatched = [...matchInvited, ...interestInvited, ...matchDeclined, ...interestDeclined]
-            .map((d) => ({ ...d, fromEvent: false as const }));
-          // Bearbeitete PKs, die Mamamia NICHT mehr in den Matchings liefert →
-          // aus unseren Events rekonstruiert (Snapshot/Name). Dedupe gegen das,
-          // was schon aus effectiveMatched kommt + Interesse-Aktionen.
-          const matchedIds = new Set(fromMatched.map((d) => d.caregiverId));
-          const fromEvents = extraProcessed
-            .filter((p) => !matchedIds.has(p.caregiverId) && !interestOriginIds.has(p.caregiverId))
-            .map((p) => ({ nurse: p.nurse, caregiverId: p.caregiverId, status: p.status, key: `ev-${p.caregiverId}`, matchIdx: -1, interest: false, fromEvent: true as const }));
-          // Eingeladene zuerst, dann Abgelehnte (über beide Quellen).
-          const allDone = [...fromMatched, ...fromEvents]
-            .sort((a, b) => (a.status === b.status ? 0 : a.status === 'invited' ? -1 : 1));
-          const hasAny = doneApps.length > 0 || allDone.length > 0;
-          if (!hasAny) return null;
-          // 3 sichtbar, Rest hinter "Weitere anzeigen" (User-Wunsch 26.06.).
-          const VISIBLE_DONE = 3;
-          const shownDone = showAllDone ? allDone : allDone.slice(0, VISIBLE_DONE);
-          const moreCount = allDone.length - shownDone.length;
-          return (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1">Bereits bearbeitet</p>
-              {doneApps.map((app) => (
-                <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
-              ))}
-              {shownDone.map(({ nurse, caregiverId, status, key, matchIdx, interest, fromEvent }) => (
-                <MatchCardDone
-                  key={key}
-                  nurse={nurse}
-                  status={status}
-                  hasInterestOrigin={interest}
-                  onNurseClick={() => (fromEvent || interest) ? setSelectedNurse(nurse) : openNurseFromMatch(nurse, matchIdx)}
-                  onUndo={(!fromEvent && status === 'declined') ? (interest ? () => undoDismissInterest(caregiverId) : () => undoDeclinedMatch(matchIdx)) : undefined}
-                />
-              ))}
-              {!showAllDone && moreCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowAllDone(true)}
-                  className="w-full text-center text-[13px] font-semibold py-2.5 rounded-xl transition-colors"
-                  style={{ color: '#8B7355', background: '#F6F2EC' }}
-                >
-                  Weitere anzeigen ({moreCount})
-                </button>
-              )}
-            </div>
-          );
-        })()}
+        {bereitsBearbeitet}
 
       </div>
+      )}
+
+      {/* Fassung 31: nach dem Absenden steht das Angebot vor der Pflegesituation, wie vor dem Absenden. */}
+      {patientSaved && nachAbsendenNeu && angebotSection}
 
       {!hasPending && (
-      <div style={{background:'#FFFFFF'}}>
-      <div className="max-w-3xl mx-auto px-4 pt-1 pb-4 space-y-4">
+      <div>
+      <div className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'pt-10' : 'pt-10'}` : nachAbsendenNeu ? 'px-5 pb-2' : 'px-3.5 pt-1 pb-4 space-y-4'}`}>
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
              PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}
         {/* Die Hervorhebung sitzt seit 13.08. am FORMULAR selbst (brauner
              Rand + Schatten in AngebotCard), nicht mehr als Rahmen um Kopf
              UND Formular: Auf dem Handy presste der Aussenrahmen Einleitung
-             und Formular aneinander (Martin: „zu eng"). Der Kopf mit
-             „Ohne diese Angaben keine Bewerbungen" traegt die Dringlichkeit
-             im Text weiter. Das div bleibt als neutraler Anker. */}
-        <div>
-        {!hasPending && (() => {
+             und Formular aneinander (Martin: „zu eng"). Die Dringlichkeit
+             traegt seit 11.09. der Block „Jetzt konkrete Bewerbungen
+             erhalten" darueber. Das div bleibt als neutraler Anker.
+             Kompakt-Einstieg (Runde 8): „Für Sie ausgewählt / Ihre passenden Pflegekräfte" mit dem
+             Hinweis „Ihre Pflegesituation ist noch nicht vollständig" (das Formular klappt darin auf) und den echten
+             Profilen darunter (sonst bleibt `KompaktPflegekraefteBereich` dieses neutrale div). */}
+        <KompaktPflegekraefteBereich
+          aktiv={kompakt}
+          look={KOMPAKT_LOOK}
+          offen={formImKasten}
+          onOeffnen={() => setFormImKasten(true)}
+          onImBlick={setFormularImBlick}
+          liste={KOMPAKT_LOOK === 'angebot' && kartenGeladen && pflegekraftAuswahl.visibleNurses.length > 0 ? (
+            // Runde 29: alle Vorschläge unter „Ihre passenden Pflegekräfte", die Empfehlung zuerst (MatchCard wie im Portal).
+            <div className="space-y-3">{angebotKarten.alle}</div>
+          ) : (
+            <KompaktePflegekraefte
+              eintraege={pflegekraftAuswahl.visibleNurses}
+              laedt={listeLaedt}
+              alleBearbeitet={pflegekraftAuswahl.visibleNurses.length === 0 && pflegekraftAuswahl.allVisible.length > 0}
+              keineVorschlaege={pflegekraftAuswahl.allVisible.length === 0 && (IS_PREVIEW_ANY || (mmReady && !!mmMatchings?.data))}
+              onProfil={(n, i) => { profilQuelleRef.current = 'liste'; openNurseFromMatch(n, i); }}
+              telefonHref={TELEFON_HREF}
+              gross={KOMPAKT_LOOK === 'angebot'}
+            />
+          )}
+        >
+        {/* Fassung 32: nach dem Absenden im Look „angebot" keine Pflegesituation zum Ändern mehr (Martin zu 31: „Die sollen doch
+            nicht plötzlich irgendwas ändern, das wollen wir nicht"). Wer etwas ändern muss, meldet sich bei Marta (Kasten unten). */}
+        {!hasPending && !kompakt && !(nachAbsendenNeu && (patientSaved || schonAbgesendet)) && (() => {
           // Unvollständig = IMMER offen (Martin, 13.08.): Solange die
           // Angaben fehlen, gibt es nichts wegzuklappen — der Bogen ist die
           // Aufgabe. Erst „Vollständig" macht den Abschnitt zur Referenz,
@@ -3468,310 +4434,67 @@ const CustomerPortalPage: FC = () => {
           // offen — nach dem Speichern ist es Referenz und fällt auf den
           // ruhigen Rahmen zurück.
           return (
-          <div id="patientendaten" className="px-1 pt-2 scroll-mt-24">
-            <button
-              type="button"
-              className="w-full flex items-center justify-between text-left"
-              onClick={() => {
-                // Unvollständig ist nicht zuklappbar — der Klick täte sonst
-                // heimlich nichts bzw. würde einen manual-Zustand setzen,
-                // der nach dem Speichern falsch nachwirkt.
-                if (!patientSaved) return;
-                const next = !patientExpanded;
-                setPatientExpandedManual(next);
-                // Nach dem Speichern direkt in den bearbeitbaren Stepper
-                // springen — sonst braeuchte es einen zweiten Klick auf den
-                // Karten-Kopf.
-                if (next) setTriggerOpenPatient(true);
-              }}
-            >
-              <div className="min-w-0">
-                <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Pflegesituation</h2>
-                {/* Sagt in fünf Wörtern, warum dieser Abschnitt anders ist
-                    als die darüber. */}
-                {!patientSaved && (
-                  <p className="text-[13px] font-semibold mt-0.5" style={{color:'#8B7355'}}>
-                    Ohne diese Angaben keine Bewerbungen möglich
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {patientSaved ? (
-                  <span className="text-[12px] font-semibold px-3 py-1 rounded-full" style={{background:'#E3F7EF', color:'#2a9a6f'}}>✓ Vollständig</span>
-                ) : (
-                  <span className="text-[12px] font-semibold px-3 py-1 rounded-full" style={{background:'#FDF1E2', color:'#B45309'}}>Unvollständig</span>
-                )}
-                {patientSaved && (
-                  <ChevronDown className={`w-5 h-5 text-[#8B7355] transition-transform duration-200 ${patientExpanded ? 'rotate-180' : ''}`} />
-                )}
-              </div>
-            </button>
-
-            {/* Einleitung „warum" (Martin, 11.08.) — seit 13.08. ohne den
-                Minuten-/Kostenrechner-Satz: Auf dem Handy stand der Text
-                gequetscht direkt auf dem Formular („zu eng"). Ein Satz plus
-                Luft; die Dauer erklaert sich im Formular von selbst
-                (Fortschrittsbalken, 4 Schritte). */}
-            {!patientSaved && (
-              <p className="text-[16px] leading-relaxed mt-3 mb-4" style={{color:'#18181B'}}>
-                Sobald Sie die Pflegesituation vervollständigt haben, erhalten Sie
-                ganz unverbindlich Bewerbungen und sehen, welche Pflegekräfte
-                die Betreuung übernehmen können.
-              </p>
+          <div id="patientendaten" className="px-1 pt-6 scroll-mt-24">
+            {/* Ein Kopf (Teil 3, Entwurf v4): Eyebrow, Status, Titel, ein Satz. Titel
+                und Satz seit Registry #109 wieder wie bis 24.09. („Jetzt konkrete
+                Bewerbungen erhalten“, Strecke v2, 11.09.): der Nutzen in der
+                Überschrift, „Pflegesituation“ als Eyebrow. Kein eigener Knopf: das
+                Formular beginnt direkt darunter. Farbe des Status: Bernstein
+                (Koralle nur für Knöpfe). */}
+            {!patientSaved ? (
+              <SectionHeader
+                eyebrow="Pflegesituation"
+                titel="Jetzt konkrete Bewerbungen erhalten"
+                rechts={<StatusBadge ton="warnung">Unvollständig</StatusBadge>}
+                zeile="Vervollständigen Sie die Pflegesituation, damit Sie Pflegekräfte einladen und Bewerbungen erhalten können. Dauert etwa 2 Minuten, vieles ist schon ausgefüllt."
+              />
+            ) : (
+              <button
+                type="button"
+                aria-expanded={patientExpanded}
+                className="w-full min-h-[44px] flex items-end justify-between gap-3 text-left"
+                onClick={() => {
+                  const next = !patientExpanded;
+                  setPatientExpandedManual(next);
+                  // Nach dem Speichern direkt in den bearbeitbaren Stepper
+                  // springen — sonst braeuchte es einen zweiten Klick.
+                  if (next) setTriggerOpenPatient(true);
+                }}
+              >
+                <span className="min-w-0">
+                  <span className={`block ${EYEBROW}`}>Für Ihre Bewerbungen</span>
+                  <span className={`block mt-1.5 ${H2}`}>Pflegesituation</span>
+                </span>
+                <span className="flex items-center gap-2 flex-shrink-0 pb-1">
+                  <StatusBadge ton="fertig">✓ Vollständig</StatusBadge>
+                  <ChevronDown className={`w-5 h-5 text-pm-taupe transition-transform duration-200 ${patientExpanded ? 'rotate-180' : ''}`} />
+                </span>
+              </button>
             )}
+
           </div>
           );
         })()}
         {/* ── Kombinierte Karte: Identität + Anfrage + Stepper ──
              Hidden once a Bewerbung is in: customer should focus on the
              pending application, not on revisiting saved patient data. */}
-        {!hasPending && (patientSaved ? (patientExpandedManual ?? false) : true) && (
+        {!hasPending && !(nachAbsendenNeu && (patientSaved || schonAbgesendet)) && (kompakt ? formImKasten : (patientSaved ? (patientExpandedManual ?? false) : true)) && (
         <div>
-        <AngebotCard
-          lead={lead}
-          mmCustomer={mmCustomer}
-          onPatientSaved={(saved) => {
-            if (saved && !patientSaved) {
-              showToast('✓ Vielen Dank! Ihre Daten sind gespeichert. Sie können jetzt Pflegekräfte einladen und Bewerbungen erhalten.', 7000);
-              // Frisch gespeichert → Abschnitt klappt zu (Referenz-Zustand).
-              // Ohne den Reset würde ein früher gesetzter manual-Wert den
-              // Bogen offen halten, obwohl die Aufgabe erledigt ist.
-              setPatientExpandedManual(null);
-            }
-            setPatientSaved(saved);
-          }}
-          forceSaved={patientSaved}
-          triggerOpenPatient={triggerOpenPatient}
-          onTriggerHandled={() => setTriggerOpenPatient(false)}
-          mamamiaEnabled={mmReady}
-          onSaveToMamamia={async (form) => {
-            const existingPatientIds = mmCustomer?.patients?.map(p => p.id) ?? [];
-
-            // ── Save flow ──────────────────────────────────────────────────
-            //
-            // One write to land the full patient profile, then a separate
-            // narrow write to overlay the AI-generated job_description.
-            //
-            // Why narrow overlay (proxy action `updateJobDescription`)
-            // instead of re-sending the whole patch with AI text spread:
-            //   - re-sending the full patch a second time bounces every
-            //     association through Mamamia's resolver again — the
-            //     resolver takes ~10-15 s to fully validate, during which
-            //     panel-side StoreRequest (invite) returns Unauthorized.
-            //   - a thin `{ job_description }` payload would trip Mamamia's
-            //     "omitted associations = wipe" rule AND the proxy's
-            //     defensive `patches=[]` workaround → wipes patients.
-            //   - the dedicated proxy action re-fetches current patient
-            //     and equipment ids and re-passes them as bare-id stubs,
-            //     which Mamamia merges into the existing rows. Nothing
-            //     else is touched, no wipe, no 10s lag.
-            //
-            // Sonnet (generateJobDescription) is fire-and-forget after the
-            // gating write so the invite gate opens in ~1 s instead of
-            // ~5 s. Mechanical job_description from the mapper is already
-            // persisted by the gating write — if AI fails or never lands,
-            // the customer profile still has a usable summary.
-
-            // Location lookup synchronous, ~500 ms typical. Required before
-            // building the patch so customer_contract carries the id.
-            let locationId: number | undefined;
-            let locationUnresolved = false;
-            const plz = form.plz?.trim();
-            if (plz && /^\d{4,5}$/.test(plz)) {
-              try {
-                const r = await callMamamia<{
-                  LocationsWithPagination: {
-                    data: Array<{ id: number; zip_code: string; country_code: string }>;
-                  };
-                }>('searchLocations', { search: plz, limit: 10, page: 1 });
-                const rows = r.LocationsWithPagination.data;
-                locationId = (rows.find(l => l.country_code === 'DE') ?? rows[0])?.id as number | undefined;
-              } catch {
-                // Lookup-Call selbst fehlgeschlagen → wie "nicht gefunden"
-                // behandeln (unten sichtbar gemeldet, NICHT mehr still).
-              }
-              // Ort eingegeben, aber Mamamia kennt keinen passenden Einsatzort
-              // (z. B. österreichische PLZ — Mamamias Locations sind deutsch).
-              // location_id ist das Aktivierungs-Gate; ohne ihn bleibt der Kunde
-              // Entwurf → NICHT verschlucken, sondern unten melden (Kunde + Team).
-              locationUnresolved = locationId == null;
-            }
-
-            const patch = mapPatientFormToUpdateCustomerInput(form, {
-              existingPatientIds,
-              locationId,
-              // Kontaktperson (Osoba Kontaktowa) aus dem Lead → customer_contract
-              // (salutation/first_name/last_name), damit das Mamamia-Panel die
-              // Kontaktdaten zeigt statt nur Customer.first_name top-level.
-              contact: {
-                anrede: lead?.anrede_text ?? lead?.anrede ?? null,
-                vorname: lead?.vorname ?? null,
-                nachname: lead?.nachname ?? null,
-              },
-            });
-
-            // ── Gating write: full mechanical patch. Awaited so the caller
-            // (AngebotCard) keeps patientSaved=false until Mamamia has the
-            // complete profile — invite gate opens only on success.
-            // portal_form_snapshot: der ROHE Patientenbogen — der Proxy friert ihn
-            // nach erfolgreichem Write an leads.patient_form ein (SA-Portal zeigt
-            // ihn im Anfrage-Block); Mamamia erreicht das Feld nie (Allowlist).
-            try {
-              await updateCustomerMutation.mutate({
-                ...(patch as Record<string, unknown>),
-                portal_form_snapshot: form,
-              });
-            } catch (err) {
-              const raw = err instanceof Error ? err.message : String(err ?? '');
-              // Token während des Ausfüllens abgelaufen → ehrlich sagen und in
-              // den Selbst-Service (neuen Link anfordern) leiten statt eines
-              // ratlosen „fehlgeschlagen".
-              if (/401|unauthorized|unauthenticated|token/i.test(raw)) {
-                showToast('Ihr Zugangslink ist abgelaufen. Sie können sich gleich einen neuen Link zusenden lassen.');
-                setSaveTokenExpired(true);
-              } else {
-                // Sprechende Meldung statt Ratespiel — häufige mamamia-Ablehnungen übersetzt.
-                const friendly = /location/i.test(raw)
-                  ? 'Die Postleitzahl konnte nicht zugeordnet werden — bitte PLZ und Ort prüfen.'
-                  : /too long|exceeds|max/i.test(raw)
-                    ? 'Eine Angabe ist zu lang (z. B. Diagnosen) — bitte etwas kürzen und erneut speichern.'
-                    : `Speichern fehlgeschlagen: ${raw.slice(0, 140)}`;
-                showToast(friendly);
-              }
-              // Fürs Team sichtbar machen, WORAN Kunden scheitern (Dashboard/Report).
-              reportLeadEvent(lead?.token, 'patient_form_save_failed', { error: raw.slice(0, 200) });
-              throw err;
-            }
-
-            // Report back to the kostenrechner lead — patient data complete
-            // unlocks invites/applications, so the Nachfass switches to the
-            // "last step: invite" variant. Fire-and-forget.
-            //
-            // Pass phone so the kostenrechner endpoint can refresh
-            // leads.telefon (kept in sync with Mamamia Customer.phone after
-            // a step-4 edit). Dedupe key includes phone, so a follow-up
-            // save with an edited number re-fires.
-            const phoneForLead = form.phone?.trim();
-            const startDateForLead = form.startDate?.trim();
-            // Vorname/Nachname für den Bridge-Sync nach leads.vorname/nachname.
-            // Identischer Split wie im Mapper (splitCustomerName) → Mamamia
-            // Customer.first_name/last_name und die leads-Spalten bleiben
-            // konsistent. Der Mapper hat den Namen bereits in den updateCustomer-
-            // Patch gelegt; hier nur für die Bridge-Metadaten wiederverwendet.
-            const { vorname: vornameForLead, nachname: nachnameForLead } = splitCustomerName(form.name);
-            const leadEventMeta: Record<string, string> = {};
-            if (phoneForLead) leadEventMeta.phone = phoneForLead;
-            if (startDateForLead) leadEventMeta.startDate = startDateForLead;
-            if (vornameForLead) leadEventMeta.vorname = vornameForLead;
-            if (nachnameForLead) leadEventMeta.nachname = nachnameForLead;
-            // Einsatzort nicht auflösbar (Ort eingegeben, aber kein Mamamia-
-            // Location-Treffer): NICHT als sauberen Erfolg ausgeben. Die
-            // Patientendaten sind gespeichert (bleiben), aber ohne location_id
-            // bleibt der Kunde in Mamamia Entwurf (keine Einladung/Veröffentlichung).
-            //  1) Kunde sichtbar informieren statt stillem "fertig".
-            //  2) Team-Ereignis loggen — unterscheidet "Ort eingegeben, nicht
-            //     auflösbar" von "leer gelassen" (Dashboard/Report).
-            //  3) Flag am patient_data_saved → der Kostenrechner unterdrückt die
-            //     irreführende "Pflegekräfte können sich bewerben"-Mail.
-            if (locationUnresolved) {
-              const ortLabel = [plz, form.ort?.trim()].filter(Boolean).join(' ');
-              // Deutsche PLZ sind IMMER 5-stellig; eine 4-stellige PLZ ist
-              // Österreich/Schweiz — dort vermittelt Primundus nicht. Dann eine
-              // ehrliche Absage statt „wir kümmern uns darum" (Marcin 03.08.:
-              // „wir bedienen kein Österreich — Info an Kunde wäre perfekt").
-              const outsideGermany = /^\d{4}$/.test(plz ?? '');
-              showToast(outsideGermany
-                ? `Wir vermitteln 24-Stunden-Betreuung aktuell ausschließlich innerhalb Deutschlands${ortLabel ? ` — für Ihren Ort „${ortLabel}"` : ''} können wir daher leider keine Pflegekraft anbieten. Bei Fragen melden Sie sich gern bei uns.`
-                : `Ihre Angaben sind gespeichert. Ihren Ort${ortLabel ? ` „${ortLabel}"` : ''} konnten wir aber nicht automatisch übernehmen — wir kümmern uns darum und melden uns bei Ihnen.`);
-              reportLeadEvent(lead?.token, 'patient_form_location_unresolved', {
-                plz: plz ?? '',
-                ort: form.ort?.trim() ?? '',
-                ...(outsideGermany ? { outside_germany: '1' } : {}),
-              });
-              leadEventMeta.location_unresolved = '1';
-            }
-            reportLeadEvent(
-              lead?.token,
-              'patient_data_saved',
-              Object.keys(leadEventMeta).length > 0 ? leadEventMeta : undefined,
-            );
-            // Patient form save flippa customer na active + dorzuca pełne
-            // patient/wish dane. Mamamia matching engine re-scoreuje całą
-            // listę z nowymi inputami — początkowo zwrócone caregivers
-            // (na bazie minimal onboard payload) mogą już nie pasować lub
-            // mogą się pojawić nowi. Refetch listę żeby user widział
-            // aktualny scoring, nie stale wynik z czasu onboardu.
-            refetchMatchings();
-
-            // ── JobOffer.arrival_at sync (fire-and-forget).
-            // Form Step 5 collects "Voraussichtliches Startdatum" — push it
-            // to Mamamia's JobOffer.arrival_at via UpdateJobOfferDates.
-            // Onboard set arrival_at as a fuzzy offset from care_start_timing
-            // (e.g. "sofort" → +7d); the customer's explicit pick wins.
-            //
-            // Only fire when the user's pick actually differs from what
-            // Mamamia currently holds — avoid no-op writes that would log
-            // noise + reload the JobOffer.
-            const pickedStartDate = form.startDate?.trim();
-            const currentArrival = mmJobOffer?.arrival_at ?? null;
-            if (pickedStartDate && pickedStartDate !== currentArrival) {
-              void (async () => {
-                try {
-                  await updateJobOfferDatesMutation.mutate({ arrival_at: pickedStartDate });
-                  refetchJobOffer();
-                } catch (err) {
-                  // Best-effort. Customer profile is saved; only the
-                  // arrival_at didn't update. Surface a soft toast so the
-                  // user knows to retry the form Save if the date was
-                  // critical, but don't block the flow.
-                  console.warn('updateJobOfferDates failed:', err);
-                  showToast('Startdatum konnte nicht aktualisiert werden. Ihre Angaben wurden gespeichert.');
-                }
-              })();
-            }
-
-            // ── AI overlay (fire-and-forget). Only writes job_description.
-            // Sonnet polishes the mechanical summary into a 2-3 sentence
-            // German text. The proxy's `updateJobDescription` action
-            // preserves patients + equipments by re-fetching their ids,
-            // so nothing else in the customer state is touched.
-            void (async () => {
-              try {
-                const aiResult = await callMamamia<{ description: string | null }>(
-                  'generateJobDescription',
-                  {
-                    anzahl: form.anzahl,
-                    geschlecht: form.geschlecht, geburtsjahr: form.geburtsjahr,
-                    pflegegrad: form.pflegegrad, mobilitaet: form.mobilitaet,
-                    heben: form.heben, demenz: form.demenz,
-                    inkontinenz: form.inkontinenz, nacht: form.nacht,
-                    diagnosen: form.diagnosen,
-                    p2_geschlecht: form.p2_geschlecht, p2_geburtsjahr: form.p2_geburtsjahr,
-                    p2_pflegegrad: form.p2_pflegegrad, p2_mobilitaet: form.p2_mobilitaet,
-                    p2_demenz: form.p2_demenz,
-                    ort: form.ort, wohnungstyp: form.wohnungstyp,
-                    urbanisierung: form.urbanisierung, familieNahe: form.familieNahe,
-                    haushalt: form.haushalt, pflegedienst: form.pflegedienst,
-                    aufgaben: form.aufgaben, sonstigeWuensche: form.sonstigeWuensche,
-                  },
-                );
-                if (aiResult.description) {
-                  await updateJobDescriptionMutation.mutate({ text: aiResult.description });
-                }
-              } catch (err) {
-                // AI overlay is best-effort. Mechanical job_description
-                // from the mapper is already persisted by the gating write.
-                console.warn('AI job_description overlay failed (mechanical retained):', err);
-              }
-            })();
-          }}
-        />
+        {patientFormular(kompakt)}
         </div>
         )}
-        </div>{/* Ende Hervorhebung Pflegesituation (Kopf + Formular) */}
+        </KompaktPflegekraefteBereich>{/* Ende Hervorhebung Pflegesituation (Kopf + Formular) */}
 
       </div>
       </div>
+      )}
+
+      {/* Kompakt-Einstieg: unter den Profilen „Bereits bearbeitet" (z. B. im Profil mit „Nein danke"
+          abgelehnt); die Profile selbst stehen im Pflegekräfte-Bereich darüber. */}
+      {kompakt && bereitsBearbeitet && (
+        <div className="max-w-3xl mx-auto px-5 pt-6">
+          {bereitsBearbeitet}
+        </div>
       )}
 
       {/* Im gespeicherten Zustand steht das Angebot HIER — unter Bewerbungen/
@@ -3779,240 +4502,28 @@ const CustomerPortalPage: FC = () => {
           13.08.). Der Kunde hat den Preis längst gesehen; jetzt ist die Seite
           sein Betreuungsportal, und oben gehören die Dinge hin, auf die er
           wartet. Als Referenz bleibt das Angebot vollständig erreichbar. */}
-      {patientSaved && angebotSection}
+      {patientSaved && !nachAbsendenNeu && angebotSection}
 
-      <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4" style={{background:'#FFFFFF'}}>
-        {/* ── SECTION: So geht es weiter (Martin, 07.09.) — dieselben drei
-             Schritte und derselbe Wortlaut wie in der Angebotsmail; der
-             anstehende Schritt ist grün und trägt den Knopf, erledigte
-             Schritte tragen den Haken. ── */}
-        <div className="px-1 pt-3">
-          <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>So geht es weiter</h2>
-        </div>
-        {(() => {
-          const schritte = [
-            { n: 1, title: 'Pflegesituation vervollständigen — 2 Minuten', desc: 'Vieles ist schon ausgefüllt. Danach laden Sie Ihre Wunsch-Pflegekräfte ein und erhalten Bewerbungen.', done: patientSaved },
-            { n: 2, title: 'Pflegekräfte einladen & Bewerbungen erhalten', desc: 'Sobald Ihre Pflegesituation vervollständigt ist, laden Sie Ihre Wunschkandidatinnen ein — passende Pflegekräfte bewerben sich dann mit Profil, Erfahrung und Anreisedatum.', done: hasPending },
-            { n: 3, title: 'Auswählen und starten', desc: 'Sie entscheiden, wir übernehmen den Rest. Ihre Wunsch-Pflegekraft kann die Betreuung bereits in 4–7 Werktagen übernehmen.', done: false },
-          ];
-          const aktiv = schritte.findIndex(st => !st.done);
-          return (
-          <div className="rounded-2xl overflow-hidden border" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
-            {schritte.map((st, i, arr) => {
-              const istAktiv = i === aktiv;
-              return (
-              <div key={st.n} className={`flex items-start gap-4 px-5 py-4 ${i < arr.length - 1 ? 'border-b' : ''}`} style={{borderColor:'#E9E9EB', background: istAktiv ? '#EEF7F1' : undefined}}>
-                {st.done ? (
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{background:'#E3F7EF'}}>
-                    <Check className="w-4 h-4" strokeWidth={3} style={{color:'#22A06B'}} />
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white mt-0.5" style={{background: istAktiv ? '#2A9D5C' : '#8B7355', fontSize:'15px'}}>{st.n}</div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className={istAktiv ? 'text-[16px] font-bold' : 'text-[15px] font-semibold'} style={{color: st.done ? '#9CA3AF' : istAktiv ? '#1F6B41' : '#18181B'}}>{st.title}</p>
-                  <p className="text-[15px] mt-0.5 leading-relaxed" style={{color: st.done ? '#B5B5B5' : istAktiv ? '#3A3A3A' : '#71717A'}}>{st.desc}</p>
-                  {istAktiv && st.n === 1 && (
-                    <button
-                      type="button"
-                      onClick={zurPflegesituation}
-                      className="mt-3 w-full rounded-xl py-3 text-[15px] font-bold text-white active:scale-[0.99] transition-transform"
-                      style={{background:'#2A9D5C'}}
-                    >
-                      Pflegesituation vervollständigen →
-                    </button>
-                  )}
-                </div>
-              </div>
-              );
-            })}
+      {/* Kompakt-Einstieg (Runde 15): 20 px Rand, 40 px Abstand zum Abschnitt darüber, FAQ-Kopf ohne Eyebrow. */}
+      <div className={`max-w-3xl mx-auto ${kompakt || nachAbsendenNeu ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'pt-14' : 'pt-10'}` : 'px-3.5 pt-1'} pb-6 space-y-4`}>
+        {/* ── So geht es weiter · Häufige Fragen · Marta (Teil 3 des Redesigns).
+             Schritt 1 = Pflegesituation gespeichert, Schritt 2 = Bewerbung da. ── */}
+        {/* Nach dem Absenden ersetzt „Stand heute" diese Liste (Martin 25.09.).
+            Schritt 1 trägt seit Registry #109 wieder den Knopf ins Formular. */}
+        {!patientSaved && !kompakt && (
+          <div className="pt-6">
+            <SoGehtEsWeiter erledigt={[patientSaved, hasPending, false]} onVervollstaendigen={zurPflegesituationAus('schritte')} />
           </div>
-          );
-        })()}
-
-        {/* ── SECTION HEADER: Häufige Fragen ── */}
-        <div className="px-1 pt-3">
-          <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Häufige Fragen</h2>
+        )}
+        <div className={kompakt || nachAbsendenNeu ? '' : 'pt-6'}>
+          <FaqListe ruhig={kompakt || nachAbsendenNeu} karte={(kompakt || nachAbsendenNeu) && KOMPAKT_LOOK === 'angebot'} onFrageGeoeffnet={messeFrage} />
         </div>
-        <div className="rounded-2xl overflow-hidden border" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
-          {[
-            /* Reihenfolge (Martin, 13.08.): Sprach-Niveaus ZUERST — die
-               Stufen (Grund/Mittel/Gut) stehen auf jeder Pflegekraft-Karte,
-               also ist das die Frage, die der Kunde beim Lesen der Liste
-               zuerst hat. Der Rest folgt dem Weg: Einladen → Vertrag →
-               Kündigung → Abrechnung → … */
-            /* Sprach-Stufen-Antwort als JSX statt String, damit wir die
-               Bar-Indikatoren genauso rendern können wie im Profil/Liste
-               (statt der Unicode-Punkte ●). Konsistente Optik im ganzen
-               Portal. Quelltext der Sätze identisch zur Modal-FAQ
-               (LANGUAGE_LEVELS in CustomerNurseModal). */
-            {
-              q: 'Was bedeuten die Deutsch-Niveaus (Grund, Mittel, Gut)?',
-              a: (
-                <div className="text-[15px] leading-[1.75] text-gray-600 space-y-3">
-                  <p>Eine grobe Orientierung — kein Sprach-Zertifikat. Die genaue Kommunikation hängt immer auch vom Tempo, der Mundart und der Geduld beider Seiten ab.</p>
-                  {[
-                    { bars: 1, label: 'Grund', desc: 'einzelne Wörter und einfache Sätze. Für eine Verständigung im Alltag braucht es Geduld, Gesten und etwas Vorbereitung; differenzierte Gespräche sind in der Regel nicht möglich.' },
-                    { bars: 2, label: 'Mittel', desc: 'einfache Alltagsthemen lassen sich besprechen, gängige Anweisungen werden meist verstanden. Bei komplexeren Themen (Diagnosen, Behörden, Telefonate) kann es zu Rückfragen oder Missverständnissen kommen.' },
-                    { bars: 3, label: 'Gut', desc: 'die Verständigung im Alltag und in der Pflege funktioniert in der Regel zuverlässig. Auch ausführlichere Gespräche sind möglich; sehr seltene Fachbegriffe, schnelles Sprechen oder Dialekt können dennoch Nachfragen erfordern.' },
-                  ].map((lvl) => (
-                    <div key={lvl.label} className="flex items-start gap-3">
-                      <div className="flex gap-0.5 pt-2.5 flex-shrink-0">
-                        {Array.from({ length: 3 }, (_, i) => (
-                          <div key={i} className={`w-3 h-1.5 rounded-full ${i < lvl.bars ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />
-                        ))}
-                      </div>
-                      <p><span className="font-semibold text-[#3D2B1F]">{lvl.label}</span> — {lvl.desc}</p>
-                    </div>
-                  ))}
-                  <p>Wenn Sprachsicherheit besonders wichtig ist (z. B. Demenz, schwerhörige oder spracheingeschränkte Patienten), sprechen Sie uns gerne an — wir helfen bei der Einordnung.</p>
-                </div>
-              ),
-            },
-            { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, laden Sie sie ein, sich bei Ihnen zu bewerben. Dafür müssen Sie nur kurz die Pflegesituation vervollständigen — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Alles unverbindlich; ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.' },
-            { q: 'Gehe ich mit dem Einladen einen Vertrag ein?', a: 'Nein — das Einladen und Anschauen von Profilen ist vollständig unverbindlich. Ein Vertrag kommt erst zustande, wenn Sie ein konkretes Angebot ausdrücklich annehmen.' },
-            { q: 'Kann ich jederzeit kündigen?', a: 'Ja, täglich kündbar — ohne Mindestlaufzeit und ohne Angabe von Gründen. Kosten entstehen ausschließlich für Tage, an denen die Pflegekraft tatsächlich vor Ort ist.' },
-            { q: 'Wie funktioniert die Abrechnung?', a: 'Tagesgenau: Sie zahlen nur für geleistete Betreuungstage. Die Rechnung für den laufenden Monat wird jeweils zur Monatsmitte erstellt — transparent, nachvollziehbar, ohne versteckte Posten.' },
-            { q: 'Wie lange bleibt die Pflegekraft — und wie läuft der Wechsel?', a: 'Pflegekräfte bleiben im Durchschnitt 6 bis 8 Wochen. Zur Mitte des Einsatzes beginnen wir bereits mit der Planung der Nachfolge, damit der Übergang nahtlos klappt. Sie müssen sich um nichts kümmern — Primundus organisiert den gesamten Wechsel.' },
-            { q: 'Was passiert, wenn die Pflegekraft ausfällt?', a: 'Primundus kümmert sich umgehend um eine qualifizierte Vertretung. Ihr persönlicher Ansprechpartner informiert Sie proaktiv und begleitet die Übergabe.' },
-            { q: 'Wie werden Reisekosten abgerechnet?', a: 'Die Reisekosten betragen pauschal 125 € pro Strecke — also je einmal bei der Anreise und bei der Abreise. Weitere versteckte Reisekosten gibt es nicht.' },
-            { q: 'Ist das legal?', a: 'Ja, vollständig. Die Pflegekräfte sind sozialversicherungspflichtig bei uns angestellt und werden von uns nach Deutschland entsandt. Für jeden Einsatz liegt eine offizielle A1-Bescheinigung vor — der Nachweis der Sozialversicherungspflicht im Herkunftsland.' },
-            { q: 'Mit wem wird der Vertrag geschlossen?', a: 'Der Betreuungsvertrag wird mit der PRIMUNDUS Sp. z o.o. geschlossen — der Gesellschaft hinter Primundus Deutschland und Ihrem Vertragspartner für die gesamte Betreuung. Die Pflegekräfte sind bei uns sozialversicherungspflichtig angestellt und werden offiziell nach Deutschland entsandt.' },
-            { q: 'Welche Kosten entstehen insgesamt?', a: 'Es gibt vier Kostenpunkte: Die monatlichen Betreuungskosten laut Ihrem Angebot. Anreise und Abreise pauschal je 125 €. Kost und Logis, die Sie der Pflegekraft frei zur Verfügung stellen. Fällt der Einsatz in einen Sommermonat (Juli oder August), kommen 200 €/Monat (bzw. 6,67 €/Tag) Sommerzuschlag hinzu. An folgenden Feiertagen wird der doppelte Tagessatz berechnet: Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. + 2. Weihnachtstag, Silvester und Neujahr. Darüber hinaus gibt es keinerlei versteckte Kosten.' },
-            /* Sachleistungs-Frage (Martin, 13.08.): kommt in Beratungen
-               regelmäßig. Fachlich: 24h-Betreuung im Entsendemodell ist
-               KEINE ambulante Pflegesachleistung (§ 36 SGB XI, zugelassenen
-               Pflegediensten vorbehalten) — der Kunde nutzt die
-               GELDleistungen (Pflegegeld u. a.). Bewusst ohne Beträge: die
-               stehen personalisiert im Angebot unter „Alle Kosten im
-               Überblick" (Block „Was bleibt für Sie übrig"). */
-            { q: 'Kann ich die Pflegesachleistungen der Pflegekasse dafür einsetzen?', a: 'Nein — die 24-Stunden-Betreuung zählt nicht als Pflegesachleistung; diese sind zugelassenen ambulanten Pflegediensten vorbehalten. Sie nutzen stattdessen die Geldleistungen Ihrer Pflegekasse, allen voran das Pflegegeld. Welche Leistungen in Ihrer Situation zusammenkommen, sehen Sie in Ihrem Angebot unter „Alle Kosten im Überblick".' },
-          ].map((item, i, arr) => (
-            <div key={i} className={i < arr.length - 1 ? 'border-b' : ''} style={{borderColor:'#E9E9EB'}}>
-              <button
-                onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                className="w-full flex items-center justify-between px-5 py-5 text-left transition-colors duration-150"
-                style={{background: openFaq === i ? '#F5F5F6' : 'transparent'}}
-              >
-                <span className="text-[15px] font-semibold pr-4 leading-snug transition-colors duration-150"
-                  style={{color: openFaq === i ? '#6B5444' : '#18181B'}}>
-                  {item.q}
-                </span>
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
-                  openFaq === i ? 'bg-[#8B7355]' : 'bg-[#F0EDE8]'
-                }`}>
-                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${
-                    openFaq === i ? 'rotate-180 text-white' : 'text-[#8B7355]'
-                  }`} />
-                </div>
-              </button>
-              {openFaq === i && (
-                <div className="px-5 pb-6 pt-1" style={{background:'#F5F5F6'}}>
-                  {typeof item.a === 'string' ? (
-                    <p className="text-[15px] leading-[1.75] text-gray-600 whitespace-pre-line">{item.a}</p>
-                  ) : (
-                    item.a
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* ── Marta-Box (Beraterin / Trust / CTA) ── */}
-        <div className="rounded-2xl overflow-hidden border bg-white" style={{borderColor:'#E9E9EB'}}>
-          <div className="px-5 pt-5 pb-5 space-y-5">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Noch Fragen? Ihre Beraterin</p>
-            <div className="flex items-center gap-4">
-              <div className="relative flex-shrink-0">
-                <img
-                  src="/marta-kapcio.jpg"
-                  alt="Marta Kapcio"
-                  className="w-[72px] h-[72px] rounded-2xl object-cover object-top"
-                  style={{border:'1.5px solid #F0C4B4'}}
-                />
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#22A06B] rounded-full border-2 border-white">
-                  <span className="relative flex h-full w-full items-center justify-center">
-                    <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-white opacity-60" />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
-                  </span>
-                </div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900 text-[17px] leading-tight">Marta Kapcio</p>
-                <p className="text-[14px] text-gray-500 mb-2">Pflegeberaterin · Primundus</p>
-                <a href="tel:089200000830" className="inline-flex items-center gap-1.5 text-[#8B7355] font-bold text-[16px] hover:opacity-80 transition-opacity">
-                  <Phone className="w-4 h-4 flex-shrink-0" />
-                  089 200 000 830
-                </a>
-                <p className="text-[14px] text-gray-500 mt-0.5">Mo–So, 8:00–18:00 Uhr</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">
-                <img src="/badge-testsieger.webp" alt="Testsieger" className="h-8 w-auto mx-auto mb-1.5 object-contain" />
-                <p className="text-xs font-semibold text-gray-500 leading-tight">Testsieger<br/>Die Welt</p>
-              </div>
-              <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">
-                <div className="flex justify-center mb-1.5">
-                  <svg className="w-6 h-6 text-[#8B7355]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <p className="text-xs font-semibold text-gray-500 leading-tight">20+ Jahre<br/>Erfahrung</p>
-              </div>
-              <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">
-                <div className="flex justify-center mb-1.5">
-                  <svg className="w-6 h-6 text-[#8B7355]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <p className="text-xs font-semibold text-gray-500 leading-tight">60.000+<br/>Einsätze</p>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold text-gray-300 uppercase tracking-wider text-center mb-2.5">Bekannt aus</p>
-              <div className="flex items-center justify-center gap-4 flex-wrap">
-                {[
-                  { src: '/media-welt.webp', alt: 'Die Welt' },
-                  { src: '/media-bildderfau.webp', alt: 'Bild der Frau' },
-                  { src: '/media-faz.webp', alt: 'FAZ' },
-                  { src: '/media-ard.webp', alt: 'ARD' },
-                  { src: '/media-ndr.webp', alt: 'NDR' },
-                  { src: '/media-sat1.webp', alt: 'SAT.1' },
-                ].map(logo => (
-                  <img key={logo.alt} src={logo.src} alt={logo.alt} className="h-4 w-auto object-contain opacity-50 grayscale" />
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <a
-                href="tel:089200000830"
-                className="flex-1 flex items-center justify-center gap-2 bg-[#E76F63] hover:bg-[#D65E52] text-white rounded-xl py-3 text-sm font-bold transition-colors"
-              >
-                <Phone className="w-4 h-4" />
-                Anrufen
-              </a>
-              <a
-                href={`https://wa.me/4989200000830?text=${encodeURIComponent('Hallo Frau Wysocki, ich habe folgendes Anliegen:')}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20BA5A] text-white rounded-xl py-3 text-sm font-bold transition-colors"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.529 5.845L.057 23.571l5.865-1.539A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.894a9.86 9.86 0 01-5.031-1.378l-.361-.214-3.741.981.999-3.648-.235-.374A9.86 9.86 0 012.106 12C2.106 6.58 6.58 2.106 12 2.106S21.894 6.58 21.894 12 17.42 21.894 12 21.894z"/>
-                </svg>
-                WhatsApp
-              </a>
-            </div>
-          </div>
+        <div className="pt-4">
+          <MartaBox sterne={sterne} ohneVertrauen={kompakt && KOMPAKT_LOOK === 'angebot'} />
         </div>
 
       </div>
-      </>
+      </div>
       )}
 
       {/* Unterschriebenen Vertrag ansehen (read-only) — vom gebucht-Screen */}
@@ -4055,32 +4566,27 @@ const CustomerPortalPage: FC = () => {
         <PflegekraftChat nurse={chatNurse} onClose={() => setChatNurse(null)} />
       )}
 
-      {/* ── Rückmeldung zum Angebot (schwebend, unten rechts) ────────────
-           Als Kasten im Fluss saß sie ~3000 px weit unten und wurde kaum
-           gesehen (Martin, 12.08.). Jetzt schwebend mit Martas Gesicht:
-           erst zusammengeklappt als ein Satz, wegklickbar, und sie taucht
-           erst auf, wenn der Kunde am Angebot und an den Pflegekräften
-           vorbei ist (`feedbackReif`).
+      {/* Pop-up der Angebotsseite (Teil 3 des Redesigns). */}
+      <BestpreisSheet offen={bestpreisOffen} onClose={() => setBestpreisOffen(false)} />
+      {/* Rückbau Registry #122: „Warum erst die Pflegesituation?" nur vor dem ersten Speichern (Stand 75b8df8). */}
+      <WarumSheetVorSpeichern offen={rueckbau && warumOffen} onClose={() => setWarumOffen(false)} onVervollstaendigen={zurPflegesituationAus('warum')} />
 
-           Nur solange das Profil offen ist: Wer gespeichert hat, hat die
-           Frage „wie geht es weiter" beantwortet, und wer offene
-           Bewerbungen hat, soll sich um die kümmern. Chat und Modale
-           liegen auf z-[60]+ — die Blase auf z-40 verdeckt sie nicht. */}
-      {!hasPending && !patientSaved && !feedbackWeg && feedbackReif && feedbackVerweilt && !chatNurse && !selectedApp && !selectedNurse && (
+      {/* ── Rückmeldung zum Angebot (schwebend, unten rechts), zurück seit Registry #102 ────────────
+           Als Kasten im Fluss saß sie ~3000 px weit unten und wurde kaum gesehen (Martin, 12.08.).
+           Schwebend mit Martas Gesicht: erst zusammengeklappt als ein Satz, wegklickbar, und sie taucht erst
+           auf, wenn der Kunde am Angebot und an den Pflegekräften vorbei ist (`feedbackReif`) und 45 s da war.
+           Nur solange das Profil offen ist (nie nach dem Absenden, auch nicht kurz: `schonAbgesendet`), nicht
+           bei offenen Bewerbungen, nicht über dem Formular. Chat und Modale liegen auf z-[60]+. */}
+      {/* Rückbau Registry #122: vor dem ersten Speichern NICHT — im Stand 75b8df8 war sie wegen eines Fehlers bei echten
+          Kunden nie sichtbar (Registry #114); die Kunden sollen erleben, was sie damals erlebt haben. */}
+      {!rueckbau && !hasPending && !patientSaved && !schonAbgesendet && !feedbackWeg && feedbackReif && feedbackVerweilt && !formularImBlick && !chatNurse && !selectedApp && !selectedNurse && (
         <AngebotsFeedback
           onDismiss={feedbackErledigt}
-          onGoToForm={() => {
-            document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            setPatientExpandedManual(true);
-            setTriggerOpenPatient(true);
-          }}
+          onGoToForm={zurPflegesituationAus('frage')}
           onAnswer={(answer, detail, endgueltig) => {
-            // Der erste Tap geht STILL raus (notify:false) — er sichert die
-            // Antwort, falls der Kunde jetzt abbricht, löst aber keine Mail
-            // aus. Die Team-Mail hängt am endgültigen Aufruf, der genau
-            // einmal kommt. Sonst bekäme info@primundus.de zwei Mails pro
-            // Rückmeldung (Martin, 12.08.: „ich will immer eine Antwort
-            // erhalten" — eine, nicht zwei).
+            // Der erste Tap geht STILL raus (notify:false) — er sichert die Antwort, falls der Kunde jetzt
+            // abbricht, löst aber keine Mail aus. Die Team-Mail hängt am endgültigen Aufruf, der genau einmal
+            // kommt (Martin, 12.08.: „ich will immer eine Antwort erhalten“ — eine, nicht zwei).
             reportLeadEvent(
               lead?.token,
               'angebots_feedback',
@@ -4096,7 +4602,7 @@ const CustomerPortalPage: FC = () => {
       )}
 
       {/* Angebot prüfen Modal */}
-      {selectedApp && (
+      {selectedApp && vorbelegungBereit && (
         <AngebotPruefenModal
           app={selectedApp}
           prefill={pruefenPrefill}
@@ -4110,7 +4616,7 @@ const CustomerPortalPage: FC = () => {
           (Vertragsformular). app.offer trägt die Eckdaten der gebuchten
           Kraft/des Jobs (Anreise/Abreise/Konditionen aus der fc-Synthese),
           pruefenPrefill die Personendaten aus Lead + mmCustomer. */}
-      {contractApp && (
+      {contractApp && vorbelegungBereit && (
         <AngebotPruefenModal
           app={contractApp}
           prefill={pruefenPrefill}
@@ -4120,7 +4626,7 @@ const CustomerPortalPage: FC = () => {
           // Nur Profil-Ansicht (wie im BookedScreen) — KEIN nurseModalApp,
           // sonst böte das Profil-Modal „Angebot prüfen"/„Ablehnen" für die
           // längst gebuchte Pflegekraft an.
-          onNurseClick={setSelectedNurse}
+          onNurseClick={(n) => { profilQuelleRef.current = 'gebucht'; setSelectedNurse(n); }}
         />
       )}
 
@@ -4139,6 +4645,8 @@ const CustomerPortalPage: FC = () => {
           initialLevelInfo={nurseModalStufe}
           onClose={() => { setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setNurseModalStufe(false); }}
           app={nurseModalApp ?? undefined}
+          // Gebucht oder Vertrag offen: nur das Profil, kein „Einladen" (Review 25.09.).
+          nurProfil={!!acceptedApp || !!contractApp}
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onChat={CHAT_ENABLED && nurseModalApp ? () => { const n = enrichedSelectedNurse; setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setChatNurse(n); } : undefined}
@@ -4161,6 +4669,7 @@ const CustomerPortalPage: FC = () => {
             nurseMatchIdx !== null
               ? async () => {
                   const idx = nurseMatchIdx;
+                  messeEinladen(selectedNurse, 'profil');
                   // Modal animation is driven by the returned Promise — surfaces
                   // failure to the user instead of fake success (CLAUDE.md §1).
                   try {
@@ -4177,6 +4686,7 @@ const CustomerPortalPage: FC = () => {
                   // Einladen ruft denselben Interest-Invite-Pfad wie der
                   // Card-Footer-Button.
                   const cgId = selectedFromInterestId;
+                  messeEinladen(selectedNurse, 'profil');
                   try {
                     await confirmInviteInterest(cgId, displayName(selectedNurse.name));
                   } finally {
@@ -4233,7 +4743,7 @@ const CustomerPortalPage: FC = () => {
                   </div>
                 </div>
                 <a
-                  href="tel:089200000830"
+                  href={TELEFON_HREF}
                   className="flex items-center justify-center gap-2 w-full bg-[#9B1FA1] hover:bg-[#7B1A85] text-white rounded-xl py-3 text-sm font-bold transition-colors"
                 >
                   <Phone className="w-4 h-4" />

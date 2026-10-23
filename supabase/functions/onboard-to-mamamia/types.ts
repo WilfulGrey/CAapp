@@ -57,6 +57,9 @@ export interface Lead {
   // ─── Stage-B fields (populated by /api/betreuung-beauftragen) ─────────
   // The customer types these in manually after clicking through the
   // calculator email. Until stage B runs they're null.
+  /** Gesetzt, wenn der Lead ueber einen Vermittler kam (Registry #59) —
+   *  dann ist der Besteller die Agentur, nicht der Haushalt. */
+  vermittler?: string | null;
   patient_anrede?: string | null;
   patient_vorname?: string | null;
   patient_nachname?: string | null;
@@ -233,8 +236,7 @@ export interface CustomerInput {
   // Care budget — both fields are kept in sync per prod (100% fill)
   care_budget?: number | null;
   monthly_salary?: number | null;
-  // Agent commission — panel form rejects 0. 365 is the prod-most-common
-  // value for low-bracket customers; we set 300 as the Primundus default.
+  // Agent commission — onboard sends 0 (since 2026-09-24; was 300, then 10).
   commission_agent_salary?: number;
   // arrival_at — Customer-level, separate from JobOffer.arrival_at.
   // Required by the "complete state" gate in Mamamia's customer-active

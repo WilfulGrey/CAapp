@@ -1,6 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { installTranslateGuard } from './lib/translateGuard';
+// Inter selbst ausgeliefert (keine Google-Server, DSGVO), wie primundus.de und Kostenrechner
+import '@fontsource-variable/inter';
 import './index.css';
 import App from './App';
 

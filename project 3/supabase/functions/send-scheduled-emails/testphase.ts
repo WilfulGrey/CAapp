@@ -35,3 +35,21 @@ export function testphaseUmleitung(
     betreffPraefix: `[TESTPHASE → ${lead.email ?? "?"}] `,
   };
 }
+
+/* Anreise-Mail im Test (ANREISE_MAILS=test, Registry #119) — NUR hier, kein
+ * Spiegel in lib/. detect markiert die Meldung mit metadata.test, die Zeile
+ * geht dann wie die Testphase der Portale ans Team; der Betreff nennt den
+ * Kunden, die Kopie an den Kunden (CC) faellt weg. */
+export function anreiseTestUmleitung(
+  emailType: string,
+  metadata: unknown,
+  kundenAdresse: string,
+  empfaenger?: string | null,
+): { empfaenger: string; betreffPraefix: string } | null {
+  if (emailType !== "anreise") return null;
+  if (!metadata || typeof metadata !== "object" || (metadata as Record<string, unknown>).test !== true) return null;
+  return {
+    empfaenger: (empfaenger ?? "").trim() || TESTPHASE_EMPFAENGER,
+    betreffPraefix: `[TEST Anreise → ${kundenAdresse}] `,
+  };
+}

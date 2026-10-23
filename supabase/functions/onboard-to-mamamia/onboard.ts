@@ -15,6 +15,7 @@ import {
   mapOtherPeopleInHouse,
   mapToolIds,
   detailFelderNachMamamia,
+  panelIdentitaet,
 } from "./mappers.ts";
 import { getOrRefreshAgencyToken, mamamiaRequest } from "../_shared/mamamiaClient.ts";
 import { loginAsAgency, panelMutateAsCustomer } from "../_shared/mamamiaPanelClient.ts";
@@ -159,9 +160,12 @@ async function lookupLocationId(args: {
       variables: { search: args.plz },
       fetchFn: args.fetchFn,
     });
-    // Prefer DE matches; otherwise take the first.
-    const de = r.Locations.find(l => l.country_code === "DE");
-    return (de ?? r.Locations[0])?.id ?? null;
+    // Exakte PLZ und DE — `search` matcht PRÄFIXE (Sonde 11.09.2026: '503'
+    // liefert 50321 Brühl, 50354 Hürth, …). „Erster Treffer" hiess also, dass
+    // eine unvollständige PLZ still eine fremde Stadt bekam; und ein
+    // nicht-deutscher Treffer wäre ohnehin kein Einsatzort für uns
+    // (Registry #65).
+    return r.Locations.find(l => l.country_code === "DE" && l.zip_code === args.plz)?.id ?? null;
   } catch (_) {
     // Lookup failure is non-fatal — fallback to custom_text.
     return null;
@@ -484,7 +488,7 @@ async function createCustomerAndJob(args: {
         ? `Auto-created from Primundus kostenrechner\n\n${fd.portal_details}`
         : "Auto-created from Primundus kostenrechner",
       salary_offered: careBudget,
-      salary_commission: 10,    // Primundus default commission, panel rejects 0 (300 → 10 wg decyzji 2026-05-11)
+      salary_commission: 0,     // keine SA-Provision (300 → 10 am 2026-05-11, 10 → 0 am 2026-09-24)
       visibility: "public",
       arrival_at: arrivalAt,
     },
@@ -497,7 +501,8 @@ async function createCustomerAndJob(args: {
   await supabase.updateLead(lead.id, {
     mamamia_customer_id: mamamiaCustomerId,
     mamamia_job_offer_id: mamamiaJobOfferId,
-    mamamia_user_token: agencyToken,
+    // Kein mamamia_user_token mehr: das war der Agentur-Token von Mamamia, nie
+    // gelesen — und über den offenen Anon-Zugriff auf leads für jeden lesbar.
     mamamia_onboarded_at: now().toISOString(),
   });
 
@@ -590,6 +595,19 @@ export interface ResyncResult {
   patients_after: number;
   removed_ids: number[];
   felder: string[];
+  /* Nur im Identitaets-Zweig (Vermittler + details). Traegt den Zustand des
+     Kunden VOR und NACH dem Schreiben — die Antwort des Aufrufs ist damit
+     zugleich der Beweis: der Proxy liest keine Kontaktpersonen, das Agentur-
+     Passwort liest niemand aus. Beide Schluessel sind BEDINGT gesetzt, nie
+     `undefined` — assertEquals unterscheidet das. */
+  identity?: { before: unknown; after?: unknown; hinweis?: string };
+  identity_error?: string;
+  /* Nur mit `jobPreis` (Registry #113): Ergebnis für den Preis des Jobs. */
+  job?: JobPreisErgebnis;
+  /* Nur mit `notiz` (Registry #113): Notiz in den Kunden-Aktivitäten. Best effort —
+     ein Fehler hier macht den Abgleich nicht rückgängig und nicht zum Fehler. */
+  notiz?: "gespeichert" | "fehler";
+  notiz_error?: string;
 }
 
 interface ResyncPatientRow {
@@ -605,6 +623,8 @@ interface ResyncReadData {
   Customer: {
     id: number;
     equipments: Array<{ id: number }> | null;
+    location_id: number | null;
+    customer_contract: { location_id: number | null } | null;
     patients: ResyncPatientRow[] | null;
     customer_caregiver_wish: Record<string, unknown> | null;
   } | null;
@@ -617,6 +637,8 @@ const RESYNC_READ = /* GraphQL */ `
     Customer(id: $id) {
       id
       equipments { id }
+      location_id
+      customer_contract { location_id }
       patients { id care_level mobility_id lift_id night_operations tools { id } }
       customer_caregiver_wish {
         is_open_for_all gender germany_skill alternative_germany_skill
@@ -671,6 +693,248 @@ const RESYNC_CUSTOMER = /* GraphQL */ `
   }
 `;
 
+/* ─── Jobpreis nachziehen (Registry #113) ──────────────────────────────────
+   Der Preis, den der Kunde sieht (leads.kalkulation.bruttopreis), muss auch der
+   Preis des Jobs in Mamamia sein — sonst suchen SA-Portal und Pflegekräfte mit
+   dem alten Preis (Martin 06.10.2026, Kunde 11228: Portal 2.800 €, Job 2.600 €).
+   `budget` im Resync setzte bisher nur care_budget/monthly_salary am KUNDEN;
+   das SA-Portal und die Bewerbungen lesen aber JobOffer.salary_offered.
+
+   Weg und Felder 1:1 wie das SA-Portal („Job bearbeiten",
+   mamamia-sadash JobOfferController::update, täglich produktiv):
+   Fetch-Merge — UpdateJobOffer verlangt bei JEDEM Update customer_id + title +
+   salary_offered + arrival_at; visibility und die CGA-Liste MÜSSEN mit, sonst
+   leert Mamamia die Liste (QA 02.09., Job 35894); departure_at nur, wenn
+   gesetzt; description wird nicht gesendet (bleibt). Geändert wird nur
+   salary_offered. Gebuchter Job (final_confirmation ohne rejected_at): nichts
+   anfassen — die Buchung hat ihren eigenen Preis. */
+const RESYNC_JOB_READ = /* GraphQL */ `
+  query ResyncJobRead($id: Int!) {
+    JobOffer(id: $id) {
+      id customer_id title salary_offered salary_commission
+      arrival_at departure_at visibility
+      visible_caregiver_agencies { id }
+      final_confirmation { id rejected_at }
+    }
+  }
+`;
+
+const RESYNC_JOB_PREIS = /* GraphQL */ `
+  mutation ResyncJobPreis(
+    $id: Int!, $customer_id: Int, $title: String,
+    $salary_offered: Float, $salary_commission: Float,
+    $arrival_at: String, $departure_at: String, $visibility: String,
+    $visible_caregiver_agency_ids: [Int]
+  ) {
+    UpdateJobOffer(
+      id: $id, customer_id: $customer_id, title: $title,
+      salary_offered: $salary_offered, salary_commission: $salary_commission,
+      arrival_at: $arrival_at, departure_at: $departure_at, visibility: $visibility,
+      visible_caregiver_agency_ids: $visible_caregiver_agency_ids
+    ) { id salary_offered visibility }
+  }
+`;
+
+interface JobPreisRead {
+  JobOffer: {
+    id: number;
+    customer_id: number;
+    title: string | null;
+    salary_offered: number | null;
+    salary_commission: number | null;
+    arrival_at: string | null;
+    departure_at: string | null;
+    visibility: string | null;
+    visible_caregiver_agencies?: Array<{ id: number }> | null;
+    final_confirmation?: { id: number; rejected_at: string | null } | null;
+  } | null;
+}
+
+export interface JobPreisErgebnis {
+  /** aktualisiert | unveraendert (Preis stimmt schon) | gebucht (nicht angefasst)
+   *  | ohne_anreise (kein arrival_at — Mamamia verlangt es, nicht raten) */
+  status: "aktualisiert" | "unveraendert" | "gebucht" | "ohne_anreise";
+  job_offer_id: number;
+  alt: number | null;
+  neu: number;
+}
+
+const nurDatum = (v: string | null | undefined) => (v ? v.slice(0, 10) : null);
+
+export async function jobPreisNachziehen(args: {
+  jobOfferId: number;
+  preis: number;
+  token: string;
+  endpoint: string;
+  fetchFn: typeof fetch;
+}): Promise<JobPreisErgebnis> {
+  const { jobOfferId, preis, token, endpoint, fetchFn } = args;
+  const job = (await mamamiaRequest<JobPreisRead>({
+    endpoint, token, query: RESYNC_JOB_READ, variables: { id: jobOfferId }, fetchFn,
+  })).JobOffer;
+  if (!job) throw new Error(`JobOffer ${jobOfferId} nicht gefunden`);
+  const alt = job.salary_offered ?? null;
+  const basis = { job_offer_id: jobOfferId, alt, neu: preis };
+  if (job.final_confirmation && !job.final_confirmation.rejected_at) return { status: "gebucht", ...basis };
+  if (alt !== null && Math.round(alt) === Math.round(preis)) return { status: "unveraendert", ...basis };
+  const anreise = nurDatum(job.arrival_at);
+  if (!anreise) return { status: "ohne_anreise", ...basis };
+
+  const vars: Record<string, unknown> = {
+    id: jobOfferId,
+    customer_id: job.customer_id,
+    title: job.title,
+    salary_offered: preis,
+    salary_commission: job.salary_commission,
+    arrival_at: anreise,
+    visibility: job.visibility,
+  };
+  const cga = (job.visible_caregiver_agencies ?? []).map((a) => a.id).filter((id) => Number.isInteger(id) && id > 0);
+  if (cga.length) vars.visible_caregiver_agency_ids = cga;
+  const abreise = nurDatum(job.departure_at);
+  if (abreise) vars.departure_at = abreise;
+
+  await mamamiaRequest<{ UpdateJobOffer: { id: number } }>({
+    endpoint, token, query: RESYNC_JOB_PREIS, variables: vars, fetchFn,
+  });
+  return { status: "aktualisiert", ...basis };
+}
+
+/* Notiz in den Kunden-Aktivitäten (Registry #113, Martin 06.10.2026: „Anfrage
+   erneut gemacht und Angebot aktualisiert" muss in der SA-Historie stehen — zentral
+   in Mamamia, keine Ablage daneben). Derselbe Weg wie das SA-Portal für Notizen und
+   für „💶 Angebot angepasst" (mamamia-sadash CustomerNoteController::store,
+   OfferAdjustController): StoreCustomerSaContact mit contact "note_only". Der Text
+   kommt vom Kostenrechner, die Zeile zum Job hängt diese Funktion an. */
+const RESYNC_NOTIZ = /* GraphQL */ `
+  mutation StoreCustomerSaContact($customer_id: Int, $contact: String, $message: String) {
+    StoreCustomerSaContact(customer_id: $customer_id, contact: $contact, message: $message) { id }
+  }
+`;
+
+const euroDe = (n: number) => `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 }).format(Math.round(n))} €`;
+
+export function notizJobZeile(job: JobPreisErgebnis | undefined): string {
+  if (!job) return "";
+  switch (job.status) {
+    case "aktualisiert": return ` — Job in Mamamia: ${job.alt != null ? euroDe(job.alt) : "–"} → ${euroDe(job.neu)}`;
+    case "unveraendert": return ` — Job hatte schon ${euroDe(job.neu)}`;
+    case "gebucht": return " — Job ist gebucht, Preis dort nicht geändert";
+    case "ohne_anreise": return " — Job ohne Anreisedatum, Preis dort nicht geändert";
+  }
+}
+
+/* ─── Identitaet eines Vermittler-Falls (Registry #67) ────────────────────
+   Beim Vermittler traegt der Mamamia-Kunde bisher den Ansprechpartner der
+   Agentur — bei Pflegena acht Mal "Bernd Walde". Diese Mutation setzt den
+   Haushalt: Customer-Name, die Patienten-Contract-Zeile (Anrede, Name,
+   Strasse, PLZ/Ort, Einsatzort) und den Vermittler als Kontaktperson.
+
+   Form 1:1 aus _shared/acceptanceSync.ts (UPDATE_CUSTOMER_CONTRACT +
+   Variablenbau) — dort seit 07/2026 auf beiden Tenants produktiv.
+
+   ZWEITE Mutation, nicht in die Detail-Mutation gemischt: Kontaktzeilen
+   sind Kosmetik, und eine von Mamamia abgelehnte Adresse darf den
+   funktionierenden Detail-Sync nicht mitreissen (Registry #52). */
+const RESYNC_IDENTITAET = /* GraphQL */ `
+  mutation ResyncIdentitaet(
+    $id: Int
+    $patients: [PatientInputType]
+    $equipment_ids: [Int]
+    $first_name: String
+    $last_name: String
+    $patient_contracts: [CustomerContractInputType]
+    $customer_contacts: [CustomerContactInputType]
+  ) {
+    UpdateCustomer(
+      id: $id
+      patients: $patients
+      equipment_ids: $equipment_ids
+      first_name: $first_name
+      last_name: $last_name
+      patient_contracts: $patient_contracts
+      customer_contacts: $customer_contacts
+    ) { id customer_id }
+  }
+`;
+
+/* Eigenes Read-Query, NUR im Identitaets-Zweig. Bewusst NICHT in
+   RESYNC_READ: das laeuft bei JEDEM Resync, auch bei den Admin-
+   Preiskorrekturen (Registry #55) — ein Feld, das prod nicht kennt, legte
+   dort alles lahm.
+
+   Selektiert wird deshalb nur, was prod heute schon taeglich liest (Proxy
+   GET_CUSTOMER bei jedem Portalbesuch, mamamia-proxy/operations.ts):
+   der SINGULARE customer_contract. Die Flags (contact_type/is_same_as_*) werden geschrieben, hier aber
+   nicht gelesen. */
+const RESYNC_IDENTITY_READ = /* GraphQL */ `
+  query ResyncIdentity($id: Int!) {
+    Customer(id: $id) {
+      id first_name last_name status location_id
+      patients { id tools { id } }
+      equipments { id }
+      customer_contract {
+        salutation first_name last_name phone email
+        street_number zip_code city location_id
+      }
+      customer_contacts { salutation first_name last_name email }
+    }
+  }
+`;
+
+interface IdentityContactRow {
+  salutation?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  [k: string]: unknown;
+}
+interface IdentityReadData {
+  Customer: {
+    id: number;
+    first_name: string | null;
+    last_name: string | null;
+    status: string | null;
+    location_id: number | null;
+    patients: Array<{ id: number; tools: Array<{ id: number }> | null }> | null;
+    equipments: Array<{ id: number }> | null;
+    customer_contract: IdentityContactRow | null;
+    customer_contacts: IdentityContactRow[] | null;
+  } | null;
+}
+
+/* Mamamia kennt nur "Mr."/"Mrs.", der Parser liefert "Herr"/"Frau".
+   Unbekannt ⇒ weglassen — mapSalutation() defaultet still auf "Mr." und
+   waere hier eine erfundene Angabe (Święta zasada nr 1). */
+function anredeNachMamamia(anrede: string | null | undefined): "Mr." | "Mrs." | undefined {
+  const v = (anrede ?? "").trim().toLowerCase();
+  if (v === "herr") return "Mr.";
+  if (v === "frau") return "Mrs.";
+  return undefined;
+}
+
+/* Gehoert eine bestehende Zeile UNS? patient_contracts und
+   customer_contacts sind REPLACE — was ein Mensch im Panel eingetragen
+   hat, darf ein Automat nicht ueberschreiben.
+
+   Das Praedikat ist bewusst "gehoert uns", nicht "ist gleich unserem
+   Wert": eine von uns verursachte "Walde"-Zeile (alter Patientenbogen
+   oder ein Spiegel) hat einen anderen Namen als der Patient und waere
+   sonst fuer immer eingefroren. Vorname ZUSAETZLICH, damit eine von Hand
+   korrigierte Zeile (Nachname gelassen, Vorname berichtigt) fremd bleibt. */
+function zeileGehoertUns(
+  row: IdentityContactRow | null | undefined,
+  lead: Lead,
+): boolean {
+  if (!row) return true;
+  const norm = (v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : "");
+  const passt = (wert: unknown, unsere: Array<string | null | undefined>) => {
+    const w = norm(wert);
+    return w === "" || unsere.some((u) => norm(u) === w);
+  };
+  return passt(row.last_name, [lead.patient_nachname, lead.nachname])
+    && passt(row.first_name, [lead.patient_vorname, lead.vorname]);
+}
+
 type PatientStub = Record<string, unknown> & { id?: number; tool_ids: number[] };
 
 function toolIdsOf(p: ResyncPatientRow): number[] {
@@ -687,10 +951,17 @@ export async function resyncCustomerFromLead(args: {
    *  `felder`: das sind keine Kalkulator-Angaben und werden nicht gediffed,
    *  sie stehen einfach im Dokument oder eben nicht. */
   details?: boolean;
+  /** Registry #113: `budget` zusätzlich als Preis des Jobs
+   *  (lead.mamamia_job_offer_id) setzen — Weg wie das SA-Portal, siehe
+   *  jobPreisNachziehen. Ohne `budget` wirkungslos. */
+  jobPreis?: boolean;
+  /** Registry #113: Text für eine Notiz in den Kunden-Aktivitäten (Weg wie das
+   *  SA-Portal); die Zeile zum Job wird angehängt. Best effort. */
+  notiz?: string;
   secrets: OnboardSecrets;
   fetchFn?: typeof fetch;
 }): Promise<ResyncResult> {
-  const { lead, felder, budget, details, secrets, fetchFn = globalThis.fetch } = args;
+  const { lead, felder, budget, details, jobPreis, notiz, secrets, fetchFn = globalThis.fetch } = args;
   const customerId = lead.mamamia_customer_id;
   if (!customerId) throw new Error("lead not onboarded (no mamamia_customer_id)");
   const fd = lead.kalkulation?.formularDaten;
@@ -836,8 +1107,165 @@ export async function resyncCustomerFromLead(args: {
     }
   }
 
+  const ergebnis: ResyncResult = {
+    patients_before: existing.length,
+    patients_after: after,
+    removed_ids: removed,
+    felder: [...felder],
+  };
+
+  // Registry #113: Preis des Jobs nach dem Kunden — ein Fehler hier wirft
+  // (502 beim Aufrufer ⇒ mamamia_sync_pending, Retry wiederholt beides; das
+  // UpdateCustomer ist idempotent).
+  if (jobPreis && budget !== undefined && lead.mamamia_job_offer_id) {
+    ergebnis.job = await jobPreisNachziehen({
+      jobOfferId: lead.mamamia_job_offer_id,
+      preis: budget,
+      token: agencyToken,
+      endpoint: secrets.mamamiaEndpoint,
+      fetchFn,
+    });
+  }
+
+  if (notiz) {
+    try {
+      await mamamiaRequest<{ StoreCustomerSaContact: { id: number } }>({
+        endpoint: secrets.mamamiaEndpoint,
+        token: agencyToken,
+        query: RESYNC_NOTIZ,
+        variables: { customer_id: customerId, contact: "note_only", message: `${notiz}${notizJobZeile(ergebnis.job)}` },
+        fetchFn,
+      });
+      ergebnis.notiz = "gespeichert";
+    } catch (e) {
+      ergebnis.notiz = "fehler";
+      ergebnis.notiz_error = (e as Error).message;
+      console.warn(`[onboard] resync notiz customer=${customerId} failed: ${(e as Error).message}`);
+    }
+  }
+
+  /* ─── Identitaet (Registry #67) ──────────────────────────────────────────
+     Nur fuer Vermittler-Leads MIT Patientennamen und nur wenn `details`
+     gesetzt ist. `details` kommt ausschliesslich vom Vermittler-Eingang
+     (und vom Backfill) — die Admin-Preiskorrektur ruft Resync mit `felder`
+     und darf von Hand gepflegte Namen/Adressen nicht ueberschreiben.
+
+     LETZTE Mutation der Funktion, nach Pass 2: `patients[]` ist REPLACE per
+     id, und die Variable `patients` traegt nach einem Ehepaar-Klon einen
+     Eintrag OHNE id — dieselbe Liste erneut gesendet wuerde den in Pass 2
+     angelegten Patienten loeschen (Mamamia hat kein Delete). Deshalb Stubs
+     aus einem FRISCHEN Read. Dass die Contract-Zeile in der letzten Mutation
+     entsteht, schuetzt sie ausserdem vor dem Spiegel aus gotcha #12, der
+     beim NAECHSTEN UpdateCustomer zuschlaegt. */
+  const ident = panelIdentitaet(lead);
+  if (ident.istPatient && details) {
+    try {
+      const vorher = (await mamamiaRequest<IdentityReadData>({
+        endpoint: secrets.mamamiaEndpoint,
+        token: agencyToken,
+        query: RESYNC_IDENTITY_READ,
+        variables: { id: customerId },
+        fetchFn,
+      })).Customer;
+      // Sofort festhalten: schlaegt die Mutation fehl, ist `before` der
+      // einzige Beleg, in welchem Zustand der Kunde steht.
+      ergebnis.identity = { before: vorher };
+
+      const stubs = (vorher?.patients ?? []).map((pt) => ({
+        id: pt.id,
+        tool_ids: (pt.tools ?? []).map((t) => t.id),
+      }));
+      const iVars: Record<string, unknown> = {
+        id: customerId,
+        // equipments MUESSEN zurueckgereicht werden (omitted ⇒ Wipe, gotcha #3);
+        // patients non-empty, sonst lehnt beta ab (gotcha #12).
+        patients: stubs,
+        equipment_ids: (vorher?.equipments ?? []).map((e) => e.id),
+        // `first_name: null` ist ABSICHT, wenn der Haushalt keinen Vornamen
+        // hat — sonst bliebe "Bernd" vor "Maier" stehen.
+        first_name: ident.first_name,
+        last_name: ident.last_name,
+      };
+
+      const hinweise: string[] = [];
+      const anrede = anredeNachMamamia(lead.patient_anrede);
+      // BEKANNTE GRENZE (Registry #131): `vorher.customer_contract` ist der
+      // Singular — nach einer Annahme liefert Mamamia hier oft die Zeile des
+      // Auftraggebers (contract_contact). Dann prüft „gehört uns" die falsche
+      // Zeile und location_id kann die des AG sein. Betrifft nur den
+      // Identitäts-Resync (Vermittler-Eingang/Backfill, details: true), der
+      // praktisch vor der ersten Annahme läuft. Gleiches gilt für
+      // `customer_contract { location_id }` in RESYNC_READ (dort nicht genutzt).
+      // Richtig wäre `customer_contracts` nach contact_type — nicht umgebaut.
+      if (zeileGehoertUns(vorher?.customer_contract, lead)) {
+        const locationId = vorher?.customer_contract?.location_id ?? vorher?.location_id ?? null;
+        iVars.patient_contracts = [{
+          contact_type: "patient_contact",
+          // Flags IMMER explizit: ohne sie defaultet Mamamia auf true und
+          // spiegelt beim naechsten UpdateCustomer die Daten der ersten
+          // Kontaktperson (= ab hier der Vermittler) in diese Zeile.
+          is_same_as_first_patient: false,
+          is_same_as_contact: false,
+          ...(anrede ? { salutation: anrede } : {}),
+          ...(ident.first_name ? { first_name: ident.first_name } : {}),
+          ...(ident.last_name ? { last_name: ident.last_name } : {}),
+          ...(lead.patient_street ? { street_number: lead.patient_street } : {}),
+          ...(typeof fd.plz === "string" && fd.plz.trim() ? { zip_code: fd.plz.trim() } : {}),
+          ...(typeof fd.ort === "string" && fd.ort.trim() ? { city: fd.ort.trim() } : {}),
+          ...(locationId != null ? { location_id: locationId } : {}),
+          // KEIN email: Mamamia validiert die im Contract streng, ein Reject
+          // killt die ganze Mutation (Registry #52).
+        }];
+      } else {
+        hinweise.push("customer_contract von Hand gepflegt — nicht ersetzt");
+      }
+
+      const kpAnrede = anredeNachMamamia(lead.anrede ?? lead.anrede_text);
+      const kpVor = lead.vorname?.trim();
+      const kpNach = lead.nachname?.trim();
+      if ((vorher?.customer_contacts ?? []).every((row) => zeileGehoertUns(row, lead))) {
+        if (kpVor || kpNach) {
+          // Der Vermittler bleibt sichtbar — sonst stuende in Mamamia nur noch
+          // der Haushalt und niemand wuesste, wer die Anfrage geschickt hat.
+          iVars.customer_contacts = [{
+            is_same_as_first_patient: false,
+            ...(kpAnrede ? { salutation: kpAnrede } : {}),
+            ...(kpVor ? { first_name: kpVor } : {}),
+            ...(kpNach ? { last_name: kpNach } : {}),
+          }];
+        }
+      } else {
+        hinweise.push("customer_contacts von Hand gepflegt — nicht ersetzt");
+      }
+
+      await mamamiaRequest<{ UpdateCustomer: { id: number } }>({
+        endpoint: secrets.mamamiaEndpoint,
+        token: agencyToken,
+        query: RESYNC_IDENTITAET,
+        variables: iVars,
+        fetchFn,
+      });
+
+      const nachher = (await mamamiaRequest<IdentityReadData>({
+        endpoint: secrets.mamamiaEndpoint,
+        token: agencyToken,
+        query: RESYNC_IDENTITY_READ,
+        variables: { id: customerId },
+        fetchFn,
+      })).Customer;
+
+      ergebnis.identity.after = nachher;
+      if (hinweise.length) ergebnis.identity.hinweis = hinweise.join("; ");
+    } catch (e) {
+      // Kosmetik darf den Detail-Sync nicht mitreissen (Registry #52) — aber
+      // still ist sie auch nicht: der Aufrufer protokolliert identity_error.
+      ergebnis.identity_error = e instanceof Error ? e.message : String(e);
+      console.error(`[onboard] resync identity customer=${customerId} failed: ${ergebnis.identity_error}`);
+    }
+  }
+
   console.log(
-    `[onboard] resync customer=${customerId} felder=${felder.join(",")} patients ${existing.length}→${after} removed=${removed.join(",") || "-"} budget=${budget ?? "-"}`,
+    `[onboard] resync customer=${customerId} felder=${felder.join(",")} patients ${existing.length}→${after} removed=${removed.join(",") || "-"} budget=${budget ?? "-"} identity=${ergebnis.identity_error ? "error" : ergebnis.identity ? "ok" : "-"}`,
   );
-  return { patients_before: existing.length, patients_after: after, removed_ids: removed, felder: [...felder] };
+  return ergebnis;
 }

@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Check, ChevronDown, Heart, Sparkles, UserPlus, X } from 'lucide-react';
+import { Check, Heart, Sparkles, UserPlus, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { NurseStatus } from './shared';
-import { nurseFacts, nurseLevel, displayName, initials } from './shared';
-import { DeutschZeile } from './SprachBalken';
+import { PflegekraftProfil } from './PflegekraftProfil';
 
 export const MatchCard: FC<{
   nurse: Nurse;
@@ -37,16 +36,20 @@ export const MatchCard: FC<{
    *  all pass the gate. Local invitePhase='sending' on this card already
    *  hides the button — this prop covers the OTHER cards. */
   globalInviteLocked?: boolean;
-  /** Pflegesituation fehlt noch: Der Knopf heißt dann „Profil vervollständigen &
-   *  einladen“ und führt über die Sperre direkt zum Formular (07.09.). */
+  /** Pflegesituation fehlt noch: Koralle-Knopf „Profil vervollständigen & einladen" über die
+   *  volle Breite, derselbe Text wie auf der Interesse-Karte (Registry #109, Martin 02.10.).
+   *  Der Tipp geht über `onInvite`; das Portal springt dort direkt ins Formular
+   *  (`zurPflegesituation`) und gibt `false` zurück. Vom 24.09. bis 02.10. stand hier
+   *  „Einladen" mit Schloss und ein Erklärfenster. */
   profilFehlt?: boolean;
+  /** Fassung 31 (Ansicht nach dem Absenden im Look „angebot"): „Einladen" über die volle Breite wie der Knopf vor dem
+   *  Absenden, statt rechtsbündig. */
+  breit?: boolean;
   /** Tipp auf die Stufen-Plakette: Profil mit geöffneter Erklärung (07.09.,
    *  Clarity: Kunden tippten Stammkraft/Bewährt und nichts passierte). */
   onStufeClick?: () => void;
-}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin, isRecommended, globalInviteLocked, profilFehlt, onStufeClick }) => {
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin, isRecommended, globalInviteLocked, profilFehlt, breit, onStufeClick }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
-  const inits = initials(nurse.name);
-  const name = displayName(nurse.name);
 
   const handleInvite = async () => {
     const allowed = onInvite ? onInvite() : true;
@@ -78,19 +81,7 @@ export const MatchCard: FC<{
          - Card-Header (innerhalb) bekommt zusätzlichen pt-1 wenn
            isRecommended → Name rutscht vom Badge weg, sonstige Cards
            bleiben kompakt wie vorher. */
-    <div className={isRecommended && status === 'pending'
-      ? 'relative rounded-3xl px-3 py-4 border space-y-3'
-      : 'relative'}
-      style={isRecommended && status === 'pending'
-        ? { background: '#FFFFFF', borderColor: '#8B7355' }
-        : undefined}
-    >
-      {isRecommended && status === 'pending' && (
-        <p className="flex items-center gap-2 text-[16px] font-semibold leading-relaxed px-1" style={{ color: '#8B7355' }}>
-          <Sparkles className="w-4 h-4 flex-shrink-0" />
-          Unsere Empfehlung für Sie
-        </p>
-      )}
+    <div className="relative">
       {showInterestOriginBadge && (
         <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap">
           <span
@@ -107,93 +98,50 @@ export const MatchCard: FC<{
         </div>
       )}
     <div
-      /* Weiss statt #F4F4F6 (Martin, 03.09.2026: „finde weiss besser"): die
-         Karten liegen in einem grauen Kasten (#F5F5F6) und hatten fast
-         denselben Ton — dadurch wirkten sie flach. Weiss hebt sie heraus,
-         genau wie die Karten in der Mail. shadow-sm wie in BookedScreen. */
       /* Ganze Karte öffnet das Profil (Clarity 07.09.: 15,5 % tote Klicks auf
          Name, Plaketten und Faktenzeile). Knöpfe stoppen die Weitergabe. */
       onClick={onNurseClick}
-      className={`group bg-white shadow-sm rounded-2xl border overflow-hidden transition-all cursor-pointer ${
+      className={`group bg-white rounded-card overflow-hidden transition-colors cursor-pointer ${
         status === 'declined'
-          ? 'opacity-40 border-gray-200'
-          : status === 'invited'
-          ? 'border-zinc-300'
-          : 'border-zinc-300 hover:border-zinc-500'
+          ? 'opacity-40 border border-[#EFEBE4]'
+          : isRecommended && status === 'pending'
+          ? 'border-[1.5px] border-[#CDBFA8] hover:border-pm-taupe'
+          : 'border border-[#EFEBE4] hover:border-pm-taupe-light'
       }`}
     >
-      <div className="px-4 pt-4 pb-3 active:bg-gray-50">
-        <div className="flex items-center gap-3.5">
-          <div className="flex-shrink-0">
-            {nurse.image ? (
-              <img src={nurse.image} alt={nurse.name} className="w-16 h-16 rounded-xl object-cover" />
-            ) : (
-              <div className="w-16 h-16 rounded-xl flex items-center justify-center text-lg font-bold text-white"
-                style={{ backgroundColor: nurse.color }}>
-                {inits}
-              </div>
-            )}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            {/* Umbau 11.08. (Martin: „CG-Kasten sieht immer noch scheisse aus —
-                Farben austauschen bringt nichts"). Es lag an der Struktur:
-                drei Kleinschrift-Zeilen neben einem 56px-Foto, die Faktenzeile
-                mit `truncate` (der Kunde las „Ø 1…" — eine abgeschnittene
-                Zahl), dazu ein Sprachbalken, der genau das wiederholte, was
-                daneben im Klartext stand.
-                Jetzt: größeres Foto, Name als Zeile, darunter EINE Meta-Zeile,
-                darunter die Fakten ausgeschrieben und umbrechend. */}
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[17px] font-semibold leading-snug" style={{ color: '#18181B' }}>
-                {name}
-                {nurse.age ? <span className="font-normal" style={{ color: '#71717A' }}>, {nurse.age}</span> : null}
-              </p>
-              {/* Öffnen-Hinweis statt „Details"-Link im Footer (11.08.) */}
-              <ChevronDown className="w-4 h-4 -rotate-90 flex-shrink-0 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
-            </div>
-
-            <p className="mt-1"><DeutschZeile nurse={nurse} /></p>
-          </div>
+      {/* Empfehlung als Kopfleiste IN der Karte, wie „Unsere Empfehlung" in der Angebotsmail
+          (Martin 27.09.2026, „V"). */}
+      {isRecommended && status === 'pending' && (
+        <div className="flex items-center gap-2 bg-pm-shell px-5 py-3 text-[15px] font-extrabold text-pm-taupe-ink">
+          <Sparkles className="w-4 h-4 flex-none" aria-hidden="true" />
+          Unsere Empfehlung für Sie
         </div>
-
-        {/* Fakten über die VOLLE Kartenbreite (11.08.), nicht in der schmalen
-            Spalte neben dem Foto — dort brach die Zeile mitten in der Zahl um
-            („· im / Schnitt 12 Wochen"). */}
-        <p className="text-[16px] mt-3" style={{ color: '#71717A' }}>
-          {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return lvl.label ? (
-            <span
-              role={onStufeClick ? 'button' : undefined}
-              onClick={onStufeClick ? (e) => { e.stopPropagation(); onStufeClick(); } : undefined}
-              className={`font-semibold ${onStufeClick ? 'underline decoration-dotted underline-offset-4 cursor-pointer' : ''}`}
-              style={{ color: '#18181B' }}
-            >{lvl.label}: </span>
-          ) : null; })()}
-          {nurseFacts(nurse)}
-        </p>
+      )}
+      <div className="px-3.5 pt-3.5">
+        <PflegekraftProfil nurse={nurse} onProfil={onNurseClick} onStufeClick={onStufeClick} />
       </div>
 
-      <div className="border-t border-gray-100 px-4 py-2.5 flex items-center justify-end gap-3">
+      <div className="px-4 py-3 flex items-center justify-end gap-3">
         {status === 'declined' ? (
           <div className="flex items-center gap-3">
             {onUndoDecline && (
               <button
                 onClick={(e) => { e.stopPropagation(); onUndoDecline(); }}
-                className="text-xs font-semibold text-[#8B7355] hover:underline"
+                className="min-h-[44px] px-1 text-[13px] font-semibold text-pm-taupe-ink hover:underline"
               >
                 ↩ Rückgängig
               </button>
             )}
-            <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-gray-100 border border-gray-200 px-4 py-1.5 rounded-full">
+            <span className="flex items-center gap-1.5 text-[13px] font-medium text-pm-muted bg-pm-paper border border-pm-line px-4 py-1.5 rounded-full">
               <X className="w-3 h-3 flex-shrink-0" /> Abgelehnt
             </span>
           </div>
         ) : status === 'invited' ? (
-          <span className="flex items-center gap-1.5 text-xs font-bold text-[#22A06B] bg-[#E3F7EF] border border-[#B8E8D4] px-4 py-1.5 rounded-full">
+          <span className="flex items-center gap-1.5 text-[13px] font-bold text-pm-green-deep bg-pm-mint border border-[#CFE8D8] px-4 py-1.5 rounded-full">
             <Check className="w-3 h-3 flex-shrink-0" /> Einladung gesendet
           </span>
         ) : invitePhase === 'sending' ? (
-          <span className="flex items-center gap-1.5 text-xs font-bold text-[#8B7355] bg-[#F5F5F6] border border-[#E9E9EB] px-4 py-1.5 rounded-full">
+          <span className="flex items-center gap-1.5 text-[13px] font-bold text-pm-taupe-ink bg-pm-paper border border-pm-line px-4 py-1.5 rounded-full">
             <svg className="w-3 h-3 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
@@ -201,7 +149,7 @@ export const MatchCard: FC<{
             wird eingeladen…
           </span>
         ) : invitePhase === 'done' ? (
-          <span className="flex items-center gap-1.5 text-xs font-bold text-[#22A06B] bg-[#E3F7EF] border border-[#B8E8D4] px-4 py-1.5 rounded-full">
+          <span className="flex items-center gap-1.5 text-[13px] font-bold text-pm-green-deep bg-pm-mint border border-[#CFE8D8] px-4 py-1.5 rounded-full">
             <Check className="w-3 h-3 flex-shrink-0" /> wurde eingeladen!
           </span>
         ) : globalInviteLocked ? (
@@ -214,7 +162,7 @@ export const MatchCard: FC<{
           <button
             disabled
             aria-disabled="true"
-            className="flex items-center gap-1.5 text-xs font-bold text-[#8B7355] bg-[#F5F5F6] border border-[#E9E9EB] px-4 py-1.5 rounded-full cursor-not-allowed shadow-sm"
+            className="flex items-center gap-1.5 text-[13px] font-bold text-pm-taupe-ink bg-pm-paper border border-pm-line px-4 py-1.5 rounded-full cursor-not-allowed shadow-sm"
           >
             <svg className="w-3 h-3 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
@@ -222,13 +170,25 @@ export const MatchCard: FC<{
             </svg>
             Bitte warten…
           </button>
+        ) : profilFehlt ? (
+          // Volle Breite (Registry #109): Bis 24.09. stand der lange Text rechtsbündig und
+          // brach um. Gemessen (WebKit, Inter): Inhalt 268 px, Knopf bei 360 px 297 px breit,
+          // also einzeilig ab 360 px; darunter bricht er im Knopf um, statt überzustehen.
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); handleInvite(); }}
+            className="w-full min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 rounded-full bg-pm-coral text-white text-[15px] font-bold leading-tight text-center transition-colors hover:bg-pm-coral-deep active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-taupe"
+          >
+            <UserPlus className="w-4 h-4 flex-none" aria-hidden="true" />
+            Profil vervollständigen &amp; einladen
+          </button>
         ) : (
           <button
             onClick={e => { e.stopPropagation(); handleInvite(); }}
-            className="flex items-center gap-1.5 text-xs font-bold bg-[#E76F63] text-white px-4 py-1.5 rounded-full hover:bg-[#D65E52] transition-colors active:scale-95 shadow-sm"
+            className={`${breit ? 'w-full justify-center px-3 ' : 'px-[18px] '}min-h-[44px] inline-flex items-center gap-1.5 rounded-full text-[15px] font-bold whitespace-nowrap transition-colors active:scale-[0.98] bg-pm-coral text-white hover:bg-pm-coral-deep`}
           >
-            <UserPlus className="w-3.5 h-3.5" />
-            {profilFehlt ? 'Profil vervollständigen & einladen' : 'Einladen'}
+            <UserPlus className="w-4 h-4" aria-hidden="true" />
+            Einladen
           </button>
         )}
       </div>

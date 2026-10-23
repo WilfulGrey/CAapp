@@ -39,21 +39,21 @@ Deno.test('leere und kaputte Eingaben bleiben unverändert', () => {
 });
 
 // ── buildLeadRef: Name im Betreff der Nachfass-3-Antwortknöpfe ────────────
-// Anlass Oehlert/Stein (08.09.2026): die Antwort kam über ein anderes
+// Anlass zweier Leads (08.09.2026): die Antwort kam über ein anderes
 // t-online-Konto, im Postfach stand ein Kunde als Absender und im Betreff ein
 // anderer — beide echte offene Leads. Der Name im Betreff macht die Zuordnung
 // eindeutig, egal aus welchem Postfach geantwortet wird.
 Deno.test('buildLeadRef: Name zuerst, Adresse in Klammern', () => {
   assertEquals(
-    buildLeadRef({ vorname: 'Thea', nachname: 'Oehlert', email: 'Humbug62@t-online.de', id: 'abc' }),
-    'Thea Oehlert (Humbug62@t-online.de)',
+    buildLeadRef({ vorname: 'Maria', nachname: 'Muster', email: 'maria.muster@example.de', id: 'abc' }),
+    'Maria Muster (maria.muster@example.de)',
   );
 });
 
 Deno.test('buildLeadRef: ALL-CAPS wird normalisiert', () => {
   assertEquals(
-    buildLeadRef({ vorname: 'CATARINA', nachname: 'STEIN', email: 'c@example.com', id: 'abc' }),
-    'Catarina Stein (c@example.com)',
+    buildLeadRef({ vorname: 'RENATE', nachname: 'KÖNIG', email: 'c@example.com', id: 'abc' }),
+    'Renate König (c@example.com)',
   );
 });
 

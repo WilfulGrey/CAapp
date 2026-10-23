@@ -11,15 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { createClient } from '@supabase/supabase-js';
+import { adminDb as supabase } from '@/lib/admin-db';
 import { Search, Loader as Loader2, Mail, Phone, Calendar, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import { istEingekauft, quellenName, reiterFuer, PORTALE } from '@/lib/portal-lead';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { istEingekauft, quellenName, reiterFuer, kontaktAnzeige, PORTALE } from '@/lib/portal-lead';
 
 /* „Dzyń" für neue Leads/Portal-Mails (Registry #48): zwei kurze Sinus-Töne
    (A5 → E6) rein aus WebAudio — kein Asset. Browser-Autoplay: der
@@ -260,13 +255,15 @@ export default function LeadsPage() {
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (lead) =>
-          lead.email?.toLowerCase().includes(term) ||
-          lead.vorname?.toLowerCase().includes(term) ||
-          lead.telefon?.includes(term) ||
-          lead.telefon_2?.includes(term)
-      );
+      /* Gesucht wird ueber den ANGEZEIGTEN Namen plus die Kontaktspalten:
+         bei Vermittler-Leads steht der Kunde nur in patient_*, und der
+         Nachname fehlte hier bisher ganz — "Walde" fand nichts, obwohl es
+         in der Zeile stand. */
+      filtered = filtered.filter((lead) => {
+        const namen = [kontaktAnzeige(lead).name, lead.vorname, lead.nachname, lead.email]
+          .filter(Boolean).join(' ').toLowerCase();
+        return namen.includes(term) || lead.telefon?.includes(term) || lead.telefon_2?.includes(term);
+      });
     }
 
     setFilteredLeads(filtered);
@@ -475,13 +472,16 @@ export default function LeadsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredLeads.map((lead) => (
+                filteredLeads.map((lead) => {
+                  const anzeige = kontaktAnzeige(lead);
+                  return (
                   <tr key={lead.id} className="border-b hover:bg-gray-50">
                     <td className="py-3 px-4">
                       <div>
-                        <p className="font-medium text-gray-900">
-                          {[lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(' ') || 'Unbekannt'}
-                        </p>
+                        <p className="font-medium text-gray-900">{anzeige.name}</p>
+                        {anzeige.via && (
+                          <p className="text-xs text-gray-500">{anzeige.via}</p>
+                        )}
                         <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
                           <Mail className="w-3 h-3" />
                           {lead.email}
@@ -591,7 +591,8 @@ export default function LeadsPage() {
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

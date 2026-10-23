@@ -23,11 +23,17 @@ Edge sync-acceptance → _shared/acceptanceSync.ts (współdzielony z cronem):
                          (location_id rozwiązywane z PLZ LE przez katalog
                          Locations — ta sama metoda co główna lokalizacja
                          klienta [Bug #13d]; fallback: carry z istniejącego
-                         contractu — MM REPLACES listę przy zapisie)
+                         wiersza patient_contact (nie z singulara — po akcepcie
+                         to bywa wiersz AG, Registry #131) — MM REPLACES listę.
+                         Od Registry #65: tylko PLZ o DOKŁADNIE 5 cyfrach
+                         i wiersz o DOKŁADNIE tej `zip_code` — `search`
+                         matchuje prefiksy, więc „pierwszy trafiony DE"
+                         wpisywał obce miasto na PODPISANĄ umowę)
                        • AG → invoice_contract{contact_type:"contract_contact"}
                          (panel: „Person für den Vertrag/Rechnung"; agGleich ⇒
-                         dyskretne pola LE, AG odrębny ⇒ split composed ag.name
-                         na ostatniej spacji, bez salutation; location_id z PLZ
+                         dyskretne pola LE, AG odrębny ⇒ ag.anrede/vorname/nachname
+                         ze snapshotu (od Registry #131), starsze rowy: split
+                         composed ag.name na ostatniej spacji, bez salutation; location_id z PLZ
                          AG — Stadt-dropdown AG to JEGO miasto, nie adres opieki.
                          Uwaga: Location select-uje pole `location`, NIE `name`)
                        • KP → customer_contacts[] (panel: „Kontaktperson")
@@ -101,22 +107,54 @@ audit-row w `lead_events`).
 | Sytuacja | Kiedy alarm | Kto wysyła |
 |---|---|---|
 | StoreConfirmation odrzucone **permanentnie** (GraphQL-level error — deterministyczna odmowa, klasyfikacja po `graphqlErrors` na errorze, bez zgadywania treści komunikatu) | **NATYCHMIAST (T+0)** | bridge, zaraz po odpowiedzi synchronicznego sync-acceptance (`result.confirm_error.permanent=true`); stempel `mamamia_sync_alerted_at` po udanym mailu |
+| j.w., ale Mamamia odrzuciła **nasze dane z formularza umowy** — wszystkie klucze `extensions.validation` pod `contract_patient.*`/`contract_contact.*` (Registry #88, np. brak anredy LE) | **NATYCHMIAST (T+0)**, ten sam kanał | edge ustawia `confirm_error.ursache = "vertragsdaten"`; mail NIE pisze „Bewerbung zurückgezogen", tylko „nasze dane odrzucone, Bewerbung najpewniej otwarta — zabookuj ręcznie w SA-Portalu i ustaw pole" |
 | StoreConfirmation pada **transient** (network/HTTP/5xx) | 3 próby w callu (2s+4s backoff) + **retry-chain +15/+30/+60 s** — po wyczerpaniu łańcucha wciąż brak confirm ⇒ **alarm ≈ T+2 min** | retry-chain (edge, w tle) → POST `acceptance_sync_alarm` (source `sync-retry`) do bridge'a → mail; stempel TYLKO gdy mail przeszedł |
 | j.w., ale proces edge zginął zanim chain skończył | próg **5 min** od akceptu (niezależny bezpiecznik) | cron → ten sam POST (source `cron`); błąd maila ⇒ 502 ⇒ re-alarm za 15 min |
-| Confirm OK, **tylko PDF-upload** niedomknięty | po **24h** (archiwum, zero ryzyka klienta — bramka final_confirmation potrzebuje z natury drugiego przebiegu; chain zwykle domyka go w ≤2 min) | cron, ten sam kanał |
+| **Confirm ostemplowany, ale MM nie pokazuje confirmation na jobie tej Bewerbung** (bramka uploadu nachlasa; `booking_not_visible` = `not_processed` \| `foreign_confirmation`, Registry #82) | **~T+2 min** z retry-chain, **15 min** z crona — to problem BOOKINGOWY: klient dostał „Neue Buchung", a w MM nic tego nie potwierdza | retry-chain → POST (source `sync-retry`), potem cron (source `cron`); mail bridge'a ma własny, CZERWONY wariant „Buchung nicht in Mamamia sichtbar" |
+| Confirm OK, **confirmation widoczna**, tylko PDF-upload niedomknięty | po **24h** (archiwum, zero ryzyka klienta — render/StoreFile pada, booking stoi) | cron, ten sam kanał |
 | Wiersz naprawiony w tym samym przebiegu crona / stufie chaina | **bez alarmu** (alarm ocenia stan PO retry, nie sprzed) | — |
 | Krok 1 (kontakt-rows) odrzucony przez walidację MM LUB e-mail z formularza wyrzucony (`contact_fields_dropped`) — booking NIE dotknięty (Registry #52) | po CAŁEJ sekwencji (`finally` w `syncAcceptance`, timeout 5 s), pomijany gdy confirm permanent (czerwony już niesie błąd) | edge → POST **`acceptance_contact_alarm`** (ŻÓŁTY team-mail „Kontaktdaten nicht in Mamamia übernommen" + rohwerte); bridge dedupuje po `lead_events`+`application_id`, mail PRZED insertem; **bez** stempla `mamamia_sync_alerted_at` |
 
 Stałe: `RETRY_DELAYS_MS = [15s, 30s, 60s]` (`sync-acceptance/index.ts`);
-`ACCEPTANCE_CONFIRM_ALERT_AFTER_MS = 5 min`, `ACCEPTANCE_PDF_ALERT_AFTER_MS = 24h`
+`ACCEPTANCE_CONFIRM_ALERT_AFTER_MS = 5 min`, `ACCEPTANCE_BOOKING_ALERT_AFTER_MS = 15 min`, `ACCEPTANCE_PDF_ALERT_AFTER_MS = 24h`
 (`detect-caregiver-events/index.ts`); retry wewnętrzny `CONFIRM_TRANSIENT_RETRIES = 2`
 (`_shared/acceptanceSync.ts`). Stempel `mamamia_sync_alerted_at` = jednorazowość alarmu.
+
+**Dwie granice tej polityki, obie świadome (Registry #82):**
+
+1. **Alarm oparty na naszym stemplu wykrywa tylko awarie, o których sami wiemy.**
+   Próg 5 min sprawdza BRAK `mamamia_confirmed_at`. W przypadku Berga stempel był —
+   guard zaadoptował cudzą confirmation i wiersz wyglądał na udany, więc nie zadzwonił
+   żaden dzwonek przez 7 dni. Dlatego właściwym sygnałem jest **odczyt z MM** (bramka
+   uploadu), a nie nasz zapis. Konsekwencja: mur `gehoertZurRow` jest pojedynczym punktem
+   zaufania — każda jego zmiana wymaga testu regresyjnego, bo gdy on skłamie, alarm zamilknie.
+2. **Anulowanie akceptu w Mamamii NIE jest awarią i nie alarmuje** (decyzja Michała,
+   22.09.2026). Confirmation, która była widoczna i zniknęła później, to storno — legalny
+   krok agencji. Monitoring pilnuje wyłącznie „akcept nigdy nie wylądował", nigdy
+   „zniknął po czasie"; inaczej każdy storno zapalałby czerwone światło.
+
+**Jak trafienie znika:** stan gaśnie sam, gdy upload przejdzie — a przejdzie dopiero,
+gdy MM pokaże naszą confirmation na właściwym jobie. Trwałym kanałem jest linia
+**„Buchungs-Check"** w porannym raporcie (`fetchBuchungHealth`, czyste SQL, zero wywołań MM —
+pokazuje WYŁĄCZNIE wiersze, dla których alarm zaprotokołował `booking_not_visible`; sam brak
+stempla PDF-a niczego nie dowodzi, bo ma wiele innych przyczyn):
+alarm z crona leci raz, a po 30 dniach (`ACCEPTANCE_SYNC_MAX_AGE_DAYS`) wiersz w ogóle znika
+cronowi z oczu — raport trzyma go widocznym, dopóki trwa przyczyna.
 
 ## Guardy idempotencji (nigdy podwójny akcept)
 
 - **Adopcja:** przed StoreConfirmation moduł czyta `Customer.job_offers[].final_confirmation`
-  — jeśli istnieje confirmation dla **tej opiekunki** (caregiver-match: stare bundle,
-  SA-Portal, wcześniejszy retry po zgubionej odpowiedzi) → przejmuje jej id, NIE strzela.
+  — jeśli istnieje confirmation, która **należy do tego wiersza** (`gehoertZurRow`, Registry #78):
+  ta sama Bewerbung (`fc.application_id === row.application_id` — stare bundle, retry po
+  zgubionej odpowiedzi, panel zabookował tę samą Bewerbung), kotwica adopcyjna
+  (`fc.id === row.application_id`, Vertrag nachträglich) LUB ten sam job + ta sama PK
+  (job z `lead_events.application_accepted_internal.mamamia_job_offer_id`; panel zabookował
+  inną Bewerbung tej samej PK na tym jobie) → przejmuje jej id, NIE strzela. **Nigdy po samym
+  `caregiver_id`** — ta sama opiekunka wraca na kolejne turnusy (Fall Berg 9753: stary akcept
+  4296 przejęty dla nowej Bewerbung i przepięty uploadem). Faza PDF ma ten sam mur PRZED
+  StoreFile (obcy stempel ⇒ defer „Stempel prüfen"), a `UpdateConfirmation` dostaje zawsze
+  `application_id` z samej confirmation, nigdy z wiersza (MM od 17.09 odrzuca każdą inną
+  wartość: „The selected application id is invalid"; pole nadal wymagane).
 - **skip_confirm:** stare zakeszowane bundle wciąż wołają storeConfirmation same i wysyłają
   `metadata.mamamia_accepted=true` → bridge przekazuje `skip_confirm` → moduł nie dubluje
   (czeka aż final_confirmation będzie widoczne — wtedy adopcja).

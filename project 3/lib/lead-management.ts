@@ -1,11 +1,20 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { Kalkulation, generateToken, getTokenExpiry } from './calculation';
+import { abgleichNachAnfrage, anfrageNotiz, pendingNachAbgleich, resyncAufrufen, type MamamiaStatus } from './mamamia-abgleich';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  { auth: { persistSession: false, autoRefreshToken: false } }
-);
+/* Service-Key: leads und lead_events sind für den Anon-Schlüssel per RLS zu.
+   Bis 10/2026 lief die Lead-Anlage hier auf dem Anon-Schlüssel und brauchte
+   dafür offene Policies (USING true) — jeder mit dem öffentlichen Schlüssel
+   konnte alle Leads lesen und ändern. Lazy, damit ein fehlender Schlüssel nicht
+   schon `next build` sprengt, sondern erst der Aufruf laut scheitert. */
+let client: SupabaseClient | null = null;
+function db(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error('lead-management: SUPABASE_SERVICE_ROLE_KEY fehlt');
+  client ??= createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return client;
+}
 
 export interface Lead {
   id: string;
@@ -25,6 +34,9 @@ export interface Lead {
   token_used: boolean;
   care_start_timing: string | null;
   kalkulation: any;
+  /** Gesetzt, sobald das Kundenportal den Kunden in Mamamia angelegt hat. */
+  mamamia_customer_id?: number | null;
+  mamamia_job_offer_id?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -63,7 +75,7 @@ export async function findOrCreateLead(
     quelle?: string;
   }
 ): Promise<{ lead: Lead; isNew: boolean; isUpgrade: boolean; kalkulationChanged: boolean }> {
-  const { data: existingLeads } = await supabase
+  const { data: existingLeads } = await db()
     .from('leads')
     .select('*')
     .eq('email', email)
@@ -107,7 +119,7 @@ export async function findOrCreateLead(
       if (data?.telefon) updates.telefon = data.telefon;
       if (data?.care_start_timing) updates.care_start_timing = data.care_start_timing;
 
-      const { data: updatedLead } = await supabase
+      const { data: updatedLead } = await db()
         .from('leads')
         .update(updates)
         .eq('id', latestLead.id)
@@ -118,6 +130,8 @@ export async function findOrCreateLead(
         message: 'Lead bereits vorhanden, Kalkulation aktualisiert',
         kalkulation_changed: kalkulationChanged,
       });
+      // Registry #113: der Kunde sieht ab jetzt das neue Angebot — Mamamia zieht nach.
+      if (data?.kalkulation) mamamiaImHintergrund(latestLead, data.kalkulation);
       return { lead: updatedLead || latestLead, isNew: false, isUpgrade: false, kalkulationChanged };
     }
 
@@ -147,7 +161,7 @@ export async function findOrCreateLead(
         updates.token_used = false;
       }
 
-      const { data: updatedLead, error: updateError } = await supabase
+      const { data: updatedLead, error: updateError } = await db()
         .from('leads')
         .update(updates)
         .eq('id', latestLead.id)
@@ -168,6 +182,7 @@ export async function findOrCreateLead(
         from: latestLead.status,
         to: targetStatus,
       });
+      if (data?.kalkulation) mamamiaImHintergrund(latestLead, data.kalkulation);
 
       return { lead: updatedLead, isNew: false, isUpgrade: true, kalkulationChanged: false };
     }
@@ -192,7 +207,7 @@ export async function findOrCreateLead(
         newLeadData.token_used = false;
       }
 
-      const { data: newLead, error: insertError } = await supabase
+      const { data: newLead, error: insertError } = await db()
         .from('leads')
         .insert(newLeadData)
         .select()
@@ -235,7 +250,7 @@ export async function findOrCreateLead(
     newLeadData.token_used = false;
   }
 
-  const { data: newLead, error: insertError } = await supabase
+  const { data: newLead, error: insertError } = await db()
     .from('leads')
     .insert(newLeadData)
     .select()
@@ -261,7 +276,7 @@ export async function logEvent(
   eventType: string,
   metadata?: any
 ): Promise<void> {
-  await supabase.from('lead_events').insert({
+  await db().from('lead_events').insert({
     lead_id: leadId,
     event_type: eventType,
     metadata: metadata || {},
@@ -273,7 +288,7 @@ export async function validateToken(token: string): Promise<{
   lead?: Lead;
   error?: string;
 }> {
-  const { data: lead } = await supabase
+  const { data: lead } = await db()
     .from('leads')
     .select('*')
     .eq('token', token)
@@ -295,3 +310,54 @@ export async function validateToken(token: string): Promise<{
 
   return { valid: true, lead };
 }
+
+/* ─── Registry #113: erneute Anfrage → Mamamia ─────────────────────────────
+   Martin 06.10.2026 (Kunde 11228): der Kunde fragte erneut an, bekam 2.800 €
+   statt 2.600 € (Kundenportal + Mail), Job und SA-Portal blieben bei 2.600 € —
+   „sonst suchen wir falsche Pflegekräfte". Ist der Lead schon in Mamamia
+   angelegt, laufen die geänderten Angaben und der neue Preis über DENSELBEN
+   Weg wie die Admin-Korrektur (#55): onboard-to-mamamia { resync } — Kunde
+   per UpdateCustomer, Job-Preis per UpdateJobOffer wie das SA-Portal; ein
+   gebuchter Job wird nicht angefasst. Dazu eine Notiz in den Kunden-Aktivitäten
+   in Mamamia (Weg wie das SA-Portal) — so steht die erneute Anfrage in der
+   SA-Historie, ohne Ablage neben Mamamia (Martin 06.10.2026). Im Hintergrund
+   (bis 25 s), Lead, Mails und Antwort warten nicht darauf. Fehler ⇒
+   mamamia_sync_pending, der Admin wiederholt mit „Mamamia erneut synchronisieren". */
+function mamamiaImHintergrund(vorher: Lead, neu: Kalkulation): void {
+  mamamiaNachAnfrage(vorher, neu).catch((e) =>
+    console.error(`[mamamia-nach-anfrage] lead=${vorher.id} threw: ${e instanceof Error ? e.message : String(e)}`));
+}
+
+export async function mamamiaNachAnfrage(
+  vorher: Lead,
+  neu: Kalkulation,
+  deps: { fetchFn?: typeof fetch; env?: Record<string, string | undefined>; db?: SupabaseClient } = {},
+): Promise<MamamiaStatus | null> {
+  if (!vorher.mamamia_customer_id || !vorher.mamamia_job_offer_id) return null;
+  const plan = abgleichNachAnfrage(vorher.kalkulation as Kalkulation | null, neu, vorher.care_start_timing);
+  if (!plan) return null;
+  const env = deps.env ?? process.env;
+  const url = env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+
+  const datenbank = deps.db ?? db();
+  const mamamia = await resyncAufrufen({
+    supabaseUrl: url, serviceKey: key, leadId: vorher.id, felder: plan.felder, budget: plan.budget,
+    notiz: anfrageNotiz(vorher.kalkulation as Kalkulation | null, neu), fetchFn: deps.fetchFn,
+  });
+
+  // Pending nur schreiben, wenn die Kalkulation noch dieselbe ist — eine
+  // neuere Anfrage hat sie inzwischen ersetzt und gleicht selbst ab.
+  const { data: aktuell } = await datenbank.from('leads').select('kalkulation').eq('id', vorher.id).maybeSingle();
+  const k = aktuell?.kalkulation as Kalkulation | null | undefined;
+  const dieselbe = !!k && Number(k.bruttopreis) === Number(neu.bruttopreis)
+    && JSON.stringify(k.formularDaten ?? {}) === JSON.stringify(neu.formularDaten ?? {});
+  if (dieselbe && (mamamia.status !== 'ok' || k.mamamia_sync_pending)) {
+    await datenbank.from('leads').update({ kalkulation: pendingNachAbgleich(k, mamamia, plan.felder, plan.budget) }).eq('id', vorher.id);
+  }
+
+  console.log(`[mamamia-nach-anfrage] lead=${vorher.id} ${mamamia.status} felder=${plan.felder.join(',') || '-'} budget=${plan.budget ?? '-'} ${mamamia.message}`);
+  return mamamia;
+}
+

@@ -140,12 +140,46 @@ export function computeArrivalDate(
   return d.toISOString().slice(0, 10);
 }
 
+// ─── Panel-Identitaet ───────────────────────────────────────────────────────
+// Unter welchem Namen Mamamia den Fall fuehrt. Normalfall: der Besteller —
+// wer den Kostenrechner ausgefuellt hat, ist auch der Kunde.
+//
+// Bei einem VERMITTLER-Lead (Registry #59) ist der Besteller die Agentur:
+// `lead.vorname/nachname` tragen deren Ansprechpartner, bei Pflegena bei
+// JEDER Anfrage denselben. Acht Kunden "Bernd Walde" sind fuer die Agentur
+// nicht unterscheidbar — die Identitaet, unter der jemand den Fall sucht,
+// ist der Haushalt.
+//
+// Anker ist der NACHNAME: einen Fall ohne Nachnamen gibt es nicht, ein
+// fehlender Vorname ist normal ("Familie Maier"). Fehlt der Nachname,
+// bleibt es beim Ansprechpartner — lieber der immer gleiche Name als keiner.
+//
+// Der Rechner-Zweig ist bitgleich mit dem Verhalten vor dieser Funktion.
+export function panelIdentitaet(lead: Lead): {
+  first_name: string | null;
+  last_name: string | null;
+  istPatient: boolean;
+} {
+  const nach = lead.patient_nachname?.trim();
+  if (lead.vermittler && nach) {
+    return { first_name: lead.patient_vorname?.trim() || null, last_name: nach, istPatient: true };
+  }
+  return {
+    first_name: lead.vorname ?? lead.patient_vorname ?? null,
+    last_name: lead.nachname ?? lead.patient_nachname ?? null,
+    istPatient: false,
+  };
+}
+
 // ─── JobOffer title generator ───────────────────────────────────────────────
 // Mamamia requires non-empty title. Use "Primundus — {nachname}" when available,
 // fall back to "Primundus — {first-8-chars-of-lead-id}" if nachname is null.
 export function buildJobOfferTitle(lead: Lead): string {
-  if (lead.nachname && lead.nachname.trim().length > 0) {
-    return `Primundus — ${lead.nachname}`;
+  // Derselbe Name wie der Kunde (panelIdentitaet) — sonst heissen die Jobs
+  // eines Vermittlers alle gleich, waehrend die Kunden unterscheidbar sind.
+  const nachname = panelIdentitaet(lead).last_name;
+  if (nachname && nachname.trim().length > 0) {
+    return `Primundus — ${nachname}`;
   }
   return `Primundus — ${lead.id.slice(0, 8)}`;
 }
@@ -291,8 +325,8 @@ export function mapOtherPeopleInHouse(fd: FormularDaten): "yes" | "no" {
 // dopiero zapis formularza pacjenta nadpisywał to na level_3 — a robi to
 // tylko ~22 % klientów. Reszta zostawała na level_4 → SA-Portal liczył im
 // 600 €/Mo i rekomendował ~150 € ponad ich własną ofertą.
-// Dowód (prod, 16.08.): Hümmer/Bähr/Krohne/Glatz — bez formularza → level_4;
-// Felsch/Türschmann — z formularzem → level_3.
+// Dowód (prod, 16.08.): cztery konta bez formularza → level_4;
+// dwa z formularzem → level_3.
 // `level_4` NIE jest tu osiągalny — to świadome ograniczenie, nie luka.
 // Mamamia enum 0..4 + "not_important" verified prod sweep 2026-04-28.
 //
@@ -357,33 +391,23 @@ export function buildCaregiverWish(fd: FormularDaten): CaregiverWishInput {
 //
 // Returns 5-digit PLZ string or null when no PLZ is available — caller
 // passes null to StoreCustomer (location_id stays null too).
+// Genau fünf Ziffern — kein Auffüllen (Registry #65). Bis dahin wurde eine
+// 4-stellige Angabe mit `padStart(5, "0")` zu einer deutschen PLZ gemacht:
+// aus dem österreichischen 6130 (Schwaz) wurde 06130 = Halle (Saale), und
+// StoreCustomer legte den Kunden still dort an. Aus einer Zahl lässt sich die
+// führende Null ohnehin nicht rekonstruieren (1067 Dresden vs. AT-1067), also
+// fällt auch der Zahl-Zweig weg — auf prod trägt kein einziger Lead die PLZ
+// als JSON-Zahl.
 function isPlzString(v: unknown): v is string {
-  return typeof v === "string" && /^\d{4,5}$/.test(v.trim());
-}
-function isPlzNumber(v: unknown): v is number {
-  return typeof v === "number" && v >= 1000 && v <= 99999;
+  return typeof v === "string" && /^\d{5}$/.test(v.trim());
 }
 
 export function extractPlzFromLead(lead: Lead): string | null {
-  if (isPlzString(lead.patient_zip)) {
-    return (lead.patient_zip as string).trim().padStart(5, "0");
-  }
+  if (isPlzString(lead.patient_zip)) return (lead.patient_zip as string).trim();
   const fd = lead.kalkulation?.formularDaten ?? {};
   for (const k of ["plz", "postleitzahl", "postal_code", "zip", "zip_code"]) {
     const v = fd[k];
-    if (isPlzString(v)) return v.trim().padStart(5, "0");
-    if (isPlzNumber(v)) return String(v).padStart(5, "0");
-  }
-  return null;
-}
-
-// Back-compat alias — kept so old call sites don't break, but new code
-// should use extractPlzFromLead which sees the stage-B patient_zip.
-export function extractPlzFromFormularDaten(fd: FormularDaten): string | null {
-  for (const k of ["plz", "postleitzahl", "postal_code", "zip", "zip_code"]) {
-    const v = fd?.[k];
-    if (isPlzString(v)) return v.trim().padStart(5, "0");
-    if (isPlzNumber(v)) return String(v).padStart(5, "0");
+    if (isPlzString(v)) return v.trim();
   }
   return null;
 }
@@ -427,8 +451,9 @@ export function resolvePatientSalutation(lead: Lead): "Mr." | "Mrs." {
 // Business defaults that DO ship in onboard (NOT pytania do klienta):
 //   - language_id = 1   → Primundus is German market
 //   - visibility = "public"
-//   - commission_agent_salary = 10  → Primundus baseline (panel rejects 0;
-//     było 300, obniżone 2026-05-11 wg decyzji biznesowej Michała)
+//   - commission_agent_salary = 0  → keine Provision (300 → 10 am 2026-05-11,
+//     10 → 0 am 2026-09-24, Entscheidung Michał). MM rechnet (beta belegt)
+//     care_budget = monthly_salary − commission_agent_salary, mit 0 sind beide gleich.
 //   - is_open_for_all = false (in wish) → matcher should respect filters
 //
 // caller passes locationId from Locations(plz) lookup; null when PLZ
@@ -442,17 +467,20 @@ export function buildCustomerInput(
   const fd = lead.kalkulation?.formularDaten ?? {};
   const careBudget = lead.kalkulation?.bruttopreis ?? null;
   const arrivalAt = computeArrivalDate(lead.care_start_timing, nowISO);
+  const ident = panelIdentitaet(lead);
 
   return {
-    // Identity — Customer.first_name/last_name = die KONTAKTPERSON / Osoba
-    // Kontaktowa (der Besteller, der den Kostenrechner ausgefüllt hat). Verified
-    // im Mamamia-Panel: dorthin, wo "John Smith" steht, gehört der Lead-Kontakt.
-    // Also lead.vorname/nachname (der Orderer); patient_* ist die GEPFLEGTE
-    // PERSON und gehört in die Patienten-/Vertrags-Records, NICHT in den
-    // Kontakt-Slot. (War invertiert: resolvePatient* bevorzugte patient_*, was
-    // bei gelaufenem Stage-B den Patienten in den Kontakt-Slot schrieb.)
-    first_name: lead.vorname ?? lead.patient_vorname ?? null,
-    last_name: lead.nachname ?? lead.patient_nachname ?? null,
+    // Identity — siehe panelIdentitaet(): normalerweise die KONTAKTPERSON /
+    // Osoba Kontaktowa (der Besteller, der den Kostenrechner ausgefüllt hat).
+    // Verified im Mamamia-Panel: dorthin, wo "John Smith" steht, gehört der
+    // Lead-Kontakt, nicht die gepflegte Person — die gehört in die Patienten-/
+    // Vertrags-Records. (War einmal invertiert: resolvePatient* bevorzugte
+    // patient_*, was bei gelaufenem Stage-B den Patienten in den Kontakt-Slot
+    // schrieb.) AUSNAHME Vermittler-Leads: dort IST der Besteller die Agentur,
+    // und ihr Ansprechpartner ist bei jeder Anfrage derselbe — dann traegt der
+    // Slot den Haushalt.
+    first_name: ident.first_name,
+    last_name: ident.last_name,
     email: lead.email,
     phone: lead.telefon,
     // Location — best-effort. Null when PLZ unknown; patient form fills
@@ -461,7 +489,7 @@ export function buildCustomerInput(
     // Business defaults
     language_id: 1,
     visibility: "public",
-    commission_agent_salary: 10,
+    commission_agent_salary: 0,
     // Pricing (real, from kalkulation)
     care_budget: careBudget,
     monthly_salary: careBudget,

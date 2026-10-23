@@ -7,9 +7,10 @@ async function handleGet(
   request: NextRequest,
   { params }: { params: { leadId: string } }
 ) {
+  // Service-Key: leads ist für den Anon-Schlüssel per RLS zu.
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { persistSession: false, autoRefreshToken: false } }
   );
   try {

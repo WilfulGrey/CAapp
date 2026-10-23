@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
   plugins: [react()],
@@ -7,6 +8,11 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./test/setup.ts'],
+    // Nur für Tests: project 3/lib/email.ts lädt nodemailer, das in CI nicht installiert ist
+    // (die Pakete von project 3 installiert CI nicht). Kein Test versendet Mails.
+    alias: {
+      nodemailer: fileURLToPath(new URL('./test/stubs/nodemailer.ts', import.meta.url)),
+    },
     css: false,
     // Override real .env.local values so MSW handlers in test/fixtures
     // intercept the correct base URL (see test/mocks/server.ts).

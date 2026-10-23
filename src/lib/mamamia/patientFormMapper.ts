@@ -659,11 +659,8 @@ export interface MappedCustomerPatch {
   // zakwaterowania" is a required-looking multi-select; an empty list
   // surfaces as missing config to the agency.
   equipment_ids?: number[];
-  // Bug #13l + Bug #16: Mamamia panel "Lokalizacja opieki" reads z
+  // Bug #13l: Mamamia panel "Lokalizacja opieki" reads z
   // customer_contract.location_id (NIE z Customer.location_id top-level).
-  // Beta miała plural patient_contracts + invoice_contract — prod ma
-  // singular customer_contract (1:1). Refactor 2026-05-12 na singular
-  // który działa na obu środowiskach.
   // phone: Mamamia panel "Dane kontaktowe" reads from customer_contract.phone,
   // NOT Customer.phone top-level (same trap as Bug #13l with location_id).
   // We write to both so panel renders + agency tooling that queries the
@@ -684,6 +681,12 @@ export interface MappedCustomerPatch {
     salutation?: string;
     first_name?: string;
     last_name?: string;
+    // Nur bei Vermittler-Leads (Registry #67): ohne sie defaultet Mamamia auf
+    // true und spiegelt beim naechsten UpdateCustomer die Daten der ersten
+    // Kontaktperson in diese Zeile — das ist dort der Vermittler, womit
+    // "Herr Bernd Walde" wieder unter der Adresse des Patienten stuende.
+    is_same_as_first_patient?: boolean;
+    is_same_as_contact?: boolean;
   };
   customer_caregiver_wish?: CaregiverWishPatch;
   // Patient array.
@@ -723,6 +726,15 @@ export function mapPatientFormToUpdateCustomerInput(
     // customer_contract.salutation/first_name/last_name, damit das Panel die
     // Kontaktdaten zeigt (nicht nur Customer.first_name top-level).
     contact?: { anrede?: string | null; vorname?: string | null; nachname?: string | null };
+    /* Vermittler-Lead: `contact` traegt dann den HAUSHALT (der Aufrufer
+       waehlt ihn aus patient_*), und die Zeile bekommt die expliziten
+       Spiegel-Flags. Bei allen uebrigen Kunden bleibt der Patch bitgleich. */
+    vermittler?: boolean;
+    /* Registry #131: ein Einsatz ist schon angenommen — Name, Anrede und Telefon
+       der betreuten Person kommen dann aus dem Vertragsformular (acceptanceSync)
+       und werden hier NICHT mehr mit der Kontaktperson ueberschrieben. Einsatzort
+       (location_id, zip_code, city) schreibt der Bogen weiter. */
+    vertragAusAnnahme?: boolean;
   } = {},
 ): MappedCustomerPatch {
   const patch: MappedCustomerPatch = {};
@@ -800,12 +812,17 @@ export function mapPatientFormToUpdateCustomerInput(
   if (plzTrim) cc.zip_code = plzTrim;
   const ortTrim = form.ort?.trim();
   if (ortTrim) cc.city = ortTrim;
-  const cSal = salutationToApi(opts.contact?.anrede);
+  const kontakt = opts.vertragAusAnnahme ? undefined : opts.contact;
+  const cSal = salutationToApi(kontakt?.anrede);
   if (cSal) cc.salutation = cSal;
-  const cVor = opts.contact?.vorname?.trim();
+  const cVor = kontakt?.vorname?.trim();
   if (cVor) cc.first_name = cVor;
-  const cNach = opts.contact?.nachname?.trim();
+  const cNach = kontakt?.nachname?.trim();
   if (cNach) cc.last_name = cNach;
+  if (opts.vermittler) {
+    cc.is_same_as_first_patient = false;
+    cc.is_same_as_contact = false;
+  }
   if (Object.keys(cc).length > 0) {
     patch.customer_contract = { ...(patch.customer_contract ?? {}), ...cc };
   }
@@ -859,7 +876,9 @@ export function mapPatientFormToUpdateCustomerInput(
   const phoneTrimmed = form.phone?.trim();
   if (phoneTrimmed) {
     patch.phone = phoneTrimmed;
-    patch.customer_contract = { ...(patch.customer_contract ?? {}), phone: phoneTrimmed };
+    if (!opts.vertragAusAnnahme) {
+      patch.customer_contract = { ...(patch.customer_contract ?? {}), phone: phoneTrimmed };
+    }
   }
 
   // ── customer_caregiver_wish nested ───────────────────────────────────

@@ -24,12 +24,6 @@ export interface MamamiaRequestOptions {
 export async function mamamiaRequest<T>(opts: MamamiaRequestOptions): Promise<T> {
   const { endpoint, token, query, variables, fetchFn = globalThis.fetch } = opts;
 
-  // ───── DEBUG TRACE — TEMP ─────
-  // Identify the mutation/query by its name (first GraphQL keyword).
-  const opName = (query.match(/(?:mutation|query)\s+(\w+)/) || [, "?"])[1];
-  console.log(`[DBG][mamamiaRequest][4-OUT] op=${opName} vars=${JSON.stringify(variables ?? {}).slice(0, 12000)}`);
-  // ───────────────────────────────
-
   const res = await fetchFn(endpoint, {
     method: "POST",
     headers: {
@@ -40,12 +34,10 @@ export async function mamamiaRequest<T>(opts: MamamiaRequestOptions): Promise<T>
   });
 
   if (!res.ok) {
-    console.log(`[DBG][mamamiaRequest][5-RES-NOK] op=${opName} http=${res.status}`);
     throw new Error(`HTTP ${res.status} ${res.statusText}`);
   }
 
   const json = (await res.json()) as GraphQLResponse<T>;
-  console.log(`[DBG][mamamiaRequest][5-RES-OK] op=${opName} errors=${JSON.stringify(json.errors ?? null)} data=${JSON.stringify(json.data ?? null).slice(0, 4000)}`);
 
   if (json.errors && json.errors.length > 0) {
     const first = json.errors[0];

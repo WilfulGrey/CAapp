@@ -241,7 +241,7 @@ async function registriereFehlmail(
           grund: grund ?? '',
           // Kappe wie beim zusatz-Archiv (Registry #42): Inhalt kommt von aussen.
           auszug: (roh || '').slice(0, 500),
-          /* Abgelehnte Mails komplett aufheben (Michał 04.09., Trageser uid 40:
+          /* Abgelehnte Mails komplett aufheben (Michał 04.09., uid 40:
              die Mail war nach dem Lauf aus dem Postfach verschwunden, unser
              500-Zeichen-Auszug war die einzige Kopie — ohne Kundendaten). */
           ...(art === 'abgelehnt' ? { volltext: roh || '' } : {}),

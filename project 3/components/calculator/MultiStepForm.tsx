@@ -5,36 +5,63 @@ import { useCalculator, formatEuro } from "@/lib/calculator-context";
 import { CircleCheck as CheckCircle2, Phone } from "lucide-react";
 import Image from "next/image";
 import { analytics, variantenSeite, websiteHerkunft } from "@/lib/analytics";
+import { websiteEinstieg } from "@/lib/website-einstieg";
 import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
-import { naechsterDrift, naechsterAbstandMs } from "@/lib/counter-drift";
-import { deutschBalken, GANZ_SICHTBAR, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { deutschBalken, GANZ_SICHTBAR, GARANTIE, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { BestpreisDialog } from "@/components/calculator/BestpreisDialog";
+import { PreisSeite, type PreisDaten } from "@/components/calculator/PreisSeite";
+import { HERO_PUNKTE } from "@/lib/hero-punkte";
+import type { SterneStand } from "@/lib/sterne-zeile";
+import { SterneText } from "@/components/calculator/BewertungsZeile";
+import { KontaktSeite, KONTAKT_FELD_ID, type KontaktFeld } from "@/components/calculator/KontaktSeite";
+import { ablaufVariante, KONTAKT_NACH_PREIS, KONTAKT_SEITE, WARTE_KURZ_ENDE_MS, WARTE_KURZ_MS, type Ablauf } from "@/lib/preis-zuerst";
+import { GARANTIE_OEFFNEN_EVENT } from "@/components/calculator/BestpreisSiegelLink";
 import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
+import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
+import { kontaktStandard, kontaktVariante, KNOPF_KONTAKT, STUFEN, STUFEN_FEHLER, type KontaktStufe, type KontaktVariante } from "@/lib/kontakt-stufen";
+
+const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ─── Matching Animation Component ────────────────────────────────────────────
 // Läuft zwischen letzter Frage (Step 8) und Kontaktformular (Step 9). 3 Schritte
-// mit Pflegekraft-Match-Zähler — baut Wertaufbau auf, bevor der Nutzer Name/
+// (ohne ausgedachten Zähler seit 27.09.2026) — baut Wertaufbau auf, bevor der Nutzer Name/
 // E-Mail eingibt. Wurde im Mai 2026 versehentlich entfernt (Commit 281e4ef
 // argumentierte mit „Friction nach Submit", aber die Animation lief VOR dem
 // Submit) — hier 1:1 wiederbelebt.
-function MatchingAnimation({ onComplete, initialCount, vorschau }: { onComplete: (finalCount: number) => void; initialCount: number; vorschau?: boolean }) {
+// Zeichen rechts in jeder Antwort: Pfeil, bei der gewählten Antwort ein
+// Haken. Farbregel (Martin 11.09.): Koralle nur für Knöpfe, Braun = „Ihre
+// Auswahl“, Rot nur für Fehler. Die Klasse `ist-gewaehlt` setzt btnClass.
+function AntwortZeichen() {
+  return (
+    <>
+      <svg className="w-5 h-5 flex-shrink-0 text-[#A8977F] group-[.ist-gewaehlt]:hidden" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+      <span className="hidden group-[.ist-gewaehlt]:inline-flex w-[22px] h-[22px] items-center justify-center rounded-full bg-[#8B7355] flex-shrink-0" aria-hidden="true">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+      </span>
+    </>
+  );
+}
+
+function MatchingAnimation({ onComplete, vorschau, kurz }: { onComplete: () => void; vorschau?: boolean; kurz?: boolean }) {
   const [activeStep, setActiveStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const [nurseCount, setNurseCount] = useState(initialCount);
   const [done, setDone] = useState(false);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
-  // Vorschau-Modus (Registry #61, Martins Aufbau 10.09.): zwei Schritte —
-  // „Sofortangebot berechnet" und „5 passende Pflegekräfte gefunden", dann
-  // automatisch weiter. Sonst die drei Schritte des normalen Rechners.
+  // Vorschau-Modus (Registry #61): drei Schritte aus WARTE („Preis
+  // berechnet", Suche, „Verfügbarkeit geprüft"), dann automatisch weiter.
+  // Sonst die drei Schritte des normalen Rechners.
   const ANIM_STEPS = vorschau
     ? [
-        { label: WARTE.schritt1, sub: '', icon: '📋', duration: 3200 },
-        { label: WARTE.schritt2Laeuft, sub: '', icon: '👩‍⚕️', duration: 4500 },
-        { label: WARTE.schritt3, sub: '', icon: '✓', duration: 1800 },
+        // Ablauf „Preis zuerst" (Registry #77): ca. 3 s statt 10,7 s — der Lohn
+        // (der Preis) folgt direkt, die Berechnung braucht ca. 1 s.
+        { label: WARTE.schritt1, sub: '', icon: '📋', duration: kurz ? WARTE_KURZ_MS[0] : 3200 },
+        { label: WARTE.schritt2Laeuft, sub: '', icon: '👩‍⚕️', duration: kurz ? WARTE_KURZ_MS[1] : 4500 },
+        { label: WARTE.schritt3, sub: '', icon: '✓', duration: kurz ? WARTE_KURZ_MS[2] : 1800 },
       ]
     : [
         { label: 'Ihr persönliches Angebot wird erstellt', sub: 'Angebot & Pflegekräfte werden zusammengestellt', icon: '📋', duration: 3200 },
@@ -46,7 +73,7 @@ function MatchingAnimation({ onComplete, initialCount, vorschau }: { onComplete:
     let t: ReturnType<typeof setTimeout>;
     const run = (i: number) => {
       if (i >= ANIM_STEPS.length) {
-        setTimeout(() => { setDone(true); setTimeout(() => onCompleteRef.current(nurseCount), 900); }, 300);
+        setTimeout(() => { setDone(true); setTimeout(() => onCompleteRef.current(), kurz ? WARTE_KURZ_ENDE_MS : 900); }, 300);
         return;
       }
       setActiveStep(i);
@@ -56,27 +83,6 @@ function MatchingAnimation({ onComplete, initialCount, vorschau }: { onComplete:
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Pflegekraft-Zähler läuft während Step 1 (Index 1) auf eine personalisierte
-  // Endzahl (target=5) herunter — fühlt sich wie eine echte Filterung an.
-  // 2026-07-08 (Martin): 3 → 5, passend zur gesperrten Ergebnis-Karte im
-  // Kontakt-Schritt. Hinweis: Portal-Vorschau zeigt aktuell Top 3 — ggf.
-  // dort nachziehen.
-  useEffect(() => {
-    if (activeStep !== 1) return;
-    const iv = setInterval(() => {
-      // Ziel 5 = die Zahl, die auch das Kundenportal zeigt (waehleFuenf).
-      // Auch im Vorschau-Modus: dort stehen 3 der 5 vorab auf Schritt 9
-      // (Martin, 10.09.: „im Kundenportal zeigen wir doch 5").
-      const target = 5;
-      setNurseCount(prev => {
-        const next = prev - Math.ceil((prev - target) / 14);
-        if (next <= target) { clearInterval(iv); return target; }
-        return next;
-      });
-    }, 120);
-    return () => clearInterval(iv);
-  }, [activeStep]);
 
   return (
     <div className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
@@ -101,12 +107,12 @@ function MatchingAnimation({ onComplete, initialCount, vorschau }: { onComplete:
             // zweite Zeile sitzt der Text mittig zum Icon (Martin, 10.09.:
             // „Text nicht mittig zum Icon, wenn fertig"); ein leerer Absatz mit
             // Abstand hatte ihn nach oben geschoben.
-            const subText: React.ReactNode = i === 1 && isActive
-              ? <><span className="font-bold text-[#22A06B] tabular-nums">{nurseCount}</span> Pflegekräfte werden geprüft…</>
-              : i === 1 && isDone && !vorschau
-              ? <><span className="font-bold text-[#22A06B]">{nurseCount}</span> passende Pflegekräfte gefunden</>
+            // Während der Suche KEINE Zahl (Martin 27.09.2026): nur „… werden gesucht", fertig
+            // dann die echte Portal-Zahl.
+            const subText: React.ReactNode = i === 1 && isDone && !vorschau
+              ? <><span className="font-bold text-[#22A06B]">{PORTAL_ANZAHL}</span> passende Pflegekräfte gefunden</>
               : vorschau && i === 2 && isDone
-              ? WARTE.schritt3Fertig(nurseCount)
+              ? WARTE.schritt3Fertig(PORTAL_ANZAHL)
               : (isActive || isDone) && s.sub ? s.sub : null;
             return (
               <div key={i} className={`flex ${subText ? 'items-start' : 'items-center'} gap-4 transition-all duration-500 ${isPending ? 'opacity-25' : 'opacity-100'}`}>
@@ -125,7 +131,7 @@ function MatchingAnimation({ onComplete, initialCount, vorschau }: { onComplete:
                 </div>
                 <div className="flex-1 min-w-0 text-left">
                   <p className={`text-[15px] font-semibold leading-snug transition-colors duration-300 ${isDone ? 'text-[#3D3D3D]' : isActive ? 'text-[#3D3D3D]' : 'text-[#AFAFAF]'}`}>
-                    {vorschau && i === 1 && isDone ? WARTE.schritt2Fertig(nurseCount) : s.label}
+                    {vorschau && i === 1 && isDone ? WARTE.schritt2Fertig(PORTAL_ANZAHL) : s.label}
                     {isDone && <span className="ml-2 text-xs font-normal text-[#22A06B] whitespace-nowrap">✓ Fertig</span>}
                   </p>
                   {subText ? <p className="text-sm text-[#8B8B8B] mt-1">{subText}</p> : null}
@@ -163,9 +169,11 @@ interface MultiStepFormProps {
    * geliefert hat.
    */
   mode?: 'inline' | 'cta';
+  /** Bewertungsstand der Startseite (server-seitig geladen) — die Preisseite zeigt dieselbe Sterne-Zeile. */
+  bewertung?: SterneStand | null;
 }
 
-export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
+export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFormProps = {}) {
   const { state, updateState, calculate } = useCalculator();
   const [currentStep, setCurrentStep] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
@@ -180,10 +188,63 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // auslöst.
   const [vorschauAktiv, setVorschauAktiv] = useState(false);
   const vorschauAktivRef = useRef(false);
+  // Kontakt in drei Schritten (Registry #76, Martin 16.09.): 50/50 gegen das
+  // heutige Formular, klebrig je Sitzung, `?kontakt=stufen|alt` erzwingt.
+  // Nur im useEffect bestimmen — nie beim Rendern (Hydration, s. Tagesformel).
+  // Ref daneben, damit die Zähler-Effekte lesen können, ohne neu zu feuern.
+  const [kontaktVar, setKontaktVar] = useState<KontaktVariante>('alt');
+  const kontaktVarRef = useRef<KontaktVariante>('alt');
+  const [stufe, setStufe] = useState<KontaktStufe>('name');
+  const [stufenFehler, setStufenFehler] = useState('');
+  // Nach dem E-Mail-Schritt existiert der Lead; Token und Portal-Link für
+  // den Telefon-Schritt und den Redirect. Ref, weil die Handler async sind.
+  const leadDatenRef = useRef<{ leadId: string; portalUrl: string; token: string | null } | null>(null);
+  const [leadGespeichert, setLeadGespeichert] = useState(false);
+  // Preis zuerst (Registry #77, Martin 17.09.): EIN Test — der Ablauf würfelt
+  // (`preis` gegen `alt`), die Kontaktform folgt ihm. Die Kalkulation lädt
+  // während der Warteseite; scheitert sie, läuft der Besucher den heutigen Weg.
+  const [ablauf, setAblauf] = useState<Ablauf>('alt');
+  const ablaufRef = useRef<Ablauf>('alt');
+  const [preisDaten, setPreisDaten] = useState<PreisDaten | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const preisDatenRef = useRef<any>(null);
+  const preisLadenRef = useRef<Promise<void> | null>(null);
+  // Kontaktseite hinter dem Preis: Fehler je Feld (erst beim Klick geprüft) + Server-Fehler am Knopf.
+  const [kontaktFehler, setKontaktFehler] = useState<Record<KontaktFeld, string>>({ name: '', email: '', phone: '' });
+  const [kontaktServerFehler, setKontaktServerFehler] = useState('');
+  // Ablauf-Test (Registry #80): `preis` = Preisseite vor dem Kontakt, `stufen` = kein Preis, drei Kontaktschritte.
+  const zaehlVariante = () => (vorschauAktivRef.current ? 'vorschau' : ablaufRef.current === 'preis' ? 'preis' : kontaktVarRef.current);
   const [kraefteVorschau, setKraefteVorschau] = useState<VorschauKraft[] | null>(null);
   // Schritt 9 im Vorschau-Modus: die Kontaktfelder öffnen sich erst nach dem
   // Knopf „Preis & Profile freischalten" (Martin, 10.09.). Ref für Payload/Redirect.
   const [kontaktOffen, setKontaktOffen] = useState(false);
+  // Bestpreisgarantie: Pop-up aus dem grünen Kopf (Martin 12.09.). Öffnen
+  // zählt anonym (garantie_geoeffnet), damit wir sehen, wie viele es lesen.
+  const [garantieOffen, setGarantieOffen] = useState(false);
+  const oeffneGarantie = () => {
+    setGarantieOffen(true);
+    zaehle('garantie_geoeffnet', zaehlVariante());
+  };
+  // Knopf im Pop-up (Martin 13.09.: statt Verstanden in den Rechner): wie der
+  // Hero-Knopf, Wizard auf, Einstieg ohne Warm-up. Ist der Wizard schon offen,
+  // schließt er nur das Pop-up. Zählt anonym als garantie_weiter.
+  const weiterAusGarantie = () => {
+    setGarantieOffen(false);
+    zaehle('garantie_weiter', zaehlVariante());
+    if (!fullscreen) {
+      analytics.trackEvent('wizard', 'wizard_opened', { source: 'garantie_popup' });
+      setWarmupAudience('direct');
+      setFullscreen(true);
+    }
+  };
+  // Das Siegel im Hero-Bild (app/page.tsx) liegt außerhalb dieses Wizards und
+  // öffnet das Pop-up über ein Fensterereignis (BestpreisSiegelLink).
+  useEffect(() => {
+    const h = () => oeffneGarantie();
+    window.addEventListener(GARANTIE_OEFFNEN_EVENT, h);
+    return () => window.removeEventListener(GARANTIE_OEFFNEN_EVENT, h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const kontaktOffenRef = useRef(false);
   const kraefteVorschauRef = useRef<VorschauKraft[] | null>(null);
   const oeffneKontakt = () => {
@@ -192,16 +253,55 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     analytics.trackEvent('wizard', 'kraefte_wahl', { aktion: 'button', kraft_id: null });
     zaehle('cta_geklickt', 'vorschau');
     setTimeout(() => {
-      document.getElementById('kontakt-schranke')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Kontakt ist ein eigener Schritt (keine Karten mehr darüber): an den
+      // Kartenanfang, damit Kopf und Siegel sichtbar bleiben (11.09.).
+      document.querySelector('[data-calculator-card]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('kontakt-name')?.focus({ preventScroll: true });
+    }, 60);
+  };
+  const oeffneKontaktNachPreis = () => {
+    kontaktOffenRef.current = true;
+    setKontaktOffen(true);
+    analytics.trackEvent('wizard', 'preis_weiter', {});
+    zaehle('kontakt_geoeffnet', 'preis');
+    setTimeout(() => {
+      document.querySelector('[data-calculator-card]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       document.getElementById('kontakt-name')?.focus({ preventScroll: true });
     }, 60);
   };
   const vorschauModus = vorschauAktiv && !!kraefteVorschau && kraefteVorschau.length > 0;
+  // Preisseite vor der Kontaktabfrage — nur wenn die Kalkulation da ist.
+  const preisModus = ablauf === 'preis' && !!preisDaten && !vorschauModus;
+  const ergebnisModus = vorschauModus || preisModus;
+  // Die Karten-Seite (?kraefte=1) behält das alte Formular — keine Kreuzung der Tests.
+  const stufenAktiv = kontaktVar === 'stufen' && !vorschauModus;
+  // Hinter dem Preis verspricht der Kontakt nicht mehr den Preis, sondern die Kräfte (Registry #77).
+  const stufenText = preisModus && stufe === 'email' ? KONTAKT_NACH_PREIS.emailText : STUFEN[stufe].text;
+  const stufenKnopf = preisModus && stufe === 'telefon' ? KONTAKT_NACH_PREIS.knopf : STUFEN[stufe].knopf;
+  // Nach jedem Teilschritt-Wechsel das Feld fokussieren (der Wechsel folgt
+  // auf einen Klick, darum öffnet sich auch auf dem Handy die Tastatur).
+  useEffect(() => {
+    if (currentStep !== totalSteps || !stufenAktiv) return;
+    const id = stufe === 'name' ? 'kontakt-name' : stufe === 'email' ? 'kontakt-email' : 'kontakt-telefon';
+    const t = setTimeout(() => document.getElementById(id)?.focus({ preventScroll: true }), 60);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stufe, currentStep, stufenAktiv]);
   useEffect(() => {
     try {
       const an = kraefteVorschauAktiv(window.location.search, window.sessionStorage);
       vorschauAktivRef.current = an;
       setVorschauAktiv(an);
+      // Die Karten-Seite (?kraefte=1) bleibt beim alten Weg — keine Kreuzung der Tests.
+      // Ablauf: seit 19.09. für alle `alt` (Preis zuerst aus), `?ablauf=preis` klebt je Sitzung.
+      const ab: Ablauf = an ? 'alt' : ablaufVariante(window.location.search, window.sessionStorage);
+      ablaufRef.current = ab;
+      setAblauf(ab);
+      // Kontakt-Test (Registry #80) seit 24.09.2026 beendet (Registry #84): altes Formular für alle,
+      // das Los wird nicht mehr gelesen; Zwang per `?kontakt=stufen` klebt weiter je Sitzung.
+      const kv = kontaktVariante(window.location.search, window.sessionStorage, an ? 'alt' : kontaktStandard(ab), Math.random, window.localStorage);
+      kontaktVarRef.current = kv;
+      setKontaktVar(kv);
     } catch { /* sessionStorage gesperrt — Vorschau bleibt aus */ }
   }, []);
   const setzeVorschau = (liste: VorschauKraft[]) => { kraefteVorschauRef.current = liste; setKraefteVorschau(liste); };
@@ -224,110 +324,10 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // contact form users engage / drop off.
   const { trackFieldFocus, trackFieldBlur, trackFormSubmit } = useFormTracking('kontaktformular');
 
-  /* Die Tagesformel darf NICHT beim Rendern laufen.
+  /* Die ausgedachte Startzahl der Warte-Animation (71–78 je Kalendertag minus Abzüge je
+     Antwort, Zähler vor „gefunden") ist raus (Martin 27.09.2026: „ja mach"):
+     Wir nennen nur noch die echte Portal-Zahl 5. */
 
-     Bis 23.08.2026 stand hier `useMemo(() => 71 + (new Date().getDate() % 8))`.
-     useMemo laeuft WAEHREND des Renderns — auf dem Server wie im Browser. Die
-     Startseite wird statisch vorgerendert, ihr HTML traegt also den Tag des
-     letzten Deploys, waehrend der Browser mit heute rechnet. Ab dem Tag danach
-     standen an derselben Stelle zwei verschiedene Zahlen.
-
-     Die Folge war kein Schoenheitsfehler: React meldete #425 („Text content
-     does not match server-rendered HTML"), daraus wurden #418 und #423 — und
-     #423 heisst „the entire root will switch to client rendering". React warf
-     bei JEDEM Aufruf die fertig gelieferte Seite weg und baute sie im Browser
-     neu auf. Auf Prod in Safari UND Chrome nachgewiesen.
-
-     Beim Drift weiter unten war die Falle bekannt („ERST NACH MOUNT"), bei der
-     Basis darunter nicht. Also derselbe Weg: im Render ein fester Wert, den
-     Server und Browser gleich berechnen, das echte Datum erst im Effekt. Der
-     Nachzug faellt nicht auf — der Zaehler bewegt sich ohnehin von selbst. */
-  const TAGESBASIS_SSR = 75;   // Mitte von 71..78
-  const [dailyBase, setDailyBase] = useState(TAGESBASIS_SSR);
-  useEffect(() => {
-    setDailyBase(71 + (new Date().getDate() % 8));
-  }, []);
-
-  function getMatchingCount(): number {
-    let count = dailyBase;
-    // Answer-specific reductions
-    if (state.patientCount === 'ehepaar') count -= 9;
-    if (state.householdOthers === 'ja') count -= 4;
-    const grad = parseInt(state.pflegegrad || '0');
-    count -= Math.max(0, grad - 1) * 2;
-    // rollator & gehfähig: no extra drop. rollstuhl/bettlägerig: deutlich
-    if (state.mobility === 'rollstuhl') count -= 9;
-    if (state.mobility === 'bettlaegerig') count -= 14;
-    if (state.nightCare === 'gelegentlich') count -= 2;
-    if (state.nightCare === 'taeglich') count -= 8;
-    if (state.nightCare === 'mehrmals') count -= 14;
-    if (state.germanLevel === 'kommunikativ') count -= 2;
-    if (state.germanLevel === 'sehr-gut') count -= 10;
-    if (state.driving === 'ja') count -= 8;
-    if (state.gender === 'maennlich') count -= 7;
-    if (state.gender === 'weiblich') count -= 1;
-    return Math.max(12, count);
-  }
-
-  const displayCountRef = useRef(dailyBase);
-  const [displayCount, setDisplayCount] = useState(dailyBase);
-
-  /**
-   * Leichte Eigenbewegung des Zaehlers — Schrittlogik und Grenzen liegen in
-   * `lib/counter-drift.ts` (dort steht auch, warum die Zahl lebendiger, aber
-   * nicht echter wird).
-   *
-   * Der Versatz ist bewusst eigener State und NICHT Teil von
-   * getMatchingCount(): so bleibt die Antwort-Logik pur, und beide Effekte
-   * laufen durch dieselbe Tween-Schleife — kein Ruckeln, wenn eine Antwort
-   * und ein Drift-Schritt zusammenfallen.
-   *
-   * ERST NACH MOUNT: der Server rendert Versatz 0, sonst Hydration-Mismatch.
-   */
-  const [drift, setDrift] = useState(0);
-
-  useEffect(() => {
-    // Wer Bewegung im System abgestellt hat, bekommt auch hier keine.
-    if (
-      typeof window === 'undefined' ||
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    ) {
-      return;
-    }
-    let timer: ReturnType<typeof setTimeout>;
-    const tick = () => {
-      // Im unsichtbaren Tab NICHT weiterlaufen: requestAnimationFrame ruht
-      // dort, die Tweens wuerden sich aufstauen und beim Zurueckkommen alle
-      // auf einmal abfeuern. Der Schritt wird uebersprungen, nicht nachgeholt.
-      if (!document.hidden) {
-        setDrift((d) => naechsterDrift(d, Math.random()));
-      }
-      timer = setTimeout(tick, naechsterAbstandMs(Math.random()));
-    };
-    timer = setTimeout(tick, naechsterAbstandMs(Math.random()));
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    const target = Math.max(12, getMatchingCount() + drift);
-    const start = displayCountRef.current;
-    if (target === start) return;
-    let rafId: number;
-    // Die Drift laeuft langsamer als ein Antwort-Sprung: eine Antwort ist
-    // eine Reaktion auf den Klick und darf zackig sein, die Drift soll
-    // nebenbei passieren.
-    const duration = Math.abs(target - start) <= 1 ? 1400 : 600;
-    const startTime = performance.now();
-    const frame = (now: number) => {
-      const t = Math.min((now - startTime) / duration, 1);
-      const current = Math.round(start + (target - start) * t);
-      displayCountRef.current = current;
-      setDisplayCount(current);
-      if (t < 1) rafId = requestAnimationFrame(frame);
-    };
-    rafId = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(rafId);
-  }, [dailyBase, currentStep, drift, state.patientCount, state.householdOthers, state.pflegegrad, state.mobility, state.nightCare, state.germanLevel, state.driving, state.gender]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -352,6 +352,9 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                         // entfernt — das konkrete Startdatum wird jetzt im
                         // CA-App-Patientenformular abgefragt (PatientForm.startDate).
                         // Getriebe lebt auch im CA-app patient form, nicht hier.
+  // Registry #121 (Martin 10.10.): Absendeblock des Kontakt-Schritts sichtbar (Knopf, Sterne,
+  // „100 % kostenfrei & unverbindlich“). Dann lässt die Leiste am Kartenfuß denselben Punkt weg.
+  const kontaktAbsendeblock = currentStep === totalSteps && (!ergebnisModus || kontaktOffen) && !stufenAktiv && !preisModus;
   const stepStartRef = useRef<number>(Date.now());
   // Scroll target for step changes. page.tsx renders TWO MultiStepForm
   // instances (mobile + desktop layout), both with id="calculator-form" —
@@ -387,7 +390,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       kraefte_vorschau: vorschauAktivRef.current,
     });
     // Anonymer Zähler ohne Einwilligung (Registry #63): nur Schritt + Variante.
-    if (currentStep >= 1 && currentStep <= 9) zaehle(`schritt_${currentStep}` as `schritt_${1|2|3|4|5|6|7|8|9}`, vorschauAktivRef.current ? 'vorschau' : 'alt');
+    if (currentStep >= 1 && currentStep <= 9) zaehle(`schritt_${currentStep}` as `schritt_${1|2|3|4|5|6|7|8|9}`, zaehlVariante());
     stepStartRef.current = Date.now();
   }, [currentStep, wizardSichtbar]);
 
@@ -602,217 +605,360 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       case 7: return Boolean(state.driving);
       case 8: return Boolean(state.gender);
       // Step 9 Kontaktformular: Name + E-Mail + Telefon alle drei Pflicht.
-      // Telefon-Plausibilität wird in validateForm() detailliert geprüft;
-      // hier reicht "nicht leer" für die Weiter-Button-Aktivierung.
-      // Telefon ist Pflicht (Rückrufe durch die Beratung; Server verlangt es ebenso).
-      case 9: return Boolean(formData.name.trim() && formData.email.trim() && formData.phone.trim());
+      // Knopf erst aktiv, wenn E-Mail und Telefon plausibel sind (Martin
+      // 11.09.: „Buchstaben eingeben und der Button ist sofort aktiv") —
+      // dieselbe Prüfung wie validateForm(), Hinweise erscheinen beim Verlassen
+      // des Feldes.
+      case 9: return Boolean(formData.name.trim() && EMAIL_MUSTER.test(formData.email.trim()) && telefonGueltig(formData.phone));
       default: return false;
     }
   };
 
+  // Hinweise des Kontaktformulars, eine Regel für Absenden und Knopf-Tipp.
+  // Name + E-Mail + Telefon wieder alle drei Pflicht (Rückrollung der
+  // Änderung vom 06.06.2026). Begründung 14.06.2026: Tel-Quote ist seit
+  // 06.06. von 67 % auf 34 % gefallen, ohne Conversion-Vorteil — der
+  // Lead-Wert leidet, weil das Sales-Team ohne Telefonnummer nicht
+  // nachhaken kann. Daten ohne Telefon können nicht zu Mamamia weiter,
+  // d.h. Pflegekräfte sehen den Lead nicht.
+  // Telefon: 8–15 Ziffern, nur Ziffern/+/Trennzeichen (lib/telefon.ts,
+  // Maßstab 284 echte Anfragen). Der Server prüft weiter mild (≥6), damit
+  // Pria- und Portal-Wege nicht an der strengeren Regel scheitern.
+  const kontaktFehlerAlt = (): Record<KontaktFeld, string> => ({
+    name: formData.name.trim() ? '' : 'Bitte geben Sie Ihren Namen ein',
+    email: !formData.email.trim()
+      ? 'Bitte geben Sie Ihre E-Mail-Adresse ein'
+      : EMAIL_MUSTER.test(formData.email.trim()) ? '' : 'Bitte geben Sie eine gültige E-Mail-Adresse ein',
+    phone: telefonFehler(formData.phone ?? ''),
+  });
+
   const validateForm = () => {
-    const newErrors = {
-      name: '',
-      email: '',
-      phone: '',
-      acceptPrivacy: '',
-    };
-
-    // Name + E-Mail + Telefon wieder alle drei Pflicht (Rückrollung der
-    // Änderung vom 06.06.2026). Begründung 14.06.2026: Tel-Quote ist seit
-    // 06.06. von 67 % auf 34 % gefallen, ohne Conversion-Vorteil — der
-    // Lead-Wert leidet, weil das Sales-Team ohne Telefonnummer nicht
-    // nachhaken kann. Daten ohne Telefon können nicht zu Mamamia weiter,
-    // d.h. Pflegekräfte sehen den Lead nicht.
-    if (!formData.name.trim()) {
-      newErrors.name = 'Bitte geben Sie Ihren Namen ein';
-    }
-    if (!formData.email.trim()) {
-      newErrors.email = 'Bitte geben Sie Ihre E-Mail-Adresse ein';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Bitte geben Sie eine gültige E-Mail-Adresse ein';
-    }
-    // Telefon mild geprüft — alles mit ≥6 Ziffern akzeptieren. Lässt
-    // gängige DACH-Formate zu (+49 30 123456, 030/12345, 015123…) und
-    // lehnt klare Fehleingaben ("abc", "1") ab. Strengere Formate hätten
-    // False-Negatives produziert.
-    const phoneDigits = (formData.phone ?? '').replace(/\D/g, '');
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Bitte geben Sie Ihre Telefonnummer ein';
-    } else if (phoneDigits.length < 6) {
-      newErrors.phone = 'Bitte geben Sie eine gültige Telefonnummer ein';
-    }
-
     // Datenschutz-Einwilligung wurde durch Soft-Consent ersetzt (Hinweistext
     // unter dem CTA, das Absenden gilt als Zustimmung) — kein explizites
     // Checkbox-Validation mehr nötig.
-
+    const newErrors = { ...kontaktFehlerAlt(), acceptPrivacy: '' };
     setErrors(newErrors);
     return !newErrors.name && !newErrors.email && !newErrors.phone;
+  };
+
+  // Registry #121 (Martin 09.10.): Der Knopf im Kontakt-Schritt ist nie blass.
+  // Fehlt etwas, zeigt der Tipp den Hinweis am ERSTEN offenen Feld und setzt den
+  // Cursor dorthin (so abgenommen; drei rote Zeilen auf einmal wirken wie eine
+  // Strafe für jemanden, der nur den Preis sehen wollte). Ein echter Tipp darf
+  // fokussieren, auf dem Handy geht dann die Tastatur auf.
+  const kontaktUnvollstaendig = () => {
+    zaehle('knopf_unvollstaendig', zaehlVariante());
+    const fehler = kontaktFehlerAlt();
+    const erstes = (['name', 'email', 'phone'] as const).find((k) => fehler[k]);
+    if (!erstes) return;
+    setErrors((alt) => ({ ...alt, [erstes]: fehler[erstes] }));
+    document.getElementById(KONTAKT_FELD_ID[erstes])?.focus();
+  };
+
+  // Registry #121: erstes Antippen eines Kontaktfeldes. Der Zähler zählt je
+  // Seitenaufruf einmal; der Verlust am Kontakt-Schritt liegt vor diesem Tipp.
+  const kontaktFeldFokus = (feld: KontaktFeld) => {
+    trackFieldFocus(feld);
+    zaehle('feld_angetippt', zaehlVariante());
+  };
+
+  // Lead anlegen: Preis serverseitig rechnen, dann /api/angebot-anfordern.
+  // Beide Varianten gehen diesen Weg; `stufen` schickt kein Telefon und
+  // meldet `telefonSpaeter` — die Route lässt die Nummer dann aus und der
+  // Telefon-Schritt trägt sie über /api/lead-telefon nach (Registry #76).
+  // Antworten → formularDaten der Preisberechnung (Preisseite UND Lead nutzen dieselben).
+  const formularDatenAusAntworten = () => ({
+    betreuung_fuer: state.patientCount || '',
+    pflegegrad: parseInt(state.pflegegrad || '0'),
+    weitere_personen: state.householdOthers || '',
+    mobilitaet: state.mobility || '',
+    nachteinsaetze: state.nightCare || '',
+    deutschkenntnisse: state.germanLevel || '',
+    fuehrerschein: state.driving || '',
+    // Getriebe (gearbox) lives on the CA-app patient form, not here —
+    // user picks Automatik / Schaltung / Egal in the in-portal step 3
+    // (Wünsche zur PK), and patientFormMapper writes it to
+    // customer_caregiver_wish.driving_license_gearbox via UpdateCustomer.
+    // Onboard sets a permissive 'automatic' default so Mamamia matching
+    // works before the patient form is saved.
+    geschlecht: state.gender || '',
+  });
+  // Preis zuerst: Kalkulation laden, sobald die Warteseite läuft (frischer State,
+  // darum im Effekt und nicht im Klick-Handler der letzten Frage).
+  useEffect(() => {
+    if (!showMatching || ablaufRef.current !== 'preis' || preisDatenRef.current) return;
+    preisLadenRef.current = fetch('/api/kalkulation-berechnen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ formularDaten: formularDatenAusAntworten() }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((k) => { if (k && typeof k.bruttopreis === 'number' && k.zuschüsse) { preisDatenRef.current = k; setPreisDaten(k); } })
+      .catch(() => { /* Preisseite entfällt — der Besucher läuft den heutigen Weg */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMatching]);
+  // Preisseite gesehen: anonym zählen (einmal je Seitenaufruf) + Ereignis mit Einwilligung.
+  useEffect(() => {
+    if (currentStep !== totalSteps || !preisModus || kontaktOffen) return;
+    zaehle('preis_gesehen', 'preis');
+    analytics.trackEvent('wizard', 'preis_gesehen', {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, preisModus, kontaktOffen]);
+  const erzeugeLead = async (opts: { telefon: string | null; telefonSpaeter: boolean }) => {
+    const formularDaten = formularDatenAusAntworten();
+
+    // Preis zuerst (Registry #77): die Kalkulation der Preisseite wiederverwenden —
+    // der Kunde bekommt genau den Preis, den er gesehen hat. Sonst wie bisher
+    // server-seitig berechnen (damit die echten Preise aus der DB verwendet werden).
+    let kalkulation = preisDatenRef.current;
+    if (!kalkulation) {
+      const kalkulationResponse = await fetch('/api/kalkulation-berechnen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formularDaten }),
+      });
+      if (!kalkulationResponse.ok) {
+        throw new Error('Fehler bei der Kalkulation');
+      }
+      kalkulation = await kalkulationResponse.json();
+    }
+
+    // Sende an angebot-anfordern API (erstellt Lead + versendet Angebots-E-Mails)
+    // adParams: Google-Klick-IDs (gclid/wbraid/gbraid) aus der Landing-URL
+    // dieser Session — die Route sanitisiert und hängt sie an den Lead,
+    // damit qualifizierte Leads später als Offline-Conversions zu Google
+    // importiert werden können (docs/google-ads-tracking.md).
+    const response = await fetch('/api/angebot-anfordern', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        vorname: formData.name,
+        email: formData.email,
+        ...(opts.telefon ? { telefon: opts.telefon } : {}),
+        telefonSpaeter: opts.telefonSpaeter,
+        kontaktVariante: kontaktVarRef.current,
+        ablauf: ablaufRef.current,
+        careStartTiming: state.careStartTiming,
+        adParams: analytics.getAdParams(),
+        // Von welcher Seite kam die Anfrage (Martin, 27.08.). Die
+        // Varianten-Weiche liefert alle drei unter „/" aus, deshalb zählt
+        // die Variante aus dem Cookie — nicht der Pfad (analytics.ts).
+        quelle: (() => {
+          // Von primundus.de gekommen? Dann zählt die Website als Quelle
+          // (Martin, 04.09.: Betreff „Primundus.de", Unterseite in der Mail).
+          const web = websiteHerkunft();
+          if (web) return `website:${web.src}`;
+          const seite = variantenSeite();
+          return seite === '/' ? 'rechner' : `rechner:${seite.replace(/^\//, '')}`;
+        })(),
+        websitePfad: websiteHerkunft()?.pfad ?? null,
+        // Erste Seite und Herkunft des Besuchs auf primundus.de (Registry #120); ohne Werte null
+        websiteEinstieg: websiteEinstieg(),
+        kalkulation: {
+          ...kalkulation,
+          formularDaten,
+        },
+      }),
+    });
+    if (!response.ok) {
+      throw new Error('Fehler beim Senden');
+    }
+    const data = await response.json();
+    if (!(data.success && data.leadId)) {
+      throw new Error('Fehler beim Anfordern des Angebots');
+    }
+    // No portalUrl from server is a deploy/config bug — surface it so
+    // the issue is visible instead of hidden behind a fallback UI.
+    if (typeof data.portalUrl !== 'string' || data.portalUrl.length === 0) {
+      throw new Error('Portal-URL fehlt in Server-Antwort. Bitte Support kontaktieren.');
+    }
+    return { data: data as { leadId: string; portalUrl: string; token: string | null }, kalkulation };
+  };
+
+  // Erfolgsmeldungen, die es je Lead genau EINMAL gibt: Beacon (Bug #33),
+  // OpenAI-Pixel, Google-Ads-Conversion über den dataLayer. `onDone` hängt
+  // den Redirect an das GTM-Ereignis (Variante alt); in `stufen` bleibt die
+  // Seite offen, GTM hat Zeit, der Redirect kommt nach dem Telefon-Schritt.
+  const meldeErfolg = (data: { leadId: string; portalUrl: string }, kalkulation: { bruttopreis?: number }, onDone?: () => void) => {
+    trackFormSubmit();
+    zaehle('abgeschickt', zaehlVariante());
+    // step_complete(contact_form) + Conversion in EINEM Beacon — überlebt
+    // den Redirect garantiert (Bug #33). Ersetzt die früheren racy
+    // supabase-js-Inserts (analytics.trackConversion + step_complete aus
+    // handleNext), von denen ~die Hälfte beim window.location.assign starb.
+    analytics.trackCriticalSubmit({
+      step: totalSteps,
+      stepName: getStepId(totalSteps),
+      timeOnStepSeconds: Math.round((Date.now() - stepStartRef.current) / 1000),
+      extra: {
+        kraefte_vorschau: vorschauAktivRef.current,
+        kraefte_aktion: kontaktOffenRef.current ? 'button' : null,
+        kontakt_variante: kontaktVarRef.current,
+        ablauf: ablaufRef.current,
+      },
+      conversion: {
+        leadId: data.leadId,
+        conversionType: 'angebot_angefordert',
+        conversionValue: kalkulation.bruttopreis,
+        formData: {
+          pflegegrad: state.pflegegrad,
+          care_start_timing: state.careStartTiming,
+          patient_count: state.patientCount,
+        },
+      },
+    });
+    // OpenAI Ads (ChatGPT-Werbung): lead_created an den Pixel. Bis zum
+    // 10.09. stand dieser Aufruf nur auf der alten /result-Seite, die der
+    // Wizard seit dem Direkt-Redirect nie erreicht — der Pixel hatte in
+    // einer Woche Kampagne kein einziges Ereignis gesehen. Ohne
+    // Marketing-Einwilligung existiert window.oaiq nicht, dann passiert
+    // nichts. Das SDK sendet mit keepalive/sendBeacon, der Redirect
+    // gleich darunter reisst den Request nicht ab.
+    meldeAnfrage(window.oaiq, data.leadId);
+    // GTM-Tags (Google-Ads-Conversion auf `angebot_erfolgreich`, siehe
+    // docs/google-ads-tracking.md) brauchen einen Moment zum Feuern,
+    // bevor die Navigation alle offenen Requests killt: eventCallback
+    // meldet „alle Tags fertig", eventTimeout/setTimeout sichern den
+    // Redirect ab, falls GTM geblockt ist (Adblocker) oder hängt.
+    (window as any).dataLayer = (window as any).dataLayer || [];
+    (window as any).dataLayer.push({
+      event: 'angebot_erfolgreich',
+      lead_id: data.leadId,
+      pflegegrad: state.pflegegrad,
+      care_start_timing: state.careStartTiming,
+      conversion_value: kalkulation.bruttopreis,
+      // Enhanced Conversions (Martin 25.08.): GTM-Variable „Nutzerdaten"
+      // normalisiert + SHA256-hasht die E-Mail, bevor sie an Google geht —
+      // Klartext verlässt den Browser nicht (docs/google-ads-tracking.md).
+      user_email: formData.email,
+      ...(onDone ? { eventCallback: onDone, eventTimeout: 700 } : {}),
+    });
+  };
+
+  // Variante alt: ein Formular, ein Absenden, direkt ins Portal.
+  // Kontaktseite hinter dem Preis (Registry #77): Knopf nie grau — geprüft wird
+  // beim Klick, Fehler stehen am Feld, das erste fehlerhafte Feld bekommt den Fokus.
+  const kontaktSeiteAbsenden = async () => {
+    if (isSubmitting) return;
+    const f: Record<KontaktFeld, string> = {
+      name: formData.name.trim() ? '' : KONTAKT_SEITE.fehler.name,
+      email: !formData.email.trim() ? KONTAKT_SEITE.fehler.emailLeer : EMAIL_MUSTER.test(formData.email.trim()) ? '' : KONTAKT_SEITE.fehler.email,
+      phone: telefonFehler(formData.phone ?? ''),
+    };
+    setKontaktFehler(f);
+    setKontaktServerFehler('');
+    const erstes = (['name', 'email', 'phone'] as const).find((k) => f[k]);
+    if (erstes) { document.getElementById(KONTAKT_FELD_ID[erstes])?.focus(); return; }
+    zaehle('absenden_geklickt', zaehlVariante());
+    setIsSubmitting(true);
+    try {
+      const { data, kalkulation } = await erzeugeLead({ telefon: formData.phone, telefonSpaeter: false });
+      let weg = false;
+      const insPortal = () => { if (weg) return; weg = true; window.location.assign(data.portalUrl); };
+      meldeErfolg(data, kalkulation, insPortal);
+      setTimeout(insPortal, 900);
+      // Knopf bleibt bis zum Redirect gesperrt — kein zweiter Lead durch Doppelklick.
+    } catch (error) {
+      console.error('Error:', error);
+      zaehle('absenden_fehler', zaehlVariante());
+      setKontaktServerFehler(KONTAKT_SEITE.fehler.speichern);
+      setIsSubmitting(false);
+    }
   };
 
   const handleSubmit = async () => {
     if (!validateForm()) {
       return;
     }
-
+    zaehle('absenden_geklickt', zaehlVariante());
     setIsSubmitting(true);
 
     try {
-      // Erstelle formularDaten für die Berechnung
-      const formularDaten = {
-        betreuung_fuer: state.patientCount || '',
-        pflegegrad: parseInt(state.pflegegrad || '0'),
-        weitere_personen: state.householdOthers || '',
-        mobilitaet: state.mobility || '',
-        nachteinsaetze: state.nightCare || '',
-        deutschkenntnisse: state.germanLevel || '',
-        fuehrerschein: state.driving || '',
-        // Getriebe (gearbox) lives on the CA-app patient form, not here —
-        // user picks Automatik / Schaltung / Egal in the in-portal step 3
-        // (Wünsche zur PK), and patientFormMapper writes it to
-        // customer_caregiver_wish.driving_license_gearbox via UpdateCustomer.
-        // Onboard sets a permissive 'automatic' default so Mamamia matching
-        // works before the patient form is saved.
-        geschlecht: state.gender || '',
+      const { data, kalkulation } = await erzeugeLead({ telefon: formData.phone, telefonSpaeter: false });
+      // Direct redirect into the CA app — no thank-you interstitial, no
+      // countdown, no MatchingAnimation. User already filled name/email/
+      // phone on step 9 and clicked submit. Anything between submit and
+      // CA app is friction. Kostet im Normalfall ~100-300 ms, im Worst
+      // Case 900 ms (GTM-Callback, s. meldeErfolg).
+      let redirected = false;
+      const goToPortal = () => {
+        if (redirected) return;
+        redirected = true;
+        window.location.assign(data.portalUrl);
       };
-
-      // Berechne Kalkulation server-seitig (damit die echten Preise aus der DB verwendet werden)
-      const kalkulationResponse = await fetch('/api/kalkulation-berechnen', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          formularDaten,
-        }),
-      });
-
-      if (!kalkulationResponse.ok) {
-        throw new Error('Fehler bei der Kalkulation');
-      }
-
-      const kalkulation = await kalkulationResponse.json();
-
-      // Sende an angebot-anfordern API (erstellt Lead + versendet Angebots-E-Mails)
-      // adParams: Google-Klick-IDs (gclid/wbraid/gbraid) aus der Landing-URL
-      // dieser Session — die Route sanitisiert und hängt sie an den Lead,
-      // damit qualifizierte Leads später als Offline-Conversions zu Google
-      // importiert werden können (docs/google-ads-tracking.md).
-      const response = await fetch('/api/angebot-anfordern', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          vorname: formData.name,
-          email: formData.email,
-          telefon: formData.phone,
-          careStartTiming: state.careStartTiming,
-          adParams: analytics.getAdParams(),
-          // Von welcher Seite kam die Anfrage (Martin, 27.08.). Die
-          // Varianten-Weiche liefert alle drei unter „/" aus, deshalb zählt
-          // die Variante aus dem Cookie — nicht der Pfad (analytics.ts).
-          quelle: (() => {
-            // Von primundus.de gekommen? Dann zählt die Website als Quelle
-            // (Martin, 04.09.: Betreff „Primundus.de", Unterseite in der Mail).
-            const web = websiteHerkunft();
-            if (web) return `website:${web.src}`;
-            const seite = variantenSeite();
-            return seite === '/' ? 'rechner' : `rechner:${seite.replace(/^\//, '')}`;
-          })(),
-          websitePfad: websiteHerkunft()?.pfad ?? null,
-          kalkulation: {
-            ...kalkulation,
-            formularDaten,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Fehler beim Senden');
-      }
-
-      const data = await response.json();
-
-      if (data.success && data.leadId) {
-        trackFormSubmit();
-        zaehle('abgeschickt', vorschauAktivRef.current ? 'vorschau' : 'alt');
-        // step_complete(contact_form) + Conversion in EINEM Beacon — überlebt
-        // den Redirect garantiert (Bug #33). Ersetzt die früheren racy
-        // supabase-js-Inserts (analytics.trackConversion + step_complete aus
-        // handleNext), von denen ~die Hälfte beim window.location.assign starb.
-        analytics.trackCriticalSubmit({
-          step: totalSteps,
-          stepName: getStepId(totalSteps),
-          timeOnStepSeconds: Math.round((Date.now() - stepStartRef.current) / 1000),
-          extra: {
-            kraefte_vorschau: vorschauAktivRef.current,
-            kraefte_aktion: kontaktOffenRef.current ? 'button' : null,
-          },
-          conversion: {
-            leadId: data.leadId,
-            conversionType: 'angebot_angefordert',
-            conversionValue: kalkulation.bruttopreis,
-            formData: {
-              pflegegrad: state.pflegegrad,
-              care_start_timing: state.careStartTiming,
-              patient_count: state.patientCount,
-            },
-          },
-        });
-        // Direct redirect into the CA app — no thank-you interstitial, no
-        // countdown, no MatchingAnimation. User already filled name/email/
-        // phone on step 10 and clicked submit. Anything between submit and
-        // CA app is friction.
-        if (typeof data.portalUrl === 'string' && data.portalUrl.length > 0) {
-          // GTM-Tags (Google-Ads-Conversion auf `angebot_erfolgreich`, siehe
-          // docs/google-ads-tracking.md) brauchen einen Moment zum Feuern,
-          // bevor die Navigation alle offenen Requests killt: eventCallback
-          // meldet „alle Tags fertig", eventTimeout/setTimeout sichern den
-          // Redirect ab, falls GTM geblockt ist (Adblocker) oder hängt.
-          // Kostet im Normalfall ~100-300 ms, im Worst Case 900 ms.
-          let redirected = false;
-          const goToPortal = () => {
-            if (redirected) return;
-            redirected = true;
-            window.location.assign(data.portalUrl);
-          };
-          // OpenAI Ads (ChatGPT-Werbung): lead_created an den Pixel. Bis zum
-          // 10.09. stand dieser Aufruf nur auf der alten /result-Seite, die der
-          // Wizard seit dem Direkt-Redirect nie erreicht — der Pixel hatte in
-          // einer Woche Kampagne kein einziges Ereignis gesehen. Ohne
-          // Marketing-Einwilligung existiert window.oaiq nicht, dann passiert
-          // nichts. Das SDK sendet mit keepalive/sendBeacon, der Redirect
-          // gleich darunter reisst den Request nicht ab.
-          meldeAnfrage(window.oaiq, data.leadId);
-          (window as any).dataLayer = (window as any).dataLayer || [];
-          (window as any).dataLayer.push({
-            event: 'angebot_erfolgreich',
-            lead_id: data.leadId,
-            pflegegrad: state.pflegegrad,
-            care_start_timing: state.careStartTiming,
-            conversion_value: kalkulation.bruttopreis,
-            // Enhanced Conversions (Martin 25.08.): GTM-Variable „Nutzerdaten"
-            // normalisiert + SHA256-hasht die E-Mail, bevor sie an Google geht —
-            // Klartext verlässt den Browser nicht (docs/google-ads-tracking.md).
-            user_email: formData.email,
-            eventCallback: goToPortal,
-            eventTimeout: 700,
-          });
-          setTimeout(goToPortal, 900);
-          return;
-        }
-        // No portalUrl from server is a deploy/config bug — surface it so
-        // the issue is visible instead of hidden behind a fallback UI.
-        throw new Error('Portal-URL fehlt in Server-Antwort. Bitte Support kontaktieren.');
-      } else {
-        throw new Error('Fehler beim Anfordern des Angebots');
-      }
+      meldeErfolg(data, kalkulation, goToPortal);
+      setTimeout(goToPortal, 900);
     } catch (error) {
       console.error('Error:', error);
+      zaehle('absenden_fehler', zaehlVariante());
       alert('Es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.');
     } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Variante stufen: Name → E-Mail (Lead gespeichert, Mail raus, Conversion)
+  // → Telefon (nachgetragen oder übersprungen) → Portal.
+  const zumPortal = () => {
+    const ld = leadDatenRef.current;
+    if (ld?.portalUrl) window.location.assign(ld.portalUrl);
+  };
+  const ohneTelefon = () => {
+    if (isSubmitting) return;
+    zaehle('ohne_telefon', zaehlVariante());
+    zumPortal();
+  };
+  const stufeWeiter = async () => {
+    if (isSubmitting) return;
+    if (stufe === 'name') {
+      if (!formData.name.trim()) { setStufenFehler(STUFEN.name.fehler); return; }
+      setStufenFehler('');
+      setStufe('email');
+      zaehle('kontakt_email', zaehlVariante());
+      return;
+    }
+    if (stufe === 'email') {
+      if (!EMAIL_MUSTER.test(formData.email.trim())) { setStufenFehler(STUFEN.email.fehler); return; }
+      setStufenFehler('');
+      if (leadGespeichert) { setStufe('telefon'); return; }
+      zaehle('absenden_geklickt', zaehlVariante());
+      setIsSubmitting(true);
+      try {
+        const { data, kalkulation } = await erzeugeLead({ telefon: null, telefonSpaeter: true });
+        leadDatenRef.current = { leadId: data.leadId, portalUrl: data.portalUrl, token: data.token ?? null };
+        setLeadGespeichert(true);
+        meldeErfolg(data, kalkulation);
+        setStufe('telefon');
+        zaehle('kontakt_telefon', zaehlVariante());
+      } catch (error) {
+        console.error('Error:', error);
+        zaehle('absenden_fehler', zaehlVariante());
+        setStufenFehler(STUFEN_FEHLER.speichern);
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+    // Telefon
+    const fehler = telefonFehler(formData.phone);
+    if (fehler) { setStufenFehler(fehler); return; }
+    setStufenFehler('');
+    setIsSubmitting(true);
+    try {
+      const ld = leadDatenRef.current;
+      if (ld?.token) {
+        const r = await fetch('/api/lead-telefon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: ld.token, telefon: formData.phone }),
+        });
+        if (!r.ok) throw new Error('Telefon speichern fehlgeschlagen');
+      }
+      zaehle('telefon_angegeben', zaehlVariante());
+      zumPortal();
+    } catch (error) {
+      console.error('Error:', error);
+      setStufenFehler(STUFEN_FEHLER.telefon);
       setIsSubmitting(false);
     }
   };
@@ -909,11 +1055,15 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // Antwort-Buttons bewusst als BUTTONS erkennbar (Martin 13.08.: „gehen
   // noch ein bisschen unter" — Funnel: 59 % klicken die erste Frage nie an):
   // kräftigerer Rand, echter Schatten, mehr Höhe.
+  // Farben (Martin 11.09.): kein Koralle-Rahmen mehr beim Darüberfahren — er
+  // sah aus wie ein Fehler und blieb auf dem Handy nach dem Tippen an der
+  // nächsten Antwort hängen. Darüberfahren nur noch bei echter Maus
+  // (hover:hover), gewählt = Braun mit Haken (AntwortZeichen).
   const btnClass = (isSelected: boolean) =>
-    `w-full relative rounded-xl px-4 py-3.5 border-[1.5px] shadow-[0_2px_6px_rgba(61,61,61,0.10)] transition-all duration-200 text-left ${
+    `group w-full relative rounded-xl px-4 py-3.5 border-[1.5px] shadow-[0_2px_6px_rgba(61,61,61,0.10)] transition-all duration-200 text-left ${
       isSelected
-        ? 'border-[#8B7355] bg-[#8B7355]/5 ring-1 ring-[#8B7355]/20'
-        : 'border-[#CFC6B8] bg-white hover:border-[#E76F63] hover:shadow-[0_3px_10px_rgba(231,111,99,0.22)] hover:bg-[#FFFDFB]'
+        ? 'ist-gewaehlt border-[#8B7355] bg-[#8B7355]/5 ring-1 ring-[#8B7355]/20'
+        : 'border-[#CFC6B8] bg-white [@media(hover:hover)]:hover:border-[#A8977F] [@media(hover:hover)]:hover:bg-[#FAF8F4]'
     }`;
 
   // Fokus-Modus nach der ersten Frage: der Rest wird abgedunkelt, das
@@ -931,7 +1081,8 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       const source = (e as CustomEvent<{ source?: string }>).detail?.source ?? 'cta';
       analytics.trackEvent('wizard', 'wizard_opened', { source });
       setWarmupAudience('direct');
-      setCurrentStep(1);
+      // Kein Zurücksetzen auf Frage 1 (Registry #108): Wer schon geantwortet
+      // und geschlossen hat, macht an seiner Frage weiter — wie beim Hero-Knopf.
       setFullscreen(true);
     };
     window.addEventListener(OPEN_CALCULATOR_EVENT, oeffnen);
@@ -975,6 +1126,30 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     return () => { document.body.style.overflow = vorher; };
   }, [fullscreen]);
 
+  // Schließen = Pause, kein Neustart (Registry #108, Martin 02.10.2026).
+  // Bis dahin setzten das X und ein Tipp auf den dunklen Hintergrund den
+  // Fragebogen auf Frage 1 zurück. Die Cookie-Leiste (z-50) liegt unter dem
+  // Hintergrund (z-80): Wer per ?start=1 kam und auf die Leiste tippte, traf
+  // den Hintergrund — Fragebogen zu, beim Wiederöffnen wieder Frage 1 (live 32
+  // von 32 Läufen). Jetzt schließt nur das X, und Schritt und Antworten
+  // bleiben: Die Antworten liegen im CalculatorProvider, der Schritt in diesem
+  // State, und die Komponente bleibt beim Schließen gemountet (CTA-Zweig
+  // unten). Hero-Knopf und alle CTAs öffnen an derselben Frage. Ein noch
+  // laufender Auto-Weiter (Antwort vor < 300 ms getippt) wird verworfen, damit
+  // der Fragebogen nicht geschlossen weiterläuft — die Antwort bleibt gewählt.
+  // Der Inline-Modus (derzeit nirgends eingebunden) setzt wie bisher zurück.
+  const schliessen = () => {
+    if (advanceTimer.current) {
+      clearTimeout(advanceTimer.current);
+      advanceTimer.current = null;
+    }
+    setFullscreen(false);
+    if (mode !== 'cta') {
+      setWarmupAudience(null);
+      setCurrentStep(1);
+    }
+  };
+
   // Offen = ECHTES Overlay (fixed), nicht mehr `relative` im Textfluss
   // (Martin 16.08.: "warum oeffnet sich das so weit unten und nicht wie bei
   // allen CTA oben schoen, damit es auch nicht mehr springt").
@@ -1003,11 +1178,19 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       {fullscreen && <div className="fixed inset-0 bg-black/60 z-[80]" aria-hidden="true" />}
       <div ref={formRef} id="calculator-form" className={outerClass}>
         <MatchingAnimation
-          initialCount={getMatchingCount()}
-          vorschau={vorschauAktivRef.current}
-          onComplete={() => {
+          // Warte-Screen immer mit den drei Schritten aus WARTE („Preis
+          // berechnet“ …) — auch ohne Karten-Seite (Martin 11.09.: Warten bleibt).
+          vorschau
+          kurz
+          onComplete={async () => {
+            // Preis zuerst: auf die Kalkulation warten (läuft seit Beginn der
+            // Warteseite, ca. 1 s). Ohne Preis → heutiger Weg, anonym gezählt.
+            if (ablaufRef.current === 'preis') {
+              if (preisLadenRef.current) await preisLadenRef.current;
+              if (!preisDatenRef.current) zaehle('preis_fehler', 'preis');
+            }
             setShowMatching(false);
-            setCurrentStep(totalSteps); // = Step 9 (Kontaktformular)
+            setCurrentStep(totalSteps); // = Step 9 (Preisseite bzw. Kontaktformular)
           }}
         />
       </div>
@@ -1033,7 +1216,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           }}
           className="w-full rounded-xl bg-[#E76F63] px-4 py-[18px] text-[17px] font-bold text-white shadow-[0_4px_14px_rgba(231,111,99,0.32)] transition-all duration-200 hover:bg-[#D65E52]"
         >
-          Kosten &amp; Pflegekräfte ansehen →
+          Preis &amp; Pflegekräfte ansehen →
         </button>
         {/* Zaehler zentriert unter dem Button (Martin 16.08.) — er gehoert
             zum Button, nicht zur linksbuendigen Textspalte darueber. */}
@@ -1055,7 +1238,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
               setWarmupAudience('direct');
               setFullscreen(true);
             }}
-            aria-label={`${displayCount} Pflegekräfte sofort verfügbar — jetzt passende ansehen`}
+            aria-label="Passende Pflegekräfte sofort verfügbar — jetzt ansehen"
             className="inline-flex items-center gap-2 rounded-full border border-[#A8D5B0] bg-[#F0F7F1] py-1 pl-1.5 pr-3 transition-all duration-200 hover:border-[#7FBF8C] hover:bg-[#E7F3E9] active:scale-[0.98] cursor-pointer">
             <div className="flex">
               {['/images/caregivers/pk-1.jpg','/images/caregivers/pk-2.jpg','/images/caregivers/pk-3.jpg','/images/caregivers/pk-4.jpg'].map((src,i)=>(
@@ -1066,7 +1249,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
               ))}
             </div>
             <span className="text-[12px] text-[#3A6B42]">
-              <span className="font-bold tabular-nums">{displayCount}</span> Pflegekräfte sofort verfügbar
+              Passende Pflegekräfte sofort verfügbar
             </span>
             {/* Der Pfeil sagt, dass hier etwas passiert — sonst sieht die
                 Plakette aus wie ein Etikett und der Klick bleibt Zufall. */}
@@ -1082,20 +1265,19 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             kuendbar ist bei uns vertraglich hinterlegt (vertrag-content.ts
             §3.3). Alle drei gehoeren zur selben Kategorie: nichts, worin man
             haengenbleibt — die Startzeit ist bewusst NICHT dabei, sie ist
-            eine andere Aussage und steht weiter unten (Martin 16.08.).
-            "Kostenlos & unverbindlich" ist entfallen, das sagt jetzt die
-            Hero-Unterzeile. */}
+            eine andere Aussage (Martin 16.08.). Am 14.09. kam sie trotzdem
+            als Punkt dazu; seit 17.09. steht „Anreise in 3 Tagen möglich"
+            in der Hero-Unterzeile (Martin: „aus den 5 Punkten rausnehmen und
+            im Hero machen statt kostenlos und unverbindlich").
+            "Kostenlos & unverbindlich" steht damit nicht mehr im Hero, nur
+            noch im Fuß des Kontaktschritts und im Schluss-Aufruf. */}
         {/* Schriftgroesse: NIE kleiner als die Hero-Unterzeile ueber dem
             Button (16px, app/page.tsx) — Martin 16.08. Diese drei Zeilen
             sind der Message-Match zu den Anzeigen, nicht Kleingedrucktes. */}
         {/* Einrueckung erst ab lg: auf 375px schob sie "Taeglich kuendbar,
             taggenau abgerechnet" in eine zweite Zeile. */}
         <ul className="mt-5 flex flex-col gap-3 lg:pl-1.5">
-          {[
-            'Keine Vermittlungsgebühr',
-            'Kein Vertrag vor Ihrer Auswahl',
-            'Täglich kündbar, taggenau abgerechnet',
-          ].map((punkt) => (
+          {HERO_PUNKTE.map((punkt) => (
             <li key={punkt} className="flex items-center gap-2.5">
               <svg className="h-[18px] w-[18px] flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -1103,14 +1285,41 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
               <span className="text-[16px] leading-snug text-[#3D3D3D]">{punkt}</span>
             </li>
           ))}
+          {/* 4. Punkt (Martin 12.09.): Text wie die drei anderen, dazu ein
+              Textlink, der das Pop-up öffnet. Das Siegel selbst steht im Hero-Bild. */}
+          <li className="flex items-center gap-2.5">
+            <svg className="h-[18px] w-[18px] flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-[16px] leading-snug text-[#3D3D3D]">
+              {GARANTIE.wort}{' '}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); oeffneGarantie(); }}
+                className="font-semibold text-[#1E5C3A] underline underline-offset-[3px]"
+                aria-haspopup="dialog"
+                aria-expanded={garantieOffen}
+              >
+                Mehr Infos
+              </button>
+            </span>
+          </li>
         </ul>
+        {/* Das Pop-up muss auch im Hero-Zweig im Baum stehen (eigener Return). */}
+        <BestpreisDialog open={garantieOffen} onOpenChange={setGarantieOffen} onWeiter={weiterAusGarantie} />
       </div>
     );
   }
 
   return (
     <>
-    {fullscreen && <div className="fixed inset-0 bg-black/60 z-[80]" aria-hidden="true" onClick={() => { setFullscreen(false); if (mode !== 'cta') setWarmupAudience(null); setCurrentStep(1); }} />}
+    {/* Der Hintergrund schließt bei den Fragen NICHT (Registry #108): Ein Tipp
+        daneben, etwa auf die Cookie-Leiste darunter, kostete den ganzen
+        Fortschritt. Dort schließt nur das X (`schliessen`). Ausnahme
+        Kontaktschritt (Schritt 9): Er hat kein X, der Tipp daneben bleibt dort
+        der Ausgang wie bisher — jetzt über `schliessen`, also ohne Neustart;
+        der Knopf öffnet wieder beim Kontaktschritt. */}
+    {fullscreen && <div className="fixed inset-0 bg-black/60 z-[80]" aria-hidden="true" onClick={currentStep === totalSteps ? schliessen : undefined} />}
     <div ref={formRef} id="calculator-form" className={outerClass}>
       <div className="relative">
       <div data-calculator-card className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
@@ -1118,7 +1327,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           {fullscreen && currentStep !== totalSteps && (
             <button
               type="button"
-              onClick={() => { setFullscreen(false); if (mode !== 'cta') setWarmupAudience(null); setCurrentStep(1); }}
+              onClick={schliessen}
               aria-label="Schließen"
               className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full text-white hover:bg-white/20"
             >
@@ -1135,21 +1344,45 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
               {/* Vorschau-Modus (Registry #61, Runde 3): dieselbe Zahl wie am
                   Ende der Animation, und kein „Angebot ist fertig", solange der
                   Kunde noch keinen Preis sieht. */}
-              <p className="text-center text-base font-bold uppercase tracking-wide text-white mb-1.5">
-                {vorschauModus ? (kontaktOffen ? SCHRANKE.kopf : kopfzeile().titel) : '✓ Ihr Angebot ist fertig'}
-              </p>
-              <p className="text-center text-sm text-white/90">
-                {vorschauModus ? (kontaktOffen ? SCHRANKE.kopfText : kopfzeile().text) : 'Persönlich auf Ihre Angaben abgestimmt'}
-              </p>
+              {vorschauModus && !kontaktOffen ? (
+                <>
+                  <p className="text-center text-base font-bold uppercase tracking-wide text-white mb-1.5">{kopfzeile().titel}</p>
+                  <p className="text-center text-sm text-white/90">{kopfzeile().text}</p>
+                </>
+              ) : (
+                // Kontakt-Schritt: Haken-Symbol + Titel, darunter die Auszeichnung,
+                // Siegel rechts (Martins Aufbau 11.09.). Gegen 390×664 in beiden
+                // Wegen geprüft: Knopf bleibt über der Falz.
+                <div className="flex items-center justify-between gap-3 px-1">
+                  <div>
+                    <p className="flex items-center gap-2 text-base font-bold uppercase tracking-wide text-white leading-tight">
+                      <span className="inline-flex w-[22px] h-[22px] items-center justify-center rounded-full bg-white flex-shrink-0" aria-hidden="true">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F8F5F" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                      </span>
+                      {preisModus && kontaktOffen && preisDaten ? KONTAKT_NACH_PREIS.kopf(preisDaten.bruttopreis) : SCHRANKE.kopf}
+                    </p>
+                    <p className="text-[14px] font-medium text-white/95 leading-snug mt-1 pl-[30px]">{SCHRANKE.auszeichnung}</p>
+                  </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT Service-Champions" className="h-[66px] w-auto rounded-[5px] shadow-[0_2px_8px_rgba(0,0,0,0.2)] flex-shrink-0" />
+                </div>
+              )}
             </>
           ) : (
             <p className="text-center text-[15px] font-bold text-white">
-              In 2 Minuten zu Ihrem Angebot
+              In 2 Minuten zu Ihrem Preis
             </p>
           )}
         </div>
 
-        {currentStep > 1 && (
+        {/* Bestpreisgarantie — Pop-up aus dem Kopf des Kontakt-Schritts (Martin 12.09.). */}
+        <BestpreisDialog open={garantieOffen} onOpenChange={setGarantieOffen} onWeiter={weiterAusGarantie} />
+
+        {/* Balken ab der ersten echten Frage (Martin 11.09.: Schritt 1 ohne
+            Balken wirkte eng und anders als der Rest) — im eingebetteten
+            Hero-Kasten (nicht fullscreen) bleibt Schritt 1 ohne, damit die
+            Antworten über der Falz bleiben. */}
+        {(currentStep > 1 || (fullscreen && currentStep === 1)) && (
           <div className="px-3 sm:px-4 py-2 bg-[#F8F7F5]/50 border-b border-[#E5E3DF]/30">
             <div className="h-1.5 bg-[#E5E3DF] rounded-full overflow-hidden">
               <div
@@ -1163,27 +1396,22 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         {currentStep >= 1 && currentStep <= 8 && (
           <div className="flex justify-center pt-2 pb-0">
             <div className="inline-flex items-center gap-2 bg-[#F0F7F1] border border-[#A8D5B0] rounded-full pl-1.5 pr-3 py-1">
-              {currentStep === 1 ? (
-                <div className="flex">
-                  {[
-                    '/images/caregivers/pk-1.jpg',
-                    '/images/caregivers/pk-2.jpg',
-                    '/images/caregivers/pk-3.jpg',
-                    '/images/caregivers/pk-4.jpg',
-                  ].map((src, i) => (
-                    <span key={src} className={`relative w-6 h-6 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2' : ''}`}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <span className="w-1.5 h-1.5 rounded-full bg-[#4CAF50] animate-pulse flex-shrink-0"></span>
-              )}
-              <span className="text-[12px] text-[#3A6B42]">
-                <span className="font-bold tabular-nums">{displayCount}</span>
-                {currentStep === 1 ? ' Pflegekräfte sofort verfügbar' : ' Pflegekräfte passen zu Ihrer Suche'}
-              </span>
+              {/* Eine Pille auf allen Fragen (Martin 11.09.: Schritt 1 mit
+                  Bildern, Schritt 2 ohne — wirkte wie zwei Hinweise). */}
+              <div className="flex">
+                {[
+                  '/images/caregivers/pk-1.jpg',
+                  '/images/caregivers/pk-2.jpg',
+                  '/images/caregivers/pk-3.jpg',
+                  '/images/caregivers/pk-4.jpg',
+                ].map((src, i) => (
+                  <span key={src} className={`relative w-6 h-6 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2' : ''}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                  </span>
+                ))}
+              </div>
+              <span className="text-[12px] text-[#3A6B42]">Passende Pflegekräfte sofort verfügbar</span>
             </div>
           </div>
         )}
@@ -1191,7 +1419,8 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         {/* Step 9 zeigt die Headline „✅ Ihr Angebot ist fertig" jetzt direkt
             im Titel-Block (getStepTitle); separate Pill ist redundant. */}
 
-        <div id="calc-step-content" className="px-3 sm:px-6 lg:px-8 pt-3 pb-5">
+        {/* Registry #121: im Kontakt-Schritt rückt der Knopf an die Felder (36 → 16 px). */}
+        <div id="calc-step-content" className={`px-3 sm:px-6 lg:px-8 pt-3 ${fullscreen && currentStep === 1 ? 'pb-8' : currentStep === totalSteps && !stufenAktiv && !preisModus && (!ergebnisModus || kontaktOffen) ? 'pb-2' : 'pb-5'}`}>
           <div className="w-full">
             {/* Step 9: kleine grüne „fertig"-Pill über dem Titel, dann die
                 Frage als reguläre Step-Headline + Erklärung als italic
@@ -1241,7 +1470,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     >
                       <div className="flex items-center justify-between gap-3.5">
                         <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                        <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        <AntwortZeichen />
                       </div>
                     </button>
                   ))}
@@ -1258,7 +1487,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     >
                       <div className="flex items-center justify-between gap-3.5">
                         <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                        <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        <AntwortZeichen />
                       </div>
                     </button>
                   ))}
@@ -1276,7 +1505,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     >
                       <div className="flex items-center justify-between gap-3.5">
                         <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                        <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        <AntwortZeichen />
                       </div>
                     </button>
                   ))}
@@ -1290,10 +1519,11 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     <button
                       key={grad}
                       onClick={() => selectAndAdvance(grad, () => updateState({ pflegegrad: grad as any }))}
-                      className={`px-4 py-3 border rounded-lg transition-all duration-300 shadow-sm hover:shadow-md ${
+                      // Gleicher Rahmen wie die übrigen Antworten (Martin 11.09.).
+                      className={`px-4 py-3 border-[1.5px] rounded-xl transition-all duration-200 shadow-[0_2px_6px_rgba(61,61,61,0.10)] ${
                         state.pflegegrad === grad
-                          ? 'border-[#8B7355] bg-[#8B7355]/5 ring-1 ring-[#8B7355]/20 shadow-md'
-                          : 'border-[#E5E3DF] bg-white hover:bg-gray-50'
+                          ? 'border-[#8B7355] bg-[#8B7355]/5 ring-1 ring-[#8B7355]/20'
+                          : 'border-[#CFC6B8] bg-white [@media(hover:hover)]:hover:border-[#A8977F] [@media(hover:hover)]:hover:bg-[#FAF8F4]'
                       }`}
                     >
                       <span className={`text-lg font-bold ${state.pflegegrad === grad ? 'text-[#8B7355]' : 'text-[#3D3D3D]'}`}>
@@ -1320,7 +1550,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     >
                       <div className="flex items-center justify-between gap-3.5">
                         <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                        <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        <AntwortZeichen />
                       </div>
                     </button>
                   ))}
@@ -1343,7 +1573,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     >
                       <div className="flex items-center justify-between gap-3.5">
                         <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                        <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        <AntwortZeichen />
                       </div>
                     </button>
                   ))}
@@ -1365,7 +1595,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       >
                         <div className="flex items-center justify-between gap-3.5">
                           <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                          <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                          <AntwortZeichen />
                         </div>
                       </button>
                       <div className="relative group flex-shrink-0">
@@ -1396,7 +1626,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       >
                         <div className="flex items-center justify-between gap-3.5">
                           <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                          <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                          <AntwortZeichen />
                         </div>
                       </button>
                       <div className="relative group flex-shrink-0">
@@ -1428,7 +1658,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     >
                       <div className="flex items-center justify-between gap-3.5">
                         <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                        <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        <AntwortZeichen />
                       </div>
                     </button>
                   ))}
@@ -1501,29 +1731,11 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                           // Schranke. Kein Zurück-Link (Martin: „macht keinen Sinn").
                           return (
                             <div id="kontakt-schranke">
-                              {/* Die gefundenen Kräfte bleiben sichtbar (Martin: „vielleicht zeigen
-                                  wir oben auch die Bilder der gefundenen Pflegekräfte") — Kasten wie
-                                  der alte „5 passende Pflegekräfte"-Kasten, nur mit echten Fotos. */}
-                              <div className="flex items-center gap-3 rounded-2xl border border-[#C4E3CB] bg-[#F0F7F1] px-4 py-3 mb-4">
-                                <div className="flex flex-shrink-0">
-                                  {kraefteVorschau.map((k, i) => (
-                                    <span key={k.id} className={`relative w-10 h-10 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2.5' : ''}`}>
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img src={k.fotoUrl} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-                                    </span>
-                                  ))}
-                                  {PORTAL_ANZAHL > kraefteVorschau.length && (
-                                    <span className="relative w-10 h-10 rounded-full border-2 border-white bg-[#22A06B] text-white text-[12px] font-bold flex items-center justify-center flex-shrink-0 -ml-2.5">
-                                      +{PORTAL_ANZAHL - kraefteVorschau.length}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-[14px] leading-snug text-[#2F5A38]">
-                                  <span className="font-semibold">{SCHRANKE.gefunden()}</span><br />{SCHRANKE.gefundenText}
-                                </p>
-                              </div>
-                              <p className="text-[16px] font-bold text-[#3D3D3D]">{SCHRANKE.titel}</p>
-                              <p className="text-[13px] text-[#5A5A5A] mt-0.5">{SCHRANKE.text}</p>
+                              {/* Strecke v2 (11.09.): kein zweites „5 Pflegekräfte" und keine
+                                  Frage mehr — die Kräfte standen einen Schritt vorher. Nur der
+                                  Grund, warum wir die Daten brauchen. */}
+                              <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{SCHRANKE.frage}</p>
+                              <p className="text-[15px] leading-snug text-[#555] mt-1">{SCHRANKE.text}</p>
                             </div>
                           );
                         }
@@ -1541,6 +1753,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                             {(
                               <div className={`relative text-center ${angeschnitten ? '-mt-3' : 'pt-4'}`}>
                                 <p className="text-[15px] font-bold text-[#3D3D3D] leading-snug">{VERLAUF.weitere()}</p>
+                                <p className="text-[13px] text-[#5A5A5A] leading-snug mt-0.5">{VERLAUF.preis}</p>
                                 <button
                                   type="button"
                                   onClick={oeffneKontakt}
@@ -1555,6 +1768,26 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                         );
                       })()}
                     </div>
+                  ) : preisModus && !kontaktOffen && preisDaten ? (
+                    /* Preis zuerst (Registry #77): Preis, Zuschüsse, Garantie,
+                       Konditionen, Kräfte — dann der Knopf zur Kontaktabfrage. */
+                    <PreisSeite daten={preisDaten} bewertung={bewertung} onWeiter={oeffneKontaktNachPreis} onGarantie={oeffneGarantie} />
+                  ) : preisModus && kontaktOffen && !stufenAktiv ? (
+                    /* Kontaktseite hinter dem Preis: eine Seite, drei Felder, ein Knopf. */
+                    <KontaktSeite
+                      werte={{ name: formData.name, email: formData.email, phone: formData.phone }}
+                      fehler={kontaktFehler}
+                      serverFehler={kontaktServerFehler}
+                      sendet={isSubmitting}
+                      bewertung={bewertung}
+                      onAendern={(feld, wert) => {
+                        setFormData({ ...formData, [feld]: feld === 'phone' ? telefonBereinigen(wert) : wert });
+                        if (kontaktFehler[feld]) setKontaktFehler({ ...kontaktFehler, [feld]: '' });
+                      }}
+                      onAbsenden={() => { void kontaktSeiteAbsenden(); }}
+                      onFokus={(feld) => trackFieldFocus(feld)}
+                      onBlur={(feld) => trackFieldBlur(feld)}
+                    />
                   ) : (
                     <>
                       {/* V7 (Martin, 2026-07-08): Der Preiskasten ist die 1:1-Kopie
@@ -1564,6 +1797,10 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                           die Zahl ist verpixelt (Dummy! Die echte Kalkulation
                           läuft erst nach dem Absenden serverseitig und darf hier
                           nie im Quelltext stehen). */}
+                      {/* Registry #121: der grüne Kasten nur noch in den drei Teilschritten
+                          (?kontakt=stufen). Das Formular für alle zeigt Gesichter + Lohnzeile
+                          unter der Frage (Aufbau der Kontaktseite vom 17.09.). */}
+                      {stufenAktiv && (
                       <div className="flex items-center gap-3 rounded-2xl border border-[#C4E3CB] bg-[#F0F7F1] px-5 py-4 mb-1">
                         <div className="flex flex-shrink-0">
                           {/* Echte Pflegekräfte aus dem eigenen Bestand (leicht verpixelt
@@ -1583,17 +1820,128 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                         </div>
                         <p className="text-[14px] leading-snug text-[#2F5A38]"><span className="font-semibold">5 passende Pflegekräfte</span> für Sie gefunden</p>
                       </div>
+                      )}
                       {/* CRO 15.08.: Preisspanne steht im HERO (app/page.tsx),
                           nicht hier — auf diesem Schritt sagen wir „Ihr Angebot
                           ist fertig", eine generische Spanne daneben wirkte
                           widersprüchlich (Martins Einwand 15.08.). */}
-                      <div className="pt-1">
-                        <p className="text-[16px] font-bold text-[#3D3D3D]">Wohin dürfen wir Ihr Angebot senden?</p>
-                        <p className="text-[12.5px] text-[#8B8B8B] mt-0.5">Ihr genauer Preis &amp; 5 passende Pflegekräfte werden sofort sichtbar.</p>
+                      <div className={stufenAktiv ? 'pt-1' : 'pt-0.5'}>
+                        {stufenAktiv ? (
+                          <>
+                            {stufe === 'telefon' && (
+                              /* Schließt den E-Mail-Schritt ab: die Mail ist ausgelöst (Runde 2, Martin 16.09.). */
+                              <p className="text-[14px] leading-snug text-[#2F5A38] mb-2">
+                                {STUFEN.telefon.bestaetigung} <span className="font-semibold break-all">{formData.email.trim()}</span>
+                              </p>
+                            )}
+                            <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{STUFEN[stufe].frage}</p>
+                            {stufenText && <p className="text-[15px] leading-snug text-[#555] mt-1">{stufenText}</p>}
+                          </>
+                        ) : (
+                          <>
+                            {/* Registry #121 (Martin 09.10.): Frage, darunter vier Gesichter und
+                                die Lohnzeile statt grünem Kasten und Extrazeile. Vier statt fünf
+                                Fotos: neben „5 passende Profile“ sähen fünf Beispielgesichter wie
+                                genau diese fünf aus (OpenAI-Gegencheck). So stehen Knopf und Sterne
+                                auch auf dem iPhone SE (553 px) im ersten Bild. */}
+                            <p className="text-[20px] font-bold leading-tight text-[#1a1a1a] [text-wrap:balance]">{SCHRANKE.frage}</p>
+                            <div className="mt-2.5 flex items-center gap-2.5">
+                              <div className="flex flex-shrink-0" aria-hidden="true">
+                                {['pk-1', 'pk-2', 'pk-3', 'pk-4'].map((n, i) => (
+                                  <span key={n} className={`relative w-7 h-7 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2' : ''}`}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={`/images/caregivers/${n}.jpg`} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                                  </span>
+                                ))}
+                              </div>
+                              <p className="text-[14px] leading-[1.35] text-[#5A5A5A] [text-wrap:balance]">{SCHRANKE.lohn}</p>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </>
                   )}
-                  {(!vorschauModus || kontaktOffen) && (<>
+                  {preisModus && !(kontaktOffen && stufenAktiv) ? null : stufenAktiv ? (
+                    /* Kontakt in drei Schritten (Registry #76): ein Feld je
+                       Schritt, echtes <form>, damit Enter/„Weiter" der Tastatur
+                       absendet; Fehler inline am Feld, Knopf nie grau. */
+                    <form
+                      noValidate
+                      onSubmit={(e) => { e.preventDefault(); void stufeWeiter(); }}
+                      className="space-y-3"
+                    >
+                      {stufe === 'name' && (
+                        <input
+                          id="kontakt-name"
+                          type="text"
+                          value={formData.name}
+                          onChange={(e) => { setFormData({ ...formData, name: e.target.value }); setStufenFehler(''); }}
+                          onFocus={() => trackFieldFocus('name')}
+                          onBlur={() => trackFieldBlur('name')}
+                          className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${stufenFehler ? 'border-red-500' : 'border-[#CFC6B8]'}`}
+                          placeholder={STUFEN.name.platzhalter}
+                          autoComplete="name"
+                        />
+                      )}
+                      {stufe === 'email' && (
+                        <input
+                          id="kontakt-email"
+                          type="email"
+                          inputMode="email"
+                          value={formData.email}
+                          onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setStufenFehler(''); }}
+                          onFocus={() => trackFieldFocus('email')}
+                          onBlur={() => trackFieldBlur('email')}
+                          className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${stufenFehler ? 'border-red-500' : 'border-[#CFC6B8]'}`}
+                          placeholder={STUFEN.email.platzhalter}
+                          autoComplete="email"
+                        />
+                      )}
+                      {stufe === 'telefon' && (
+                        <input
+                          id="kontakt-telefon"
+                          type="tel"
+                          inputMode="tel"
+                          value={formData.phone}
+                          onChange={(e) => { setFormData({ ...formData, phone: telefonBereinigen(e.target.value) }); setStufenFehler(''); }}
+                          onFocus={() => trackFieldFocus('phone')}
+                          onBlur={() => trackFieldBlur('phone')}
+                          className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${stufenFehler ? 'border-red-500' : 'border-[#CFC6B8]'}`}
+                          placeholder={STUFEN.telefon.platzhalter}
+                          autoComplete="tel"
+                        />
+                      )}
+                      {stufenFehler && <p className="text-[12px] text-red-500 px-3" role="alert">{stufenFehler}</p>}
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className={`w-full py-4 font-bold text-base rounded-xl transition-all duration-200 text-white shadow-lg ${isSubmitting ? 'bg-[#F2B5AE] cursor-wait' : 'bg-[#E76F63] hover:bg-[#D65E52] hover:shadow-xl cursor-pointer'}`}
+                      >
+                        {isSubmitting ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <span>Wird gesendet...</span>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          </div>
+                        ) : (
+                          stufenKnopf
+                        )}
+                      </button>
+                      {stufe === 'telefon' && (
+                        <button type="button" onClick={ohneTelefon} className="block w-full text-center text-[12px] text-[#8B8B8B] underline hover:text-[#3D3D3D] py-1">
+                          {STUFEN.telefon.ohne}
+                        </button>
+                      )}
+                      {/* Nur die Einwilligung, dort wo die Daten abgehen; keine Fußzeile, kein Zurück (Runde 3, Martin). */}
+                      {stufe === 'email' && (
+                        <p className="text-center text-xs text-[#8B8B8B] leading-snug">
+                          Mit dem Absenden stimmen Sie unserer{' '}
+                          <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
+                            Datenschutzerklärung
+                          </a>{' '}zu.
+                        </p>
+                      )}
+                    </form>
+                  ) : (!ergebnisModus || kontaktOffen) && (<>
                   <div>
                     <input
                       id="kontakt-name"
@@ -1603,53 +1951,69 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                         setFormData({ ...formData, name: e.target.value });
                         setErrors({ ...errors, name: '' });
                       }}
-                      onFocus={() => trackFieldFocus('name')}
-                      onBlur={(e) => trackFieldBlur('name', e.target.value)}
+                      onFocus={() => kontaktFeldFokus('name')}
+                      onBlur={() => trackFieldBlur('name')}
                       className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                         errors.name ? 'border-red-500' : 'border-[#CFC6B8]'
                       }`}
-                      placeholder="Name"
+                      // Registry #121: „Ihr Name“ (Wortlaut der Kontaktseite 17.09.) — die
+                      // Frage „Für wen …?“ ließ offen, ob der Name der Mutter gemeint ist.
+                      placeholder="Ihr Name"
                       autoComplete="name"
                     />
-                    {errors.name && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.name}</p>}
+                    {errors.name && <p className="text-[13px] text-red-600 mt-1.5 px-3">{errors.name}</p>}
                   </div>
 
                   <div>
                     <input
+                      id="kontakt-email"
                       type="email"
                       value={formData.email}
                       onChange={(e) => {
                         setFormData({ ...formData, email: e.target.value });
                         setErrors({ ...errors, email: '' });
                       }}
-                      onFocus={() => trackFieldFocus('email')}
-                      onBlur={(e) => trackFieldBlur('email', e.target.value)}
+                      onFocus={() => kontaktFeldFokus('email')}
+                      onBlur={(e) => {
+                        trackFieldBlur('email');
+                        if (e.target.value.trim() && !EMAIL_MUSTER.test(e.target.value.trim())) {
+                          setErrors((alt) => ({ ...alt, email: 'Bitte geben Sie eine gültige E-Mail-Adresse ein' }));
+                        }
+                      }}
                       className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                         errors.email ? 'border-red-500' : 'border-[#CFC6B8]'
                       }`}
                       placeholder="E-Mail-Adresse"
                       autoComplete="email"
                     />
-                    {errors.email && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.email}</p>}
+                    {errors.email && <p className="text-[13px] text-red-600 mt-1.5 px-3">{errors.email}</p>}
                   </div>
 
                   <div>
                     <input
+                      id="kontakt-telefon"
                       type="tel"
                       value={formData.phone}
+                      inputMode="tel"
                       onChange={(e) => {
-                        setFormData({ ...formData, phone: e.target.value });
+                        setFormData({ ...formData, phone: telefonBereinigen(e.target.value) });
                         setErrors({ ...errors, phone: '' });
                       }}
-                      onFocus={() => trackFieldFocus('phone')}
-                      onBlur={(e) => trackFieldBlur('phone', e.target.value)}
+                      onFocus={() => kontaktFeldFokus('phone')}
+                      onBlur={(e) => {
+                        trackFieldBlur('phone');
+                        // Hinweis erst nach dem Tippen, nie auf ein leeres Feld.
+                        if (e.target.value.trim()) setErrors((alt) => ({ ...alt, phone: telefonFehler(e.target.value) }));
+                      }}
                       className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                         errors.phone ? 'border-red-500' : 'border-[#CFC6B8]'
                       }`}
                       placeholder="Telefonnummer"
                       autoComplete="tel"
                     />
-                    {errors.phone && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.phone}</p>}
+                    {errors.phone
+                      ? <p className="text-[13px] text-red-600 mt-1.5 px-3">{errors.phone}</p>
+                      : <p className="text-[12px] text-[#8B8B8B] mt-1 px-3">{SCHRANKE.telefonHinweis}</p>}
                   </div>
                   </>)}
                 </div>
@@ -1661,23 +2025,26 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         {/* Bottom-Button-Block: auf Step 1 komplett ausgeblendet (kein
             Zurück, Auto-Advance kümmert sich um Weiter), Steps 2-9 zeigen
             nur Zurück, Step 10 zeigt den Submit-Button mit Hinweis. */}
-        {currentStep > 1 && !(currentStep === totalSteps && vorschauModus && !kontaktOffen) && (
-          <div className="px-3 sm:px-6 lg:px-8 pt-4 pb-5 bg-white">
-            {currentStep === totalSteps && (!vorschauModus || kontaktOffen) ? (
+        {currentStep > 1 && !(currentStep === totalSteps && ergebnisModus && !kontaktOffen) && !(currentStep === totalSteps && stufenAktiv) && !(currentStep === totalSteps && preisModus) && (
+          // Nur-Zurück-Zeile eng an die Antworten (Martin 11.09.: „zurück hat
+          // zu viel Luft"); der Absendeblock behält seinen Abstand.
+          <div className={`px-3 sm:px-6 lg:px-8 bg-white ${currentStep === totalSteps && (!ergebnisModus || kontaktOffen) ? 'pt-2 pb-5' : 'pt-0 pb-3'}`}>
+            {currentStep === totalSteps && (!ergebnisModus || kontaktOffen) ? (
               <div className="flex flex-col gap-2.5">
                 <button
-                  onClick={() => handleNext()}
-                  disabled={!canProceed() || isSubmitting}
-                  // Disabled: heller Coral-Ton mit weißer Schrift, damit die
-                  // Botschaft auch ohne Eingabe lesbar bleibt (vorher
-                  // #8B8B8B auf #E5E3DF war kaum lesbar). Inline-Style statt
-                  // Tailwind-Slash-Alpha, weil bg-[#E76F63]/55 vom JIT nicht
-                  // konsistent gerendert wird.
-                  style={!canProceed() || isSubmitting ? { backgroundColor: '#F2B5AE' } : undefined}
+                  onClick={() => (canProceed() ? handleNext() : kontaktUnvollstaendig())}
+                  disabled={isSubmitting}
+                  // Registry #121 (Martin 09.10.): nie blass. Bis dahin blieb der
+                  // Knopf hellrosa und ohne Wirkung, bis alle drei Felder stimmten;
+                  // ein Tipp war eine Sackgasse. Jetzt prüft der Tipp und zeigt, was
+                  // fehlt (kontaktUnvollstaendig). Hell nur noch während des Sendens.
+                  // Inline-Style statt Tailwind-Slash-Alpha, weil bg-[#E76F63]/55 vom
+                  // JIT nicht konsistent gerendert wird.
+                  style={isSubmitting ? { backgroundColor: '#F2B5AE' } : undefined}
                   className={`w-full py-4 font-bold text-base rounded-xl transition-all duration-200 ${
-                    canProceed() && !isSubmitting
+                    !isSubmitting
                       ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl cursor-pointer'
-                      : 'text-white shadow-md cursor-not-allowed'
+                      : 'text-white shadow-md cursor-wait'
                   }`}
                 >
                   {isSubmitting ? (
@@ -1686,15 +2053,31 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   ) : (
-                    <span className={vorschauModus ? 'whitespace-nowrap text-[15px]' : undefined}>{vorschauModus ? SCHRANKE.knopf : 'Angebot & Pflegekräfte anzeigen →'}</span>
+                    <span className={vorschauModus ? 'whitespace-nowrap text-[15px]' : undefined}>{vorschauModus ? SCHRANKE.knopf : KNOPF_KONTAKT}</span>
                   )}
                 </button>
-                <p className="text-center text-xs text-[#8B8B8B] leading-snug">
-                  Öffnet sofort · unverbindlich · keine Werbeanrufe<br />Mit dem Absenden stimmen Sie unserer{' '}
-                  <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
-                    Datenschutzerklärung
-                  </a>{' '}zu.
-                </p>
+                {/* Registry #121: Sterne direkt unter dem Knopf, damit Knopf, Gesichter
+                    und Sterne als ein Paket im ersten Bild stehen (Martin 23.09.). Ohne
+                    Stand keine Zeile; ohne Sprungziel, niemand soll den Schritt verlassen. */}
+                {bewertung && (
+                  <div className="mt-0.5 flex justify-center">
+                    <span aria-label={`${bewertung.schnitt} von 5 Sternen`}><SterneText stand={bewertung} /></span>
+                  </div>
+                )}
+                {/* Registry #121 (Martin 10.10.: „prominenter, so wie das vorher da drunter
+                    war"): Haken und Schrift wie der Punkt in der Leiste am Kartenfuß. */}
+                <div className="flex flex-col items-center gap-1">
+                  <p className="flex items-center justify-center gap-1.5 text-xs">
+                    <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" aria-hidden="true" />
+                    <span className="text-[#3D3D3D] font-medium">{SCHRANKE.fussnote}</span>
+                  </p>
+                  <p className="text-center text-xs text-[#8B8B8B] leading-snug">
+                    Mit dem Absenden stimmen Sie unserer{' '}
+                    <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
+                      Datenschutzerklärung
+                    </a>{' '}zu.
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="flex items-center">
@@ -1719,13 +2102,17 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
             <span className="text-[#3D3D3D] font-medium">DSGVO-Konform</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
-            {/* War "Keine Werbeanrufe" (Martin 16.08. geaendert). Passt
-                zusaetzlich zur Leitplanke des SEA-Laufs: keine Aussagen
-                ueber Anrufe — das Gespraech ist Teil des Modells. */}
-            <span className="text-[#3D3D3D] font-medium">100&nbsp;% kostenfrei &amp; unverbindlich</span>
-          </div>
+          {/* Registry #121 (Martin 10.10.): Im Absendeblock steht der Satz schon
+              unter den Sternen, dort nicht doppelt in der Karte. */}
+          {!kontaktAbsendeblock && (
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
+              {/* War "Keine Werbeanrufe" (Martin 16.08. geaendert). Passt
+                  zusaetzlich zur Leitplanke des SEA-Laufs: keine Aussagen
+                  ueber Anrufe — das Gespraech ist Teil des Modells. */}
+              <span className="text-[#3D3D3D] font-medium">100&nbsp;% kostenfrei &amp; unverbindlich</span>
+            </div>
+          )}
         </div>
       </div>
       </div>
@@ -1755,7 +2142,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
               <span className="text-[14px] font-semibold text-[#8B7355]">Anrufen</span>
             </a>
             <a
-              href={`https://wa.me/4989200000830?text=${encodeURIComponent("Hallo Frau Wysocki, ich habe eine Rückfrage:")}`}
+              href={`https://wa.me/4989200000830?text=${encodeURIComponent("Hallo Frau Kapcio, ich habe eine Rückfrage:")}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-[#25D366] hover:bg-[#20C05A] transition-colors"

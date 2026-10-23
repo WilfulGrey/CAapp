@@ -84,6 +84,8 @@ export const CustomerNurseModal: FC<{
    *  parent surfaces the error (CLAUDE.md §1 — no fake animation). */
   onInvite?: () => Promise<void>;
   onDeclineMatch?: () => void;
+  /** Nur ansehen, keine Aktionen (gebuchte Pflegekraft, Vertrag offen). */
+  nurProfil?: boolean;
   /** Öffnet den (übersetzten) Chat mit der Pflegekraft. */
   onChat?: () => void;
   isInvited?: boolean;
@@ -92,7 +94,7 @@ export const CustomerNurseModal: FC<{
    *  Heart-Icon), der erklärt, dass eine Einladung ihre offizielle
    *  Bewerbung ermöglicht. */
   hasInterest?: boolean;
-}> = ({ nurse, profileLoading = false, aboutLoading = false, initialLevelInfo = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, onChat, isInvited = false, hasInterest = false }) => {
+}> = ({ nurse, profileLoading = false, aboutLoading = false, initialLevelInfo = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, onChat, isInvited = false, hasInterest = false, nurProfil = false }) => {
   const [invited, setInvited] = useState(isInvited);
   const [invitePhaseModal, setInvitePhaseModal] = useState<'idle' | 'sending' | 'done'>('idle');
   const [showLevelInfo, setShowLevelInfo] = useState(initialLevelInfo);
@@ -163,7 +165,14 @@ export const CustomerNurseModal: FC<{
     }
   };
 
+  // Aktionen nur, wenn es wirklich eine gibt (Review 25.09.): Aus dem
+  // Gebucht-Bildschirm, dem Vertrag und den erledigten Karten kommt das Profil
+  // ohne onInvite. Vorher stand dort trotzdem „Einladen" und meldete
+  // „Pflegekraft wurde eingeladen!", ohne dass etwas gesendet wurde.
+  const zeigeAktionen = !nurProfil && (!!app || !!onInvite || invited);
+
   const handleModalInvite = async () => {
+    if (!onInvite) return;
     setInvitePhaseModal('sending');
     try {
       await onInvite?.();
@@ -180,7 +189,7 @@ export const CustomerNurseModal: FC<{
   const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
   // Erklaerung zur Stufe — steht sichtbar im Profil (nicht mehr nur im
   // Popup hinter dem Chip). Wortlaut + Schwellen in shared.ts.
-  const stufeErklaerung = badgeErklaerung(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
+  const stufeErklaerung = badgeErklaerung(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0, nurse.onOtherJob);
   const p = nurse.profile;
   const dash = '—';
   const yesNo = (v: boolean | undefined): string => v == null ? dash : v ? 'Ja' : 'Nein';
@@ -478,11 +487,14 @@ export const CustomerNurseModal: FC<{
               </div>
             )}
 
-            {nurse.detailedAssignments && nurse.detailedAssignments.length > 0 && (nurse.history?.assignments ?? 0) > 0 && (
+            {/* Letzte Einsätze — CaregiverDeparturesWithPagination (Registry #126).
+                Drei ehrliche Zustände wie im SA-Portal: gerade woanders im
+                Einsatz, Liste der abgeschlossenen, Fehler der Abfrage. */}
+            {(nurse.onOtherJob || nurse.einsaetzeError || (nurse.detailedAssignments?.length ?? 0) > 0) && (
               <div className="px-5 pb-5">
                 <div className="flex items-center justify-between mb-2 gap-2">
                   <h3 className={sectionHeadCls + ' mb-0'}>Letzte Einsätze</h3>
-                  {nurse.history && (
+                  {nurse.history && (nurse.detailedAssignments?.length ?? 0) > 0 && (
                     <span className="text-[13px] font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                       style={{ color: '#71717A', background: '#F5F5F6', border: '1px solid #D4D4D8' }}>
                       {/* Gleicher Wortlaut wie die Karte, ohne Ø-Dauer (Martin, 03.09.). */}
@@ -491,16 +503,27 @@ export const CustomerNurseModal: FC<{
                   )}
                 </div>
                 <div className="space-y-2">
-                  {nurse.detailedAssignments.map((a, i) => (
+                  {nurse.onOtherJob && (
+                    <div className={boxCls}>
+                      <p className="text-[16px] leading-relaxed" style={{ color: '#71717A' }}>Derzeit im Einsatz bei einem anderen Kunden.</p>
+                    </div>
+                  )}
+                  {nurse.detailedAssignments?.map((a, i) => (
                     <div key={i} className={boxCls}>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
                         <div><p className={assignLabelCls}>Zeitraum</p><p className={assignValueCls}>{a.startDate} – {a.endDate}</p></div>
-                        <div><p className={assignLabelCls}>Ort</p><p className={assignValueCls}>{a.postalCode} {a.city}</p></div>
-                        <div><p className={assignLabelCls}>Patienten</p><p className={assignValueCls}>{a.patientCount} {a.patientCount === 1 ? 'Patient' : 'Patienten'}</p></div>
                         <div><p className={assignLabelCls}>Dauer</p><p className={assignValueCls}>{a.duration}</p></div>
+                        {(a.postalCode || a.city) && (
+                          <div><p className={assignLabelCls}>Ort</p><p className={assignValueCls}>{a.postalCode} {a.city}</p></div>
+                        )}
                       </div>
                     </div>
                   ))}
+                  {nurse.einsaetzeError && (
+                    <div className={boxCls}>
+                      <p className="text-[16px] leading-relaxed" style={{ color: '#71717A' }}>Die Einsätze können wir gerade nicht abrufen.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -618,6 +641,7 @@ export const CustomerNurseModal: FC<{
             ))}
           </div>
 
+          {(onChat || zeigeAktionen) && (
           <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 space-y-3">
             {onChat && (
               <button
@@ -630,6 +654,7 @@ export const CustomerNurseModal: FC<{
                 Frage an {nurse.name.split(' ')[0]} stellen
               </button>
             )}
+            {zeigeAktionen && (
             <div className="flex gap-3">
             {app ? (
               app.status === 'declined' ? (
@@ -659,12 +684,14 @@ export const CustomerNurseModal: FC<{
               <>
                 {!invited ? (
                   <>
+                    {onDeclineMatch && (
                     <button
-                      onClick={() => { onDeclineMatch?.(); }}
+                      onClick={() => { onDeclineMatch(); }}
                       className="flex-1 border-2 border-gray-200 text-gray-500 rounded-xl py-3 font-semibold text-sm hover:bg-gray-50 transition-colors"
                     >
                       Nein danke
                     </button>
+                    )}
                     {invitePhaseModal === 'sending' ? (
                       <div className="flex-[2] bg-[#F5F5F6] text-[#8B7355] rounded-xl py-3 font-bold text-sm border border-[#E9E9EB] flex items-center justify-center gap-2">
                         <svg className="w-4 h-4 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
@@ -694,7 +721,9 @@ export const CustomerNurseModal: FC<{
               </>
             )}
             </div>
+            )}
           </div>
+          )}
         </div>
       </div>
 

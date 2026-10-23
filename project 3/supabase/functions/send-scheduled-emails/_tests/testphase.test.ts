@@ -1,7 +1,7 @@
 /* Deno-Test der Testphase-Umleitung — Spiegel des vitest-Tests
  * (src/__tests__/portalSchutz.test.ts). Logik-Kopie: siehe testphase.ts. */
 import { assertEquals } from "jsr:@std/assert";
-import { testphaseUmleitung, TESTPHASE_EMPFAENGER } from "../testphase.ts";
+import { anreiseTestUmleitung, testphaseUmleitung, TESTPHASE_EMPFAENGER } from "../testphase.ts";
 
 Deno.test("Flag an + Portal-Lead → Team-Adressen + Betreff-Praefix", () => {
   const u = testphaseUmleitung({ source: "portal:pflegehilfe.org", email: "kunde@example.org" }, "1");
@@ -42,4 +42,15 @@ Deno.test("Testphase: Ziel ist ueberschreibbar (ein Durchlauf, eine Adresse)", (
   );
   // Leerer/blanker Wert zaehlt als nicht gesetzt.
   assertEquals(testphaseUmleitung(lead, "pflegena.com", "   ")?.empfaenger, TESTPHASE_EMPFAENGER);
+});
+
+/* Registry #119: Anreise-Mail im Test (ANREISE_MAILS=test) geht ans Team. */
+Deno.test("Anreise-Test: nur Typ anreise mit metadata.test wird umgeleitet", () => {
+  const u = anreiseTestUmleitung("anreise", { test: true }, "kunde@example.org");
+  assertEquals(u?.empfaenger, TESTPHASE_EMPFAENGER);
+  assertEquals(u?.betreffPraefix, "[TEST Anreise → kunde@example.org] ");
+  assertEquals(anreiseTestUmleitung("anreise", { test: true }, "k@x.de", "michal@example.org")?.empfaenger, "michal@example.org");
+  assertEquals(anreiseTestUmleitung("anreise", {}, "k@x.de"), null);
+  assertEquals(anreiseTestUmleitung("anreise", null, "k@x.de"), null);
+  assertEquals(anreiseTestUmleitung("nachfass_2", { test: true }, "k@x.de"), null);
 });

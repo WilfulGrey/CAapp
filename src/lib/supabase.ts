@@ -38,6 +38,16 @@ export interface LeadKalkulation {
 
 export interface Lead {
   id: string;
+  /** Zeitpunkt des LETZTEN Speicherns der Pflegesituation (mamamia-proxy setzt ihn
+   *  bei jedem erfolgreichen UpdateCustomer). Nur als „schon abgesendet" genutzt. */
+  patient_form_at?: string | null;
+  /** Der Patientenbogen, wie der Kunde ihn zuletzt abgesendet hat (mamamia-proxy,
+   *  `portal_form_snapshot`). Quelle für das Startdatum im Portal. */
+  patient_form?: Record<string, unknown> | null;
+  /** Standard-Job des Leads (Onboard). Ereignisse ohne Job gehören wie im Server zu ihm. */
+  mamamia_job_offer_id?: number | null;
+  /** Gesetzt, wenn der Lead ueber einen Vermittler kam (Registry #59). */
+  vermittler?: string | null;
   email: string;
   /** Zweite Empfängeradresse (CC) — gepflegt im SA-Portal/Admin, nie Teil der Identität. */
   email_cc?: string | null;
@@ -76,11 +86,11 @@ export async function fetchLeadByToken(token: string): Promise<{
   lead: Lead | null;
   error: string | null;
 }> {
-  const { data, error } = await supabase
-    .from('leads')
-    .select('*')
-    .eq('token', token)
-    .maybeSingle();
+  /* Über die Funktion lead_by_token, nicht direkt aus der Tabelle: leads ist für
+     den Anon-Schlüssel per RLS zu (vorher konnte jeder mit dem öffentlichen
+     Schlüssel alle Leads lesen). Liefert die eigene Zeile als Objekt — ohne
+     interne Spalten (admin_notes, notizen, mamamia_user_token) — oder null. */
+  const { data, error } = await supabase.rpc('lead_by_token', { p_token: token });
 
   if (error) return { lead: null, error: error.message };
   if (!data) return { lead: null, error: 'Token nicht gefunden' };
@@ -99,6 +109,8 @@ export async function setDeclinedCaregiver(
   caregiverId: number,
   declined: boolean,
 ): Promise<{ error: string | null }> {
+  // Vorschau (?preview=…): kein echter Lead, nichts schreiben.
+  if (token === 'preview-token') return { error: null };
   const { error } = await supabase.rpc('set_declined_caregiver', {
     p_token: token,
     p_caregiver_id: caregiverId,

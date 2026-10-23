@@ -49,7 +49,7 @@ Stan kodu: `integration/mamamia-onboarding`, ostatnie sweepy K1–K7 (kwiecień�
 │  caapp-beta/?token=X        │
 │  (Vite/React, src/)         │
 └──┬──────────────────────────┘
-   │ 4. GET /rest/v1/leads?token=eq.X  ──►  Supabase.leads
+   │ 4. POST /rest/v1/rpc/lead_by_token { p_token: X }  ──►  Supabase (Registry #107)
    │ 5. POST /functions/v1/onboard-to-mamamia { token }
    ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -124,8 +124,11 @@ Next.js 13 SSR, deployowane na `kostenrechner-beta.onrender.com` z brancha
 
 ### Tracking Stage A (analytics_*, Bug #33)
 
-`lib/analytics.ts` pisze bezpośrednio (anon key) do `analytics_sessions` /
-`analytics_events` / `analytics_conversions`. Wizard-Events:
+`lib/analytics.ts` wysyła przez trasy kostenrechnera (`/api/analytics/collect`,
+`/critical-event`, `/page-time`) do `analytics_sessions` / `analytics_events` /
+`analytics_conversions`. `collect` pisze Service-Keyem: `analytics_sessions` jest dla
+anon zamknięte (Registry #107 — `landing_page` niesie często `/kalkulation/<leadId>`).
+Wizard-Events:
 `warmup_answered`, `step_view` / `step_complete` (step 1–9, step 9 =
 `contact_form`), `step_back`.
 
@@ -139,6 +142,29 @@ Next.js 13 SSR, deployowane na `kostenrechner-beta.onrender.com` z brancha
   `eventCallback` + `eventTimeout: 700` + Safety-`setTimeout(900)` vor
   `window.location.assign` — der Google-Ads-Conversion-Tag (GTM) bekommt
   Zeit zu feuern, Adblocker blockieren nur den Tag, nie den Redirect.
+- **Schließen und Wiederöffnen (Registry #108):** Der dunkle Hintergrund des
+  Overlays schließt bei den Fragen nicht; dort schließt nur das X, ohne Schritt
+  oder Antworten zurückzusetzen. Im Kontaktschritt (kein X) schließt der Tipp
+  daneben wie bisher, ebenfalls ohne Zurücksetzen. Hero-Knopf und alle CTAs öffnen an derselben Frage. Für die
+  Messung: `step_view` feuert beim Wiederöffnen für die aktuelle Frage erneut
+  (der Trichter zählt Sitzungen), `wizard_opened` je Öffnen wie bisher, der
+  anonyme Zähler `schritt_N` bleibt bei einmal je Seitenaufruf.
+- **Einstieg auf primundus.de (Registry #120):** primundus.de hängt beim Klick in den Rechner `ein` (erste Seite
+  des Besuchs) und `her` (Klasse der Herkunft, nie die Adresse) an. `lib/website-einstieg.ts` liest beide beim ersten
+  Aufruf (`AnalyticsProvider`) in den Arbeitsspeicher — kein sessionStorage, kein Cookie —, das Formular schickt sie als
+  `websiteEinstieg` mit, die Absende-Route schreibt nach Prüfung `lead_events` `website_einstieg {pfad, herkunft, art,
+  quelle}` zu jeder Absendung. Nicht an `analytics_sessions` (bräuchte eine Migration).
+- **Kontaktschritt B2 (Registry #121, 2026-10-09):** Frage „Für wen dürfen wir Ihre
+  Preisberechnung ausstellen?“, darunter vier Gesichter + `SCHRANKE.lohn` („Danach sehen
+  Sie sofort Ihren Preis und 5 passende Profile.“) statt grünem Kasten (der bleibt nur bei
+  `?kontakt=stufen`), Namensfeld „Ihr Name“. Der Absende-Knopf ist nur beim Senden gesperrt:
+  ein Tipp bei fehlenden Angaben ruft `kontaktUnvollstaendig` (Hinweis nur am ersten offenen
+  Feld, Fokus dorthin über `KONTAKT_FELD_ID`). Direkt unter dem Knopf die Sterne
+  (`SterneText`, ohne Stand keine Zeile), darunter „100 % kostenfrei & unverbindlich“ mit Haken
+  wie in der Leiste am Kartenfuß (Martin 10.10.) und der Datenschutz-Satz; die Leiste lässt den
+  Punkt weg, solange dieser Absendeblock steht (`kontaktAbsendeblock`). Anonyme Zähler neu, je Seitenaufruf einmal: `feld_angetippt` (erster
+  Fokus auf Name/E-Mail/Telefon) und `knopf_unvollstaendig` (Tipp, solange etwas fehlt).
+  Gemessen vorher (09.10.): Knopf auf dem iPhone SE (553 px sichtbar) bei 619–675 px.
 - **Ad-Parameter:** `gclid`/`wbraid`/`gbraid`/`utm_term`/`utm_content` aus
   der Landing-URL landen per best-effort Update auf `analytics_sessions`
   (utm_source/medium/campaign standen schon im Insert) + in sessionStorage
@@ -226,7 +252,44 @@ Content-Type: application/json
    testu znika, gdy zadna ze stron czatu nie miala ruchu. To INNY wymiar niż `wizardOpenedBySource` w tym samym
    raporcie: tamto to PRZYCISK otwierający wizard, to jest STRONA, z której
    przyszło zapytanie.
+   Ereignis `website_einstieg` (Registry #120): direkt nach dem Klick-ID-Update, wenn der Body einen gültigen
+   `websiteEinstieg` trägt — auch beim Duplikat; best-effort.
 5. Build `portalUrl = ${NEXT_PUBLIC_PORTAL_URL}/?token=<lead.token>`
+
+### Preis zuerst (Registry #77, 2026-09-17)
+
+Ablauf `preis` (für ALLE Besucher vom 17.09. 13:05 bis zum 19.09. — seitdem AUS (Registry #80): `ABLAUF_STANDARD = 'alt'`,
+die Preisseite ist nur noch per `?ablauf=preis` erreichbar (klebt je Sitzung); `project 3/lib/preis-zuerst.ts`):
+Nach der letzten Frage lädt der Rechner die Kalkulation (`POST /api/kalkulation-berechnen`, ohne
+`sessionId` — die Route schreibt dann nichts), die Warteseite dauert ca. 3 s, danach steht in
+Schritt 9 die **Preisseite** (`components/calculator/PreisSeite.tsx`): Preis, Bestpreisgarantie,
+„Nach Zuschüssen ca. …", Heimvergleich, Kräfte-Fotos, Knopf zur Kontaktabfrage, darunter die
+Konditionen. Erst der Knopf öffnet den Kontakt — EINE Seite (`components/calculator/KontaktSeite.tsx`:
+Name, E-Mail, Telefon; Knopf nie grau, Fehler am Feld); `?kontakt=stufen|seite` erzwingt die Form
+unabhängig vom Ablauf. Der Lead trägt die Kalkulation der Preisseite (kein zweiter Rechenlauf); das
+Event `kontakt_variante` trägt zusätzlich `ablauf` (so lassen sich Anfragen je Arm zählen). Scheitert
+die Berechnung, entfällt die Preisseite und der Besucher läuft den alten Weg. Anonyme Zähler:
+`schritt_9` = Preisseite gesehen, `kontakt_geoeffnet`, `preis_fehler`, Variante `preis`.
+
+### Kontakt in drei Schritten (Registry #76, 2026-09-16)
+
+Variante `stufen` (`project 3/lib/kontakt-stufen.ts`; seit dem 19.09. der EINE Test, Registry #80: im Ablauf `alt`
+50/50 je Besucher gegen das alte Formular, Los klebt 30 Tage in localStorage `prim_kontakt_los`, Warteseite in beiden
+Armen kurz; `?kontakt=stufen|alt|seite` erzwingt je Sitzung; `KONTAKT_TEST.aktiv = false` beendet den Test):
+Schritt 9 fragt Name → E-Mail → Telefon einzeln. Nach der E-Mail ruft der Rechner
+`POST /api/angebot-anfordern` mit `telefonSpaeter: true` und OHNE `telefon` — die Route
+legt den Lead an (Spalte `telefon` NULL), plant Mail 1 wie sonst (delay 0 + flush), schickt
+die Team-Mail mit Telefon „noch nicht angegeben …" und loggt `kontakt_variante`
+(`{variante, telefon_spaeter, telefon_dabei}`; auch Variante `alt` loggt das). Conversion
+(dataLayer `angebot_erfolgreich`), Beacon und OpenAI-Pixel feuern genau einmal, an dieser
+Stelle, ohne Redirect. Der Telefon-Schritt ruft `POST /api/lead-telefon {token, telefon}`
+(nur `leads.telefon`, Event `telefon_nachgetragen`, Team-Mail-Nachtrag wenn vorher leer) und
+leitet dann ins Portal; „Ohne Rückrufnummer weiter" leitet ohne Nummer. Das Patientenprofil
+zeigt die Nummer IMMER (Schritt „Einsatzort & Start", unter dem Startdatum; vorbelegt aus
+`leads.telefon` bzw. mamamia, zu prüfen oder zu ergänzen, Pflicht — Martin 17.09.) — von dort geht
+sie den bestehenden Weg (`patientFormMapper` → `Customer.phone` + `customer_contract.phone`;
+`lead-event` `metadata.phone` → `leads.telefon`). mamamia bekommt die Nummer aus dem
+Telefon-Schritt NICHT (kein Resync-Feld); das Panel liest ohnehin `customer_contract.phone`.
 
 ### Response
 
@@ -428,7 +491,9 @@ kalkulation           jsonb                   -- całe `kalkulation` z body API
 -- mamamia onboarding cache (wypełnione przez onboard-to-mamamia)
 mamamia_customer_id   integer  NULL
 mamamia_job_offer_id  integer  NULL
-mamamia_user_token    text     NULL
+mamamia_user_token    text     NULL        -- NIEUŻYWANE od Registry #107: był tu token agencji
+                                            --   MM (czytelny przez anon). Onboard już nie pisze,
+                                            --   wartości wyzerowane; kolumna zostaje (Święta zasada 3).
 mamamia_onboarded_at  timestamptz NULL
 
 -- follow-up discovery (Bug #25, cron detect-caregiver-events)
@@ -479,17 +544,24 @@ Kolumny `mamamia_*` dodane migracją
 
 Vite + React 18 + TS, `caapp-beta.onrender.com/?token=X`.
 
-### B.1 Pobranie leada (Supabase REST z anon key)
+### B.1 Pobranie leada (funkcja `lead_by_token`, Registry #107)
 
-`src/pages/CustomerPortalPage.tsx:49` → `src/lib/supabase.ts:62`:
+`src/pages/CustomerPortalPage.tsx` → `src/lib/supabase.ts` `fetchLeadByToken`:
 
 ```http
-GET https://ycdwtrklpoqprabtwahi.supabase.co/rest/v1/leads?select=*&token=eq.<token>
+POST https://ycdwtrklpoqprabtwahi.supabase.co/rest/v1/rpc/lead_by_token
 apikey: <anon>
 Authorization: Bearer <anon>
+
+{ "p_token": "<token>" }
 ```
 
-Zwraca cały wiersz `leads`. Tani (~150–300 ms).
+Zwraca własny wiersz `leads` jako obiekt jsonb **bez** `admin_notes`, `notizen`,
+`mamamia_user_token` — albo `null`. Bez filtra `token_expires_at` (wygasły token ładuje
+wiersz, 401 daje dopiero onboard → „Neuen Link senden”). Tabela `leads` jest dla anon
+zamknięta (RLS); do 10/2026 portal czytał `select=*` z tabeli, a ten sam publiczny klucz
+pozwalał czytać wszystkie leady. Nowa kolumna potrzebna portalowi przychodzi sama; nowa
+**wewnętrzna** kolumna musi trafić na listę wykluczeń w funkcji (migracja).
 
 ### B.2 Onboard do mamamii
 
@@ -522,6 +594,33 @@ Content-Type: application/json
 ```
 
 (szczegóły poszczególnych akcji → §6)
+
+### B.4 Patientenbogen („Pflegesituation“) — UI i walidacja (Registry #86)
+
+`src/components/portal/AngebotCard.tsx`, 4 kroki (`STEP_LABELS` w `shared.ts`):
+
+| Krok | Pflicht (`missingFields`) |
+|---|---|
+| 1 Zur Person | `geschlecht` (+ `p2_geschlecht` przy 2 osobach); `geburtsjahr` opcjonalny, ale jeśli wpisany: 4 cyfry 1920–2010 |
+| 2 Pflegebedarf | `mobilitaet`, `heben`, `demenz`, `nacht` (+ wszystkie `p2_*`); `mobilitaet`/`nacht` osoby 1 są stałe z kalkulatora |
+| 3 Einsatzort & Start | `plz` rozwiązywalny (`einsatzortHinweis`), `wohnungstyp`, `urbanisierung`, `startDate`, `phone` (8–15 cyfr) |
+| 4 Wünsche & Aufgaben | `wunschGeschlecht`, `fuehrerschein` |
+
+- Błędy pokazują się dopiero po „Weiter →“/„Speichern“ — przy polu (`FormField`, `data-invalid`) i skrótem nad przyciskiem („Geschlecht fehlt“), który przewija do pola. Znikają na żywo po uzupełnieniu.
+- **Kalendarz daty startu (krok 3, Registry #123, live z „1,2,3 ja“ Martina 14.10.2026):** `DateField` przy otwarciu wsuwa cały kalendarz w widok (dolna krawędź vs `visualViewport` minus przyklejony pasek przycisków minus 12 px, przewijany tylko jeden scroller, nigdy `scrollIntoView`, miejsce od razu na miesiąc z sześcioma tygodniami; przewijanie miesięcy nie przewija strony). Pasek `FormNav` jedzie w przepływie, dopóki pole jest rozwinięte (`pm:feld-aufgeklappt`). Zamknięcie poza kalendarzem tylko przy prawdziwym tapnięciu (≤ 10 px, bez `pointercancel`/scrolla) i dopiero przy `click`. Tapnięcia zaczęte w trakcie wsuwania nie liczą się (min. 450 ms, do 80 ms po ostatnim scrollu, maks. 1 s). Wcześniej (od #86) kalendarz na telefonie otwierał się za paskiem przycisków, tapnięcie w zasłonięty dzień trafiało „Zurück“/„Weiter“ i pole zostawało puste. Komunikat dla nieznanego PLZ (`einsatzortHinweis`, wariant A-R5.4): „Zu der Postleitzahl … kennen wir keinen Einsatzort. Unsere Pflegekräfte sind nur in Deutschland im Einsatz. Bitte prüfen Sie die Postleitzahl. Bei Fragen hilft Ihnen Marta Kapcio gern.“ (bez „vermitteln“).
+- Ostatni przycisk („Bewerbungen erhalten“ od Registry #93, po wcześniejszym zapisie „Änderungen speichern“, Registry #90) jest zawsze aktywny: przy brakach skacze do pierwszego niepełnego kroku, inaczej `onSaveToMamamia` → `updateCustomer` → `patient_data_saved` (w `CustomerPortalPage`). Nad nim przed pierwszym wysłaniem zdanie „Kostenlos und unverbindlich. Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen und im Portal unterschreiben.“ (Registry #109; wcześniej zdanie o rezerwacji 72 h), po wysłaniu bez zdania. **Wyjątek od Registry #122:** w widoku przed pierwszym zapisem (`EinstiegVorSpeichern`) formularz dostaje prop `stand75b8df8` — ostatni przycisk „Speichern“ z przyciskiem „Zurück“ obok (nie link pod spodem), bez zdania nad nim, tekst ładowania „Speichern…“, przy stałych wartościach „Aus Ihrem Kostenrechner übernommen“ (jak w 75b8df8). Zapis i walidacja bez zmian.
+- **Od Registry #122 (10.10.2026) przed pierwszym zapisem portal pokazuje znowu stan 75b8df8 (25.09. 15:56, ostatni przed #748)** — `src/components/portal/EinstiegVorSpeichern.tsx` + `MatchCardVorSpeichern.tsx`, w `CustomerPortalPage` gałąź `rueckbau = kompakt && !einstiegKompakt`. Powód: od #748 klienci z Google zapisywali Pflegesituation w 1. godzinie w 2 z 48 przypadków (wcześniej 42 ze 151); analiza: `seo-reports/analysen/profil-ursache-2026-10-10/ERGEBNIS.md`. Kolejność: nagłówek jak dziś w Kompakt-Einstieg (od 10.10., Martin: „oben den neuen Teil besser … die Sterne … nicht unterstrichen“) — `KopfVorSpeichern` z klocków `KompaktEinstieg.tsx`: `AngebotPerson` (inicjały, „Guten Tag, …“, „Ihr persönlicher Bereich“), H1 „Ihr Angebot zur 24-Stunden-Betreuung“, `AngebotSterne` (wiersz gwiazdek BEZ linku); na tle paper, margines 18 px; BEZ wstępu „Gerne übernehmen wir …“, bloku Testsieger i karty oferty; karta kosztów „Ihre Betreuungskosten“ (28 px pod nagłówkiem, `pt-7` zamiast `-mt-6`; cena, „Monatlich inkl. …“, Bestpreisgarantie, cztery haczyki „Täglich kündbar / Tagesgenaue Abrechnung / Erst auswählen, dann buchen / Keine Vermittlungsgebühr“, „Kosten erst, wenn die Pflegekraft da ist.“, porównanie z domem opieki, Testsieger, „Alle Kosten im Überblick“); „Für Sie ausgewählt / Passende Pflegekräfte“ (`#pflegekraefte`) z linkiem „Warum? Mehr“; karta „● Pflegesituation unvollständig / Noch 2 Minuten bis zu Ihren Bewerbungen / Vieles ist schon aus Ihrem Kostenrechner übernommen.“ z przyciskiem „Pflegesituation vervollständigen“ (`zurPflegesituation`, płynny skok do `#patientendaten`); karty `MatchCardVorSpeichern` (rekomendacja jako wiersz NAD kartą, „Einladen“ obrysowany z kłódką → przez `canInviteNurse` okno `WarumSheetVorSpeichern` „Warum erst die Pflegesituation?“ z przyciskiem do formularza; to samo z „Einladen“ w profilu); nagłówek `#patientendaten` „Für Ihre Bewerbungen · Pflegesituation · Unvollständig — Damit sich Pflegekräfte bewerben können. Vieles ist schon ausgefüllt.“ i formularz OTWARTY pod nim (`patientFormular(false, true)`); „In drei Schritten / So geht es weiter“ bez przycisku; FAQ jak dziś w Kompakt-Einstieg (od 10.10.): `FaqListe karte` — karta z „Deutsch-Niveaus“ + trzema pytaniami podstawowymi, „10 weitere Fragen“, dzisiejszy zestaw z pytaniem o Bestpreis (#118); `MartaBox` z pieczęcią. Pozostałe widoczne teksty bajt w bajt jak w 75b8df8. Pływające `AngebotsFeedback` NIE pojawia się (w 75b8df8 przez błąd z #114 nigdy nie było widoczne u prawdziwych klientów). `goto=anfragen` skacze dopiero, gdy lista opiekunek jest załadowana. Bez zmian zostają: `lead_by_token`, zapis do mamamii, telefon, data startu, stan ładowania listy (#749). Po pierwszym zapisie — widok Fassung 33 jak niżej. `?einstieg=kompakt` pokazuje przed zapisem Kompakt-Einstieg (porównanie / droga powrotu); na stałe z powrotem: `rueckbau` → `false`.
+- **Wiersz gwiazdek w nagłówku nie jest linkiem** (Registry #122, Martin 10.10.: „Das muss aber nicht unterstrichen sein, damit man da das nicht draufklickt“): `BewertungsZeile link={false}` renderuje `<p>` — bez `href`, bez podkreślenia, bez pola dotyku 44 px, bez hover/focus; `AngebotSterne` (jedyny wiersz gwiazdek w nagłówku: Rückbau i `?einstieg=kompakt`) używa tego wariantu. Po zapisie i na ekranie „gebucht“ w nagłówku nie ma gwiazdek — tam bez zmian. Linkiem do `primundus.de/erfahrungen` zostają: gwiazdki w karcie Bewerbung (`AppCard vorteile`), w karcie kosztów looku „ruhig“ (`KompaktVertrauen`) i w `MartaBox`; maile bez zmian.
+- **Od Registry #114 (Fassung 30 + 33, live 06.10.2026) do Registry #122 widok standardowy przed zapisem to Kompakt-Einstieg w wyglądzie „angebot“ (od #122 tylko z `?einstieg=kompakt`)** (`src/components/portal/KompaktEinstieg.tsx`, `KOMPAKT_LOOK`; `?look=ruhig` pokazuje starszy szkic i dotychczasowy widok po wysłaniu, tylko do porównania). Przed pierwszym wysłaniem (`kompakt` = brak aplikacji, `!patientSaved`, `!schonAbgesendet`, `!lokalAbgesendet`): nagłówek z inicjałami („Guten Tag … / Ihr persönlicher Bereich“), tytuł „Ihr Angebot zur 24-Stunden-Betreuung“, gwiazdki, wstęp, wiersz Testsieger; karta oferty (`#angebot`: „Ihr Angebot vom …“, zakres i osoby, cena miesięczna, „Kosten im Überblick ›“ otwiera `#kosten-ueberblick`, cztery punkty); „So geht es weiter“ (3 kroki, link „Jetzt vervollständigen ›“ w kroku 1 otwiera formularz); sekcja „1 · Pflegesituation ergänzen und Pflegekräfte einladen“ (`#pflegekraefte`) z kartą „Achtung: Es fehlen noch Angaben zur Pflegesituation“ (`#patientendaten`) — przycisk „Jetzt vervollständigen“ otwiera formularz W karcie (`AngebotCard eingebettet`), pod nią karty `MatchCard` (rekomendacja pierwsza, „Profil vervollständigen & einladen“ → formularz); FAQ jako karty (`FAQ_ANGEBOT`), Marta bez pieczęci.
+- **Po wysłaniu (Fassung 33, `nachAbsendenNeu`)**: ten sam nagłówek, tytuł „Ihre Suche läuft“ + „Passende Pflegekräfte sehen jetzt Ihre Anfrage und können sich bei Ihnen bewerben.“; „So geht es weiter“ ze stanem (`AngebotAblaufStand`, zastępuje `SucheStand`): krok 1 „Pflegesituation vollständig“ (zielony haczyk) z linkiem „Pflegekräfte einladen ›“, krok 2 „Bewerbungen erhalten“ aktywny, krok 3 jak przed wysłaniem + „Ihr Wunschstart“ z formularza; sekcja „Pflegekräfte einladen“ (bez czerwonej 1, `MatchCard breit`); obszar „Angebot und Pflegesituation“: JEDNA karta, dwa rozwijane wiersze — oferta (ta sama treść co przed wysłaniem; przy otwartej aplikacji bez ceny w wierszu) i „Ihre Pflegesituation · ✓ Vollständig · Angaben ansehen“, który otwiera formularz w karcie (`patientFormular(true)`, „Änderungen speichern“). W krokach NIE ma linku do zmiany danych (decyzja Martina 06.10.). Karta bez `overflow-hidden`, bo pasek przycisków formularza jest `sticky`. Obszar stoi też przy otwartej aplikacji (wcześniej Pflegesituation była wtedy ukryta).
+- **Pływające `AngebotsFeedback`** („Was sagen Sie zum Angebot?“): od Registry #114 obserwator czeka na `#patientendaten` (MutationObserver) — przy pierwszym renderze stoi ekran „Ihr Angebot wird geladen…“ i dawny efekt rezygnował na zawsze, więc od 12.08. pytanie nie pojawiło się u żadnego prawdziwego klienta (podgląd startuje „reif“, dlatego tego nie widać było). Warunki bez zmian: 45 s, sekcja w widoku, nie nad formularzem, nigdy po wysłaniu. Od Registry #122 także nigdy w widoku przed zapisem ze stanu 75b8df8 (`!rueckbau`).
+- **Ekran po rezerwacji (`BookedScreen`, Fassung 34, Registry #115, live 06.10.2026)**: ten sam wygląd co przed i po wysłaniu. Nagłówek z inicjałami i powitaniem (`AngebotPerson`, prop `kopf`), duży tytuł po lewej (bez emoji 🎊/📋), „Einsatz-Zeitraum & Kosten“ jako sekcja z nagłówkiem (`MonatsAufstellung abschnitt`; w dialogu „Angebot prüfen“ zostaje mały wiersz), „Als Nächstes“ jako JEDNA karta z krokami (kółka jak w „So geht es weiter“: zielony haczyk = zrobione, czerwony numer = do zrobienia, szary = później; chipy statusu zostają), „Vertrag jetzt abschließen →“ to standardowy `Button` (czerwony zamiast zielonego), na końcu `MartaBox` (prop `sterne`; bez propa brak skrzynki). Przy zakończonym einsatzu sekcja nazywa się „Ihre Unterlagen“ zamiast „Als Nächstes“ (jedyna zmiana tekstu). Uwaga: skrzynka „Hinweis der Agentur“ na tym ekranie czyta tylko `coverMessage` (= wyłącznie mocki podglądu), więc prawdziwi klienci jej tu nie widzą (AppCard i „Angebot prüfen“ pokazują `application.message`).
+  Od Registry #116 (Fassung 35, decyzja Martina 06.10.2026) zdanie pod tytułem nazywa doradczynię: „Ihr Vertrag ist unterschrieben. Marta Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen, um die Anreise zu besprechen.“; przy umowie w przygotowaniu: „Wir bereiten Ihre Vertragsdokumente vor. Marta Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen.“ (imię z twardą spacją, żeby się nie łamało).
+- Widok poniżej (Registry #109) zostaje tylko dla `?look=ruhig` i przypadku `lokalAbgesendet` bez potwierdzenia z serwera:
+  Przed formularzem (od Registry #109 słownictwo jak do 24.09., wygląd nowy): nad opiekunkami zdanie „Gefällt Ihnen eine Pflegekraft, laden Sie sie ein, sich bei Ihnen zu bewerben. Das ist kostenlos und unverbindlich: …“ i karta „Noch 2 Minuten bis zum Einladen“ (bez linii statusu) z przyciskiem „Jetzt vervollständigen →“ (`zurPflegesituation`); na każdej karcie opiekunki koralowy przycisk na całą szerokość „Profil vervollständigen & einladen“, który przez `canInviteNurse` skacze prosto do formularza (okno „Warum erst die Pflegesituation?“ i link „Warum? Mehr“ usunięte); nagłówek formularza „Pflegesituation · Unvollständig — Jetzt konkrete Bewerbungen erhalten“; „So geht es weiter“ krok 1 z przyciskiem „Jetzt vervollständigen →“. Do tego pływające `AngebotsFeedback` („Was sagen Sie zum Angebot?“, event `angebots_feedback`, po 45 s i gdy #patientendaten w widoku, nie nad formularzem). `AngebotFrage` nie jest renderowane. Po wysłaniu: `SucheStand`. Przy otwartej aplikacji: odliczanie 72 h (`src/lib/reservierung.ts`, ta sama reguła co auto-reject w `detect-caregiver-events`).
+- Chipy zapisują niezmienione wartości (`Pflegegrad 3`, `71-80 kg`); krótsze etykiety tylko w widoku (`ChipSelect labels`).
+- Szkic w `localStorage` pod `patient_<token>` (`_isDraft`), event `patient_form_step` (`metadata.step` = osiągnięty krok, 0-based: 1–3) raz na krok i sesję. Bridge `/api/lead-event` zapisuje od Registry #109 KAŻDY krok (`NON_DEDUPED_EVENTS`; wcześniej dedupe po (lead, typ) zostawiał tylko pierwszy krok na lead), bez maili. Od Registry #122 także klucz sesji w `reportLeadEvent` zawiera krok (`${token}:patient_form_step:${step}`) — wcześniej przeglądarka wysyłała na odsłonę tylko PIERWSZY krok. Brak eventu „formularz otwarty“: formularz stoi otwarty na stronie, a `step: 0` zafałszowałby „Formular begonnen“ w istniejących analizach (liczą każdy `patient_form_step`).
+- **Niewidoczne punkty pomiarowe (Registry #123):** tylko prawdziwe leady, nigdy w trybach podglądu (`IS_PREVIEW_ANY`), przez `reportLeadEvent` z `notify: false`; bridge przyjmuje je w `ALLOWED_EVENTS` i `NON_DEDUPED_EVENTS` z jednej listy `project 3/lib/messpunkte.ts` (lustro `MESSPUNKTE` w `src/lib/leadEvents.ts`), w ŻADNEJ liście maili, bez własnej gałęzi — czyli bez maila do zespołu, maila do klienta, remindera, Offline-Conversion i zmiany statusu. Zdarzenia: `profil_geoeffnet` {caregiver_id, quelle, vor_speichern}, `einladen_getippt` {caregiver_id, quelle, vor_speichern} (też tapnięcie w kłódkę przed zapisem), `warum_geoeffnet`, `bestpreis_geoeffnet`, `kosten_aufgeklappt`, `faq_geoeffnet` {frage: klucz z `FAQ_SCHLUESSEL`}, `kalender_geoeffnet`, `kalender_zu_ohne_datum` (żaden dzień nie wybrany i pole puste, także gdy pole znika otwarte). Raz na sesję; profil i „Einladen“ raz na opiekunkę (osobno przed i po zapisie), FAQ raz na pytanie. Bez danych osobowych. Kalendarz: `DateField` ma ogólne callbacki `onGeoeffnet`/`onGeschlossen(gewaehlt)`, znaczenie nadaje `AngebotCard` (`onMesspunkt`). `freischaltung` celowo nie zbudowane — portal po zapisie nie wie bez nowego wywołania Mamamii, kiedy klient jest aktywny. **Pomiar pól (Registry #132)** tą samą drogą: `formular_sichtbar` {schritt, vor_speichern} (pierwsze pole formularza w połowie widoczne — IntersectionObserver w `AngebotCard`, raz na sesję), `feld_beruehrt` {schritt, feld, vor_speichern} (tap lub fokus na polu kroku 1 „Zur Person“ i 3 „Einsatzort & Start“; `feld` = klucz `data-field`, nigdy wartość; raz na pole), `weiter_blockiert` {schritt, offen, vor_speichern} („Weiter“ / „Bewerbungen erhalten“ przy brakujących polach obowiązkowych; `offen` = klucze z `missingFields`; raz na krok i zestaw pól), `zur_pflegesituation` {quelle, vor_speichern} (przycisk do formularza: `kasten` = ramka nad opiekunkami, `warum` = okno „Warum erst die Pflegesituation?“, `karte` = przycisk na karcie, `schritte` = „So geht es weiter“, `frage` = pływające pytanie, `mail` = link `goto=anfragen`, `stand` = „Stand heute“ po zapisie; tylko kliknięcia klienta i link z maila, nigdy skok wywołany przez portal; raz na źródło). Krok 2 (diagnozy, demencja) i 4 celowo bez pomiaru pól.
 
 ---
 
@@ -621,7 +720,19 @@ PLZ czytany z `lead.patient_zip` (zwykle null bo to stage-B) lub z
 `formularDaten.{plz, postleitzahl, postal_code, zip, zip_code}` (kostenrechner
 też nie wysyła). **W MVP zwykle PLZ = null** → `lookupLocationId` zwraca
 `null` → `location_id` w StoreCustomer pozostaje null; patient form save
-wypełni przez `UpdateCustomer.location_id` lub `location_custom_text`.
+wypełnia go przez `UpdateCustomer.location_id`.
+
+**Od Registry #65 (2026-09-11) `location_id` jest warunkiem zapisu formularza,
+nie alternatywą.** `onSaveToMamamia` rozwiązuje PLZ przez `searchLocations`
+i przy braku trafienia **rzuca przed zapisem** — do Mamamii nie idzie nic.
+Powód: bez `location_id` MM stempluje placeholder (prod: `location_id=16480`
+dla KAŻDEJ nierozwiązywalnej PLZ), przestawia klienta na `status='active'`,
+a portal pokazuje „Vollständig" dla profilu, którego panel nie widzi. Gałąź
+`location_custom_text` w `patientFormMapper` istnieje nadal, ale z portalu jest
+nieosiągalna. Dwie reguły przy rozwiązywaniu PLZ (wszędzie — portal, onboard,
+acceptanceSync): **dokładna `zip_code`**, bo `search` matchuje prefiksy
+(`'503'` → 50321 Brühl), i **`country_code === 'DE'`**, bo katalog MM jest
+wyłącznie niemiecki.
 
 #### ⑤ StoreCustomer (minimalny payload — Bug #13 refactor)
 
@@ -646,14 +757,28 @@ z prawdziwymi danymi. Verified live: Customer 7651 (`/tmp/test-minimal-storecust
 
 | Pole | Źródło | Komentarz |
 |---|---|---|
-| `first_name`, `last_name` | `lead.patient_*` (stage B) lub fallback `lead.vorname/nachname` | identity |
+| `first_name`, `last_name` | `panelIdentitaet(lead)`: normalnie `lead.vorname/nachname` (fallback `lead.patient_*`); przy **vermittlerze** z `patient_nachname` — `lead.patient_*` | identity; patrz niżej |
 | `email`, `phone` | `lead.email`, `lead.telefon` | identity |
 | `location_id` | wynik `Locations(plz)` lub `null` | tylko gdy stage-B podała PLZ |
 | `language_id` | **stała `1`** (German) | business default |
 | `visibility` | **stała `"public"`** | business default |
-| `commission_agent_salary` | **stała `300`** | Primundus baseline (panel rejects 0) |
+| `commission_agent_salary` | **stała `0`** | brak prowizji (300 → 10 w 05/2026, 10 → 0 od 24.09.2026); MM liczy `care_budget = monthly_salary − commission_agent_salary` (sprawdzone na becie), więc przy 0 oba są równe |
 | `care_budget`, `monthly_salary` | `lead.kalkulation.bruttopreis` | real |
 | `arrival_at` | derived z `care_start_timing` przez `OFFSET_DAYS` (sofort=+7d, 2-4-wochen=+21d, 1-2-monate=+45d, unklar=+30d) | derivation z real |
+
+> **Vermittler-Leads (Registry #67).** Normalnie `Customer.first_name/last_name` to
+> KONTAKTPERSONA (zamawiający z kalkulatora) — tak było zweryfikowane w panelu MM.
+> Ale przy leadzie od pośrednika zamawiającym jest agencja: `lead.vorname/nachname`
+> trzymają jej Ansprechpartnera, u Pflegeny przy KAŻDEJ anfradze tego samego
+> („Herr Bernd Walde" ×8 — prod, 16.09.2026). Wtedy slot niesie **haushalt**
+> (`lead.patient_anrede/_vorname/_nachname`), bo pod tym nazwiskiem agencja szuka
+> sprawy. Kotwicą jest NAZWISKO: brak `patient_nachname` ⇒ zostaje Ansprechpartner.
+> Ta sama funkcja `panelIdentitaet` daje tytuł joba (`buildJobOfferTitle`).
+> Kolumny kontaktowe leada zostają nietknięte — z nich powstaje anreda maili DO
+> pośrednika.
+>
+> `Patient` w MM **nie ma pola z nazwiskiem** (introspekcja 16.09.2026) —
+> imię/nazwisko/adres pacjenta żyją wyłącznie w `CustomerContract`.
 | `other_people_in_house` | `formularDaten.weitere_personen === "ja" ? "yes" : "no"` | real |
 | `gender` (caregiver wish mirror) | `formularDaten.geschlecht` (`weiblich`→`female`, `maennlich`→`male`, `egal`→`not_important`) | real |
 | `patients[]` | patrz tabela niżej | real care attrs |
@@ -712,7 +837,7 @@ Authorization: Bearer <agency-jwt>
     "title":               "Primundus — <lead.nachname>",
     "description":         "Auto-created from Primundus kostenrechner",
     "salary_offered":      <lead.kalkulation.bruttopreis>,
-    "salary_commission":   300,
+    "salary_commission":   0,
     "visibility":          "public",
     "arrival_at":          "<YYYY-MM-DD>"
   }
@@ -735,8 +860,7 @@ Response:
 UPDATE leads SET
   mamamia_customer_id  = <StoreCustomer.id>,
   mamamia_job_offer_id = <StoreJobOffer.id>,
-  mamamia_user_token   = <agency-jwt>,
-  mamamia_onboarded_at = now()
+  mamamia_onboarded_at = now()      -- bez mamamia_user_token (Registry #107)
 WHERE id = <lead.id>
 ```
 
@@ -813,6 +937,26 @@ Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>          # Pflicht — sonst 4
 - Live belegt (beta 2026-09-07): 2→1 und 1→2 auf Customer 9989; Mutation ohne
   Contract-Args auf dem gebuchten 8394 lässt `customer_contract` und Confirmation
   unangetastet, 2→1 dort akzeptiert.
+- **Zweite Mutation: Identität (Registry #67)** — nur wenn der Lead ein Vermittler-Lead
+  MIT `patient_nachname` ist UND `details: true` gesetzt wurde (also beim Vermittler-
+  Eingang und beim Backfill, NICHT bei der Admin-Preiskorrektur: die darf von Hand
+  gepflegte Namen nicht überschreiben). Sie ist die **letzte** Mutation der Funktion —
+  nach Pass 2 — und ihre `patients`-Stubs kommen aus einem **frischen** Read
+  (`RESYNC_IDENTITY_READ`): die Variable `patients` trägt nach einem Ehepaar-Klon einen
+  Eintrag OHNE id, und `patients[]` ist REPLACE per id — dieselbe Liste erneut gesendet
+  würde den in Pass 2 angelegten Patienten löschen. Inhalt: `first_name`/`last_name`
+  (= Haushalt), `patient_contracts[{contact_type:"patient_contact",
+  is_same_as_*: false, salutation, first_name, last_name, street_number, zip_code,
+  city, location_id}]` und `customer_contacts[{is_same_as_first_patient:false, +
+  Ansprechpartner des Vermittlers}]`. **Kein `email`** in beiden Zeilen (#52).
+  Eigener try/catch: Fehler ⇒ `resync.identity_error` im 200er-Body, der Detail-Sync
+  bleibt unberührt. Der Read liegt in der Antwort (`resync.identity.before/after`) —
+  damit ist der `curl` zugleich Pre-flight und Beweis; der Proxy liest keine
+  Kontaktpersonen und das Agentur-Passwort liest niemand aus.
+  Bestehende Zeilen werden nur ersetzt, wenn sie **uns gehören** (Name leer oder aus
+  `{patient_*, lead.*}`) — sonst `identity.hinweis` und die Zeile bleibt stehen.
+  Das Read-Query selektiert den **singularen** `customer_contract` (den liest prod
+  täglich über den Proxy).
 
 #### ⑧ Sign session JWT + Set-Cookie
 
@@ -855,9 +999,25 @@ applications/jobs zwracają 403.
 #### `getCustomer`
 GraphQL: `Customer(id: $id)` z całym setem pól potrzebnych do prefilla
 patient form (patrz [operations.ts:26](../supabase/functions/mamamia-proxy/operations.ts:26))
-— customer + patients[] + customer_caregiver_wish + customer_contracts[] + equipments[].
+— customer + patients[] + customer_caregiver_wish + singular `customer_contract` (z
+`contact_type`, Registry #131) + equipments[] + job_offers[].final_confirmation.
 
 `$id` wymuszany z `session.customer_id`.
+
+**Singular `customer_contract` NIE jest pewnym wierszem pacjenta** (beta e2e 21.10.2026):
+po akcepcie Mamamia zwraca przy odczycie często wiersz Auftraggebera
+(`contract_contact`). Front czyta go przez `patientenVertrag()` (mappers.ts), który
+ignoruje wiersz `contract_contact` — formularz pacjenta i fallback vorbelegungu umowy
+nie biorą wtedy adresu/telefonu Auftraggebera jako danych betreute Person.
+
+#### `getCustomerKontakte` (Registry #130)
+GraphQL: `Customer(id: $id) { customer_contracts { … contact_type … } customer_contacts { … } }`
+— osobne zapytanie (fail-soft), tylko odczyt, `$id` z `session.customer_id`. Front woła je
+tylko, gdy INNY job klienta ma `final_confirmation`, i wypełnia z niego formularz umowy
+(`vertragVorbelegung`): LE ← `patient_contact`, AG ← `contract_contact`, KP ←
+`customer_contacts`. Modal „Angebot prüfen" otwiera się dopiero, gdy `getCustomer` i (jeśli
+potrzebne) `getCustomerKontakte` odpowiedziały (Registry #131) — modal czyta vorbelegung
+tylko przy otwarciu i od razu zapisuje ją jako szkic w `sessionStorage`.
 
 #### `getJobOffer`
 GraphQL: `JobOffer(id: $id)` —
@@ -898,10 +1058,24 @@ gender/language**. Filtrowanie `wunschGeschlecht` po stronie frontendu.
 GraphQL: `JobOfferMatchingsWithPagination(filters: { is_request: true })`.
 Proxy spłaszcza odpowiedź do `{ caregiver_ids: [<int>, ...] }`. Używane
 do seedowania statusu `'invited'` po F5 / pierwszym wejściu.
+Od Registry #128 proxy dokleja **nasz ledger** `caregiver_invite_attempts`
+(ten job + stare wiersze bez joba, bez okna czasowego): po odmowie opiekunki
+Mamamia zdejmuje `is_request` i listuje ją znowu jako otwarty matching —
+bez ledgera portal pokazywał „Einladen" drugi raz. Błąd odczytu ledgera =
+błąd akcji.
 
 #### `getCaregiver`
 GraphQL: `Caregiver(id: $id)` z pełnym setem pól (nationality, hobbies,
-personalities, mobilities, languagables, recent_assignments, avatar). Backed
+personalities, mobilities, languagables, avatar) + `CaregiverCertificates`.
+Równolegle osobna query `CaregiverDeparturesWithPagination(caregiver_id, limit 200)`
+(Registry #126 — HP + MM wszystkich agencji, status `accepted|on_job|finish`):
+proxy dokleja do `Caregiver` pola `einsaetze[]` (BEZ `customer_id`) i
+`on_other_job` (`on_job` u klienta ≠ `session.customer_id`); błąd query lub
+`has_more_pages` ⇒ `einsaetze_error`, profil się ładuje. Modal liczy z tego
+„Letzte Einsätze", licznik i odznakę w profilu; karty (`PflegekraftProfil`,
+`PflegekraftZeile`) biorą to samo z cache przez `useEinsatzStand` (Registry #127,
+bez własnego zapytania); ranking, karty przed pierwszym zapisem i maile dalej
+`hp_total_jobs`. Backed
 przez frontend `caregiverCache` (TTL) — `prefetchCaregivers` woła ten endpoint
 dla wszystkich widocznych matchings od razu po onboardzie.
 
@@ -1027,7 +1201,7 @@ mutation StoreConfirmation(
 }
 ```
 
-Pola `contract_*` mapują 1:1 z step-2 `AngebotPruefenModal` w UI.
+Pola `contract_*` mapują 1:1 z step-2 `AngebotPruefenModal` w UI („Ihre Angaben“). Od Registry #103 podpis to osobny krok 3 („Vertrag & Unterschrift“); lista brakujących pól = `fehlendeAngaben()` (te same reguły co dawny `canProceed`).
 
 #### `inviteCaregiver` — innym kanałem (panel/Sanctum)
 
@@ -1047,6 +1221,12 @@ nie da się derive'ować z `MAMAMIA_ENDPOINT` host'a. Wartość ustalana per-ten
 przez inspekcję DevTools Network w żywym panelu (Bug #17). Auth: agency-only
 session cookie z osobnego loginu (Sanctum CSRF + `XSRF-TOKEN`).
 
+**Raz zaproszona = koniec dla tego joba (Registry #128):** przed limitem 5/60 min
+proxy sprawdza ledger; opiekunka już tam jest ⇒ HTTP **409** `{ error: "already-invited" }`,
+zero StoreRequest, zero nowego wiersza. Portal traktuje 409 jak każdy błąd zaproszenia
+(toast + cofnięcie), a przycisk i tak znika po odświeżeniu listy. Inny job tego klienta
+blokady nie dziedziczy.
+
 Tło: K5/K6 historia. `SendInvitationCaregiver` jest customer-side mutacją
 (wymaga customer JWT — niedostępny). `StoreRequest` na zwykłym `/graphql`
 zwraca `Unauthorized` dla agency tokena. Panel-mode session pozwala — pod
@@ -1058,6 +1238,7 @@ warunkiem że Customer ma `status='active'` ORAZ JobOffer też jest active
 | Action | Rodzaj | Endpoint mamamii | Auth |
 |---|---|---|---|
 | `getCustomer` | read | `/graphql` | agency-jwt |
+| `getCustomerKontakte` | read | `/graphql` | agency-jwt |
 | `getJobOffer` | read | `/graphql` | agency-jwt |
 | `listApplications` | read | `/graphql` | agency-jwt |
 | `listMatchings` | read | `/graphql` | agency-jwt |
@@ -1069,6 +1250,32 @@ warunkiem że Customer ma `status='active'` ORAZ JobOffer też jest active
 | `storeConfirmation` | write | `/graphql` | agency-jwt |
 | `inviteCaregiver` | write | **`/backend/graphql`** | **panel/Sanctum** |
 | `generateCaregiverGermanDescription` | write (LLM) | `/graphql` | agency-jwt |
+
+### Mail o przyjeździe opiekunki (Registry #119)
+
+Po bookingu agencja wpisuje w MM dane dojazdu (`final_confirmation.arrival`:
+`arrival_date`, `arrival_time_from/to`, `arrival_type { id type }` = Minibus /
+Sindbad / Own transport, `note`). Ścieżka = wzorzec `reservierung_beendet`:
+
+1. **`detect-caregiver-events` z body `{ "mode": "anreise" }`** (własny cron
+   `7-59/15`, osobno od batcha — batch zjada już ~110 s z ~150 s). Kandydaci:
+   `lead_jobs` `gebucht` z `anreise ≥ dziś−30` (max 60). Per job osobne zapytanie
+   `DetectJobOfferArrival` (NIE w `GET_CUSTOMER_JOB_OFFERS`). Czysta funkcja
+   `anreise.ts:anreiseAusConfirmation` odrzuca: storno (`rejected_at`), brak
+   daty/godziny/typu, format ≠ `YYYY-MM-DD` / `HH:MM`, przyjazd już był (czas
+   berliński), wpis młodszy niż 10 min, konflikt daty z `final_confirmation.arrival_date`.
+   Klucz `job|conf|datum|von|bis|type_id` — zmiana notatki go nie zmienia.
+2. **Bridge** `/api/lead-event` event `caregiver_arrival_scheduled` (własna gałąź,
+   `planeAnreise`): ten sam klucz co ostatni dla (job, confirmation) ⇒ nic; Vermittler /
+   brak e-maila ⇒ tylko event `seeded`; inaczej wiersz `scheduled_emails`
+   `email_type='anreise'` (`sendezeitIso` — noc → 08:00), potem event.
+3. **`send-scheduled-emails`** `anreiseMail` (`kundenMails.ts`): zdjęcie pobierane
+   świeżo przy wysyłce (CID), „Geänderte Anreisedaten“ gdy dla tej pary był już
+   wysłany wiersz. Typ transakcyjny (`TRANSAKTIONALE_MAILS`): idzie mimo wypisu i pauzy.
+
+Przełącznik `ANREISE_MAILS` (sekret Supabase, czyta tylko detect): `aus` (domyślnie,
+tylko log), `test` (cały łańcuch, mail do zespołu przez `anreiseTestUmleitung`),
+`live`. Stany `test` i `live` liczą się osobno — `test → live` wysyła klientom od nowa.
 
 ---
 
@@ -1101,6 +1308,12 @@ Edge Fn   ←─── Sanctum session cookie (agency login) ──────�
   żeby logi Mamamii rozróżniały akcje portalu od akcji ludzi.
 - `SUPABASE_SERVICE_ROLE_KEY` ZAWSZE server-side. Używany w
   `onboard-to-mamamia` do bypass RLS przy lookup leada po tokenie.
+- **Klucz anon nie widzi leads & co.** (Registry #107): leads, lead_events, vertraege,
+  scheduled_emails, lead_jobs, portal_*_log, chat_* i analytics_sessions są dla anon
+  zamknięte, ceny/zuschüsse tylko do odczytu (`aktiv`). Portal czyta przez
+  `lead_by_token` + `set_declined_caregiver`, panel admina przez konto Supabase Auth z
+  flagą `app_metadata.primundus_admin` (`public.ist_admin()`), serwer kostenrechnera
+  (lead-management, PDF, analytics/collect, `/api/kalkulation/[leadId]`) Service-Keyem.
 - **Privilegierte Onboard-Bodies nur hinter service_role** (`_shared/serviceRoleAuth.ts`,
   Registry #55): `mirror_token` (Token-Spiegel), `lead_id`/`resync` (Admin-Korrektur nach
   MM). Gate aus dem Header VOR dem Rate-Limit; Anon-Bearer ⇒ 401 vor jedem MM-Call.

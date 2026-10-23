@@ -94,3 +94,142 @@ describe('reportLeadEvent', () => {
     expect(bodyOf(1).metadata).toEqual({ phone: '+49 89 222' });
   });
 });
+
+describe('patient_form_location_unresolved dedupe (Registry #65)', () => {
+  it('collapses the same PLZ twice in one session', () => {
+    reportLeadEvent('t', 'patient_form_location_unresolved', { plz: '50348', ort: '' });
+    reportLeadEvent('t', 'patient_form_location_unresolved', { plz: '50348', ort: '' });
+    expect(calls()).toHaveLength(1);
+  });
+
+  it('reports a corrected — still wrong — PLZ as its own event', () => {
+    // Ohne PLZ im Schlüssel bliebe die zweite Korrektur stumm und das Team
+    // sähe für immer nur den ersten Versuch.
+    reportLeadEvent('t', 'patient_form_location_unresolved', { plz: '50348', ort: '' });
+    reportLeadEvent('t', 'patient_form_location_unresolved', { plz: '50384', ort: '' });
+    expect(calls()).toHaveLength(2);
+    expect(bodyOf(1).metadata.plz).toBe('50384');
+  });
+
+  it('a proxy outage does not eat the later real rejection of the same PLZ', () => {
+    // Die stille lookup_down-Variante darf den Schlüssel nicht besetzen —
+    // sonst fehlt genau die Mail, für die das Team-Ereignis existiert.
+    reportLeadEvent('t', 'patient_form_location_unresolved', { plz: '50348', ort: '', lookup_down: '1' }, false);
+    reportLeadEvent('t', 'patient_form_location_unresolved', { plz: '50348', ort: '' }, true);
+    expect(calls()).toHaveLength(2);
+    expect(bodyOf(0).notify).toBe(false);
+    expect(bodyOf(1).notify).not.toBe(false);
+  });
+});
+
+describe('patient_form_step: der Schritt gehört in den Schlüssel (Registry #122)', () => {
+  // Bis Registry #122 lautete der Sitzungs-Schlüssel `${token}:patient_form_step` — der erste erreichte Schritt
+  // besetzte ihn, jeder weitere Schritt derselben Sitzung wurde verschluckt. Der Server speichert seit Registry #109
+  // jeden Schritt, bekam aber nur den ersten zu sehen.
+  it('meldet jeden erreichten Schritt einmal', () => {
+    reportLeadEvent('tok-1', 'patient_form_step', { step: 1 });
+    reportLeadEvent('tok-1', 'patient_form_step', { step: 2 });
+    reportLeadEvent('tok-1', 'patient_form_step', { step: 3 });
+    expect(calls()).toHaveLength(3);
+    expect([0, 1, 2].map((i) => bodyOf(i).metadata.step)).toEqual([1, 2, 3]);
+  });
+
+  it('derselbe Schritt zweimal in einer Sitzung (Zurück und wieder Weiter) bleibt EIN Ereignis', () => {
+    reportLeadEvent('tok-1', 'patient_form_step', { step: 1 });
+    reportLeadEvent('tok-1', 'patient_form_step', { step: 1 });
+    expect(calls()).toHaveLength(1);
+  });
+});
+
+describe('Messpunkte (Registry #123)', () => {
+  it('dieselbe Liste wie die Bridge (project 3/lib/messpunkte.ts)', async () => {
+    const { MESSPUNKTE } = await import('../lib/leadEvents');
+    const { MESSPUNKTE: bridge } = await import('../../project 3/lib/messpunkte');
+    expect([...MESSPUNKTE]).toEqual([...bridge]);
+    expect(new Set(MESSPUNKTE).size).toBe(MESSPUNKTE.length);
+  });
+
+  it('profil_geoeffnet: je Pflegekraft einmal, vor und nach dem ersten Speichern getrennt; mit notify:false', () => {
+    reportLeadEvent('tok-m', 'profil_geoeffnet', { caregiver_id: 1, quelle: 'karte', vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'profil_geoeffnet', { caregiver_id: 1, quelle: 'liste', vor_speichern: true }, false); // dieselbe
+    reportLeadEvent('tok-m', 'profil_geoeffnet', { caregiver_id: 2, quelle: 'karte', vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'profil_geoeffnet', { caregiver_id: 1, quelle: 'karte', vor_speichern: false }, false);
+    expect(calls()).toHaveLength(3);
+    expect(bodyOf(0)).toEqual({
+      token: 'tok-m',
+      event: 'profil_geoeffnet',
+      metadata: { caregiver_id: 1, quelle: 'karte', vor_speichern: true },
+      notify: false,
+    });
+    expect([1, 2].map((i) => [bodyOf(i).metadata.caregiver_id, bodyOf(i).metadata.vor_speichern])).toEqual([[2, true], [1, false]]);
+  });
+
+  it('einladen_getippt: je Pflegekraft einmal (ein zweiter Tipp aufs Schloss zählt nicht doppelt)', () => {
+    reportLeadEvent('tok-m', 'einladen_getippt', { caregiver_id: 7, quelle: 'karte', vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'einladen_getippt', { caregiver_id: 7, quelle: 'profil', vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'einladen_getippt', { caregiver_id: 8, quelle: 'karte', vor_speichern: true }, false);
+    expect(calls()).toHaveLength(2);
+  });
+
+  it('faq_geoeffnet: je Frage einmal', () => {
+    reportLeadEvent('tok-m', 'faq_geoeffnet', { frage: 'deutsch' }, false);
+    reportLeadEvent('tok-m', 'faq_geoeffnet', { frage: 'deutsch' }, false);
+    reportLeadEvent('tok-m', 'faq_geoeffnet', { frage: 'ablauf' }, false);
+    expect(calls()).toHaveLength(2);
+    expect(bodyOf(1).metadata).toEqual({ frage: 'ablauf' });
+  });
+
+  it('Pop-ups, Kosten und Kalender: einmal je Sitzung, ohne metadata', () => {
+    for (const punkt of ['warum_geoeffnet', 'bestpreis_geoeffnet', 'kosten_aufgeklappt', 'kalender_geoeffnet', 'kalender_zu_ohne_datum'] as const) {
+      reportLeadEvent('tok-m', punkt, undefined, false);
+      reportLeadEvent('tok-m', punkt, undefined, false);
+    }
+    expect(calls()).toHaveLength(5);
+    for (let i = 0; i < 5; i++) {
+      expect(bodyOf(i)).not.toHaveProperty('metadata');
+      expect(bodyOf(i).notify).toBe(false);
+    }
+  });
+
+  it('formular_sichtbar: einmal je Sitzung', () => {
+    reportLeadEvent('tok-m', 'formular_sichtbar', { schritt: 0, vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'formular_sichtbar', { schritt: 2, vor_speichern: true }, false);
+    expect(calls()).toHaveLength(1);
+    expect(bodyOf(0)).toEqual({
+      token: 'tok-m', event: 'formular_sichtbar', metadata: { schritt: 0, vor_speichern: true }, notify: false,
+    });
+  });
+
+  it('feld_beruehrt: je Feld einmal (Antippen und Fokus desselben Felds zählen einfach)', () => {
+    reportLeadEvent('tok-m', 'feld_beruehrt', { schritt: 0, feld: 'geschlecht', vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'feld_beruehrt', { schritt: 0, feld: 'geschlecht', vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'feld_beruehrt', { schritt: 2, feld: 'plz', vor_speichern: true }, false);
+    expect(calls()).toHaveLength(2);
+    expect(bodyOf(1).metadata).toEqual({ schritt: 2, feld: 'plz', vor_speichern: true });
+  });
+
+  it('weiter_blockiert: je Schritt und Satz offener Felder einmal', () => {
+    reportLeadEvent('tok-m', 'weiter_blockiert', { schritt: 2, offen: ['plz', 'startDate'], vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'weiter_blockiert', { schritt: 2, offen: ['plz', 'startDate'], vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'weiter_blockiert', { schritt: 2, offen: ['startDate'], vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'weiter_blockiert', { schritt: 0, offen: ['startDate'], vor_speichern: true }, false);
+    expect(calls()).toHaveLength(3);
+    expect([0, 1, 2].map((i) => [bodyOf(i).metadata.schritt, bodyOf(i).metadata.offen])).toEqual([
+      [2, ['plz', 'startDate']], [2, ['startDate']], [0, ['startDate']],
+    ]);
+  });
+
+  it('zur_pflegesituation: je Quelle einmal', () => {
+    reportLeadEvent('tok-m', 'zur_pflegesituation', { quelle: 'kasten', vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'zur_pflegesituation', { quelle: 'kasten', vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'zur_pflegesituation', { quelle: 'warum', vor_speichern: true }, false);
+    expect(calls()).toHaveLength(2);
+    expect([0, 1].map((i) => bodyOf(i).metadata.quelle)).toEqual(['kasten', 'warum']);
+  });
+
+  it('Vorschau-Token sendet nichts', () => {
+    reportLeadEvent('preview-token', 'profil_geoeffnet', { caregiver_id: 1, quelle: 'karte', vor_speichern: true }, false);
+    reportLeadEvent('preview-token', 'kalender_geoeffnet', undefined, false);
+    expect(calls()).toHaveLength(0);
+  });
+});

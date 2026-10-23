@@ -10,26 +10,78 @@ import nodemailer from "npm:nodemailer@6.9.10";
 import { Buffer } from "node:buffer";
 // Multi-Job-Helfer (Bug #25) — pure Funktionen, separat wegen Testbarkeit.
 import { appendJobParam, reminderBookedCancel } from "./followupJobs.ts";
+// Kunden-Meilenstein: Bewerbung eingegangen = Profil fertig (Registry #69).
+import { type LeadMilestone, MEILENSTEIN_EREIGNISSE, meilensteinAus } from "./meilenstein.ts";
+// Nachfass-Kette und Abschiedssatz (Registry #70).
+import {
+  AKTIVITAET_NACH_PAUSE,
+  GESTRICHENE_MAILS,
+  KETTE_NACH_MAIL1,
+  OFFENE_STATUS,
+  pauseAktiv,
+  rueckmeldungLink,
+} from "./kette.ts";
+// Persönliche Nachfrage zum Wunschtermin (Registry #72).
+import {
+  WIEDERVORLAGE_BETREFF,
+  WIEDERVORLAGE_KERN,
+  WIEDERVORLAGE_KNOPF,
+  WIEDERVORLAGE_SPAETER,
+  WIEDERVORLAGE_SPAETER_LINK,
+  wiedervorlageEinstieg,
+} from "./wiedervorlage.ts";
 // Anrede-Namen sauber schreiben (Versalien → „Ruppert") — Kopie aus lib/email.ts,
 // weil Edge Functions nicht aus lib/ importieren können. Siehe names.ts.
 import { buildLeadRef, capitalizeName as capitalize, cleanNamePart } from "./names.ts";
 // Nachtruhe-Fenster — Kopie von lib/quiet-hours.ts (Edge Fns koennen nicht aus
 // lib/ importieren); Aenderungen immer in BEIDEN Dateien.
 import { sendezeitIso } from "./quietHours.ts";
+// Kundenmails neu (Vorschau v2, Martin 26.09.2026): Builder in kundenMails.ts (testbar),
+// Stopp- und Countdown-Regeln in stopRegeln.ts.
+import type { BewerbungsAngebot } from "./mailBausteine.ts";
+import {
+  type AngebotEingabe,
+  angebotMail,
+  erinnerungMail,
+  type KundenMail,
+  type Kontext,
+  nachfass2Mail,
+  nachfass3Mail,
+  neuePflegekraefteMail,
+  nudge1Mail,
+  nudge2Mail,
+  portalLink,
+  anreiseMail,
+  reservierungBeendetMail,
+  sucheStandMail,
+  vierDingeMail,
+} from "./kundenMails.ts";
+import {
+  ERINNERUNG_TYPEN,
+  erinnerungStopp,
+  erinnerungStufe,
+  neuePflegekraefteEntscheidung,
+  reservierungAktiv,
+  reserviertBisAus,
+  sucheStandStopp,
+  VOR_DEM_ABSENDEN,
+  vorAbsendenStopp,
+} from "./stopRegeln.ts";
+// Registry #125: vor jeder Bewerbungs-Erinnerung bei mamamia nachfragen, ob die Bewerbung
+// noch steht (Rausnahme im SA-Portal kurz vor der Sendezeit rutschte am Detect-Sweep vorbei).
+import { type BewerbungStand, bewerbungStand, standDepsAusEnv, standNochmalUm } from "./bewerbungStand.ts";
 import { deutschStufe } from "./deutschStufe.ts";
-import { testphaseUmleitung } from "./testphase.ts";
+import { anreiseTestUmleitung, testphaseUmleitung } from "./testphase.ts";
 // Empfehlung fuer die Angebotsmail (Martin, 31.08.2026): echte gematchte
 // Pflegekraft statt der Behauptung "im Portal warten Pflegekraefte".
 // Reihenfolge + Trichter sind Kopien der Portal-Logik — siehe empfehlung.ts.
 import {
-  empfehlungHtml,
-  empfehlungText,
   holeEmpfehlung,
-  keineEmpfehlungHtml,
-  keineEmpfehlungText,
   stufenWort,
-  type EmpfehlungErgebnis, holeFuenf, fuenfListeHtml, fuenfListeText, kraefteWort, fuenfBetreff, fotoBudget } from "./empfehlung.ts";
+  type EmpfehlungErgebnis, holeFuenf, fuenfListeHtml, fuenfListeText, fotoBudget,
+  holeFuenfStreng, esc } from "./empfehlung.ts";
 import {
+  kraefteNochmalUm,
   vermittlerAngebotHtml, vermittlerAngebotText,
   vermittlerKraefteHtml, vermittlerKraefteText,
   VERMITTLER_ABSENDER,
@@ -46,15 +98,19 @@ import {
   type BewertungsLead,
 } from "./bewertung.ts";
 import { kundenEmpfaenger, ccListe } from "./empfaenger.ts";
+// Bewertungsstand für die Sterne in Martas Karte (Martin, 17.09.2026) — Kopie von
+// lib/bewertungen-stand.ts, Stand wird einmal pro Aufruf geladen (siehe unten).
+import {
+  type BewertungsStand,
+  BEWERTUNGS_STAND_ERSATZ,
+  ladeBewertungsStand,
+} from "./bewertungenStand.ts";
+// Martas Signaturkarte — eine Vorlage für alle Mails (Kopie von lib/marta-karte.ts).
+import { MARTA_KARTE_MOBIL_CSS, martaKarteHtml } from "./martaKarte.ts";
 import {
   portalHerkunft,
-  portalIntroHtml,
-  portalIntroText,
   portalAngabenHinweisHtml,
   portalAngabenHinweisText,
-  portalVorschauHtml,
-  portalVorschauText,
-  portalCtaButtonHtml,
   PORTAL_BETREFF,
 } from "./herkunft.ts";
 const corsHeaders = {
@@ -185,14 +241,16 @@ function buildAnredeText(anrede: string | null, nachname: string, vorname: strin
   return "Guten Tag";
 }
 
+/* „Guten Tag Frau Müller" in allen Kundenmails (Vorschau v2, Martin 26.09.2026) — vorher
+   „Hallo Frau …" in den Folgemails und „Guten Tag" nur in der Angebotsmail. Name bleibt
+   der Funktionsname, damit die übrigen Builder (Nachfrage, Wechsel) unverändert bleiben. */
 function buildHalloAnrede(anrede: string | null, nachname: string, vorname: string): string {
   const effectiveAnrede = anrede || detectGenderFromName(vorname);
   const n = capitalize(cleanNamePart(nachname));
-  if (effectiveAnrede === "Frau" && n) return `Hallo Frau ${n}`;
-  if (effectiveAnrede === "Herr" && n) return `Hallo Herr ${n}`;
-  if (effectiveAnrede === "Familie" && n) return `Hallo Familie ${n}`;
+  if (effectiveAnrede === "Frau" && n) return `Guten Tag Frau ${n}`;
+  if (effectiveAnrede === "Herr" && n) return `Guten Tag Herr ${n}`;
+  if (effectiveAnrede === "Familie" && n) return `Guten Tag Familie ${n}`;
   // KEIN Vorname-Fallback (Martin 2026-08).
-  // Salutation unknown → neutral, warm fallback (no name).
   return "Guten Tag";
 }
  
@@ -248,6 +306,21 @@ function buildEmailWrapper(
          der Ansicht entfernt, die der Kunde eine Sekunde spaeter sieht.
          Die Faktenzeile laeuft ohnehin ueber die volle Kartenbreite. */
       .empf-foto { padding-left: 0 !important; }
+    }
+    /* Handy (11.09.2026): Signatur-Karte (buildMartaSig) — "DIE WELT" in eine
+       eigene Zeile, Siegelbild kleiner, sonst passt die Siegel-Spalte nicht
+       neben Foto + Name; Anrufen/WhatsApp duerfen umbrechen (17.09.2026,
+       Regeln aus martaKarte.ts). Kopfzeile mit 20 statt 40 px Rand wie in
+       lib/email-template.ts (Logo 160 + Siegel-Block brauchten mit 40 px
+       Rand 363 px). Eigene Grenze 480 statt 600 px: ein 600 px breites
+       Fenster behaelt exakt die Desktop-Optik. */
+    @media only screen and (max-width: 480px) {
+      .email-header { padding: 20px 20px 16px 20px !important; }${MARTA_KARTE_MOBIL_CSS}
+      /* Bestpreisgarantie-Zeile der Eingangsbestaetigung (Siegel 190 px +
+         Linktext) war auf 360–390 px breiter als der Bildschirm: Siegel
+         ueber den Link statt daneben (17.09.2026). */
+      .bpg-bild { display: block !important; width: auto !important; padding: 0 0 10px 0 !important; }
+      .bpg-text { display: block !important; }
     }
   </style>
 </head>
@@ -310,94 +383,34 @@ function buildEmailWrapper(
 </html>`;
 }
  
-function buildMartaSig(siteUrl: string): string {
-  // Martas Foto kommt aus primundus.de statt vom Kostenrechner (20.08.):
-  // Beide Dienste deployen unabhaengig voneinander. Nach dem Foto-Wechsel
-  // (#481) war die neue Datei auf primundus.de sofort da, der
-  // Kostenrechner-Build haing >45 Min in Renders Warteschlange — in dieser
-  // Zeit verlinkte JEDE Mail ein 404 (eine Kundenmail um 07:50 war
-  // betroffen). Die Mail-Funktion deployt manuell und ist damit IMMER
-  // schneller als der Kostenrechner; Bilder gehoeren deshalb an die
-  // Adresse, die unabhaengig davon steht.
-  const martaUrl = "https://primundus.de/images/marta-kapcio.jpg";
-  const testUrl = `${siteUrl}/images/primundus_testsieger-2021.webp`;
-  const mediaBase = `${siteUrl}/images/media`;
+/* Bewertungsstand fuer die Sterne in der Karte. Der Handler setzt ihn
+   einmal pro Aufruf (Demo-Vorschau und Versand), bevor Mails gebaut werden —
+   die ~15 Mail-Bauer bleiben so unveraendert synchron. Bis dahin (und wenn
+   primundus.de nicht antwortet) gilt der Ersatzwert. */
+let bewertungsStand: BewertungsStand = BEWERTUNGS_STAND_ERSATZ;
+
+/* Grussformel + Martas Karte. Die Karte kommt aus martaKarte.ts (eine Vorlage
+   fuer alle Mails, Handy-Regeln MARTA_KARTE_MOBIL_CSS in buildEmailWrapper).
+   Martas Foto liegt auf primundus.de statt auf dem Kostenrechner (20.08.):
+   nach dem Foto-Wechsel (#481) hing der Kostenrechner-Build >45 Min in
+   Renders Warteschlange und JEDE Mail verlinkte ein 404 — primundus.de steht
+   unabhaengig davon.
+   Vermittler-Mails ("vermittler"): Karte ohne Sterne und ohne
+   Kunden-Konditionen in der Faktenzeile (vermittler.ts). */
+function buildMartaSig(siteUrl: string, fuer: "kunde" | "vermittler" = "kunde"): string {
+  const karte = fuer === "kunde"
+    ? martaKarteHtml({ fuer: "kunde", bewertung: bewertungsStand, siteUrl, presseLogos: true })
+    : martaKarteHtml({ fuer: "vermittler", siteUrl, presseLogos: true });
   return `
     <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
-      <tr>
-        <td style="padding:18px 20px 16px;background:#ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="vertical-align:top;">
-                <table cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td style="padding-right:12px;vertical-align:top;">
-                      <img src="${martaUrl}" alt="Marta Kapcio" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
-                    </td>
-                    <td style="vertical-align:middle;">
-                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Marta Kapcio</p>
-                      <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
-                      <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
-                    </td>
-                  </tr>
-                </table>
-                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
-                  <tr><td style="padding-bottom:6px;">
-                    <a href="tel:+4989200000830" style="display:inline-block;background-color:#f0ebe4;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:500;color:#3D2B1F;white-space:nowrap;">&#9990; 089 200 000 830</a>
-                  </td></tr>
-                  <tr><td>
-                    <a href="https://wa.me/4989200000830" style="display:inline-block;background-color:#25D366;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:600;color:#ffffff;white-space:nowrap;">WhatsApp schreiben</a>
-                  </td></tr>
-                </table>
-              </td>
-              <td style="vertical-align:top;text-align:right;">
-                <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
-                  <tr>
-                    <td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
-                      <img src="${testUrl}" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
-                      <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
-                      <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td style="background:#f9f6f2;border-top:1px solid #e8ddd0;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;">
-                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Über 20 Jahre<br>Erfahrung</p>
-              </td>
-              <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;">
-                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">60.000+<br>betreute Einsätze</p>
-              </td>
-              <td style="padding:12px 0;text-align:center;width:33%;">
-                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td style="background:#ffffff;border-top:1px solid #e8ddd0;padding:12px 16px;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/die-welt.webp" alt="DIE WELT" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/frankfurter-allgemeine.webp" alt="FAZ" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/ard.webp" alt="ARD" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/ndr.webp" alt="NDR" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/sat1.webp" alt="SAT.1" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/bild-der-frau.webp" alt="Bild der Frau" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-          </tr></table>
-        </td>
-      </tr>
-    </table>`;
+    ${karte}`;
 }
  
+// Mails zur gebuchten Leistung (Mail C geht aus demselben Grund über die
+// Bridge ohne Abmelde-Prüfung): gehen trotz Abmelde-Link und trotz Pause.
+// Registry #119, Entscheidung Michał 09.10.2026.
+const TRANSAKTIONALE_MAILS: ReadonlySet<string> = new Set(["anreise"]);
+
 // ── Portal-Link + Lead-Meilenstein ────────────────────────────────────────
 // Der kostenrechner-Lead erfährt vom CA-App-Portal über `lead_events`, die
 // per /api/lead-event reingeschrieben werden (token-authentifiziert).
@@ -408,20 +421,56 @@ function buildPortalUrl(portalBase: string, token: string, goto?: string): strin
   return goto ? `${base}&goto=${encodeURIComponent(goto)}` : base;
 }
 
-type LeadMilestone = "none" | "portal_opened" | "patient_data_saved" | "caregiver_invited";
+/* Kontext der neuen Kundenmails (kundenMails.ts): Anrede, Links, Martas Karte. Die Karte
+   liest den Bewertungsstand dieses Aufrufs, deshalb pro Mail frisch gebaut. */
+function kundenKontext(lead: Lead, siteUrl: string, portalBase: string): Kontext {
+  return {
+    anrede: buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || ""),
+    site: siteUrl,
+    portal: (param) => portalLink(portalBase, lead.token, siteUrl, param),
+    token: lead.token || null,
+    marta: buildMartaSig(siteUrl),
+    bewertung: bewertungsStand,
+  };
+}
+
+/** Fertige Kundenmail in die Hülle setzen. */
+function inHuelle(lead: Lead, siteUrl: string, m: KundenMail): { subject: string; html: string; text: string } {
+  return { subject: m.betreff, html: buildEmailWrapper(lead, siteUrl, m.html), text: m.text };
+}
+
+// Pause aus /rueckmeldung (Registry #72): letzte kunde_pausiert-Zeile + ob der
+// Kunde seitdem selbst aktiv war (dann ist die Pause vorbei).
+async function pauseStand(supabase: any, leadId: string): Promise<{ bis: string | null; aktivSeitPause: boolean } | null> {
+  const { data: pausen } = await supabase
+    .from("lead_events")
+    .select("created_at, metadata")
+    .eq("lead_id", leadId)
+    .eq("event_type", "kunde_pausiert")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const pause = Array.isArray(pausen) ? pausen[0] : null;
+  if (!pause) return null;
+  const { data: aktiv } = await supabase
+    .from("lead_events")
+    .select("id")
+    .eq("lead_id", leadId)
+    .in("event_type", [...AKTIVITAET_NACH_PAUSE])
+    .gt("created_at", pause.created_at)
+    .limit(1);
+  return {
+    bis: (pause.metadata as { bis?: string } | null)?.bis ?? null,
+    aktivSeitPause: Array.isArray(aktiv) && aktiv.length > 0,
+  };
+}
 
 async function getLeadMilestone(supabase: any, leadId: string): Promise<LeadMilestone> {
   const { data } = await supabase
     .from("lead_events")
     .select("event_type")
     .eq("lead_id", leadId)
-    .in("event_type", ["portal_opened", "patient_data_saved", "caregiver_invited"]);
-  if (!data || data.length === 0) return "none";
-  const types = new Set(data.map((e: { event_type: string }) => e.event_type));
-  if (types.has("caregiver_invited")) return "caregiver_invited";
-  if (types.has("patient_data_saved")) return "patient_data_saved";
-  if (types.has("portal_opened")) return "portal_opened";
-  return "none";
+    .in("event_type", [...MEILENSTEIN_EREIGNISSE]);
+  return meilensteinAus((data ?? []).map((e: { event_type: string }) => e.event_type));
 }
 
 function buildAngebotsEmailHtml(lead: Lead, siteUrl: string): string {
@@ -497,7 +546,8 @@ Telefon: +49 89 200 000 830 | info@primundus.de | www.primundus.de`;
 // Nachfass-Inhalt je nach Lead-Meilenstein:
 //   none             → war noch nicht im Portal
 //   portal_opened    → war im Portal, aber Patientendaten fehlen (Hauptfall)
-//   patient_data_saved → Daten vollständig, aber noch keine Einladung
+//   patient_data_saved → Daten vollständig (selbst gespeichert oder schon eine
+//                        Bewerbung, Registry #69), aber noch keine Einladung
 // (caregiver_invited wird vorher abgebrochen, erreicht den Builder nicht.)
 function nachfassContent(milestone: LeadMilestone): { intro: string; body: string; cta: string } {
   if (milestone === "patient_data_saved") {
@@ -518,28 +568,6 @@ function nachfassContent(milestone: LeadMilestone): { intro: string; body: strin
     intro: "ich wollte kurz nachfragen, ob bei Ihnen alles angekommen ist.",
     body: "In Ihrem Kundenportal liegen bereits <strong>passende Betreuungskräfte</strong> für Sie bereit – mit Profil, Erfahrung und Verfügbarkeit. Schauen Sie gern unverbindlich rein.",
     cta: "Angebot und Pflegekräfte anzeigen →",
-  };
-}
-
-// Nachfass-2: kürzer + persönlicher als Nachfass-1. Statt Re-Marketing
-// ("hier sind unsere Konditionen") direkt fragen "brauchen Sie noch
-// Hilfe?". Je nach Milestone leichte Variation in der Hilfe-Frage.
-function nachfass2Content(milestone: LeadMilestone): { intro: string; cta: string } {
-  if (milestone === "patient_data_saved") {
-    return {
-      intro: "gute Nachricht: Wir haben passende Pflegekräfte für Ihre Betreuung gefunden. Möchten Sie sie selbst im Portal ansehen und Ihre Favoriten zur Bewerbung einladen — oder soll ich das für Sie übernehmen? Ein kurzer Anruf oder eine Antwort auf diese Mail genügt, ich kümmere mich gern.",
-      cta: "Pflegekräfte ansehen →",
-    };
-  }
-  if (milestone === "portal_opened") {
-    return {
-      intro: "brauchen Sie Hilfe beim Beschreiben der Pflegesituation? Antworten Sie einfach kurz oder rufen Sie mich an — ich helfe Ihnen gern.",
-      cta: "Pflegesituation beschreiben →",
-    };
-  }
-  return {
-    intro: "für Sie stehen Pflegekräfte bereit, die Ihre Betreuung übernehmen würden. Damit sie sich bei Ihnen bewerben können, fehlen im Portal noch ein paar Angaben zu Ihrer Pflegesituation. Das müssen Sie nicht allein machen — rufen Sie mich an oder antworten Sie kurz auf diese Mail, wir gehen es gemeinsam durch. Danach kommen die Bewerbungen ganz unverbindlich zu Ihnen.",
-    cta: "Angaben vervollständigen →",
   };
 }
 
@@ -564,40 +592,6 @@ function bulletproofButton(url: string, label: string, bgColor: string = "#2A9D5
 function nachfassCtaButton(url: string, label: string): string {
   // Sand-Braun für Nachfass (passt zum Primundus-Farbschema)
   return bulletproofButton(url, label, "#9A8A73");
-}
-
-// Pflegeheim-Vergleich (Martin, 14.08.): das emotionalste Argument des
-// Angebots (Portal-Block „Was bleibt für Sie übrig") — die Zahl pro Kunde
-// kommt aus SEINER Kalkulation (Pflegegeld nach Pflegegrad, Entlastungs-
-// budget, Steuervorteil), NIE pauschal. Fehlt die Kalkulation oder liegt
-// der Eigenanteil über dem Heim-Schnitt, erscheint der Kasten NICHT —
-// wir rechnen niemandem etwas schön. Quelle Heim-Wert: vdek-Bundes-
-// durchschnitt, Stand 01.07.2026 — bei neuen Werten (01.01./01.07.) hier
-// UND im Portal (CustomerPortalPage, HEIM_EIGENANTEIL) aktualisieren.
-const HEIM_EIGENANTEIL = 3364;
-export function heimVergleichDaten(lead: Lead): { eigen: number; diff: number; pgText: string } | null {
-  const k = lead.kalkulation || {};
-  const eigen = typeof k.eigenanteil === "number" ? Math.round(k.eigenanteil) : NaN;
-  if (!Number.isFinite(eigen) || eigen <= 0 || eigen >= HEIM_EIGENANTEIL) return null;
-  const pg = k.formularDaten?.pflegegrad;
-  const pgText = typeof pg === "number" && pg >= 1 ? ` (Pflegegrad ${pg})` : "";
-  return { eigen, diff: HEIM_EIGENANTEIL - eigen, pgText };
-}
-const fmtEuro0 = (n: number) => n.toLocaleString("de-DE", { maximumFractionDigits: 0 }) + " €";
-export function buildHeimVergleichBoxHtml(lead: Lead): string {
-  const d = heimVergleichDaten(lead);
-  if (!d) return "";
-  return `
-    <div style="margin:18px 0;padding:16px 18px;background:#F3F8F4;border:1px solid #cfe3d4;border-radius:12px;">
-      <p style="margin:0;font-size:14px;line-height:1.7;color:#444;"><strong style="color:#2D1F0F;">Und im Vergleich zum Pflegeheim?</strong> Im Pflegeheim zahlen Familien im Bundesdurchschnitt <strong style="color:#2D1F0F;">${fmtEuro0(HEIM_EIGENANTEIL)} Eigenanteil im Monat</strong> (vdek, Stand 07/2026). Bei Ihrer Betreuung zu Hause liegt der rechnerische Eigenanteil auf Basis Ihrer Angaben${d.pgText} bei <strong style="color:#2D1F0F;">ca. ${fmtEuro0(d.eigen)}</strong> &ndash; rund <strong style="color:#1F7A46;">${fmtEuro0(d.diff)} weniger, Monat für Monat</strong>. Die genaue Rechnung sehen Sie in Ihrem Angebot unter &bdquo;Alle Kosten im Überblick&ldquo;.</p>
-    </div>`;
-}
-export function buildHeimVergleichText(lead: Lead): string {
-  const d = heimVergleichDaten(lead);
-  if (!d) return "";
-  return `Und im Vergleich zum Pflegeheim? Im Pflegeheim zahlen Familien im Bundesdurchschnitt ${fmtEuro0(HEIM_EIGENANTEIL)} Eigenanteil im Monat (vdek, Stand 07/2026). Bei Ihrer Betreuung zu Hause liegt der rechnerische Eigenanteil auf Basis Ihrer Angaben${d.pgText} bei ca. ${fmtEuro0(d.eigen)} — rund ${fmtEuro0(d.diff)} weniger, Monat für Monat. Die genaue Rechnung sehen Sie in Ihrem Angebot unter „Alle Kosten im Überblick".
-
-`;
 }
 
 // Quell-Markierung (14.08.): &m=<kürzel> pro Nachfass-Mail — das Portal
@@ -656,139 +650,6 @@ Marta Kapcio
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 }
 
-// ─── Profil-Nudges (gegen den 58%-Abbruch Portal-geöffnet → Profil) ──────
-// Zwei dedizierte Mails, die NUR feuern solange das Patientenprofil offen
-// ist (Skip-Logik im Handler: patient_data_saved / gebucht / nicht-int. /
-// eingeladen → cancel). Anker: "5 vorbereitete Pflegekräfte".
-
-// Profil-Nudges v3 (Texte wortwoertlich von Martin freigegeben, 20.07. abends):
-// Einstieg = Dank + „Ihr Angebot haben Sie erhalten" (Kunde weiss, wo er steht),
-// dann der Schwenk auf die Pflegekraefte (passen + gerade verfuegbar, unverbindlich).
-// Kein „schwierig auszufuellen", kein „es eilt nicht", keine Verknappung.
-export function buildProfilNudge1Html(
-  lead: Lead, siteUrl: string, portalBase: string,
-  /* Fertige Fünf-Liste (fuenfListeHtml). null/undefined = Rückfall auf den
-     bisherigen Text — liefert mamamia gerade nichts, wird nichts behauptet. */
-  fuenfBlock?: string | null,
-  anzahl = 0,
-): string {
-  const portalUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token), "pn1") : siteUrl;
-  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-  if (fuenfBlock) {
-    /* Variante mit Liste (Martin, 03.09.2026): erst die Menschen zeigen, dann
-       um die Entscheidung bitten. Das Profil ist die Gegenleistung dafür,
-       dass sich die gewählte Kraft bewerben kann — keine Schranke. Kein
-       „Keine Katze im Sack", keine „4–7 Werktage": neben echten Menschen mit
-       echten Terminen sind das Floskeln. */
-    const matchesUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token, "matches"), "pn1") : siteUrl;
-    const wort = kraefteWort(anzahl);
-    const content = `
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Ihr Angebot haben Sie heute bekommen. Seitdem haben wir geschaut, wer zu Ihrer Situation passt und zum gewünschten Zeitpunkt frei ist &ndash; <strong>${wort} haben wir für Sie vorbereitet.</strong> ${anzahl === 1 ? "Haben Sie sich das Profil schon angesehen?" : "Haben Sie sich alle schon angesehen?"}</p>
-    ${fuenfBlock}
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;"><strong>Bitte teilen Sie uns Ihre Entscheidung mit:</strong> ${anzahl === 1 ? "Soll sich diese Pflegekraft bei Ihnen bewerben?" : "Welche dieser Pflegekräfte soll sich bei Ihnen bewerben?"} Damit sie das kann, braucht sie noch ein paar Angaben zur Pflegesituation &ndash; ein Teil ist aus dem Kostenrechner schon übernommen, der Rest dauert wenige Minuten.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Sobald das steht, sehen Sie im Portal, wer sich meldet, und entscheiden in Ruhe. <strong>Unverbindlich, und ohne Vertrag vor Ihrer Auswahl.</strong></p>
-    ${bulletproofButton(matchesUrl, "Pflegekraft auswählen&nbsp;&nbsp;&rarr;", "#E76F63")}
-    <p style="margin:10px 0 0;text-align:center;"><a href="${portalUrl}" target="_blank" style="color:#8B7355;text-decoration:underline;font-size:14px;font-weight:600;">Angaben zur Pflegesituation vervollständigen</a></p>
-    <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
-    ${buildMartaSig(siteUrl)}`;
-    return buildEmailWrapper(lead, siteUrl, content);
-  }
-  const content = `
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Ihr Angebot haben Sie bereits &ndash; doch wichtiger als jedes Angebot ist die Frage: Wer wird Ihren Angehörigen betreuen? Bei uns sehen Sie genau das vorab. Sie lernen die Pflegekräfte mit Foto, Erfahrung und Anreisedatum kennen und entscheiden erst dann &ndash; bevor irgendein Vertrag geschlossen wird. Keine Katze im Sack.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Im Moment geht das noch nicht: Ohne ein paar Angaben zur Pflegesituation können sich keine Pflegekräfte bei Ihnen bewerben. Ein Teil ist aus dem Kostenrechner schon übernommen &ndash; danach sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind. Ihre Wunsch-Pflegekraft könnte die Betreuung <strong>bereits in 4&ndash;7 Werktagen</strong> übernehmen.</p>
-    ${buildHeimVergleichBoxHtml(lead)}
-    ${bulletproofButton(portalUrl, "Pflegesituation beschreiben&nbsp;&nbsp;&rarr;", "#2A9D5C")}
-    <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
-    ${buildMartaSig(siteUrl)}`;
-  return buildEmailWrapper(lead, siteUrl, content);
-}
-
-export function buildProfilNudge1Text(
-  lead: Lead, siteUrl: string, portalBase: string, fuenfBlock?: string | null, anzahl = 0,
-): string {
-  const portalUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token), "pn1") : siteUrl;
-  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-  if (fuenfBlock) {
-    const matchesUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token, "matches"), "pn1") : siteUrl;
-    return `${halloAnrede},
-
-Ihr Angebot haben Sie heute bekommen. Seitdem haben wir geschaut, wer zu Ihrer Situation passt und zum gewünschten Zeitpunkt frei ist — ${kraefteWort(anzahl)} haben wir für Sie vorbereitet. ${anzahl === 1 ? "Haben Sie sich das Profil schon angesehen?" : "Haben Sie sich alle schon angesehen?"}
-
-${fuenfBlock}
-
-Bitte teilen Sie uns Ihre Entscheidung mit: ${anzahl === 1 ? "Soll sich diese Pflegekraft bei Ihnen bewerben?" : "Welche dieser Pflegekräfte soll sich bei Ihnen bewerben?"} Damit sie das kann, braucht sie noch ein paar Angaben zur Pflegesituation — ein Teil ist aus dem Kostenrechner schon übernommen, der Rest dauert wenige Minuten.
-
-Sobald das steht, sehen Sie im Portal, wer sich meldet, und entscheiden in Ruhe. Unverbindlich, und ohne Vertrag vor Ihrer Auswahl.
-
-Pflegekraft auswählen: ${matchesUrl}
-Angaben vervollständigen: ${portalUrl}
-
-PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
-
-Mit freundlichen Grüßen
-Marta Kapcio — Pflegeberaterin
-Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
-
-Primundus Deutschland | www.primundus.de
-`;
-  }
-  return `${halloAnrede},
-
-Ihr Angebot haben Sie bereits — doch wichtiger als jedes Angebot ist die Frage: Wer wird Ihren Angehörigen betreuen? Bei uns sehen Sie genau das vorab. Sie lernen die Pflegekräfte mit Foto, Erfahrung und Anreisedatum kennen und entscheiden erst dann — bevor irgendein Vertrag geschlossen wird. Keine Katze im Sack.
-
-Im Moment geht das noch nicht: Ohne ein paar Angaben zur Pflegesituation können sich keine Pflegekräfte bei Ihnen bewerben. Ein Teil ist aus dem Kostenrechner schon übernommen — danach sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind. Ihre Wunsch-Pflegekraft könnte die Betreuung bereits in 4–7 Werktagen übernehmen.
-
-${buildHeimVergleichText(lead)}
-
-Pflegesituation beschreiben: ${portalUrl}
-
-PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
-
-Mit freundlichen Grüßen
-Marta Kapcio
-
----
-Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
-}
-
-function buildProfilNudge2Html(lead: Lead, siteUrl: string, portalBase: string): string {
-  const portalUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token), "pn2") : siteUrl;
-  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-  const content = `
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Sie haben bisher keine unverbindlichen Bewerbungen erhalten &ndash; und können deshalb nicht sehen, welche Pflegekräfte die Betreuung übernehmen möchten. Dazu fehlen nur einige Angaben zur Pflegesituation.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Soll ich das gemeinsam mit Ihnen ausfüllen? Rufen Sie mich einfach an &ndash; <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">089&nbsp;200&nbsp;000&nbsp;830</a> &ndash; oder schreiben Sie mir per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">WhatsApp</a>, wann es Ihnen passt.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Oder Sie erledigen es direkt selbst: einmal klicken, Angaben vervollständigen, Bewerbungen erhalten. Kostenfrei und unverbindlich.</p>
-    ${bulletproofButton(portalUrl, "Angaben vervollständigen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
-    <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
-    ${buildMartaSig(siteUrl)}`;
-  return buildEmailWrapper(lead, siteUrl, content);
-}
-
-function buildProfilNudge2Text(lead: Lead, siteUrl: string, portalBase: string): string {
-  const portalUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token), "pn2") : siteUrl;
-  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-  return `${halloAnrede},
-
-Sie haben bisher keine unverbindlichen Bewerbungen erhalten — und können deshalb nicht sehen, welche Pflegekräfte die Betreuung übernehmen möchten. Dazu fehlen nur einige Angaben zur Pflegesituation.
-
-Soll ich das gemeinsam mit Ihnen ausfüllen? Rufen Sie mich einfach an — 089 200 000 830 — oder schreiben Sie mir per WhatsApp (https://wa.me/4989200000830), wann es Ihnen passt.
-
-Oder Sie erledigen es direkt selbst: einmal klicken, Angaben vervollständigen, Bewerbungen erhalten. Kostenfrei und unverbindlich.
-
-Angaben vervollständigen: ${portalUrl}
-
-PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
-
-Mit freundlichen Grüßen
-Marta Kapcio
-
----
-Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
-}
-
 // Tag-7: kurzer ehrlicher Einstieg + drei nuetzliche Infos, kein Druck.
 function buildProfilNudge3Html(lead: Lead, siteUrl: string, portalBase: string): string {
   const portalUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token), "pn3") : siteUrl;
@@ -828,6 +689,45 @@ Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 }
 
 // Tag-49: Wechsel-Fenster (nach 6–8 Wochen erster Pflegekraft-Wechsel) — Info-Ton.
+// Nachfrage zum Wunschtermin (Registry #72) — Wortlaut in wiedervorlage.ts.
+export function buildWiedervorlageHtml(lead: Lead, siteUrl: string, portalBase: string, seit: string | null): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const spaeterUrl = lead.token ? rueckmeldungLink(siteUrl, lead.token, "aktuell-nicht") : "tel:+4989200000830";
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${wiedervorlageEinstieg(seit)}</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${WIEDERVORLAGE_KERN}</p>
+    ${bulletproofButton(portalUrl, `${WIEDERVORLAGE_KNOPF}&nbsp;&nbsp;&rarr;`, "#2A9D5C")}
+    <p style="font-size:14px;line-height:1.65;color:#666;margin:18px 0 0;">${WIEDERVORLAGE_SPAETER} <a href="${spaeterUrl}" style="color:#8B7355;">${WIEDERVORLAGE_SPAETER_LINK}</a></p>
+    <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
+    ${buildMartaSig(siteUrl)}`;
+  return buildEmailWrapper(lead, siteUrl, content);
+}
+
+export function buildWiedervorlageText(lead: Lead, siteUrl: string, portalBase: string, seit: string | null): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const spaeterUrl = lead.token ? rueckmeldungLink(siteUrl, lead.token, "aktuell-nicht") : "089 200 000 830";
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  return `${halloAnrede},
+
+${wiedervorlageEinstieg(seit)}
+
+${WIEDERVORLAGE_KERN}
+
+${WIEDERVORLAGE_KNOPF}: ${portalUrl}
+
+${WIEDERVORLAGE_SPAETER} ${spaeterUrl}
+
+PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
+
+Mit freundlichen Grüßen
+Marta Kapcio
+
+---
+Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
+}
+
 function buildReaktivierungWechselHtml(lead: Lead, siteUrl: string, portalBase: string): string {
   const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
@@ -858,167 +758,6 @@ Marta Kapcio
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 }
 
-// "Neue Pflegekräfte verfügbar" — feuert +24h nach der letzten Einladung,
-// wenn der Kunde keine Reaktion erhalten hat (Batch-Nachlade-Hinweis, passend
-// zur Portal-Reveal-Logik). Bewusst kurz: kein Lob, keine Erklärung — nur der
-// Hinweis, dass neue Vorschläge bereitstehen. Anrede/Wrapper/Signatur identisch
-// zu den übrigen Mails (buildHalloAnrede).
-function buildNeuePflegekraefteHtml(lead: Lead, siteUrl: string, portalBase: string): string {
-  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
-  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-  const content = `
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">ich habe <strong>weitere passende Pflegekräfte</strong> für Sie herausgesucht. Schauen Sie sie sich gern an und laden Sie Ihre Wunschkräfte unverbindlich ein.</p>
-
-    ${bulletproofButton(portalUrl, "Neue Pflegekräfte ansehen", "#2A9D5C")}
-
-    <p style="font-size:15px;line-height:1.75;color:#444;margin:24px 0 18px;">Bei Fragen bin ich gerne für Sie da – telefonisch, per WhatsApp oder als Antwort auf diese E-Mail.</p>
-
-    ${buildMartaSig(siteUrl)}`;
-  return buildEmailWrapper(lead, siteUrl, content);
-}
-
-function buildNeuePflegekraefteText(lead: Lead, siteUrl: string, portalBase: string): string {
-  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
-  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-  return `${halloAnrede},
-
-ich habe weitere passende Pflegekräfte für Sie herausgesucht. Schauen Sie sie sich gern an und laden Sie Ihre Wunschkräfte unverbindlich ein:
-
-${portalUrl}
-
-Bei Fragen bin ich gerne für Sie da – telefonisch, per WhatsApp oder als Antwort auf diese E-Mail.
-
-Mit freundlichen Grüßen
-Marta Kapcio
-
----
-Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
-}
-
-function buildNachfass2Html(lead: Lead, siteUrl: string, portalBase: string, milestone: LeadMilestone): string {
-  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
-  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-  const v = nachfass2Content(milestone);
-
-  // Bewusst minimaler Aufbau: kurze persönliche Frage + ein CTA + Telefon-
-  // Direktdraht. Kein Re-Marketing-Block, kein Testsieger-Strip, keine
-  // Konditionen-Auflistung — die Mail soll wie eine Nachfrage vom Berater
-  // klingen, nicht wie eine zweite Verkaufsmail.
-  const content = `
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">${v.intro}</p>
-
-    ${nachfassCtaButton(portalUrl, v.cta)}
-
-    <p style="font-size:14px;line-height:1.65;color:#666;margin:20px 0 0;text-align:center;">
-      Schreiben Sie kurz per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> oder rufen Sie an: <a href="tel:+4989200000830" style="color:#3D2B1F;text-decoration:none;font-weight:600;white-space:nowrap;">+49 89 200 000 830</a>
-    </p>
-
-    ${buildMartaSig(siteUrl)}`;
-
-  return buildEmailWrapper(lead, siteUrl, content);
-}
-
-function buildNachfass2Text(lead: Lead, siteUrl: string, portalBase: string, milestone: LeadMilestone): string {
-  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
-  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-  const v = nachfass2Content(milestone);
-  return `${halloAnrede},
-
-${v.intro}
-
-${v.cta.replace(/ →$/, "")}: ${portalUrl}
-
-Schreiben Sie kurz per WhatsApp: https://wa.me/4989200000830
-Oder rufen Sie an: +49 89 200 000 830
-
-Mit freundlichen Grüßen
-Marta Kapcio
-
----
-Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
-}
-
-// Nachfass-3: "letzter Versuch" — Quick-Reaktion mit drei mailto-Buttons.
-// Antworten kommen als normale Mail an info@primundus.de mit
-// vordefiniertem Subject (inkl. Lead-ID damit das Team direkt zuordnen
-// kann). Bewusst SEHR kurz — nicht überreden, nur Status abklopfen.
-function buildNachfass3Html(lead: Lead, siteUrl: string): string {
-  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-  const leadRef = buildLeadRef(lead);
-  const mailtoYes = `mailto:info@primundus.de?subject=${encodeURIComponent(`Habe noch Interesse — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\nich habe noch Interesse, bitte melden Sie sich bei mir.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
-  const mailtoLater = `mailto:info@primundus.de?subject=${encodeURIComponent(`Aktuell nicht — vielleicht später — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\naktuell brauche ich noch keine Pflegekraft, vielleicht später.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
-  const mailtoNo = `mailto:info@primundus.de?subject=${encodeURIComponent(`Doch nicht relevant — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\nes hat sich erledigt, das Thema ist für mich nicht mehr relevant.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
-
-  const content = `
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">ein letzter Versuch von meiner Seite — wie schaut's bei Ihnen aus? Klicken Sie kurz auf eines der Felder, damit ich weiß, woran ich bin:</p>
-
-    ${bulletproofButton(mailtoYes, "Ja, habe Interesse — bitte melden", "#2A9D5C")}
-    ${bulletproofButton(mailtoLater, "Aktuell nicht — vielleicht später", "#8B7355")}
-    ${bulletproofButton(mailtoNo, "Doch nicht relevant", "#9CA3AF")}
-
-    <p style="font-size:14px;line-height:1.65;color:#666;margin:22px 0 0;text-align:center;">
-      Schreiben Sie kurz per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> oder rufen Sie an: <a href="tel:+4989200000830" style="color:#3D2B1F;text-decoration:none;font-weight:600;white-space:nowrap;">+49 89 200 000 830</a>
-    </p>
-
-    <p style="font-size:13px;line-height:1.6;color:#888;margin:22px 0 0;font-style:italic;">Falls wir nichts hören, melden wir uns nicht mehr — wir wollen Sie nicht stören.</p>
-
-    ${buildMartaSig(siteUrl)}`;
-
-  return buildEmailWrapper(lead, siteUrl, content);
-}
-
-function buildNachfass3Text(lead: Lead, _siteUrl: string): string {
-  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-  const leadRef = buildLeadRef(lead);
-  return `${halloAnrede},
-
-ein letzter Versuch von meiner Seite — wie schaut's bei Ihnen aus?
-
-Antworten Sie kurz mit einer der drei Optionen:
-
-Ja, habe Interesse — bitte melden:
-mailto:info@primundus.de?subject=Habe noch Interesse — ${leadRef}
-
-Aktuell nicht — vielleicht später:
-mailto:info@primundus.de?subject=Aktuell nicht — ${leadRef}
-
-Doch nicht relevant:
-mailto:info@primundus.de?subject=Doch nicht relevant — ${leadRef}
-
-Schreiben Sie kurz per WhatsApp: https://wa.me/4989200000830
-Oder rufen Sie an: +49 89 200 000 830
-
-Falls wir nichts hören, melden wir uns nicht mehr — wir wollen Sie nicht stören.
-
-Mit freundlichen Grüßen
-Marta Kapcio
-
----
-Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
-}
-
-
-const EINGANGS_LABELS: Record<string, Record<string, string>> = {
-  betreuung_fuer: { "1-person": "1 Person", "ehepaar": "2 Personen" },
-  mobilitaet: { "mobil": "Mobil", "rollator": "Eingeschränkt – Rollator", "rollstuhl": "Rollstuhl", "bettlaegerig": "Bettlägerig" },
-  nachteinsaetze: { "nein": "Nein", "gelegentlich": "Gelegentlich", "taeglich": "Täglich (1×)", "mehrmals": "Mehrmals nachts" },
-  deutschkenntnisse: { "grundlegend": "Grundlegend", "kommunikativ": "Kommunikativ", "sehr-gut": "Gut" },
-  fuehrerschein: { "ja": "Ja", "nein": "Nein / nicht unbedingt" },
-  geschlecht: { "egal": "Egal", "weiblich": "Weiblich", "maennlich": "Männlich" },
-  erfahrung: { "keine": "Keine Anforderung", "wuenschenswert": "Wünschenswert", "zwingend": "Zwingend erforderlich" },
-  weitere_personen: { "ja": "Ja", "nein": "Nein" },
-  // "spaeter": Legacy-Wert des Rechners, heute von pflege-helfer24 (Startdatum
-  // "Innerhalb von 6 Monaten" / "Später") — ohne Label stuende der Rohwert.
-  care_start_timing: { "sofort": "Sofort (4–7 Tage)", "2-4-wochen": "In 2–4 Wochen", "1-2-monate": "In 1–2 Monaten", "spaeter": "Zu einem späteren Zeitpunkt", "unklar": "Ich informiere mich nur" },
-};
-
-function eingangsLabel(key: string, val: string | undefined): string {
-  if (!val) return "Nicht angegeben";
-  return EINGANGS_LABELS[key]?.[val] || val;
-}
 
 function buildEingangsGreeting(lead: Lead): string {
   const detectedAnrede = lead.anrede_text || detectGenderFromName(lead.vorname || "");
@@ -1045,377 +784,6 @@ async function hasPreviousEingangsbestaetigungSent(supabase: any, leadId: string
     .eq("event_type", "email_eingangsbestaetigung_sent")
     .limit(1);
   return Array.isArray(data) && data.length > 0;
-}
-
-export function buildEingangsbestaetigungHtml(
-  lead: Lead,
-  siteUrl: string,
-  portalBase: string,
-  isResubmit: boolean = false,
-  /* Fertiger Empfehlungs-Block. undefined = gar keine Empfehlungs-Sektion
-     (Portal-Leads, Altaufrufe). null = Sektion mit Ersatztext, weil noch
-     keine Kraft feststeht. Die Mail funktioniert in allen drei Faellen. */
-  empfehlungBlock?: string | null,
-): string {
-  const greeting = buildEingangsGreeting(lead);
-  /* Eingekaufter Lead: der Kunde hat NICHT bei uns angefragt, sondern beim
-     Portal — und wartet dort gerade auf mehrere Anbieter. Kopf, Betreff und
-     beide Buttons haengen daran. Herkunft schlaegt Resubmit: ein
-     eingekaufter Lead ist per Definition der erste Kontakt. */
-  const herkunft = portalHerkunft(lead.source);
-  // Steht eine echte Pflegekraft in der Mail? Steuert Einleitung, Reihenfolge
-  // und ob der alte Sammel-CTA direkt unter dem Preis noch gebraucht wird.
-  const hatEmpfehlung = typeof empfehlungBlock === "string" && empfehlungBlock.length > 0;
-  const fd = (lead.kalkulation as any)?.formularDaten || {};
-  const careStartTiming = (lead as any).care_start_timing || "";
-
-  // Preis aus der Kalkulation (eigene DB). Tagessatz = Monatssatz / 30.
-  const kalk = lead.kalkulation || {};
-  const bruttopreis = kalk.bruttopreis || 0;
-  const gesamteZuschuesse = kalk.zuschüsse?.gesamt || 0;
-  const eigenanteil = kalk.eigenanteil || (bruttopreis - gesamteZuschuesse);
-  const tagessatz = bruttopreis > 0 ? Math.round(bruttopreis / 30) : 0;
-  const fmt = (n: number) => n.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-
-  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : "";
-  const ctaUrl = portalUrl || siteUrl;
-
-  // Wiederverwendbares Label-Styling (Preis-Bühne + Angaben-Sektionen).
-  const psLabel = "font-size:11px;font-weight:700;color:#9a8a73;letter-spacing:.08em;text-transform:uppercase;";
-
-  // ── Preis-Bühne: Preise + Konditionen + Testsieger in einer Klammer ───────
-  // Angleichung an Website/Portal (Martin, 17.08.): Die Mail erzählte an drei
-  // Stellen eine eigene Geschichte. Jetzt gilt überall dasselbe Vokabular —
-  // die VIER Konditionen wortgleich zum Angebot-Kasten im Portal, die
-  // Testsieger-Zeile wortgleich zur Portal-Zeile, und der Pflegeheim-Vergleich
-  // (buildHeimVergleichBoxHtml) direkt unter den Preisen, weil dort schon der
-  // Eigenanteil steht. Bestpreis-Garantie ist RAUS (Martin, 14.08.: „scheint
-  // nicht zu ziehen") — sie lud zum Anbietervergleich ein statt zum Nutzen.
-  const priceRows = bruttopreis > 0 ? `
-      <tr>
-        <td class="price-stage-cell" style="width:50%;padding:22px 24px 18px;border-right:1px solid #ebe2d2;vertical-align:top;">
-          <p style="margin:0 0 8px;${psLabel}">Tagessatz</p>
-          <p style="margin:0 0 4px;font-size:26px;font-weight:700;color:#2D1F0F;line-height:1.15;">${fmt(tagessatz)}&nbsp;€<span style="font-size:14px;font-weight:500;color:#9a8a73;"> / Tag</span></p>
-          <p style="margin:0;font-size:12px;color:#9a8a73;line-height:1.5;">inkl. Steuern &amp; Sozialabgaben</p>
-        </td>
-        <td class="price-stage-cell" style="width:50%;padding:22px 24px 18px;vertical-align:top;">
-          <p style="margin:0 0 8px;${psLabel}">Monatssatz</p>
-          <p style="margin:0 0 4px;font-size:26px;font-weight:700;color:#2D1F0F;line-height:1.15;">${fmt(bruttopreis)}&nbsp;€<span style="font-size:14px;font-weight:500;color:#9a8a73;"> / Monat</span></p>
-          <p style="margin:0;font-size:12px;color:#9a8a73;line-height:1.5;">rechn. Eigenanteil ca. ${fmt(eigenanteil)}&nbsp;€</p>
-        </td>
-      </tr>
-      <tr>
-        <td colspan="2" style="padding:14px 24px 16px;border-top:1px solid #ebe2d2;">
-          <p style="margin:0;font-size:13px;line-height:1.7;color:#666;">zzgl. ca. 125&nbsp;€ Anreise- und Abreisekosten je Strecke sowie Kost und Logis.</p>
-        </td>
-      </tr>` : "";
-
-  /* Aufgeteilt in ZWEI Panels (Martin, 31.08.): die Empfehlung soll direkt
-     nach den Preisen stehen, Konditionen und Testsieger danach. Optik,
-     Farben und Innenabstaende bleiben identisch — es ist dieselbe Buehne,
-     nur mit der Pflegekraft dazwischen. Ohne Empfehlung stehen beide
-     Panels wie bisher unmittelbar untereinander. */
-  const preisTabelle = "";
-
-  const konditionenTabelle = `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
-      ${priceRows}
-      <tr>
-        <td colspan="2" style="padding:16px 24px 16px;${bruttopreis > 0 ? "border-top:1px solid #ebe2d2;" : ""}">
-          <p style="margin:0 0 10px;${psLabel}color:#2A9D5C;">Ihre Konditionen</p>
-          ${["Täglich kündbar", "Tagesgenaue Abrechnung", "Betreuungskraft vor Vertragsabschluss selbst auswählen", "Keine Vermittlungsgebühren"].map((t) => `<p style="margin:0 0 6px;font-size:14px;line-height:1.6;color:#2D1F0F;"><span style="color:#2A9D5C;font-weight:700;">&#10003;</span>&nbsp;&nbsp;${t}</p>`).join("")}
-          <p style="margin:8px 0 0;font-size:13px;line-height:1.6;color:#666;">Kosten entstehen erst, wenn Ihre Betreuungskraft vor Ort ist.</p>
-        </td>
-      </tr>
-      <tr>
-        <td colspan="2" style="padding:16px 24px 20px;border-top:1px solid #ebe2d2;">
-          <!-- Wie im Siegel: die ZAHL steht oben bei "Testsieger", "in Folge"
-               kommt nur einmal darunter. Vorher trugen Etikett und Satz beides
-               doppelt ("Testsieger · 6× in Folge" / "Testsieger – DIE WELT,
-               6× in Folge") — direkt untereinander gelesen ein Stottern
-               (Martin 28.08.2026). -->
-          <p style="margin:0 0 6px;${psLabel}color:#B8860B;">6× Testsieger</p>
-          <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;"><strong>DIE&nbsp;WELT &ndash; 6× in Folge</strong>, mit über 20&nbsp;Jahren Erfahrung und 60.000 Betreuungseinsätzen.</p>
-        </td>
-      </tr>
-    </table>
-    ${buildHeimVergleichBoxHtml(lead)}`;
-
-  /* Empfehlungs-Sektion. Drei Zustaende, alle bewusst:
-       string  → echte Pflegekraft
-       null    → wir haben (noch) keine → ehrlicher Ersatztext
-       undefined → gar keine Sektion (Portal-Leads / Altaufrufe) */
-  const empfehlungSektion =
-    empfehlungBlock === undefined ? "" : (empfehlungBlock || keineEmpfehlungHtml());
-
-  /* Knopf in Schritt 1 (Martin, 07.09.): Die Mail zeigt Preis und
-     Pflegekräfte — aber ohne vervollständigte Pflegesituation kann sich im
-     Portal niemand bewerben und „Einladen" bleibt gesperrt. Deshalb ist
-     Schritt 1 der Liste nicht nur Text, sondern trägt den grünen Knopf der
-     Profil-Nudges. Klick-Quelle „eb-schritt", damit portal_reopened die
-     Rückkehr aus genau diesem Knopf zählt. Nur für eigene Leads (Sektion
-     vorhanden); Portal-Leads bekommen keinen Knopf. */
-  const schrittUrl = portalUrl ? withMailMark(portalUrl, "eb-schritt") : ctaUrl;
-  const schrittKnopf = empfehlungBlock === undefined ? "" :
-    `<div style="margin:12px 0 4px;">${bulletproofButton(schrittUrl, "Pflegesituation vervollständigen&nbsp;&nbsp;&rarr;", "#2A9D5C")}</div>`;
-
-  // ── "So geht es weiter" — 3 Schritte ──────────────────────────────────────
-  /* aktiv = der Schritt, der als Nächstes ansteht (Martin, 07.09.): grüner
-     Kasten, grüne Ziffer, größerer Titel — die übrigen Schritte bleiben ruhig. */
-  const stepRow = (n: string, title: string, desc: string, last = false, aktiv = false) => aktiv ? `
-      <tr>
-        <td bgcolor="#EEF7F1" style="background-color:#EEF7F1;vertical-align:top;width:38px;padding:16px 12px 16px 16px;border-radius:14px 0 0 14px;">
-          <table cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td width="26" height="26" align="center" valign="middle" bgcolor="#2A9D5C" style="background-color:#2A9D5C;width:26px;min-width:26px;max-width:26px;height:26px;border-radius:13px;padding:0;mso-line-height-rule:exactly;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;">${n}</td>
-          </tr></table>
-        </td>
-        <td bgcolor="#EEF7F1" style="background-color:#EEF7F1;vertical-align:top;padding:16px 16px 16px 0;border-radius:0 14px 14px 0;">
-          <p style="margin:0 0 4px;font-size:17px;font-weight:700;color:#1F6B41;line-height:1.35;">${title}</p>
-          <p style="margin:0;font-size:14px;line-height:1.6;color:#3A3A3A;">${desc}</p>
-        </td>
-      </tr>
-      <tr><td colspan="2" style="height:14px;line-height:14px;font-size:0;padding:0;">&nbsp;</td></tr>` : `
-      <tr>
-        <td style="vertical-align:top;width:38px;padding:0 12px ${last ? "0" : "14px"} 0;">
-          <table cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;width:26px;min-width:26px;max-width:26px;height:26px;border-radius:13px;padding:0;mso-line-height-rule:exactly;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${n}</td>
-          </tr></table>
-        </td>
-        <td style="vertical-align:top;padding:0 0 ${last ? "0" : "14px"} 0;">
-          <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#2D1F0F;line-height:1.4;">${title}</p>
-          <p style="margin:0;font-size:14px;line-height:1.6;color:#555;">${desc}</p>
-        </td>
-      </tr>`;
-
-  const stepsTable = `
-    <p style="margin:0 0 14px;font-size:20px;font-weight:700;line-height:1.35;color:#2D1F0F;">So geht es weiter</p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;">
-      ${stepRow("1", "Pflegesituation vervollständigen — 2 Minuten", `Ein Teil ist aus dem Kostenrechner schon übernommen. Erst danach können sich die Pflegekräfte bei Ihnen bewerben.${schrittKnopf}`, false, true)}
-      ${stepRow("2", "Pflegekräfte einladen & Bewerbungen erhalten", "Sobald Ihre Pflegesituation vervollständigt ist, laden Sie Ihre Wunschkandidatinnen ein — passende Pflegekräfte bewerben sich dann mit Profil, Erfahrung und Anreisedatum.")}
-      ${stepRow("3", "Auswählen und starten", "Sie entscheiden, wir übernehmen den Rest. Ihre Wunsch-Pflegekraft kann die Betreuung bereits in 4–7 Werktagen übernehmen.", true)}
-    </table>`;
-
-  // ── CTA-Button (Gradient + Schatten, mit Outlook-Fallback) ────────────────
-  /* Portal-Lead: derselbe Button wie oben. Zwei Farben in einer Mail
-     lesen sich als zwei verschiedene Angebote (Martin 30.08.). Fuer alle
-     anderen Leads bleibt der eingefuehrte gruene Button unangetastet —
-     die Kette laeuft und ist gemessen. */
-  const cta = herkunft
-    ? portalCtaButtonHtml(ctaUrl, "Angebot &amp; passende Pflegekräfte ansehen", "8px auto 30px")
-    : `
-    <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:8px auto 30px;border-collapse:separate;">
-      <tr>
-        <td align="center" bgcolor="#E76F63" style="background-color:#E76F63;border-radius:12px;padding:17px 44px;box-shadow:0 2px 6px rgba(231,111,99,0.25);">
-          <a href="${ctaUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:16px;letter-spacing:0.01em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">Angebot &amp; Betreuungskräfte ansehen&nbsp;&nbsp;→</a>
-        </td>
-      </tr>
-    </table>
-    <!--[if mso]></td></tr></table><![endif]-->`;
-
-  // ── Angaben im Überblick — zwei Sektionen, null-Werte ausgeblendet ────────
-  const kvRow = (label: string, value: string) =>
-    `<tr><td style="padding:4px 0;color:#888;width:55%;">${label}</td><td style="padding:4px 0;color:#2D1F0F;font-weight:600;">${value}</td></tr>`;
-
-  const section1 = [
-    kvRow("Betreuung für", eingangsLabel("betreuung_fuer", fd.betreuung_fuer)),
-    kvRow("Pflegegrad", fd.pflegegrad ? `Pflegegrad ${fd.pflegegrad}` : "Nicht angegeben"),
-    kvRow("Weitere Personen im Haushalt", eingangsLabel("weitere_personen", fd.weitere_personen)),
-    kvRow("Mobilität", eingangsLabel("mobilitaet", fd.mobilitaet)),
-    kvRow("Nachteinsätze erforderlich", eingangsLabel("nachteinsaetze", fd.nachteinsaetze)),
-    kvRow("Gewünschter Start", eingangsLabel("care_start_timing", careStartTiming)),
-  ].join("");
-
-  const section2Parts = [kvRow("Deutschkenntnisse", eingangsLabel("deutschkenntnisse", fd.deutschkenntnisse))];
-  if (fd.erfahrung) section2Parts.push(kvRow("Erfahrung", eingangsLabel("erfahrung", fd.erfahrung)));
-  if (fd.fuehrerschein) section2Parts.push(kvRow("Führerschein", eingangsLabel("fuehrerschein", fd.fuehrerschein)));
-  section2Parts.push(kvRow("Geschlecht der Pflegekraft", fd.geschlecht ? eingangsLabel("geschlecht", fd.geschlecht) : "Egal"));
-  const section2 = section2Parts.join("");
-
-  const angabenTable = `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 8px;border:1px solid #ebe2d2;border-radius:10px;overflow:hidden;">
-      <tr><td style="padding:12px 20px;background:#FAF8F4;border-bottom:1px solid #ebe2d2;"><p style="margin:0;${psLabel}">Pflegesituation &amp; Anforderungen</p></td></tr>
-      <tr><td style="padding:14px 20px 16px;border-bottom:1px solid #ebe2d2;"><table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size:14px;color:#555;line-height:1.7;">${section1}</table></td></tr>
-      <tr><td style="padding:12px 20px;background:#FAF8F4;border-bottom:1px solid #ebe2d2;"><p style="margin:0;${psLabel}">Anforderungen an die Pflegekraft</p></td></tr>
-      <tr><td style="padding:14px 20px 16px;"><table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size:14px;color:#555;line-height:1.7;">${section2}</table></td></tr>
-    </table>`;
-
-  /* Herkunft schlaegt Resubmit UND Empfehlung: ein eingekaufter Lead ist
-     per Definition der erste Kontakt, und der Portal-Kopf traegt seinen
-     eigenen Hinweis auf die Kraefte (Plakette statt Fliesstext). */
-  const introParagraph = herkunft
-    ? portalIntroHtml(herkunft)
-    : isResubmit
-    ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre Angaben übernommen und Ihr persönliches Angebot angepasst${
-        hatEmpfehlung
-          ? ` &ndash; und <strong style="color:#2D1F0F;">passende Betreuungskräfte für Sie gefunden</strong>. Sie finden sie weiter unten in dieser E-Mail.`
-          : ` für die 24-Stunden-Betreuung zu Hause.`
-      }`
-    : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr persönliches Angebot erstellt${
-        hatEmpfehlung
-          ? ` &ndash; und <strong style="color:#2D1F0F;">bereits passende Betreuungskräfte für Sie gefunden</strong>. Sie finden sie weiter unten in dieser E-Mail.`
-          : ` für die 24-Stunden-Betreuung zu Hause.`
-      }`;
-
-  /* Bei eingekauften Leads sind nicht alle Angaben vom Kunden: was das
-     Portal nicht liefert, nehmen wir bewusst zum teureren Wert an (lieber
-     ein Preis, der faellt, als einer, der steigt). Das gehoert ueber die
-     Tabelle geschrieben — sonst wundert sich der Kunde, woher wir Dinge
-     wissen, die er nie gesagt hat. Gleichzeitig der beste Grund, das
-     Portal zu oeffnen. */
-  /* Welche Felder WIR gesetzt haben, legt api/portal-lead in der
-     Kalkulation ab. Fehlt die Liste (Altbestand), nehmen wir den
-     vorsichtigeren Text an: lieber zu viel Transparenz als zu wenig. */
-  const angenommeneFelder = (lead.kalkulation as any)?.angenommene_felder;
-  const wurdeAngenommen = !Array.isArray(angenommeneFelder) || angenommeneFelder.length > 0;
-  const angabenHinweis = herkunft ? portalAngabenHinweisHtml(herkunft, wurdeAngenommen) : "";
-  /* Ohne echte Empfehlung traegt die Plakette den Kraefte-Hinweis; mit
-     Empfehlung uebernimmt das die Kraft selbst (siehe portalVorschauHtml). */
-  const vorschauBlock = herkunft ? portalVorschauHtml(siteUrl, ctaUrl, !hatEmpfehlung) : "";
-
-  const content = `
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:24px;">${introParagraph}</p>
-
-    ${vorschauBlock}
-
-    ${preisTabelle}
-
-    ${konditionenTabelle}
-
-    ${empfehlungSektion}
-
-    ${/* Mit Empfehlung gibt es KEINEN dritten Knopf mehr (Martin, 07.09.): der
-        Kasten hat „<Vorname> ansehen" + „Alle 5 ansehen", Schritt 1 den grünen
-        Knopf. Ohne Empfehlung bleibt der Angebots-Knopf vor den Schritten. */ ""}
-    ${hatEmpfehlung ? "" : cta}
-
-    ${stepsTable}
-
-    ${angabenHinweis}
-
-    ${angabenTable}
-
-    <p style="font-size:15px;line-height:1.75;color:#444;margin:30px 0 18px;">Wenn Sie Fragen haben oder Unterstützung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
-
-    ${buildMartaSig(siteUrl)}`;
-
-  return buildEmailWrapper(lead, siteUrl, content);
-}
-
-export function buildEingangsbestaetigungText(
-  lead: Lead,
-  portalBase: string,
-  isResubmit: boolean = false,
-  empfehlungAbschnitt?: string | null,
-): string {
-  const greeting = buildEingangsGreeting(lead);
-  const fd = (lead.kalkulation as any)?.formularDaten || {};
-  const careStartTiming = (lead as any).care_start_timing || "";
-
-  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : "";
-  const ctaUrl = portalUrl || "https://primundus.de";
-  const schrittLinkPlain = empfehlungAbschnitt === undefined ? "" :
-    `\n   Jetzt vervollständigen: ${portalUrl ? withMailMark(portalUrl, "eb-schritt") : ctaUrl}`;
-
-  const kalk = lead.kalkulation || {};
-  const bruttopreis = kalk.bruttopreis || 0;
-  const gesamteZuschuesse = kalk.zuschüsse?.gesamt || 0;
-  const eigenanteil = kalk.eigenanteil || (bruttopreis - gesamteZuschuesse);
-  const tagessatz = bruttopreis > 0 ? Math.round(bruttopreis / 30) : 0;
-  const fmt = (n: number) => n.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " €";
-  const priceLine = bruttopreis > 0
-    ? `Tagessatz: ${fmt(tagessatz)} / Tag (inkl. Steuern & Sozialabgaben)
-Monatssatz: ${fmt(bruttopreis)} / Monat — rechn. Eigenanteil ca. ${fmt(eigenanteil)}
-zzgl. ca. 125 € Anreise- und Abreisekosten je Strecke sowie Kost und Logis.
-
-`
-    : "";
-
-  const konditionenLine = `Ihre Konditionen:
-  ✓ Täglich kündbar
-  ✓ Tagesgenaue Abrechnung
-  ✓ Betreuungskraft vor Vertragsabschluss selbst auswählen
-  ✓ Keine Vermittlungsgebühren
-Kosten entstehen erst, wenn Ihre Betreuungskraft vor Ort ist.
-
-6× Testsieger
-DIE WELT – 6× in Folge, mit über 20 Jahren Erfahrung und 60.000 Betreuungseinsätzen.
-
-${buildHeimVergleichText(lead)}
-
-`;
-
-  const headerLine = portalHerkunft(lead.source)
-    ? PORTAL_BETREFF
-    : isResubmit
-    ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung – Primundus"
-    : "Ihr Angebot zur 24-Stunden-Betreuung – Primundus";
-
-  const hatEmpfehlungPlain = typeof empfehlungAbschnitt === "string" && empfehlungAbschnitt.length > 0;
-  const empfehlungPlain =
-    empfehlungAbschnitt === undefined ? "" : `${empfehlungAbschnitt || keineEmpfehlungText()}\n\n`;
-
-  /* Wie in der HTML-Fassung: Herkunft schlaegt Resubmit und Empfehlung. */
-  const herkunftPlain = portalHerkunft(lead.source);
-
-  const introPlain = herkunftPlain
-    ? portalIntroText(herkunftPlain)
-    : isResubmit
-    ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre Angaben übernommen und Ihr persönliches Angebot angepasst${
-        hatEmpfehlungPlain ? " – und passende Betreuungskräfte für Sie gefunden. Sie finden sie weiter unten in dieser E-Mail." : " für die 24-Stunden-Betreuung zu Hause."
-      }`
-    : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr persönliches Angebot erstellt${
-        hatEmpfehlungPlain ? " – und bereits passende Betreuungskräfte für Sie gefunden. Sie finden sie weiter unten in dieser E-Mail." : " für die 24-Stunden-Betreuung zu Hause."
-      }`;
-
-  const angenommeneFelderPlain = (lead.kalkulation as any)?.angenommene_felder;
-  const wurdeAngenommenPlain = !Array.isArray(angenommeneFelderPlain) || angenommeneFelderPlain.length > 0;
-  const angabenHinweisPlain = herkunftPlain ? portalAngabenHinweisText(herkunftPlain, wurdeAngenommenPlain) + "\n\n" : "";
-  const vorschauPlain = herkunftPlain ? portalVorschauText(ctaUrl) + "\n\n" : "";
-
-  // Sektion 2 (Anforderungen an die Pflegekraft) — null-Werte ausblenden.
-  const anf: string[] = [`Deutschkenntnisse: ${eingangsLabel("deutschkenntnisse", fd.deutschkenntnisse)}`];
-  if (fd.erfahrung) anf.push(`Erfahrung: ${eingangsLabel("erfahrung", fd.erfahrung)}`);
-  if (fd.fuehrerschein) anf.push(`Führerschein: ${eingangsLabel("fuehrerschein", fd.fuehrerschein)}`);
-  anf.push(`Geschlecht der Pflegekraft: ${fd.geschlecht ? eingangsLabel("geschlecht", fd.geschlecht) : "Egal"}`);
-
-  return `${headerLine}
-
-${greeting},
-
-${introPlain}
-
-${vorschauPlain}${priceLine}${konditionenLine}${empfehlungPlain}Angebot & Betreuungskräfte ansehen: ${ctaUrl}
-
-SO GEHT ES WEITER
-
-1. Pflegesituation vervollständigen (2 Minuten) — ein Teil ist aus dem Kostenrechner schon übernommen. Erst danach können sich die Pflegekräfte bei Ihnen bewerben.${schrittLinkPlain}
-2. Pflegekräfte einladen & Bewerbungen erhalten — sobald Ihre Pflegesituation vervollständigt ist, laden Sie Ihre Wunschkandidatinnen ein; passende Pflegekräfte bewerben sich dann mit Profil, Erfahrung und Anreisedatum.
-3. Auswählen und starten — Sie entscheiden, wir übernehmen den Rest. Ihre Wunsch-Pflegekraft kann die Betreuung bereits in 4–7 Werktagen übernehmen.
-
-PFLEGESITUATION & ANFORDERUNGEN
-
-${angabenHinweisPlain}Betreuung für: ${eingangsLabel("betreuung_fuer", fd.betreuung_fuer)}
-Pflegegrad: ${fd.pflegegrad ? `Pflegegrad ${fd.pflegegrad}` : "Nicht angegeben"}
-Weitere Personen im Haushalt: ${eingangsLabel("weitere_personen", fd.weitere_personen)}
-Mobilität: ${eingangsLabel("mobilitaet", fd.mobilitaet)}
-Nachteinsätze erforderlich: ${eingangsLabel("nachteinsaetze", fd.nachteinsaetze)}
-Gewünschter Start: ${eingangsLabel("care_start_timing", careStartTiming)}
-
-ANFORDERUNGEN AN DIE PFLEGEKRAFT
-
-${anf.join("\n")}
-
-Wenn Sie Fragen haben oder Unterstützung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.
-
-Mit freundlichen Grüßen
-Marta Kapcio
-
----
-Primundus Deutschland | 24h-Pflege und Betreuung
-Telefon: +49 89 200 000 830 | E-Mail: info@primundus.de
-www.primundus.de`;
 }
 
 
@@ -1691,7 +1059,7 @@ async function hasReactionForCaregiver(
 async function fuenfFuerNudge(
   lead: Lead, portalBase: string, supabaseUrl: string, key: string, darfOnboarden: boolean,
 ): Promise<{
-  html: string; text: string; anzahl: number; betreff: string;
+  html: string; text: string; anzahl: number; vornamen: string[];
   anhaenge: { filename: string; content: Uint8Array; contentType: string; cid: string }[];
   caregiverIds: number[];
 } | null> {
@@ -1712,12 +1080,145 @@ async function fuenfFuerNudge(
   const profilUrls = erg.fuenf.map((e) => withMailMark(`${basisUrl}&cg=${e.caregiverId}`, "pn1"));
   const alleUrl = withMailMark(buildPortalUrl(portalBase, tok, "matches"), "pn1");
   return {
-    html: fuenfListeHtml(erg.fuenf, inlines.map((r) => r?.cid ?? null), profilUrls, alleUrl),
-    text: fuenfListeText(erg.fuenf, profilUrls, alleUrl),
+    html: fuenfListeHtml(erg.fuenf, inlines.map((r) => r?.cid ?? null), profilUrls, alleUrl, "Passend zu Ihrer Anfrage"),
+    text: fuenfListeText(erg.fuenf, profilUrls, alleUrl).replace("FÜR SIE VORBEREITET", "PASSEND ZU IHRER ANFRAGE"),
     anzahl: erg.fuenf.length,
-    betreff: fuenfBetreff(erg.fuenf.length),
+    vornamen: erg.fuenf.map((e) => e.vorname),
     anhaenge: inlines.filter((r): r is NonNullable<typeof r> => r !== null),
     caregiverIds: erg.fuenf.map((e) => e.caregiverId),
+  };
+}
+
+/** Zeile abbrechen + Grund loggen (email_<typ>_cancelled). */
+async function zeileAbbrechen(
+  supabase: any, row: ScheduledEmail, grund: string, extra: Record<string, unknown> = {},
+): Promise<void> {
+  await supabase
+    .from("scheduled_emails")
+    .update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .eq("id", row.id);
+  await supabase.from("lead_events").insert({
+    lead_id: row.lead_id,
+    event_type: `email_${row.email_type}_cancelled`,
+    metadata: { reason: grund, ...extra },
+  });
+}
+
+type InlineFoto = { filename: string; content: Uint8Array; contentType: string; cid: string };
+
+/** Empfehlung für die Angebotsmail — Versand UND Testversand gehen denselben Weg (wie
+ *  fuenfFuerNudge). Schreibt nichts; der lead_events-Eintrag bleibt beim Versand. */
+async function empfehlungFuerAngebot(
+  lead: Lead, supabaseUrl: string, key: string, darfOnboarden: boolean,
+): Promise<{ erg: EmpfehlungErgebnis; inline: InlineFoto | null; weitere: (InlineFoto | null)[] } | null> {
+  if (!lead.token) return null;
+  const erg = await holeEmpfehlung({
+    supabaseUrl, key, token: lead.token,
+    jobOfferId: ((lead as unknown as Record<string, unknown>).mamamia_job_offer_id as number | null) ?? null,
+    formularDaten: (lead.kalkulation?.formularDaten ?? {}) as never,
+    darfOnboarden,
+  });
+  if (!erg) return null;
+  /* Fotos aller sichtbaren Kräfte (Martin 07.10.2026). Budget wie die Fünf-Liste der Nudge-Mail: die Empfehlung zuerst, was
+     nicht passt, bekommt die Initialen-Kachel. */
+  const [inline, ...roh] = await Promise.all((erg.alle ?? [erg.empfehlung]).map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
+  const darf = fotoBudget(roh.map((r) => r?.content.length ?? null), 300_000, 1_200_000 - (inline?.content.length ?? 0));
+  return { erg, inline, weitere: roh.map((r, i) => (r && darf[i]) ? r : null) };
+}
+
+/** „06.10.2026" (Berliner Zeit) — Datum der Kopfleiste „Ihr Angebot vom …" wie im Portal (lead.created_at). */
+function angebotsDatum(iso: string | null | undefined): string | null {
+  const d = new Date(iso ?? Date.now());
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin" });
+}
+
+/** Eingaben der Angebotsmail aus dem Lead. */
+function angebotEingabe(
+  lead: Lead, resubmit: boolean, empf: { erg: EmpfehlungErgebnis; inline: InlineFoto | null; weitere: (InlineFoto | null)[] } | null,
+): AngebotEingabe {
+  const herkunft = portalHerkunft(lead.source);
+  /* Welche Felder WIR gesetzt haben, legt api/portal-lead in der Kalkulation ab. Fehlt die
+     Liste (Altbestand), gilt der vorsichtigere Text. */
+  const felder = (lead.kalkulation as Record<string, unknown> | null)?.angenommene_felder;
+  const angenommen = !Array.isArray(felder) || felder.length > 0;
+  return {
+    kalkulation: lead.kalkulation,
+    careStartTiming: ((lead as unknown as Record<string, unknown>).care_start_timing as string | null) ?? null,
+    herkunft,
+    portalBetreff: PORTAL_BETREFF,
+    angabenHinweis: herkunft
+      ? { html: portalAngabenHinweisHtml(herkunft, angenommen), text: portalAngabenHinweisText(herkunft, angenommen) }
+      : null,
+    resubmit,
+    empfehlung: empf
+      ? {
+        e: empf.erg.empfehlung, cid: empf.inline?.cid ?? null, sichtbar: empf.erg.sichtbarGesamt,
+        weitere: (empf.erg.alle ?? []).slice(1).map((e, i) => ({ e, cid: empf.weitere[i]?.cid ?? null })),
+      }
+      : null,
+    /* Erneute Anfrage = angepasstes Angebot von heute; sonst das Datum der Anfrage. */
+    datum: angebotsDatum(resubmit ? null : (lead as unknown as Record<string, string | null>).created_at),
+    /* Vorschlag B (07.10.2026): die weiteren Kräfte als kompakte Zeilen. */
+    weitereKompakt: true,
+  };
+}
+
+/** „15.10.2026" aus einem mamamia-Datum („2026-10-15" / „2026-10-15 00:00:00"); sonst null. */
+function datumDe(wert: unknown): string | null {
+  const m = typeof wert === "string" ? wert.match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : null;
+}
+
+/** Konditionen einer Bewerbung wie die Portal-Karte (AppCard): Tagessatz = Monat / 30. */
+function angebotAus(m: Record<string, unknown> | null | undefined): BewerbungsAngebot {
+  const monat = Number(m?.offer_salary);
+  const an = datumDe(m?.offer_arrival_at);
+  const ab = datumDe(m?.offer_departure_at);
+  const fahrt = m?.offer_arrival_fee == null ? NaN : Number(m.offer_arrival_fee);
+  return {
+    tagessatz: Number.isFinite(monat) && monat > 0 ? Math.round(monat / 30) : null,
+    zeitraum: an && ab ? `${an} – ${ab}` : an ? `ab ${an}` : null,
+    reisekosten: Number.isFinite(fahrt) ? fahrt : null,
+  };
+}
+
+/** Lage einer Bewerbung für die Erinnerung: Eingänge (Anker der Reservierung, ohne `seeded`,
+ *  Job wie src/lib/reservierung.ts), Konditionen aus dem neuesten Eingang, letzte Mail dazu
+ *  (Eingang = Mail B, oder gesendete Erinnerung) und ob die letzte Erinnerung schon raus ist. */
+async function bewerbungsLage(
+  supabase: any, leadId: string, caregiverId: number | string, jobId: number | null, standardJobId: number | null,
+): Promise<{ eingaengeMs: number[]; angebot: BewerbungsAngebot; letzteMailMs: number | null; letzteGesendet: boolean }> {
+  const cg = String(caregiverId);
+  const { data: evts } = await supabase
+    .from("lead_events")
+    .select("created_at, metadata")
+    .eq("lead_id", leadId)
+    .eq("event_type", "application_received")
+    .filter("metadata->>caregiver_id", "eq", cg);
+  const zumPaar = ((evts ?? []) as { created_at: string; metadata?: Record<string, unknown> | null }[])
+    .filter((e) => {
+      const m = e.metadata ?? {};
+      if (m.seeded === true) return false;
+      const job = (m.mamamia_job_offer_id as number | null | undefined) ?? standardJobId;
+      return jobId == null || job == null || Number(job) === Number(jobId);
+    })
+    .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+  const eingaengeMs = zumPaar.map((e) => Date.parse(e.created_at)).filter((ms) => Number.isFinite(ms));
+  const { data: gesendet } = await supabase
+    .from("scheduled_emails")
+    .select("email_type, sent_at")
+    .eq("lead_id", leadId)
+    .eq("status", "sent")
+    .in("email_type", [...ERINNERUNG_TYPEN])
+    .filter("metadata->>caregiver_id", "eq", cg);
+  const zeilen = (gesendet ?? []) as { email_type: string; sent_at: string | null }[];
+  const alle = [...eingaengeMs, ...zeilen.map((z) => Date.parse(z.sent_at ?? "")).filter((ms) => Number.isFinite(ms))];
+  return {
+    eingaengeMs,
+    angebot: angebotAus(zumPaar[zumPaar.length - 1]?.metadata),
+    letzteMailMs: alle.length ? Math.max(...alle) : null,
+    letzteGesendet: zeilen.some((z) => erinnerungStufe(z.email_type) === "letzte"),
   };
 }
 
@@ -1757,6 +1258,8 @@ interface ReminderMeta {
   caregiver_german_level?: string | null;
   caregiver_photo_url?: string | null;
   caregiver_about_text?: string | null;
+  // Registry #125: Zähler der Fehlversuche der mamamia-Nachfrage vor dem Versand.
+  stand_fehlschlaege?: number;
   // Multi-Job (Bug #25): Job, zu dem dieser Reminder gehört. Reminder eines
   // AKTUELL geplanten Jobs überleben den lead-weiten "beauftragt"-Cancel
   // (die alte Buchung betraf einen ANDEREN Einsatz).
@@ -2010,80 +1513,6 @@ Primundus Deutschland | www.primundus.de
 `;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// "Warum Primundus?" — Trust-Mail (USP-Liste). Eigenständige Nurture-Mail,
-// ~48h nach der Eingangsbestätigung (Vergleichsphase: der Kunde checkt
-// gerade andere Anbieter). Cancelt sich, sobald der Lead beauftragt oder
-// nicht interessiert ist. Argument: die vier Kern-USPs (Kräfte vorab
-// sehen, keine Bindung, keine Vermittlungsgebühr, fester Ansprechpartner).
-// ─────────────────────────────────────────────────────────────────────────
-export function buildWarumPrimundusHtml(lead: Lead, portalUrl: string, siteUrl: string): string {
-  const greeting = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-
-  // Runde Marke: Maße gehoeren ins CSS, nicht nur in width=/height=.
-  // Mail-Clients werfen die Attribute weg und rechnen den Innenabstand
-  // der Spalte mit — aus dem Kreis wird sonst ein Ei (26.08.2026:
-  // gemessen 11,8 x 22 px). Pixel-Radius statt 50%, Spalte breit genug.
-  const usp = (title: string, desc: string) => `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 12px;">
-      <tr>
-        <td style="vertical-align:top;width:34px;padding:2px 12px 0 0;">
-          <table cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td width="22" height="22" align="center" valign="middle" bgcolor="#2A9D5C" style="background-color:#2A9D5C;width:22px;min-width:22px;max-width:22px;height:22px;border-radius:11px;padding:0;mso-line-height-rule:exactly;color:#ffffff;font-size:13px;font-weight:700;line-height:22px;text-align:center;">&#10003;</td>
-          </tr></table>
-        </td>
-        <td style="vertical-align:top;">
-          <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#2D1F0F;line-height:1.4;">${title}</p>
-          <p style="margin:0;font-size:14px;line-height:1.6;color:#555;">${desc}</p>
-        </td>
-      </tr>
-    </table>`;
-
-  // Nutzen-first statt Anbieter-Lob (Martin, 14.08.): jeder Punkt beginnt
-  // mit dem, was der Kunde davon hat; Vertragsvorteile eingewoben.
-  // Bestpreis-Garantie bewusst raus („scheint nicht zu ziehen"); Punkt 1
-  // betont den Bestand („Tausende bewährte Pflegekräfte"), nicht Features.
-  const uspBlock =
-    usp("Sie wissen vorher, wer ins Haus kommt.", "Tausende bewährte Pflegekräfte in unserem Bestand &mdash; Sie sehen vorab, wer die Betreuung übernehmen möchte, und entscheiden in Ruhe.") +
-    usp("Sie binden sich nicht.", "Kein Vertrag vor Auswahl, täglich kündbar, tagesgenaue Abrechnung &mdash; Kosten erst ab Anreise der Pflegekraft.") +
-    usp("Sie zahlen nie zu viel.", "Keine Vermittlungsgebühren &mdash; als Direktanbieter sparen wir die Vermittler-Provision: Die Pflegekraft verdient mehr, und Sie zahlen trotzdem weniger.") +
-    usp("Sie sind nie allein.", "Persönlicher Ansprechpartner 7 Tage die Woche &mdash; mit der Erfahrung aus über 60.000 Einsätzen, 6× in Folge als Testsieger von DIE WELT ausgezeichnet.");
-
-  const content = `
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">Sie vergleichen gerade Anbieter für die 24-Stunden-Betreuung? Dann zählt am Ende nur, was Sie davon haben:</p>
-    ${uspBlock}
-    ${buildHeimVergleichBoxHtml(lead)}
-    ${bulletproofButton(portalUrl, "Pflegekräfte im Portal ansehen →")}
-    <p style="font-size:14px;line-height:1.65;color:#555;margin:0 0 4px;">Fragen zum Preis oder zur Betreuung? Rufen Sie mich gerne <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;white-space:nowrap;">direkt an</a> oder schreiben Sie per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> &mdash; oder antworten Sie einfach auf diese E-Mail.</p>
-    ${buildMartaSig(siteUrl)}`;
-
-  return buildEmailWrapper(lead, siteUrl, content);
-}
-
-export function buildWarumPrimundusText(lead: Lead, portalUrl: string): string {
-  const greeting = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-  return `${greeting},
-
-Sie vergleichen gerade Anbieter für die 24-Stunden-Betreuung? Dann zählt am Ende nur, was Sie davon haben:
-
-✓ Sie wissen vorher, wer ins Haus kommt. Tausende bewährte Pflegekräfte in unserem Bestand — Sie sehen vorab, wer die Betreuung übernehmen möchte, und entscheiden in Ruhe.
-✓ Sie binden sich nicht. Kein Vertrag vor Auswahl, täglich kündbar, tagesgenaue Abrechnung — Kosten erst ab Anreise der Pflegekraft.
-✓ Sie zahlen nie zu viel. Keine Vermittlungsgebühren — als Direktanbieter sparen wir die Vermittler-Provision: Die Pflegekraft verdient mehr, und Sie zahlen trotzdem weniger.
-✓ Sie sind nie allein. Persönlicher Ansprechpartner 7 Tage die Woche — mit der Erfahrung aus über 60.000 Einsätzen, 6× in Folge als Testsieger von DIE WELT ausgezeichnet.
-
-${buildHeimVergleichText(lead)}Pflegekräfte im Portal ansehen: ${portalUrl}
-
-Fragen zum Preis oder zur Betreuung? Rufen Sie mich gerne direkt an (089 200 000 830) oder schreiben Sie per WhatsApp (wa.me/4989200000830) — oder antworten Sie einfach auf diese E-Mail.
-
-Mit freundlichen Grüßen
-Marta Kapcio — Pflegeberaterin
-Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
-
-Primundus Deutschland | www.primundus.de
-`;
-}
-
 async function fetchPDFAttachment(
   siteUrl: string,
   leadId: string,
@@ -2227,22 +1656,23 @@ async function runBewertungsRunde(
 /* Die fuenf Kraefte fuer die Vermittler-Mail: dieselben Daten wie beim
  * Nudge, aber ohne Profil-Links (es gibt fuer den Partner kein Portal) und
  * ohne Mail-Marker. Das Laden der Fotos bleibt hier, weil vermittler.ts
- * keine Deno-Abhaengigkeit haben soll. */
+ * keine Deno-Abhaengigkeit haben soll. Wirft, wenn mamamia nicht
+ * (rechtzeitig) antwortet; `null` heisst: geantwortet, niemand passt. */
 async function kraefteFuerVermittler(lead: Lead, supabaseUrl: string, key: string) {
   const tok = lead.token;
-  if (!tok) return null;
-  const erg = await holeFuenf({
+  if (!tok) throw new Error("Lead ohne Token");
+  const fuenf = await holeFuenfStreng({
     supabaseUrl, key, token: tok,
     jobOfferId: (lead as any).mamamia_job_offer_id ?? null,
     formularDaten: (lead as any).kalkulation?.formularDaten ?? {},
     darfOnboarden: Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0",
   });
-  if (!erg || erg.fuenf.length === 0) return null;
-  const roh = await Promise.all(erg.fuenf.map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
+  if (fuenf.length === 0) return null;
+  const roh = await Promise.all(fuenf.map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
   const erlaubt = fotoBudget(roh.map((r) => r?.content.byteLength ?? 0));
   const inlines = roh.map((r, i) => (r && erlaubt[i] ? r : null));
   return {
-    fuenf: erg.fuenf,
+    fuenf,
     cids: inlines.map((r) => r?.cid ?? null),
     anhaenge: inlines.filter(Boolean) as NonNullable<typeof inlines[number]>[],
   };
@@ -2282,56 +1712,59 @@ Deno.serve(async (req: Request) => {
       const portalBase = Deno.env.get("PORTAL_URL") || "https://kundenportal.primundus.de";
       const site = smtpConfig.siteUrl;
       const to = demoBody.recipient;
-      const ms = (demoBody.milestone || "none") as LeadMilestone;
-      const pu = (portalBase && (lead as Lead).token) ? buildPortalUrl(portalBase, (lead as Lead).token) : site;
+      // Die Vorschau zeigt dieselbe Bewertungszeile wie der Versand.
+      bewertungsStand = await ladeBewertungsStand(fetch);
+      const dk = kundenKontext(lead as Lead, site, portalBase);
+      const demoTypen: string[] = (demoBody.items || []).map((i: any) => i?.email_type);
 
-      /* Empfehlung auch in der Vorschau — sonst zeigt der Demo-Modus die
-         Angebotsmail ohne den Kasten und man prueft etwas anderes als das,
-         was der Kunde bekommt. Derselbe Weg wie im Versand; fuer einen Lead,
-         der schon eine job_offer hat, ist der Onboard-Aufruf ein
-         Cache-Treffer und legt in mamamia nichts Neues an. */
       /* Der Testversand muss GENAU das rendern, was der Kunde bekommt.
          Beim ersten Lauf am 03.09.2026 zeigte er die alte Mail 2, weil die
          Fünf-Liste hier fehlte. Kein Onboarding aus einer Vorschau:
          `onboard:true` im Body nur bewusst, sonst braucht der Test-Lead eine
-         bestehende job_offer (sonst greift der Rückfalltext). */
+         bestehende job_offer (sonst kommt die Mail ohne Liste). */
       let demoFuenf: Awaited<ReturnType<typeof fuenfFuerNudge>> = null;
-      if ((demoBody.items || []).some((i: any) => i?.email_type === "profil_nudge_1")) {
+      if (demoTypen.includes("profil_nudge_1")) {
         demoFuenf = await fuenfFuerNudge(
           lead as Lead, portalBase, supabaseUrl, supabaseServiceKey, demoBody.onboard === true,
         );
       }
-      let demoEmpfHtml: string | null | undefined = undefined;
-      let demoEmpfText: string | null | undefined = undefined;
-      let demoInline: { filename: string; content: Uint8Array; contentType: string; cid: string } | null = null;
-      if ((demoBody.items || []).some((i: any) => i?.email_type === "eingangsbestaetigung") && (lead as Lead).token) {
-        demoEmpfHtml = null;
-        demoEmpfText = null;
-        const erg = await holeEmpfehlung({
-          supabaseUrl,
-          key: supabaseServiceKey,
-          token: (lead as Lead).token as string,
-          jobOfferId: (lead as any).mamamia_job_offer_id ?? null,
-          formularDaten: {
-            ...((lead as any).kalkulation?.formularDaten ?? {}),
-            care_start_timing: (lead as any).care_start_timing ?? null,
-          },
-          darfOnboarden: Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0",
-        });
-        if (erg) {
-          demoInline = await fetchInlinePhotoDeno(erg.empfehlung.fotoUrl);
-          const profilUrl = withMailMark(`${pu}&cg=${erg.empfehlung.caregiverId}`, "eb");
-          const alleUrl = withMailMark(buildPortalUrl(portalBase, (lead as Lead).token as string, "matches"), "eb");
-          demoEmpfHtml = empfehlungHtml(erg.empfehlung, demoInline?.cid ?? null, profilUrl, alleUrl, erg.sichtbarGesamt);
-          demoEmpfText = empfehlungText(erg.empfehlung, profilUrl, alleUrl, erg.sichtbarGesamt);
-        }
+      /* Empfehlung auch in der Vorschau, derselbe Weg wie im Versand (für einen Lead mit
+         job_offer ein Cache-Treffer, in mamamia entsteht nichts Neues). */
+      let demoInline: InlineFoto | null = null;
+      let demoEmpf: Awaited<ReturnType<typeof empfehlungFuerAngebot>> = null;
+      if (demoTypen.includes("eingangsbestaetigung")) {
+        demoEmpf = await empfehlungFuerAngebot(lead as Lead, supabaseUrl, supabaseServiceKey, Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0");
+        demoInline = demoEmpf?.inline ?? null;
       }
+      /* Erinnerungen und „Reservierung abgelaufen" mit der letzten echten Bewerbung des Leads.
+         Hat der Test-Lead keine, nimmt die Vorschau eine Beispiel-Pflegekraft und sagt das in der
+         Antwort (beispiel_pflegekraft). Der Countdown zeigt den geplanten Stand der Stufe. */
+      let demoBewerbung: { meta: ReminderMeta; angebot: BewerbungsAngebot; beispiel: boolean } | null = null;
+      let demoErinnerungInline: InlineFoto | null = null;
+      if (demoTypen.some((t) => ERINNERUNG_TYPEN.has(t) || t === "reservierung_beendet")) {
+        const { data: evts } = await supabase
+          .from("lead_events")
+          .select("metadata")
+          .eq("lead_id", (lead as Lead).id)
+          .eq("event_type", "application_received")
+          .order("created_at", { ascending: false })
+          .limit(1);
+        const m = ((evts ?? [])[0]?.metadata ?? null) as Record<string, unknown> | null;
+        demoBewerbung = m && typeof m.caregiver_name === "string"
+          ? { meta: m as ReminderMeta, angebot: angebotAus(m), beispiel: false }
+          : {
+            meta: { caregiver_id: 0, caregiver_name: "Maria K.", caregiver_age: 62, caregiver_german_level: "Gut", caregiver_years_experience: 6, caregiver_einsatz_count: 14 },
+            angebot: { tagessatz: 102, zeitraum: "15.10.2026 – 10.12.2026", reisekosten: 125 },
+            beispiel: true,
+          };
+        demoErinnerungInline = await fetchInlinePhotoDeno(demoBewerbung.meta.caregiver_photo_url);
+      }
+      const demoRestStunden: Record<string, number> = { "1": 52, "2": 24, "letzte": 8 };
 
       /* Vermittler-Vorschau: dieselben Bausteine wie in der Warteschlange,
          nur die Kopfdaten sind gesetzt (die Demo-Items tragen keine
          metadata). So sieht man Provisionsblock und Liste, ohne eine
          Anfrage anlegen zu muessen. */
-      const demoTypen = (demoBody.items || []).map((i: any) => i?.email_type);
       const demoMeta = { kunde_label: "Familie Muster", provision_pro_tag: 10, betreff_antwort: "Re: Ihre Anfrage" };
       let demoVermittlerEmpf: EmpfehlungErgebnis | null = null;
       let demoVermittlerFuenf: Awaited<ReturnType<typeof kraefteFuerVermittler>> = null;
@@ -2345,24 +1778,52 @@ Deno.serve(async (req: Request) => {
         if (demoVermittlerEmpf) demoInline = await fetchInlinePhotoDeno(demoVermittlerEmpf.empfehlung.fotoUrl);
       }
       if (demoTypen.includes("vermittler_kraefte")) {
-        demoVermittlerFuenf = await kraefteFuerVermittler(lead as Lead, supabaseUrl, supabaseServiceKey);
+        demoVermittlerFuenf = await kraefteFuerVermittler(lead as Lead, supabaseUrl, supabaseServiceKey).catch(() => null);
       }
       const demoAnrede = `${buildEingangsGreeting(lead as Lead)},`;
 
+      const R = (m: KundenMail) => inHuelle(lead as Lead, site, m);
       const render = (t: string): { subject: string; html: string; text: string } => {
+        if (ERINNERUNG_TYPEN.has(t) && demoBewerbung) {
+          const stufe = erinnerungStufe(t) ?? "1";
+          const mm = demoBewerbung.meta;
+          return R(erinnerungMail(dk, {
+            stufe,
+            pk: {
+              name: mm.caregiver_name || "Ihre Pflegekraft",
+              alter: mm.caregiver_age ?? null,
+              deutsch: deutschStufe(mm.caregiver_germany_skill, mm.caregiver_german_level),
+              jahre: mm.caregiver_years_experience ?? null,
+              einsaetze: mm.caregiver_einsatz_count ?? null,
+              foto: demoErinnerungInline ? `cid:${demoErinnerungInline.cid}` : null,
+            },
+            angebot: demoBewerbung.angebot,
+            url: dk.portal({ view: "application", m: stufe === "letzte" ? "er3" : `er${stufe}` }),
+            restMs: demoRestStunden[stufe] * 60 * 60 * 1000,
+          }));
+        }
         switch (t) {
-          case "eingangsbestaetigung": return { subject: "Ihr persönliches Angebot zur 24-Stunden-Betreuung", html: buildEingangsbestaetigungHtml(lead as Lead, site, portalBase, false, demoEmpfHtml), text: buildEingangsbestaetigungText(lead as Lead, portalBase, false, demoEmpfText) };
-          case "profil_nudge_1": return { subject: demoFuenf?.betreff ?? "Pflegekräfte können sich noch nicht bei Ihnen bewerben", html: buildProfilNudge1Html(lead as Lead, site, portalBase, demoFuenf?.html ?? null, demoFuenf?.anzahl ?? 0), text: buildProfilNudge1Text(lead as Lead, site, portalBase, demoFuenf?.text ?? null, demoFuenf?.anzahl ?? 0) };
-          case "profil_nudge_2": return { subject: "Profil unvollständig — Sie können noch keine Bewerbungen erhalten", html: buildProfilNudge2Html(lead as Lead, site, portalBase), text: buildProfilNudge2Text(lead as Lead, site, portalBase) };
-          case "warum_primundus": return { subject: "Warum Familien sich für Primundus entscheiden", html: buildWarumPrimundusHtml(lead as Lead, withMailMark(pu, "wp"), site), text: buildWarumPrimundusText(lead as Lead, withMailMark(pu, "wp")) };
-          case "nachfass_2": return { subject: "Ihre Betreuung — kann ich Ihnen etwas abnehmen?", html: buildNachfass2Html(lead as Lead, site, portalBase, ms), text: buildNachfass2Text(lead as Lead, site, portalBase, ms) };
-          case "nachfass_3": return { subject: "Eine letzte Frage — wie schaut's bei Ihnen aus?", html: buildNachfass3Html(lead as Lead, site), text: buildNachfass3Text(lead as Lead, site) };
+          case "eingangsbestaetigung": return R(angebotMail(dk, angebotEingabe(lead as Lead, false, demoEmpf)));
+          case "profil_nudge_1": return R(nudge1Mail(dk, demoFuenf ? { html: demoFuenf.html, text: demoFuenf.text, vornamen: demoFuenf.vornamen } : null));
+          case "profil_nudge_2": return R(nudge2Mail(dk));
+          case "warum_primundus": return R(vierDingeMail(dk, (lead as Lead).kalkulation));
+          case "nachfass_2": return R(nachfass2Mail(dk));
+          case "nachfass_3": return R(nachfass3Mail(dk, buildLeadRef(lead as Lead)));
+          case "neue_pflegekraefte_verfuegbar": return R(neuePflegekraefteMail(dk));
+          case "suche_stand_2tage": return R(sucheStandMail(dk));
+          case "reservierung_beendet": return R(reservierungBeendetMail(dk, [String(demoBewerbung?.meta.caregiver_name ?? "").split(/\s+/)[0]]));
+          // Beispieldaten der Vorlage; `anreise: {…}` im Body überschreibt (z. B. geaendert, Own transport).
+          case "anreise": return R(anreiseMail(dk, {
+            name: "Ewa Lis", fotoCid: null, datum: "2026-10-12", von: "14:00", bis: "18:00", verkehrsmittel: "Minibus",
+            strasse: "Musterstraße 12",
+            plzOrt: "80687 München", geaendert: false, ...(demoBody.anreise ?? {}),
+          }));
           case "profil_nudge_3": return { subject: "Können wir Sie bei etwas unterstützen?", html: buildProfilNudge3Html(lead as Lead, site, portalBase), text: buildProfilNudge3Text(lead as Lead, site, portalBase) };
           case "reaktivierung_wechsel": return { subject: "Steht bei Ihnen ein Pflegekraft-Wechsel an?", html: buildReaktivierungWechselHtml(lead as Lead, site, portalBase), text: buildReaktivierungWechselText(lead as Lead, site, portalBase) };
           case "vermittler_angebot": {
             const d = {
               anrede: demoAnrede, kundeLabel: demoMeta.kunde_label,
-              signatur: buildMartaSig(site),
+              signatur: buildMartaSig(site, "vermittler"),
               bruttopreis: Number((lead as any).kalkulation?.bruttopreis ?? 0),
               provisionProTag: demoMeta.provision_pro_tag,
               empfehlung: demoVermittlerEmpf?.empfehlung ?? null,
@@ -2374,7 +1835,7 @@ Deno.serve(async (req: Request) => {
           case "vermittler_kraefte": {
             const d = {
               anrede: demoAnrede, kundeLabel: demoMeta.kunde_label,
-              signatur: buildMartaSig(site),
+              signatur: buildMartaSig(site, "vermittler"),
               fuenf: demoVermittlerFuenf?.fuenf ?? [], cids: demoVermittlerFuenf?.cids ?? [],
             };
             return { subject: demoMeta.betreff_antwort, html: buildEmailWrapper(lead as Lead, site, vermittlerKraefteHtml(d), VERMITTLER_FUSSNOTE, VERMITTLER_ABSENDER), text: vermittlerKraefteText(d) };
@@ -2393,10 +1854,14 @@ Deno.serve(async (req: Request) => {
           const subject = item.subjectPrefix ? `${item.subjectPrefix}${m.subject}` : m.subject;
           const html = b ? m.html.replace('<div class="email-content">', `${bannerHtml(b)}<div class="email-content">`) : m.html;
           const text = b ? `(${b})\n\n${m.text}` : m.text;
-          const anhang = (item.email_type === "eingangsbestaetigung" || item.email_type === "vermittler_angebot") && demoInline
+          const anhang = item.email_type === "eingangsbestaetigung" && demoInline
+            ? [demoInline, ...(demoEmpf?.weitere ?? []).filter((r): r is InlineFoto => r !== null)]
+            : item.email_type === "vermittler_angebot" && demoInline
             ? [demoInline]
             : item.email_type === "profil_nudge_1" && demoFuenf?.anhaenge.length
             ? demoFuenf.anhaenge
+            : ERINNERUNG_TYPEN.has(item.email_type) && demoErinnerungInline
+            ? [demoErinnerungInline]
             : item.email_type === "vermittler_kraefte" && demoVermittlerFuenf?.anhaenge.length
             ? demoVermittlerFuenf.anhaenge
             : undefined;
@@ -2412,6 +1877,9 @@ Deno.serve(async (req: Request) => {
             // Damit man an der Antwort sieht, ob die Liste drin war.
             ...(item.email_type === "profil_nudge_1"
               ? { fuenf: demoFuenf ? { anzahl: demoFuenf.anzahl, caregiver_ids: demoFuenf.caregiverIds, fotos_inline: demoFuenf.anhaenge.length } : null }
+              : {}),
+            ...(ERINNERUNG_TYPEN.has(item.email_type) || item.email_type === "reservierung_beendet"
+              ? { beispiel_pflegekraft: demoBewerbung?.beispiel ?? null }
               : {}),
           });
         } catch (e) {
@@ -2431,6 +1899,8 @@ Deno.serve(async (req: Request) => {
       .select("*")
       .eq("status", "pending")
       .lte("scheduled_for", now)
+      // Älteste zuerst: sonst konnte eine überfällige Zeile hinter neueren hängen bleiben.
+      .order("scheduled_for", { ascending: true })
       .limit(10);
  
     if (fetchError) {
@@ -2444,6 +1914,10 @@ Deno.serve(async (req: Request) => {
       );
     }
  
+    // Bewertungszeile unter Martas Karte: einmal pro Aufruf laden (≤ 2 s,
+    // sonst Ersatzwert) — erst hier, damit leere Takte primundus.de nicht fragen.
+    bewertungsStand = await ladeBewertungsStand(fetch);
+
     const results: { id: string; success: boolean; error?: string; flagged?: boolean }[] = [];
     // Echte Versand-Fehlschläge dieses Laufs sammeln → EINE Sammel-Alarm-Mail
     // ans Team am Ende (siehe notifyOpsOfFailures). Geflaggte Domains zählen
@@ -2484,15 +1958,17 @@ Deno.serve(async (req: Request) => {
           continue;
         }
  
-        // Abmeldung (Abmelde-Link): gilt für ALLE Mail-Typen — der Kunde hat
-        // dem weiteren E-Mail-Versand widersprochen (Art. 21 DSGVO). Mail
-        // canceln, NICHT senden.
-        const { data: unsubEvt } = await supabase
-          .from("lead_events")
-          .select("id")
-          .eq("lead_id", scheduledEmail.lead_id)
-          .eq("event_type", "email_unsubscribed")
-          .limit(1);
+        // Abmeldung (Abmelde-Link): gilt für alle Mail-Typen außer den
+        // transaktionalen (TRANSAKTIONALE_MAILS) — der Kunde hat dem weiteren
+        // E-Mail-Versand widersprochen (Art. 21 DSGVO). Mail canceln, NICHT senden.
+        const { data: unsubEvt } = TRANSAKTIONALE_MAILS.has(scheduledEmail.email_type)
+          ? { data: [] }
+          : await supabase
+            .from("lead_events")
+            .select("id")
+            .eq("lead_id", scheduledEmail.lead_id)
+            .eq("event_type", "email_unsubscribed")
+            .limit(1);
         if (Array.isArray(unsubEvt) && unsubEvt.length > 0) {
           await supabase
             .from("scheduled_emails")
@@ -2505,6 +1981,27 @@ Deno.serve(async (req: Request) => {
           });
           results.push({ id: scheduledEmail.id, success: true });
           continue;
+        }
+
+        // Pause (Kunde hat auf /rueckmeldung einen Wunschtermin gewählt, Registry #72):
+        // bis dahin keine Mails aus der Warteschlange, außer der Nachfrage selbst
+        // und Mails, die der Kunde durch eine neue Anfrage selbst auslöst.
+        // Meldet sich der Kunde vorher selbst (AKTIVITAET_NACH_PAUSE), ist die Pause vorbei.
+        if (!["wiedervorlage", "eingangsbestaetigung", "angebot", ...TRANSAKTIONALE_MAILS].includes(scheduledEmail.email_type)) {
+          const pause = await pauseStand(supabase, scheduledEmail.lead_id);
+          if (pause && pauseAktiv(pause.bis, new Date(), pause.aktivSeitPause)) {
+            await supabase
+              .from("scheduled_emails")
+              .update({ status: "cancelled", updated_at: new Date().toISOString() })
+              .eq("id", scheduledEmail.id);
+            await supabase.from("lead_events").insert({
+              lead_id: scheduledEmail.lead_id,
+              event_type: `email_${scheduledEmail.email_type}_cancelled`,
+              metadata: { reason: "pausiert", bis: pause.bis },
+            });
+            results.push({ id: scheduledEmail.id, success: true });
+            continue;
+          }
         }
 
         // Empfänger IMMER frisch aus dem Lead. scheduled_emails.recipient_email
@@ -2540,6 +2037,8 @@ Deno.serve(async (req: Request) => {
           { source: (lead as Record<string, unknown>).source as string | null, email: recipient },
           Deno.env.get("PORTAL_TESTPHASE"),
           Deno.env.get("PORTAL_TESTPHASE_EMPFAENGER"),
+        ) ?? anreiseTestUmleitung(
+          scheduledEmail.email_type, scheduledEmail.metadata, recipient, Deno.env.get("PORTAL_TESTPHASE_EMPFAENGER"),
         );
 
         let isBeauftragt = lead.status === "vertrag_abgeschlossen" || lead.status === "betreuung_beauftragt" || lead.order_confirmed === true;
@@ -2565,9 +2064,27 @@ Deno.serve(async (req: Request) => {
           scheduledEmail.email_type === "nachfass_2" ||
           scheduledEmail.email_type === "nachfass_3";
 
+        // Gestrichene Mail-Typen (kette.ts, Registry #70): nicht mehr
+        // eingeplant; was schon in der Warteschlange steht, verfaellt hier.
+        if (GESTRICHENE_MAILS.has(scheduledEmail.email_type)) {
+          await supabase
+            .from("scheduled_emails")
+            .update({ status: "cancelled", updated_at: new Date().toISOString() })
+            .eq("id", scheduledEmail.id);
+          await supabase.from("lead_events").insert({
+            lead_id: scheduledEmail.lead_id,
+            event_type: `email_${scheduledEmail.email_type}_cancelled`,
+            metadata: { reason: "gestrichen" },
+          });
+          results.push({ id: scheduledEmail.id, success: true });
+          continue;
+        }
+
         // Profil-Nudges (gegen Profil-Abbruch). Feuern nur solange das
         // Patientenprofil offen ist \u2014 bei patient_data_saved/eingeladen
-        // ist das Ziel erreicht und der Nudge cancelt sich selbst.
+        // ist das Ziel erreicht und der Nudge cancelt sich selbst. Eine
+        // Bewerbung z\u00e4hlt als fertiges Profil (Team-Profil aus dem
+        // SA-Portal, Registry #69, siehe meilenstein.ts).
         const isProfilNudge =
           scheduledEmail.email_type === "profil_nudge_1" ||
           scheduledEmail.email_type === "profil_nudge_2" ||
@@ -2576,7 +2093,7 @@ Deno.serve(async (req: Request) => {
 
         // Lead-Meilenstein aus den CA-App-Events (portal_opened, patient_data_saved,
         // caregiver_invited) \u2014 steuert die Nachfass-Variante + den Abbruch.
-        const milestone = (isNachfass || isProfilNudge)
+        const milestone = (isNachfass || isProfilNudge || VOR_DEM_ABSENDEN.has(scheduledEmail.email_type))
           ? await getLeadMilestone(supabase, scheduledEmail.lead_id)
           : "none" as LeadMilestone;
 
@@ -2598,6 +2115,48 @@ Deno.serve(async (req: Request) => {
             },
           });
 
+          results.push({ id: scheduledEmail.id, success: true });
+          continue;
+        }
+
+        // „Vier Dinge", Nachfass 2 und 3 bitten um die Pflegesituation. Steht sie (oder ist schon
+        // eine Bewerbung / Einladung da), sind sie erledigt (Vorschau v2, 26.09.2026). Vorher
+        // liefen sie weiter und fragten Kunden, die längst abgesendet hatten, nach den Angaben.
+        if (VOR_DEM_ABSENDEN.has(scheduledEmail.email_type)) {
+          const grund = vorAbsendenStopp({ beauftragt: isBeauftragt, nichtInteressiert: isNichtInteressiert, meilenstein: milestone });
+          if (grund) {
+            await zeileAbbrechen(supabase, scheduledEmail, grund);
+            results.push({ id: scheduledEmail.id, success: true });
+            continue;
+          }
+        }
+
+        // „Noch keine Bewerbung? So geht es schneller" (+48 h nach dem Absenden): nur ohne
+        // Bewerbung und ohne neues Interesse seit dem Einplanen.
+        if (scheduledEmail.email_type === "suche_stand_2tage") {
+          const seit = (scheduledEmail as any).created_at ?? "1970-01-01";
+          const { data: evts } = await supabase
+            .from("lead_events")
+            .select("event_type, created_at")
+            .eq("lead_id", scheduledEmail.lead_id)
+            .in("event_type", ["application_received", "caregiver_interest_shown"]);
+          const liste = (evts ?? []) as { event_type: string; created_at: string }[];
+          const grund = sucheStandStopp({
+            beauftragt: isBeauftragt,
+            nichtInteressiert: isNichtInteressiert,
+            bewerbungDa: liste.some((e) => e.event_type === "application_received"),
+            interesseSeitAnlage: liste.some((e) => e.event_type === "caregiver_interest_shown" && e.created_at >= seit),
+          });
+          if (grund) {
+            await zeileAbbrechen(supabase, scheduledEmail, grund);
+            results.push({ id: scheduledEmail.id, success: true });
+            continue;
+          }
+        }
+
+        // „Reservierung abgelaufen": entfällt, wenn inzwischen gebucht oder abgemeldet.
+        if (scheduledEmail.email_type === "reservierung_beendet" && (isBeauftragt || isNichtInteressiert)) {
+          await zeileAbbrechen(supabase, scheduledEmail, isNichtInteressiert ? "nicht_interessiert" : "betreuung_beauftragt");
           results.push({ id: scheduledEmail.id, success: true });
           continue;
         }
@@ -2629,34 +2188,36 @@ Deno.serve(async (req: Request) => {
         }
 
         // "Neue Pflegekräfte verfügbar" (+24h nach der letzten Einladung):
-        // nur senden, wenn der Kunde NICHT reagiert hat. Cancelt bei Buchung /
-        // nicht interessiert ODER wenn seit dem Einplanen eine Reaktion kam
-        // (Bewerbung / Interesse) — dann hat der Kunde schon etwas zu tun und
-        // die "schau dir weitere an"-Mail wäre fehl am Platz.
-        const isNeuePk = scheduledEmail.email_type === "neue_pflegekraefte_verfuegbar";
-        if (isNeuePk) {
-          const { data: reactEvents } = await supabase
+        // nur senden, wenn der Kunde NICHT reagiert hat (Bewerbung / Interesse seit dem
+        // Einplanen), nicht während eine Bewerbung reserviert ist (dann soll er über DIESE
+        // entscheiden) und nie nachts — die Zeile rutscht dann auf 08:00 (26.09.2026).
+        if (scheduledEmail.email_type === "neue_pflegekraefte_verfuegbar") {
+          const { data: evts } = await supabase
             .from("lead_events")
-            .select("id")
+            .select("event_type, created_at, metadata")
             .eq("lead_id", scheduledEmail.lead_id)
-            .in("event_type", ["application_received", "caregiver_interest_shown"])
-            .gte("created_at", (scheduledEmail as any).created_at ?? "1970-01-01")
-            .limit(1);
-          const reacted = Array.isArray(reactEvents) && reactEvents.length > 0;
-          if (isBeauftragt || isNichtInteressiert || reacted) {
+            .in("event_type", ["application_received", "caregiver_interest_shown", "application_accepted_internal", "application_rejected"]);
+          const liste = (evts ?? []) as { event_type: string; created_at: string; metadata?: Record<string, unknown> | null }[];
+          const seit = (scheduledEmail as any).created_at ?? "1970-01-01";
+          const jetzt = new Date();
+          const e = neuePflegekraefteEntscheidung({
+            jetzt,
+            beauftragt: isBeauftragt,
+            nichtInteressiert: isNichtInteressiert,
+            reagiertSeitAnlage: liste.some((x) =>
+              (x.event_type === "application_received" || x.event_type === "caregiver_interest_shown") && x.created_at >= seit),
+            reservierungAktiv: reservierungAktiv(liste, jetzt),
+          });
+          if (e.aktion === "abbrechen") {
+            await zeileAbbrechen(supabase, scheduledEmail, e.grund);
+            results.push({ id: scheduledEmail.id, success: true });
+            continue;
+          }
+          if (e.aktion === "verschieben") {
             await supabase
               .from("scheduled_emails")
-              .update({ status: "cancelled", updated_at: new Date().toISOString() })
+              .update({ status: "pending", scheduled_for: e.bis.toISOString(), updated_at: new Date().toISOString() })
               .eq("id", scheduledEmail.id);
-            await supabase.from("lead_events").insert({
-              lead_id: scheduledEmail.lead_id,
-              event_type: `email_${scheduledEmail.email_type}_cancelled`,
-              metadata: {
-                reason: reacted
-                  ? "reaction_received"
-                  : isNichtInteressiert ? "nicht_interessiert" : "betreuung_beauftragt",
-              },
-            });
             results.push({ id: scheduledEmail.id, success: true });
             continue;
           }
@@ -2669,6 +2230,14 @@ Deno.serve(async (req: Request) => {
         let eventTypeFailed = "";
 
         const portalBase = Deno.env.get("PORTAL_URL") || "https://kundenportal.primundus.de";
+        // Neue Kundenmails (kundenMails.ts): Kontext einmal, dann in die Hülle.
+        const k = kundenKontext(lead as Lead, smtpConfig.siteUrl, portalBase);
+        const neu = (m: KundenMail) => {
+          const fertig = inHuelle(lead as Lead, smtpConfig.siteUrl, m);
+          subject = fertig.subject;
+          html = fertig.html;
+          text = fertig.text;
+        };
 
         if (scheduledEmail.email_type === "angebot") {
           // Legacy: wird seit dem neuen Flow nicht mehr neu eingeplant, der
@@ -2679,70 +2248,34 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = "email_angebot_sent";
           eventTypeFailed = "email_angebot_failed";
         } else if (scheduledEmail.email_type === "eingangsbestaetigung") {
-          // Gemergte Mail 1: Empfangsbest\u00e4tigung + Angebot in einem.
-          // Re-Submit-Check: hat der Kunde schon mal eine Eingangsbest\u00e4tigung
-          // bekommen? Falls ja \u2192 angepasste Wording-Variante.
+          // Mail 1: Angebot, Knopf „Angebot & Pflegekräfte ansehen" unter dem Preis und unten (Registry #110, Martin 03.10.2026).
+          // Re-Submit: angepasster Betreff und Einstieg (Kunde hat das Formular nochmal
+          // abgeschickt). Eingekaufter Lead: eigener Betreff, Portalname im Einstieg, Hinweis
+          // über den Angaben — Herkunft schlägt Resubmit.
           const isResubmit = await hasPreviousEingangsbestaetigungSent(supabase, scheduledEmail.lead_id);
-          /* Eingekaufter Lead: eigener Betreff. Der Standard setzt voraus,
-             dass der Empfaenger weiss, wofuer er ein Angebot bekommt — der
-             Kaltkontakt weiss das nicht. Herkunft schlaegt Resubmit. */
-          subject = portalHerkunft((lead as Lead).source)
-            ? PORTAL_BETREFF
-            : isResubmit
-            ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung \u2013 Primundus"
-            : "Ihr Angebot zur 24-Stunden-Betreuung \u2013 Primundus";
-
-          /* ── Empfehlung: echte gematchte Pflegekraft in die Mail ──────────
-             Auch fuer eingekaufte Portal-Leads (Martin 01.09.): gerade der
-             Kaltkontakt, der beim Portal auf drei Anbieter wartet, entscheidet
-             an einem Gesicht mit Namen — nicht an einem Preis. Die generische
-             Fuenf-Gesichter-Plakette weicht dann automatisch (siehe
-             portalVorschauHtml), damit dieselbe Aussage nicht zweimal steht.
-             Alles hier ist best-effort — faellt es aus, bleibt es bei null und
-             die Mail zeigt den ehrlichen Ersatztext. Der Versand haengt an
-             keiner Stelle davon ab. */
-          let empfHtml: string | null | undefined = undefined;
-          let empfText: string | null | undefined = undefined;
-          if ((lead as Lead).token) {
-            empfHtml = null;
-            empfText = null;
-            const tok = (lead as Lead).token as string;
-            const basisUrl = buildPortalUrl(portalBase, tok);
-            const erg: EmpfehlungErgebnis | null = await holeEmpfehlung({
-              supabaseUrl,
-              key: supabaseServiceKey,
-              token: tok,
-              jobOfferId: (lead as any).mamamia_job_offer_id ?? null,
-              formularDaten: (lead as any).kalkulation?.formularDaten ?? {},
-              // Serverseitiges Onboarding abschaltbar, ohne das Feature zu
-              // verlieren: EMPFEHLUNG_ONBOARD=0 → nur Leads mit bestehender
-              // job_offer bekommen eine Empfehlung.
-              darfOnboarden: Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0",
+          /* Empfehlung: echte gematchte Pflegekraft (Martin 31.08.2026). Best-effort — fällt sie
+             aus, fehlt nur der Abschnitt, der Versand hängt nie davon ab. */
+          const empf = await empfehlungFuerAngebot(
+            lead as Lead, supabaseUrl, supabaseServiceKey, Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0",
+          );
+          if (empf) {
+            if (empf.inline) (scheduledEmail as any).__reminderInline = empf.inline;
+            const weitereFotos = empf.weitere.filter((r): r is InlineFoto => r !== null);
+            if (weitereFotos.length) (scheduledEmail as any).__inlineAttachments = weitereFotos;
+            await supabase.from("lead_events").insert({
+              lead_id: scheduledEmail.lead_id,
+              event_type: "empfehlung_in_angebotsmail",
+              metadata: {
+                caregiver_id: empf.erg.empfehlung.caregiverId,
+                sichtbar_gesamt: empf.erg.sichtbarGesamt,
+                gruende: empf.erg.empfehlung.gruende,
+                foto: empf.inline ? "inline" : "initialen",
+                weitere_ids: (empf.erg.alle ?? []).slice(1).map((e) => e.caregiverId),
+                fotos_inline: (empf.inline ? 1 : 0) + empf.weitere.filter(Boolean).length,
+              },
             });
-            if (erg) {
-              const inline = await fetchInlinePhotoDeno(erg.empfehlung.fotoUrl);
-              const profilUrl = withMailMark(`${basisUrl}&cg=${erg.empfehlung.caregiverId}`, "eb");
-              const alleUrl = withMailMark(buildPortalUrl(portalBase, tok, "matches"), "eb");
-              empfHtml = empfehlungHtml(
-                erg.empfehlung, inline?.cid ?? null, profilUrl, alleUrl, erg.sichtbarGesamt,
-              );
-              empfText = empfehlungText(erg.empfehlung, profilUrl, alleUrl, erg.sichtbarGesamt);
-              if (inline) (scheduledEmail as any).__reminderInline = inline;
-              await supabase.from("lead_events").insert({
-                lead_id: scheduledEmail.lead_id,
-                event_type: "empfehlung_in_angebotsmail",
-                metadata: {
-                  caregiver_id: erg.empfehlung.caregiverId,
-                  sichtbar_gesamt: erg.sichtbarGesamt,
-                  gruende: erg.empfehlung.gruende,
-                  foto: inline ? "inline" : "initialen",
-                },
-              });
-            }
           }
-
-          html = buildEingangsbestaetigungHtml(lead as Lead, smtpConfig.siteUrl, portalBase, isResubmit, empfHtml);
-          text = buildEingangsbestaetigungText(lead as Lead, portalBase, isResubmit, empfText);
+          neu(angebotMail(k, angebotEingabe(lead as Lead, isResubmit, empf)));
           eventTypeSent = "email_eingangsbestaetigung_sent";
           eventTypeFailed = "email_eingangsbestaetigung_failed";
         } else if (scheduledEmail.email_type === "nachfass_1") {
@@ -2752,17 +2285,12 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = "email_nachfass_1_sent";
           eventTypeFailed = "email_nachfass_1_failed";
         } else if (scheduledEmail.email_type === "nachfass_2") {
-          // Betreff trägt alle drei Varianten (Kräfte gefunden / Hilfe beim
-          // Ausfüllen / Angaben fehlen) — daher bewusst offen gehalten.
-          subject = "Ihre Betreuung — kann ich Ihnen etwas abnehmen?";
-          html = buildNachfass2Html(lead as Lead, smtpConfig.siteUrl, portalBase, milestone);
-          text = buildNachfass2Text(lead as Lead, smtpConfig.siteUrl, portalBase, milestone);
+          // Nur noch vor dem Absenden (Stopp oben): eine Variante, Knopf „Bewerbungen erhalten".
+          neu(nachfass2Mail(k));
           eventTypeSent = "email_nachfass_2_sent";
           eventTypeFailed = "email_nachfass_2_failed";
         } else if (scheduledEmail.email_type === "nachfass_3") {
-          subject = "Eine letzte Frage — wie schaut's bei Ihnen aus?";
-          html = buildNachfass3Html(lead as Lead, smtpConfig.siteUrl);
-          text = buildNachfass3Text(lead as Lead, smtpConfig.siteUrl);
+          neu(nachfass3Mail(k, buildLeadRef(lead as Lead)));
           eventTypeSent = "email_nachfass_3_sent";
           eventTypeFailed = "email_nachfass_3_failed";
         } else if (scheduledEmail.email_type === "vermittler_angebot") {
@@ -2794,7 +2322,7 @@ Deno.serve(async (req: Request) => {
             /* Dieselbe Grussformel, Beraterinnen-Karte und Vertrauensleiste wie
                in jeder Kundenmail — ohne sie stand die Vermittler-Mail ohne
                Absenderin, ohne Telefonnummer und ohne Siegel da. */
-            signatur: buildMartaSig(smtpConfig.siteUrl),
+            signatur: buildMartaSig(smtpConfig.siteUrl, "vermittler"),
             kundeLabel: (meta.kunde_label as string) || null,
             bruttopreis: Number(kalk.bruttopreis ?? 0),
             provisionProTag: Number(meta.provision_pro_tag ?? 0),
@@ -2810,27 +2338,49 @@ Deno.serve(async (req: Request) => {
              nach Mail 1 kann eine Kraft gebucht sein. Ohne Kraefte gaebe es
              nur eine leere Rahmung: dann lieber nicht senden (unten). */
           const meta = (scheduledEmail.metadata ?? {}) as Record<string, any>;
-          const teile = await kraefteFuerVermittler(lead as Lead, supabaseUrl, supabaseServiceKey);
-          if (!teile) {
+          /* Sichtbar statt still: der Partner wartet auf die angekuendigte
+             Liste, also muss ein Mensch davon erfahren — mit dem ECHTEN Grund
+             und dem Namen, sonst sucht das Team erst den Lead. */
+          const absagen = async (grund: string) => {
             await supabase.from("scheduled_emails").update({
-              status: "cancelled", updated_at: new Date().toISOString(),
-              error_message: "keine verfuegbaren Betreuungskraefte",
+              status: "cancelled", updated_at: new Date().toISOString(), error_message: grund,
             }).eq("id", scheduledEmail.id);
             await supabase.from("lead_events").insert({
               lead_id: scheduledEmail.lead_id,
               event_type: "vermittler_kraefte_entfallen",
-              metadata: { grund: "listMatchings lieferte keine Kraefte" },
+              metadata: { grund },
             });
-            /* Sichtbar statt still: der Partner wartet auf die angekuendigte
-               Liste, also muss ein Mensch davon erfahren. */
+            const kunde = (meta.kunde_label as string) || scheduledEmail.lead_id;
+            const satz = `Die angekündigte Liste an ${scheduledEmail.recipient_email} (${meta.betreff_antwort ?? "Re: Ihre Anfrage"}) wurde nicht verschickt: ${grund}. Bitte die Liste von Hand schicken.`;
             await sendEmailSmtp(
               smtpConfig, Deno.env.get("OPS_ALERT_TO") ?? "info@primundus.de",
-              `Vermittler: keine Kraefte fuer Lead ${scheduledEmail.lead_id}`,
-              `<p>Die angekuendigte Liste konnte nicht verschickt werden — mamamia lieferte keine verfuegbaren Betreuungskraefte.</p>`,
-              "Die angekuendigte Liste konnte nicht verschickt werden — mamamia lieferte keine verfuegbaren Betreuungskraefte.",
+              `Vermittler: Liste für ${kunde} nicht verschickt`,
+              `<p>${esc(satz)}</p><p>Lead ${scheduledEmail.lead_id}</p>`,
+              `${satz}\n\nLead ${scheduledEmail.lead_id}`,
               undefined, true,
             ).catch(() => {});
-            console.warn(`[vermittler] Lead ${scheduledEmail.lead_id}: keine Kraefte, Mail 2 entfaellt`);
+            console.warn(`[vermittler] Lead ${scheduledEmail.lead_id}: Mail 2 entfaellt — ${grund}`);
+          };
+          let teile: Awaited<ReturnType<typeof kraefteFuerVermittler>>;
+          try {
+            teile = await kraefteFuerVermittler(lead as Lead, supabaseUrl, supabaseServiceKey);
+          } catch (e) {
+            const grund = e instanceof Error ? e.message : String(e);
+            const fehlschlaege = Number(meta.fehlschlaege ?? 0) + 1;
+            const nochmal = kraefteNochmalUm(fehlschlaege, new Date());
+            if (nochmal) {
+              await supabase.from("scheduled_emails").update({
+                status: "pending", scheduled_for: nochmal, updated_at: new Date().toISOString(),
+                metadata: { ...meta, fehlschlaege }, error_message: `Versuch ${fehlschlaege}: ${grund}`,
+              }).eq("id", scheduledEmail.id);
+              console.warn(`[vermittler] Lead ${scheduledEmail.lead_id}: Liste nicht geladen (${grund}), neuer Versuch ${nochmal}`);
+            } else {
+              await absagen(`mamamia hat nach ${fehlschlaege} Versuchen nicht geantwortet (zuletzt: ${grund})`);
+            }
+            continue;
+          }
+          if (!teile) {
+            await absagen("mamamia hat keine passenden Betreuungskräfte geliefert");
             continue;
           }
           if (teile.anhaenge.length) (scheduledEmail as any).__inlineAttachments = teile.anhaenge;
@@ -2839,7 +2389,7 @@ Deno.serve(async (req: Request) => {
             /* Dieselbe Grussformel, Beraterinnen-Karte und Vertrauensleiste wie
                in jeder Kundenmail — ohne sie stand die Vermittler-Mail ohne
                Absenderin, ohne Telefonnummer und ohne Siegel da. */
-            signatur: buildMartaSig(smtpConfig.siteUrl),
+            signatur: buildMartaSig(smtpConfig.siteUrl, "vermittler"),
             kundeLabel: (meta.kunde_label as string) || null,
             fuenf: teile.fuenf, cids: teile.cids,
           };
@@ -2851,8 +2401,7 @@ Deno.serve(async (req: Request) => {
         } else if (scheduledEmail.email_type === "profil_nudge_1") {
           /* Alle fünf Kräfte in die Mail (Martin, 03.09.2026). Vorbereitung
              im gemeinsamen Helfer, damit der Testversand exakt dasselbe
-             rendert. Best-effort: fällt es aus, bleibt es beim bisherigen
-             Text und die Mail geht trotzdem. */
+             rendert. Best-effort: fällt es aus, kommt die Mail ohne Liste. */
           const teile = await fuenfFuerNudge(
             lead as Lead, portalBase, supabaseUrl, supabaseServiceKey,
             Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0",
@@ -2865,15 +2414,11 @@ Deno.serve(async (req: Request) => {
               metadata: { caregiver_ids: teile.caregiverIds, fotos_inline: teile.anhaenge.length },
             });
           }
-          subject = teile?.betreff ?? "Pflegekräfte können sich noch nicht bei Ihnen bewerben";
-          html = buildProfilNudge1Html(lead as Lead, smtpConfig.siteUrl, portalBase, teile?.html ?? null, teile?.anzahl ?? 0);
-          text = buildProfilNudge1Text(lead as Lead, smtpConfig.siteUrl, portalBase, teile?.text ?? null, teile?.anzahl ?? 0);
+          neu(nudge1Mail(k, teile ? { html: teile.html, text: teile.text, vornamen: teile.vornamen } : null));
           eventTypeSent = "email_profil_nudge_1_sent";
           eventTypeFailed = "email_profil_nudge_1_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_2") {
-          subject = "Profil unvollständig — Sie können noch keine Bewerbungen erhalten";
-          html = buildProfilNudge2Html(lead as Lead, smtpConfig.siteUrl, portalBase);
-          text = buildProfilNudge2Text(lead as Lead, smtpConfig.siteUrl, portalBase);
+          neu(nudge2Mail(k));
           eventTypeSent = "email_profil_nudge_2_sent";
           eventTypeFailed = "email_profil_nudge_2_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_3") {
@@ -2882,6 +2427,45 @@ Deno.serve(async (req: Request) => {
           text = buildProfilNudge3Text(lead as Lead, smtpConfig.siteUrl, portalBase);
           eventTypeSent = "email_profil_nudge_3_sent";
           eventTypeFailed = "email_profil_nudge_3_failed";
+        } else if (scheduledEmail.email_type === "wiedervorlage") {
+          // Nachfrage zum Wunschtermin (Registry #72). Entfällt, wenn der Lead
+          // nicht mehr offen ist (gebucht, abgemeldet, vom Team geschlossen),
+          // wenn der Kunde neu angefragt hat oder sich seit der Pause selbst
+          // gemeldet hat.
+          let entfaellt: string | null = OFFENE_STATUS.has(String(lead.status ?? "")) ? null : "status";
+          if (!entfaellt && lead.email) {
+            const { data: neuere } = await supabase
+              .from("leads")
+              .select("id")
+              .eq("email", lead.email)
+              .gt("created_at", lead.created_at)
+              .neq("id", lead.id)
+              .limit(1);
+            if (Array.isArray(neuere) && neuere.length > 0) entfaellt = "neue_anfrage";
+          }
+          if (!entfaellt) {
+            const pause = await pauseStand(supabase, scheduledEmail.lead_id);
+            if (pause?.aktivSeitPause) entfaellt = "kunde_aktiv";
+          }
+          if (entfaellt) {
+            await supabase
+              .from("scheduled_emails")
+              .update({ status: "cancelled", updated_at: new Date().toISOString() })
+              .eq("id", scheduledEmail.id);
+            await supabase.from("lead_events").insert({
+              lead_id: scheduledEmail.lead_id,
+              event_type: "email_wiedervorlage_cancelled",
+              metadata: { reason: entfaellt },
+            });
+            results.push({ id: scheduledEmail.id, success: true });
+            continue;
+          }
+          const seit = ((scheduledEmail.metadata ?? {}) as { seit?: string }).seit ?? null;
+          subject = WIEDERVORLAGE_BETREFF;
+          html = buildWiedervorlageHtml(lead as Lead, smtpConfig.siteUrl, portalBase, seit);
+          text = buildWiedervorlageText(lead as Lead, smtpConfig.siteUrl, portalBase, seit);
+          eventTypeSent = "email_wiedervorlage_sent";
+          eventTypeFailed = "email_wiedervorlage_failed";
         } else if (scheduledEmail.email_type === "reaktivierung_wechsel") {
           subject = "Steht bei Ihnen ein Pflegekraft-Wechsel an?";
           html = buildReaktivierungWechselHtml(lead as Lead, smtpConfig.siteUrl, portalBase);
@@ -2889,17 +2473,12 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = "email_reaktivierung_wechsel_sent";
           eventTypeFailed = "email_reaktivierung_wechsel_failed";
         } else if (scheduledEmail.email_type === "neue_pflegekraefte_verfuegbar") {
-          subject = "Neue Pflegekräfte für Sie";
-          html = buildNeuePflegekraefteHtml(lead as Lead, smtpConfig.siteUrl, portalBase);
-          text = buildNeuePflegekraefteText(lead as Lead, smtpConfig.siteUrl, portalBase);
+          neu(neuePflegekraefteMail(k));
           eventTypeSent = "email_neue_pflegekraefte_verfuegbar_sent";
           eventTypeFailed = "email_neue_pflegekraefte_verfuegbar_failed";
         } else if (
           scheduledEmail.email_type === "interest_reminder" ||
-          scheduledEmail.email_type === "application_reminder" ||
-          scheduledEmail.email_type === "application_reminder_4h" ||
-          scheduledEmail.email_type === "application_reminder_12h" ||
-          scheduledEmail.email_type === "application_last_chance"
+          ERINNERUNG_TYPEN.has(scheduledEmail.email_type)
         ) {
           // Reaktions-Reminder. 1h / 4h / 12h nach dem ursprünglichen
           // caregiver_interest_shown / application_received-Event. Vor
@@ -2980,36 +2559,13 @@ Deno.serve(async (req: Request) => {
           // (CID), die S3-URL ist nach 30 Min eh meist abgelaufen.
           const variant: "interest" | "application" =
             reminderVariant === "interest_reminder" ? "interest" : "application";
-          const tier: ReminderTier =
-            scheduledEmail.email_type === "application_reminder_4h" ? "4h"
-            : scheduledEmail.email_type === "application_reminder_12h" ? "12h"
-            : scheduledEmail.email_type === "application_last_chance" ? "70h"
-            : "1h";
-          const cgName = meta.caregiver_name || "Ihre Pflegekraft";
-          const firstName = cgName.split(/\s+/)[0] || cgName;
-          if (variant === "interest") {
-            subject = `${firstName} würde sich gern bei Ihnen vorstellen`;
-          } else if (tier === "1h") {
-            subject = `Haben Sie ${firstName}s Bewerbung schon gesehen?`;
-          } else if (tier === "4h") {
-            subject = `Kurze Frage zu ${firstName}`;
-          } else if (tier === "12h") {
-            subject = `Wie ist Ihr Eindruck von ${firstName}?`;
-          } else {
-            subject = `Bevor ich ${firstName} wieder freigebe …`;
-          }
 
-          // Portal-URL mit Token bauen. Bewerbungs-Reminder springen per
-          // goto direkt zur Bewerbungs-Sektion (Martin, 2026-07-09: Kunde
-          // landete auf "Bewerbungen werden vorbereitet" statt der Bewerbung).
-          let portalUrl = (portalBase && (lead as Lead).token)
-            ? buildPortalUrl(portalBase, (lead as Lead).token, variant === "application" ? "bewerbungen" : undefined)
-            : smtpConfig.siteUrl;
           // Multi-Job (Bug #25): Reminder eines konkreten Jobs verlinkt das
           // Portal MIT &job=<lead_jobs.id> — der Kunde landet auf DEM Einsatz,
           // um den es geht (nicht auf dem Default-/neuesten Job). Fail-soft:
           // kein Mirror-Wiersz ⇒ plain Link.
-          if (portalUrl !== smtpConfig.siteUrl && meta.mamamia_job_offer_id != null) {
+          let leadJobUuid: string | null = null;
+          if ((lead as Lead).token && meta.mamamia_job_offer_id != null) {
             try {
               const { data: jobRow } = await supabase
                 .from("lead_jobs")
@@ -3017,47 +2573,161 @@ Deno.serve(async (req: Request) => {
                 .eq("lead_id", scheduledEmail.lead_id)
                 .eq("mamamia_job_offer_id", meta.mamamia_job_offer_id)
                 .maybeSingle();
-              portalUrl = appendJobParam(portalUrl, typeof jobRow?.id === "string" ? jobRow.id : null);
+              leadJobUuid = typeof jobRow?.id === "string" ? jobRow.id : null;
             } catch (e) {
               console.warn(`reminder job-deeplink lookup failed (lead ${scheduledEmail.lead_id}):`, e instanceof Error ? e.message : String(e));
             }
           }
 
-          const inline = await fetchInlinePhotoDeno(meta.caregiver_photo_url);
-          html = buildReminderHtml(lead as Lead, meta, portalUrl, smtpConfig.siteUrl, variant, inline?.cid ?? null, tier);
-          text = buildReminderText(lead as Lead, meta, portalUrl, variant, tier);
+          if (variant === "interest") {
+            // Interesse-Erinnerung (+1 h nach „interessiert sich"): unverändert.
+            const cgName = meta.caregiver_name || "Ihre Pflegekraft";
+            const firstName = cgName.split(/\s+/)[0] || cgName;
+            subject = `${firstName} würde sich gern bei Ihnen vorstellen`;
+            const portalUrl = (portalBase && (lead as Lead).token)
+              ? appendJobParam(buildPortalUrl(portalBase, (lead as Lead).token), leadJobUuid)
+              : smtpConfig.siteUrl;
+            const inline = await fetchInlinePhotoDeno(meta.caregiver_photo_url);
+            html = buildReminderHtml(lead as Lead, meta, portalUrl, smtpConfig.siteUrl, variant, inline?.cid ?? null, "1h");
+            text = buildReminderText(lead as Lead, meta, portalUrl, variant, "1h");
+            (scheduledEmail as any).__reminderInline = inline;
+          } else {
+            // Erinnerung an eine Bewerbung (Vorschau v2, 26.09.2026): Countdown aus der
+            // Reservierung, Karte „Neue Bewerbung", Knopf „Angebot prüfen" öffnet sie.
+            // Alte Typen (+1 h/+4 h/+12 h/+70 h) laufen durch denselben Baustein; zu dichte
+            // oder zu späte fallen weg (stopRegeln.ts).
+
+            // Registry #125 (16.10.2026): Führt mamamia die Bewerbung noch? Der Detect-Sweep
+            // (alle 15 Min.) bricht Erinnerungen zu verschwundenen Bewerbungen ab, aber eine
+            // Rausnahme im SA-Portal kurz vor der Sendezeit rutschte durch („… noch 2 Tage für
+            // Sie reserviert" zu einer zurückgezogenen Bewerbung). Deshalb fragt der Versand
+            // selbst nach. Keine Antwort ⇒ Zeile zehn Minuten später noch einmal (höchstens
+            // dreimal), danach wie bisher senden — „nicht gefragt" ist nie „weg" (Registry #89).
+            const standDeps = standDepsAusEnv();
+            // Nur mit dem Job der Zeile prüfen. Ein Rückfall auf den Standard-Job des Leads würde bei
+            // Mehr-Job-Kunden die falsche Liste lesen und eine Bewerbung fälschlich als „weg" melden.
+            const standJob = meta.mamamia_job_offer_id ?? null;
+            if (!standDeps) {
+              console.warn(`[erinnerung] Lead ${scheduledEmail.lead_id}: MAMAMIA_*-Secrets fehlen — Bewerbung nicht gegen mamamia geprüft`);
+            } else if (standJob != null) {
+              let stand: BewerbungStand | null = null;
+              try {
+                stand = await bewerbungStand(standDeps, Number(standJob), cgId);
+              } catch (e) {
+                const grund = e instanceof Error ? e.message : String(e);
+                const fehlschlaege = Number(meta.stand_fehlschlaege ?? 0) + 1;
+                const nochmal = standNochmalUm(fehlschlaege, new Date());
+                if (nochmal) {
+                  await supabase.from("scheduled_emails").update({
+                    status: "pending", scheduled_for: nochmal, updated_at: new Date().toISOString(),
+                    metadata: { ...meta, stand_fehlschlaege: fehlschlaege },
+                    error_message: `Stand-Versuch ${fehlschlaege}: ${grund}`,
+                  }).eq("id", scheduledEmail.id);
+                  console.warn(`[erinnerung] Lead ${scheduledEmail.lead_id}: mamamia ohne Antwort (${grund}), neuer Versuch ${nochmal}`);
+                  results.push({ id: scheduledEmail.id, success: true });
+                  continue;
+                }
+                console.warn(`[erinnerung] Lead ${scheduledEmail.lead_id}: mamamia nach ${fehlschlaege} Versuchen ohne Antwort (${grund}) — Erinnerung geht wie bisher raus`);
+              }
+              if (stand === "weg") {
+                await zeileAbbrechen(supabase, scheduledEmail, "application_no_longer_active", { caregiver_id: cgId, quelle: "versand" });
+                results.push({ id: scheduledEmail.id, success: true });
+                continue;
+              }
+            }
+
+            const stufe = erinnerungStufe(scheduledEmail.email_type) ?? "1";
+            const lage = await bewerbungsLage(
+              supabase, scheduledEmail.lead_id, cgId, meta.mamamia_job_offer_id ?? null,
+              ((lead as any).mamamia_job_offer_id ?? null) as number | null,
+            );
+            const jetzt = Date.now();
+            const bis = reserviertBisAus((scheduledEmail.metadata ?? {}).reserviert_bis, lage.eingaengeMs);
+            const restMs = bis ? bis.getTime() - jetzt : null;
+            const stopp = erinnerungStopp({
+              stufe,
+              restMs,
+              seitLetzterMailMs: lage.letzteMailMs != null ? jetzt - lage.letzteMailMs : null,
+              letzteSchonGesendet: lage.letzteGesendet,
+            });
+            if (stopp) {
+              await zeileAbbrechen(supabase, scheduledEmail, stopp, { caregiver_id: cgId });
+              results.push({ id: scheduledEmail.id, success: true });
+              continue;
+            }
+            const inline = await fetchInlinePhotoDeno(meta.caregiver_photo_url);
+            const url = k.portal({ job: leadJobUuid, view: "application", m: stufe === "letzte" ? "er3" : `er${stufe}` });
+            neu(erinnerungMail(k, {
+              stufe,
+              pk: {
+                name: meta.caregiver_name || "Ihre Pflegekraft",
+                alter: meta.caregiver_age ?? null,
+                deutsch: deutschStufe(meta.caregiver_germany_skill, meta.caregiver_german_level),
+                jahre: meta.caregiver_years_experience ?? null,
+                einsaetze: meta.caregiver_einsatz_count ?? null,
+                foto: inline ? `cid:${inline.cid}` : null,
+              },
+              angebot: lage.angebot,
+              url,
+              restMs,
+            }));
+            (scheduledEmail as any).__reminderInline = inline;
+          }
           eventTypeSent = `email_${scheduledEmail.email_type}_sent`;
           eventTypeFailed = `email_${scheduledEmail.email_type}_failed`;
-
-          // Inline-Photo wird unten beim Send-Block aufgenommen (siehe
-          // reminderInline-Variable).
-          (scheduledEmail as any).__reminderInline = inline;
         } else if (scheduledEmail.email_type === "warum_primundus") {
-          // Trust-Mail (~48h nach Eingangsbestätigung).
-          // Abbruch wenn Lead beauftragt/nicht interessiert — sonst raus.
-          // Bewusst KEIN Abbruch bei caregiver_invited: solange noch nicht
-          // gebucht ist, hilft das Preis-Argument weiterhin.
-          if (isBeauftragt || isNichtInteressiert) {
-            await supabase
-              .from("scheduled_emails")
-              .update({ status: "cancelled", updated_at: new Date().toISOString() })
-              .eq("id", scheduledEmail.id);
-            await supabase.from("lead_events").insert({
-              lead_id: scheduledEmail.lead_id,
-              event_type: "email_warum_primundus_cancelled",
-              metadata: { reason: isNichtInteressiert ? "nicht_interessiert" : "betreuung_beauftragt" },
-            });
-            results.push({ id: scheduledEmail.id, success: true });
-            continue;
-          }
-          const portalUrl = (portalBase && (lead as Lead).token)
-            ? buildPortalUrl(portalBase, (lead as Lead).token)
-            : smtpConfig.siteUrl;
-          subject = "Vier Dinge, die Primundus anders macht";
-          html = buildWarumPrimundusHtml(lead as Lead, portalUrl, smtpConfig.siteUrl);
-          text = buildWarumPrimundusText(lead as Lead, portalUrl);
+          // „Vier Dinge" (~48 h nach Mail 1), nur solange die Pflegesituation fehlt (Stopp oben).
+          neu(vierDingeMail(k, (lead as Lead).kalkulation));
           eventTypeSent = "email_warum_primundus_sent";
           eventTypeFailed = "email_warum_primundus_failed";
+        } else if (scheduledEmail.email_type === "suche_stand_2tage") {
+          // Neu (26.09.2026): 48 h nach dem Absenden, nur ohne Bewerbung (Stopp oben).
+          neu(sucheStandMail(k));
+          eventTypeSent = "email_suche_stand_2tage_sent";
+          eventTypeFailed = "email_suche_stand_2tage_failed";
+        } else if (scheduledEmail.email_type === "reservierung_beendet") {
+          // Neu (26.09.2026): nach der automatischen Absage (72 h ohne Antwort). Weitere fällige
+          // Zeilen desselben Leads kommen in DIESE Mail, statt zwei Mails kurz hintereinander.
+          const { data: weitere } = await supabase
+            .from("scheduled_emails")
+            .select("id, metadata")
+            .eq("lead_id", scheduledEmail.lead_id)
+            .eq("email_type", "reservierung_beendet")
+            .eq("status", "pending")
+            .lte("scheduled_for", new Date().toISOString())
+            .neq("id", scheduledEmail.id);
+          const namen = [scheduledEmail.metadata, ...((weitere ?? []) as { metadata?: Record<string, unknown> | null }[]).map((w) => w.metadata)]
+            .map((m) => String((m ?? {}).caregiver_name ?? "").trim().split(/\s+/)[0])
+            .filter((v, i, alle) => v && alle.indexOf(v) === i);
+          if (Array.isArray(weitere) && weitere.length > 0) {
+            await supabase
+              .from("scheduled_emails")
+              .update({ status: "cancelled", error_message: `zusammengefasst in ${scheduledEmail.id}`, updated_at: new Date().toISOString() })
+              .in("id", weitere.map((w: { id: string }) => w.id))
+              .eq("status", "pending");
+          }
+          neu(reservierungBeendetMail(k, namen));
+          eventTypeSent = "email_reservierung_beendet_sent";
+          eventTypeFailed = "email_reservierung_beendet_failed";
+        } else if (scheduledEmail.email_type === "anreise") {
+          // Registry #119: Anreise-Daten der Agentur (detect, Modus „anreise"). Das
+          // Foto wird beim Versand frisch geholt — die mamamia-URL hält 30 Minuten.
+          const meta = (scheduledEmail.metadata ?? {}) as Record<string, any>;
+          const inline = await fetchInlinePhotoDeno(meta.caregiver_photo_url);
+          (scheduledEmail as any).__reminderInline = inline;
+          neu(anreiseMail(k, {
+            name: String(meta.caregiver_name ?? ""),
+            fotoCid: inline?.cid ?? null,
+            datum: String(meta.anreise_datum),
+            von: String(meta.anreise_von),
+            bis: meta.anreise_bis ?? null,
+            verkehrsmittel: String(meta.verkehrsmittel),
+            strasse: meta.einsatzort_strasse ?? null,
+            plzOrt: meta.einsatzort_plz_ort ?? null,
+            geaendert: meta.geaendert === true,
+          }));
+          eventTypeSent = "email_anreise_sent";
+          eventTypeFailed = "email_anreise_failed";
         } else {
           await supabase
             .from("scheduled_emails")
@@ -3168,27 +2838,15 @@ Deno.serve(async (req: Request) => {
  
           // Nachfass-Kette: startet jetzt nach der (gemergten) Eingangsbestätigung.
           // `angebot` bleibt für evtl. eingeplante Alt-Rows ebenfalls als Anker.
-          // Sequenz (Profil-Abbruch-optimiert, Stand 15.06.2026):
-          //   0h    Eingangsbestätigung
-          //   +4h   profil_nudge_1  (das Warum: ohne Profil keine Bewerbungen)
-          //   +28h  profil_nudge_2  ("Soll ich Ihnen beim Ausfüllen helfen?")
-          //   +48h  warum_primundus (Trust/USPs)
-          //   +72h  nachfass_2      (kurze persönliche Nachfrage)
-          //   +120h nachfass_3      (Break-up, mailto-Buttons)
-          //   +7d   profil_nudge_3  (Reaktivierung: nützliche Infos, kein Druck)
-          //   +49d  reaktivierung_wechsel (Wechsel-Fenster nach 6–8 Wochen)
-          // nachfass_1 wurde durch die zwei dedizierten Profil-Nudges
-          // ersetzt (war generisch + kollidierte zeitlich). Der nachfass_1-
-          // Handler bleibt für evtl. noch eingeplante Alt-Rows.
+          // Sequenz und Begründungen: kette.ts (profil_nudge_3 gestrichen,
+          // Registry #70). nachfass_1 wurde durch die zwei dedizierten
+          // Profil-Nudges ersetzt; der Handler bleibt für Alt-Rows.
           // Alle Profil-Nudges + Nachfässe canceln sich selbst, sobald das
           // Profil steht / gebucht / nicht interessiert (Skip-Logik oben).
           if (scheduledEmail.email_type === "eingangsbestaetigung" || scheduledEmail.email_type === "angebot") {
-            await scheduleFollowUp(supabase, lead as Lead, "profil_nudge_1", 4 * 60);
-            await scheduleFollowUp(supabase, lead as Lead, "profil_nudge_2", 28 * 60);
-            await scheduleFollowUp(supabase, lead as Lead, "warum_primundus", 48 * 60);
-            await scheduleFollowUp(supabase, lead as Lead, "nachfass_2", 72 * 60);
-            await scheduleFollowUp(supabase, lead as Lead, "profil_nudge_3", 7 * 24 * 60);
-            await scheduleFollowUp(supabase, lead as Lead, "reaktivierung_wechsel", 49 * 24 * 60);
+            for (const [typ, minuten] of KETTE_NACH_MAIL1) {
+              await scheduleFollowUp(supabase, lead as Lead, typ, minuten);
+            }
           } else if (scheduledEmail.email_type === "nachfass_2") {
             await scheduleFollowUp(supabase, lead as Lead, "nachfass_3", 48 * 60);
           }

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { deutschBalken, hakenAusAntworten, kopfzeile, kraefteVorschauAktiv, kraftFakten, kraftZeile, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { deutschBalken, GARANTIE, hakenAusAntworten, kopfzeile, kraefteVorschauAktiv, kraftFakten, kraftZeile, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
 
 function speicher(): Pick<Storage, 'getItem' | 'setItem'> {
   const m = new Map<string, string>();
@@ -7,10 +9,11 @@ function speicher(): Pick<Storage, 'getItem' | 'setItem'> {
 }
 
 describe('Kräfte-Vorschau (Rechner)', () => {
-  it('Schalter: seit 10.09. für alle an; ?kraefte=0 schaltet aus und merkt sich das, ?kraefte=1 wieder ein', () => {
+  it('Schalter: seit 11.09. aus; ?kraefte=1 schaltet ein und merkt sich das, ?kraefte=0 wieder aus', () => {
     const s = speicher();
-    expect(kraefteVorschauAktiv('?start=1', s)).toBe(true);
-    expect(kraefteVorschauAktiv('', null)).toBe(true);
+    // Seit 11.09.: standardmäßig AUS, nur mit ?kraefte=1.
+    expect(kraefteVorschauAktiv('?start=1', s)).toBe(false);
+    expect(kraefteVorschauAktiv('', null)).toBe(false);
     expect(kraefteVorschauAktiv('?kraefte=0', s)).toBe(false);
     expect(kraefteVorschauAktiv('', s)).toBe(false);
     expect(kraefteVorschauAktiv('?kraefte=1&start=1', s)).toBe(true);
@@ -45,22 +48,64 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(hakenAusAntworten({}, { einsaetze: 0 })).toEqual(['Ab sofort verfügbar']);
   });
 
-  it('Martins Aufbau: Warte-Screen, Kopf, Verlauf, Schranke', () => {
+  it('Strecke v2 (11.09.): Warte-Screen, Kopf, Verlauf, Schranke', () => {
     expect(PORTAL_ANZAHL).toBe(5);
-    expect(WARTE.schritt1).toBe('Sofortangebot berechnet');
+    // Warte-Screen bleibt bis aufs Wort „Preis" (Martin: „das ist so richtig").
+    expect(WARTE.text).toBe('Wir berechnen Ihren Preis und suchen passende Pflegekräfte.');
+    expect(WARTE.schritt1).toBe('Preis berechnet');
     expect(WARTE.schritt2Fertig(5)).toBe('5 passende Pflegekräfte gefunden');
     expect(WARTE.schritt3).toBe('Verfügbarkeit geprüft');
     expect(WARTE.schritt3Fertig(5)).toBe('alle 5 ab sofort verfügbar');
     expect(kopfzeile().titel).toBe('5 passende Pflegekräfte');
     expect(kopfzeile().text).toBe('Sofort verfügbar, persönlich auf Ihre Angaben abgestimmt');
-    expect(VERLAUF.weitere()).toBe('+ 3 weitere Pflegekräfte & Ihr Sofortangebot');
-    expect(VERLAUF.knopf).toBe('Sofortangebot & Pflegekräfte ansehen\u00A0→');
+    expect(VERLAUF.weitere()).toBe('+ 3 weitere passende Pflegekräfte');
+    expect(VERLAUF.preis).toBe('Ihr persönlicher Preis ist ebenfalls berechnet.');
+    expect(VERLAUF.knopf).toBe('Preis & alle 5 Pflegekräfte ansehen\u00A0→');
     expect(VERLAUF.hinweis).toBe('Dafür benötigen wir nur noch Ihre Kontaktdaten.');
+    expect(SCHRANKE.kopf).toBe('Ihr Preis ist berechnet');
+    expect(SCHRANKE.auszeichnung).toBe('6× Preis-Leistungssieger');
+    // Registry #121 (Martin 09.10.): ohne „persönliche“, damit der Knopf auf dem iPhone SE im ersten Bild steht.
+    expect(SCHRANKE.frage).toBe('Für wen dürfen wir Ihre Preisberechnung ausstellen?');
+    expect(SCHRANKE.text).toBe('Ihren Preis sehen Sie direkt im nächsten Schritt.');
+    // Registry #121: Lohnzeile neben vier Beispielgesichtern — „passende Profile“, nicht „Ihre 5 Pflegekräfte“.
+    expect(SCHRANKE.lohn).toBe('Danach sehen Sie sofort Ihren Preis und 5\u00A0passende Profile.');
+    // Martin 12.09.: nicht „senden" für den Preis (Sofortpreis wird gezeigt), nicht „brauchen wir", nicht „speichern".
+    expect(SCHRANKE.frage + ' ' + SCHRANKE.text + ' ' + SCHRANKE.lohn).not.toMatch(/senden|brauchen|speichern/);
+    expect(SCHRANKE.telefonHinweis).toBe('Nur bei Rückfragen');
+    // Bestpreisgarantie (Martin 12.09.): greifbar (100 € im Monat), Bedingungen
+    // ausbuchstabiert, kein „vermitteln", keine Prozentzahl.
+    expect(GARANTIE.wort).toBe('Bestpreisgarantie');
+    // Martin 12.09.: klar, knapp, verbindlich — zwei Sätze sichtbar, Bedingungen zum Aufklappen
+    expect(GARANTIE.zusage).toBe('Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot.');
+    expect(GARANTIE.ablauf).toContain('passen unseren Preis an');
+    expect(JSON.stringify(GARANTIE)).not.toMatch(/unterbieten|100/); // Variante A: kein Preiskampf
+    expect(GARANTIE.zusage + GARANTIE.warum).not.toMatch(/!/);
+    expect(GARANTIE.bedingungen).toHaveLength(5);
+    expect(GARANTIE.bedingungen[0]).toBe('Die gleiche Betreuungssituation und der gleiche Umfang');
+    expect(GARANTIE.bedingungen[1]).toBe('Legal angestelltes Personal mit A1-Bescheinigung');
+    expect(GARANTIE.bedingungen[2]).toBe('Vergleichbare Qualifikation: Sprache, Führerschein, Erfahrung');
+    expect(GARANTIE.beraterin).toBe('Marta Kapcio');
+    // Martin 13.09.: das Pop-up endet im nächsten Schritt, nicht in Verstanden,
+    // und mit denselben Worten wie der Hero-Knopf.
+    expect(GARANTIE.weiter).toBe('Preis & Pflegekräfte ansehen');
+    expect(JSON.stringify(GARANTIE)).not.toContain('Verstanden');
+    const garantieText = JSON.stringify(GARANTIE).toLowerCase();
+    expect(garantieText).not.toMatch(/vermitteln|%/);
+    // Martin 09.10. (Registry #121): unter den Sternen.
+    expect(SCHRANKE.fussnote).toBe('100\u00A0% kostenfrei & unverbindlich');
+  });
+
+  it('Vorschau und Kontakt tragen DENSELBEN Knopf, und er passt in eine Zeile', () => {
+    // Martin 11.09.: der Kunde hat dieses Versprechen geklickt, der nächste
+    // Knopf löst es ein. Und 10.09.: „Button nicht über 2 Zeilen".
     expect(SCHRANKE.knopf).toBe(VERLAUF.knopf);
-    expect(SCHRANKE.kopf).toBe('✓ Ihr Sofortangebot ist fertig');
-    expect(SCHRANKE.text).toBe('Ihr Sofortangebot und alle 5 Pflegekräfte werden sofort sichtbar – die Kopie schicken wir Ihnen per E-Mail.');
-    expect(SCHRANKE.titel).toBe('Wohin dürfen wir Ihr Sofortangebot senden?');
-    expect(SCHRANKE.gefunden()).toBe('5 passende Pflegekräfte gefunden');
+    expect(VERLAUF.knopf.length).toBeLessThanOrEqual(38);
+  });
+
+  it('niemand verspricht mehr „keine Werbeanrufe" oder nennt das Ergebnis „Sofortangebot"', () => {
+    const alles = JSON.stringify({ WARTE: { ...WARTE }, VERLAUF: { ...VERLAUF }, SCHRANKE, weitere: VERLAUF.weitere(), kopf: kopfzeile() });
+    expect(alles).not.toMatch(/Werbeanruf/i);
+    expect(alles).not.toMatch(/Sofortangebot/);
   });
 
   it('parseVorschau lässt nur saubere Karten mit https-Foto durch, maximal drei', () => {
@@ -69,5 +114,21 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(out.map((k) => k.id)).toEqual([1, 3, 4]);
     expect(parseVorschau(null)).toEqual([]);
     expect(parseVorschau({ kraefte: 'nein' })).toEqual([]);
+  });
+});
+
+// Martin 27.09.2026: Die Warteseite meldete „12 passende Pflegekräfte gefunden“ und gleich
+// danach „5“; die Startzahl des Zählers (71–78 je Kalendertag minus Abzüge) war ausgedacht.
+// Jetzt keine Zahl während der Suche, fertig die Portal-Zahl.
+describe('Warteseite ohne ausgedachte Zahl', () => {
+  const quelle = readFileSync(resolve(__dirname, '../../project 3/components/calculator/MultiStepForm.tsx'), 'utf8');
+  it('kein Zähler „N Pflegekräfte werden geprüft“, keine Tagesformel', () => {
+    expect(quelle).not.toContain('werden geprüft');
+    expect(quelle).not.toMatch(/getMatchingCount|dailyBase|getDate\(\) % 8/);
+  });
+  it('„gefunden“ und „verfügbar“ nennen die Portal-Zahl', () => {
+    expect(quelle).toContain('WARTE.schritt2Fertig(PORTAL_ANZAHL)');
+    expect(quelle).toContain('WARTE.schritt3Fertig(PORTAL_ANZAHL)');
+    expect(PORTAL_ANZAHL).toBe(5);
   });
 });

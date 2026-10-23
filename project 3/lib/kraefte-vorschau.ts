@@ -25,11 +25,12 @@ export interface VorschauKraft {
 export const VORSCHAU_KEY = 'prim_kraefte_vorschau';
 
 /**
- * Seit 10.09.2026 (Martin: „keinen Split – wir kennen die Zahlen und werden
- * dann vergleichen") ist die Vorschau für ALLE an. `?kraefte=0` zeigt den
- * alten Kasten (zum Vergleichen), `?kraefte=1` schaltet wieder ein; beides
- * wird in sessionStorage gemerkt, weil die Variantenweiche die URL neu
- * schreibt. Vergleich = vorher/nachher am Datum, nicht per Split.
+ * Seit 11.09.2026 (Martin: Karten-Seite weg — nach den Fragen direkt der
+ * Kontakt-Schritt mit Siegel-Kopf und Fotokasten) ist die Karten-Seite für
+ * alle AUS. `?kraefte=1` zeigt sie weiter (zum Vergleichen), `?kraefte=0`
+ * schaltet sie wieder aus; beides wird in sessionStorage gemerkt, weil die
+ * Variantenweiche die URL neu schreibt. 10.09. 21:17 – 11.09. war sie für
+ * alle an; Vergleich vorher/nachher am Datum, nicht per Split.
  */
 export function kraefteVorschauAktiv(search: string, storage: Pick<Storage, 'getItem' | 'setItem'> | null): boolean {
   const params = new URLSearchParams(search);
@@ -37,9 +38,9 @@ export function kraefteVorschauAktiv(search: string, storage: Pick<Storage, 'get
   try {
     if (q === '1') { storage?.setItem(VORSCHAU_KEY, '1'); return true; }
     if (q === '0') { storage?.setItem(VORSCHAU_KEY, '0'); return false; }
-    return storage?.getItem(VORSCHAU_KEY) !== '0';
+    return storage?.getItem(VORSCHAU_KEY) === '1';
   } catch {
-    return q !== '0';
+    return q === '1';
   }
 }
 
@@ -65,6 +66,7 @@ export function wuenscheAusAntworten(state: { germanLevel?: string | null; gende
  * Verlauf „+ 3 weitere passende Pflegekräfte und Ihr persönliches
  * Sofortangebot", dann der Knopf, dann „Dafür benötigen wir nur noch Ihre
  * Kontaktdaten." Die Zahl 5 ist die Portal-Zahl (`waehleFuenf`).
+ * Strecke v2 (11.09.): „Sofortangebot" heißt jetzt „Preis", siehe VERLAUF/SCHRANKE.
  */
 export const PORTAL_ANZAHL = 5;
 /** So viele Profile stehen ganz auf dem Ergebnis-Screen; das nächste läuft in den Verlauf. */
@@ -72,8 +74,9 @@ export const GANZ_SICHTBAR = 2;
 
 export const WARTE = {
   titel: 'Einen Moment bitte',
-  text: 'Wir erstellen Ihr Sofortangebot und suchen passende Pflegekräfte.',
-  schritt1: 'Sofortangebot berechnet',
+  // Strecke v2 (Martin, 11.09.): das Ergebnis heißt überall „Preis".
+  text: 'Wir berechnen Ihren Preis und suchen passende Pflegekräfte.',
+  schritt1: 'Preis berechnet',
   schritt2Laeuft: 'Passende Pflegekräfte werden gesucht',
   schritt2Fertig: (n: number) => (n === 1 ? '1 passende Pflegekraft gefunden' : `${n} passende Pflegekräfte gefunden`),
   // Dritter Schritt (Martin, 10.09.: „nur 2 Punkte sieht komisch aus") — und er
@@ -158,45 +161,109 @@ export function hakenAusAntworten(a: HakenAntworten, k: Pick<VorschauKraft, 'ein
   return t.slice(0, 2);
 }
 
+/**
+ * Der Knopf auf Vorschau UND Kontakt — derselbe Text (Martin, 11.09.): der
+ * Kunde hat dieses Versprechen geklickt, der nächste Knopf löst es ein.
+ * Passt bei 375 px in eine Zeile (Martin: „Button nicht über 2 Zeilen").
+ */
+const KNOPF = `Preis & alle ${PORTAL_ANZAHL} Pflegekräfte ansehen\u00A0→`;
+
 /** Der Verlauf unter den Profilen und der Knopf darin. */
 export const VERLAUF = {
-  // Eine Zeile statt zwei (iPhone: der Knopf muss ohne Scrollen sichtbar sein).
   weitere: (gesamt: number = PORTAL_ANZAHL, ganz: number = GANZ_SICHTBAR) => {
     const n = Math.max(1, gesamt - ganz);
-    return n === 1 ? '+ 1 weitere Pflegekraft & Ihr Sofortangebot' : `+ ${n} weitere Pflegekräfte & Ihr Sofortangebot`;
+    return n === 1 ? '+ 1 weitere passende Pflegekraft' : `+ ${n} weitere passende Pflegekräfte`;
   },
-  // Passt bei 375 px in eine Zeile (Martin: „Button nicht über 2 Zeilen").
-  knopf: 'Sofortangebot & Pflegekräfte ansehen\u00A0→',
+  // Hinter der Schranke steht etwas, das es schon gibt (Strecke v2, 11.09.).
+  preis: 'Ihr persönlicher Preis ist ebenfalls berechnet.',
+  knopf: KNOPF,
   hinweis: 'Dafür benötigen wir nur noch Ihre Kontaktdaten.',
 };
 
 /**
- * Die Kontaktschranke — ein EIGENER Schritt nach dem Klick. Die Strecke
- * erzählt EINE Geschichte (Martin, 10.09.: „mach vorher eine Prüfung, ob das
- * alles perfekt passt"):
- *   Warten:   „Sofortangebot berechnet" + „5 passende Pflegekräfte gefunden"
- *   Ergebnis: „5 passende Pflegekräfte – sofort verfügbar", 3 Profile,
- *             „+ 3 weitere … und Ihr persönliches Sofortangebot",
- *             Knopf „Alle Pflegekräfte & Sofortangebot ansehen",
- *             „Dafür benötigen wir nur noch Ihre Kontaktdaten."
- *   Kontakt:  Kopf „✓ Ihr Sofortangebot ist fertig" (das Warten hat es
- *             berechnet), Kasten mit den echten Fotos „5 passende
- *             Pflegekräfte gefunden · sofort verfügbar" (das Ergebnis hat sie
- *             gezeigt), Frage „Wohin dürfen wir Ihr Sofortangebot senden?"
- *             wie im bewährten Rechner, Satz: sofort sichtbar + Kopie per
- *             E-Mail (beides passiert wirklich), derselbe Knopf wie auf dem
- *             Ergebnis-Screen.
+ * Die Kontaktschranke — ein EIGENER Schritt nach dem Klick. Strecke v2
+ * (Martin, 11.09., nach einem Vorschlag von ChatGPT): bewusst kurz. Kein
+ * zweites „5 Pflegekräfte" (standen einen Schritt vorher), keine Frage
+ * „Wohin dürfen wir …", kein „keine Werbeanrufe" (widersprach dem Pflichtfeld
+ * Telefon und der SEA-Leitlinie). Ein Satz sagt, wofür die Daten da sind;
+ * das Telefonfeld nennt seinen Grund. Derselbe Knopf wie auf dem Ergebnis.
  * Kein „Portal", kein „Fast geschafft", kein „Nur noch …".
  */
 export const SCHRANKE = {
-  kopf: '✓ Ihr Sofortangebot ist fertig',
-  kopfText: 'Persönlich auf Ihre Angaben abgestimmt',
-  gefunden: (gesamt: number = PORTAL_ANZAHL) => `${gesamt} passende Pflegekräfte gefunden`,
-  gefundenText: 'sofort verfügbar',
-  titel: 'Wohin dürfen wir Ihr Sofortangebot senden?',
-  text: `Ihr Sofortangebot und alle ${PORTAL_ANZAHL} Pflegekräfte werden sofort sichtbar – die Kopie schicken wir Ihnen per E-Mail.`,
-  knopf: 'Sofortangebot & Pflegekräfte ansehen\u00A0→',
+  kopf: 'Ihr Preis ist berechnet', // Haken als Symbol im Kopf, nicht als Textzeichen (Martin 11.09.: „zu billig")
+  // 12.09. (Martin): Der Satz beginnt mit dem, was der Kunde bekommt, nicht
+  // mit dem, was wir brauchen. „Senden" passt nicht zu „Sofortpreis" (der
+  // Preis wird gezeigt, nur die Kopie geht per Mail), „speichern" weckt
+  // Datenschutz-Sorge, „brauchen wir" macht die Schranke ausdrücklich.
+  // Erster voller Tag der Fassung davor: 9 von 10 Google-Besuchern brachen
+  // hier ab (Zähler 11.09.), Baseline 44 %.
+  // Martins Wortlaut (12.09.): Die Frage gibt dem Namensfeld einen Grund,
+  // „ausstellen" passt zu „Ihr Preis ist berechnet" — nichts wird gesendet.
+  // 09.10. (Registry #121, Martin „1 ja“): ohne „persönliche“ — eine Zeile
+  // weniger, damit Knopf, Gesichter und Sterne auch auf dem iPhone SE (553 px)
+  // im ersten Bild stehen.
+  frage: 'Für wen dürfen wir Ihre Preisberechnung ausstellen?',
+  // Nur noch in der Karten-Seite (?kraefte=1); im Kontakt-Schritt steht `lohn`.
+  text: 'Ihren Preis sehen Sie direkt im nächsten Schritt.',
+  // Registry #121: neben vier Gesichtern statt grünem Kasten. „passende Profile“
+  // statt „Ihre 5 Pflegekräfte“: die Fotos sind Beispiele aus dem eigenen
+  // Bestand, nicht die späteren fünf (OpenAI-Gegencheck 09.10.); „Profile“ wie
+  // in den Anzeigen („Preis & Profile sofort“).
+  lohn: `Danach sehen Sie sofort Ihren Preis und ${PORTAL_ANZAHL}\u00A0passende Profile.`,
+  telefonHinweis: 'Nur bei Rückfragen',
+  knopf: KNOPF,
+  // Martin 09.10.: „unter den Sternen … 100% kostenfrei & unverbindlich“.
+  fussnote: '100\u00A0% kostenfrei & unverbindlich',
+  // Zeile unter „Ihr Preis ist berechnet", neben dem Siegel im grünen Kopf
+  // (Martin 11.09., Wortlaut von ihm).
+  auszeichnung: '6× Preis-Leistungssieger',
 };
+
+/**
+ * Bestpreisgarantie im Kontakt-Schritt (Martin, 12.09.2026). Kein Extrasatz:
+ * das Wort steht im grünen Kopf hinter der Auszeichnung als unterstrichener
+ * Link und öffnet das Pop-up. Die alte Garantie („unterbieten wir es", bis
+ * 18.08.) war nicht greifbar und hatte keine Bedingungen — diese hier ist
+ * ein bindendes Versprechen: 100 € im Monat unter einem VERGLEICHBAREN
+ * Angebot, und „vergleichbar" ist ausbuchstabiert, weil Portale mit
+ * Eigenanteilen nach Zuschuss werben („ab 1.350 €"). Martin: „Gehen wir mit
+ * reizt nicht — dann gehen wir noch hundert Euro drunter, das ist anfassbar."
+ * Wortlaut nur mit Martins Freigabe ändern; nie „vermitteln" (eigenes
+ * Personal), keine Prozentzahlen, keine erfundenen Zahlen.
+ */
+export const GARANTIE = {
+  wort: 'Bestpreisgarantie',
+  /** Unterzeile im Kopf: „6× Preis-Leistungssieger · mit [Bestpreisgarantie]" */
+  vorsatz: 'mit',
+  titel: 'Bestpreisgarantie',
+  beraterin: 'Marta Kapcio',
+  rolle: 'Ihre Beraterin',
+  fotoSrc: '/images/marta-kapcio.jpg',
+  /** Martins Siegel (12.09.): Pille mit Schild, „PRIMUNDUS / BESTPREISGARANTIE / 6× Preis-Leistungssieger". Seite = WebP, Mail = PNG. */
+  siegelSrc: '/images/bestpreisgarantie-siegel.webp',
+  siegelAlt: 'Primundus Bestpreisgarantie – 6× Preis-Leistungssieger',
+  // Martin 12.09.: „ganz klar und nicht so textlich" — zwei Sätze sichtbar,
+  // die Bedingungen zum Aufklappen. Ton: verbindlich, ruhig.
+  // Martin 12.09.: „kurz und knapp, was wir machen — erst wenn man's öffnet, mehr Infos".
+  // Variante A (Martin 12.09.: „so aggressiv wollen wir nicht sein"): kein
+  // Unterbieten, sondern die Zusage, nicht zu überzahlen — ruhig und bindend.
+  zusage: 'Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot.',
+  ablauf: 'Legen Sie uns das Angebot vor, wir passen unseren Preis an. Marta antwortet innerhalb eines Werktags.',
+  warum: 'Das können wir, weil unsere Pflegekräfte bei uns angestellt sind und keine Vermittlungsgebühr anfällt.',
+  aufklappen: 'Was heißt vergleichbar?',
+  // Martins Wortlaut (12.09.); Punkte 4 und 5 sind mein Vorschlag (Lockzahlen der Portale).
+  bedingungen: [
+    'Die gleiche Betreuungssituation und der gleiche Umfang',
+    'Legal angestelltes Personal mit A1-Bescheinigung',
+    'Vergleichbare Qualifikation: Sprache, Führerschein, Erfahrung',
+    'Gesamtpreis pro Monat, nicht der Eigenanteil nach Zuschüssen',
+    'Schriftliches Angebot, nicht älter als 14 Tage',
+  ],
+  /** Knopf in Pop-up UND Seite, dieselben Worte wie der Hero-Knopf (Martin 13.09.:
+   *  „warum Verstanden statt Jetzt Preis berechnen?“). */
+  weiter: 'Preis & Pflegekräfte ansehen',
+  sprechen: 'Lieber sprechen? 089 200 000 830',
+} as const;
 
 /** Antwort der Function absichern — nur, was die Karte braucht, nie mehr. */
 export function parseVorschau(json: unknown): VorschauKraft[] {

@@ -16,7 +16,7 @@ export function WhatIs24hCare() {
         <div className="bg-white rounded-2xl p-8 md:p-10 shadow-sm border border-[#E5E3DF]">
           <div className="prose prose-lg max-w-none">
             <p className="text-base md:text-lg text-[#3D3D3D] leading-relaxed mb-6">
-              Bei der 24-Stunden-Betreuung zieht eine qualifizierte Betreuungskraft bei Ihrem pflegebedürftigen Angehörigen ein und unterstützt ihn im Alltag – rund um die Uhr, im vertrauten Zuhause.
+              Bei der 24-Stunden-Betreuung zieht eine qualifizierte Betreuungskraft bei Ihrem pflegebedürftigen Angehörigen ein und unterstützt ihn im Alltag – im vertrauten Zuhause und bei Bedarf auch nachts.
             </p>
 
             <div className="grid md:grid-cols-2 gap-6 mt-8">

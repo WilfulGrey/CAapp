@@ -274,3 +274,157 @@ Deno.test("Profile-Kachel zeigt die Kosten je Profil statt des Tagesschnitts", (
   assert(kachel, "Profile-Kachel fehlt");
   assert(!kachel![2].includes("Ø"), "kein Tagesschnitt mehr in der Fusszeile");
 });
+
+/*
+ * Registry #82 — Buchungs-Check.
+ *
+ * Der Cron-Alarm feuert EINMAL je Zeile und nach 30 Tagen sieht der Cron die
+ * Zeile nicht mehr. Diese Zeile im Report ist der bleibende Kanal. Zwei
+ * Zusagen, die sich lautlos umkehren lassen:
+ *  1) "kein roter Block" heisst geprueft und in Ordnung — nicht "Abfrage tot".
+ *     Deshalb steht bei 0 offenen Faellen trotzdem eine Zeile da.
+ *  2) Ein Lesefehler ist sichtbar (Muster fetchAgentNotes), nicht `count ?? 0`
+ *     wie in fetchMailHealth — sonst sieht ein kaputtes Query aus wie Gesundheit.
+ */
+Deno.test("#82: offene Buchungen ⇒ roter Block, Kunde und Alter genannt, 🚨 im Betreff", () => {
+  const { html, subject } = bauen({
+    buchungHealth: {
+      offen: 1,
+      rows: [{ lead: "Ingolf Berg", leadId: "e94d428b", applicationId: 13074, ageHours: 168 }],
+    },
+  });
+  assertStringIncludes(html, "Buchung nicht in Mamamia sichtbar");
+  assertStringIncludes(html, "Ingolf Berg");
+  assertStringIncludes(html, "Bewerbung 13074");
+  assertStringIncludes(html, "seit 168 h");
+  assertStringIncludes(subject, "🚨");
+});
+
+Deno.test("#82: 0 offen ⇒ kein Alarm, aber die Zeile steht da (kein Block ≠ kaputte Abfrage)", () => {
+  const { html, subject } = bauen({ buchungHealth: { offen: 0, rows: [] } });
+  assertStringIncludes(html, "Buchungs-Check: 0 offen");
+  assertEquals(html.includes("Buchung nicht in Mamamia sichtbar"), false);
+  assertEquals(subject.includes("🚨"), false);
+});
+
+Deno.test("#82: Lesefehler der Abfrage ist sichtbar und alarmiert", () => {
+  const { html, subject } = bauen({
+    buchungHealth: { offen: 0, rows: [], error: "permission denied for table" },
+  });
+  assertStringIncludes(html, "Buchungs-Check nicht lesbar");
+  assertStringIncludes(html, "permission denied for table");
+  assertStringIncludes(subject, "🚨");
+});
+
+/*
+ * Registry #82, Runde 2 (Michał: „nie możemy mieć fałszywych alarmów").
+ *
+ * Der erste Wurf nahm „Confirm-Stempel da, PDF-Stempel fehlt" als Beweis für
+ * „Mamamia zeigt die Buchung nicht". Das ist falsch: der fehlende PDF-Stempel
+ * hat mehrere Ursachen (Renderer, StoreFile, sha, Token — oder der Cron hat
+ * nach 30 Tagen aufgehört zu schauen), und in allen kann die Buchung in
+ * Ordnung sein. Gezeigt wird deshalb nur, was ein Alarm PROTOKOLLIERT hat.
+ */
+import { offeneBuchungen } from "../queries.ts";
+
+const beleg = (app: number, grund = "not_processed") => ({ leadId: "l1", applicationId: app, grund });
+const zeile = (app: number, pdfHochgeladen: boolean) => ({
+  leadId: "l1", applicationId: app, signedAt: "2026-09-22T00:00:00Z", pdfHochgeladen,
+});
+const jetzt = Date.parse("2026-09-23T00:00:00Z");
+
+Deno.test("#82: ohne protokollierten Befund wird NICHTS behauptet (die drei Juli-Zeilen)", () => {
+  // Zeile offen, aber kein Alarm hat je 'booking_not_visible' festgestellt.
+  assertEquals(offeneBuchungen([], [zeile(9705, false)], jetzt).length, 0);
+});
+
+Deno.test("#82: protokollierter Befund + Upload noch offen ⇒ Treffer, mit Grund", () => {
+  const t = offeneBuchungen([beleg(13074, "foreign_confirmation")], [zeile(13074, false)], jetzt);
+  assertEquals(t.length, 1);
+  assertEquals(t[0].grund, "foreign_confirmation");
+  assertEquals(t[0].ageHours, 24);
+});
+
+Deno.test("#82: Upload durch ⇒ Befund erledigt sich selbst", () => {
+  assertEquals(offeneBuchungen([beleg(13074)], [zeile(13074, true)], jetzt).length, 0);
+});
+
+Deno.test("#82: Beleg zu EINER Bewerbung färbt die anderen Zeilen des Leads nicht ein", () => {
+  const t = offeneBuchungen([beleg(13074)], [zeile(13074, false), zeile(11198, false)], jetzt);
+  assertEquals(t.map((x) => x.applicationId), [13074]);
+});
+
+/*
+ * Registry #129: Google-Upload-Check.
+ *
+ * Vom 02. bis 20.10.2026 lief der Upload nur als Probelauf — 200, kein Log,
+ * pg_cron „succeeded". Der Bericht prüft deshalb das Ergebnis: Wartet eine
+ * Conversion mit Klick-ID länger als UPLOAD_ALARM_STUNDEN, ist der Upload
+ * stehen geblieben. Dieselben zwei Zusagen wie beim Buchungs-Check:
+ * bei 0 steht eine Zeile da, und ein Lesefehler alarmiert.
+ */
+import { erstesJeLead, UPLOAD_ALARM_STUNDEN, wartendeUploads } from "../queries.ts";
+import { uploadZusammenfassung } from "../template.ts";
+
+const STUNDE = 3_600_000;
+const JETZT = Date.parse("2026-10-21T06:00:00Z");
+const vor = (h: number) => new Date(JETZT - h * STUNDE).toISOString();
+
+Deno.test("#129: wartendeUploads — nur mit Klick-ID, nicht erledigt, älter als die Grenze", () => {
+  const erste = new Map([
+    ["alt-google", vor(400)],
+    ["alt-ohne-klick", vor(400)],
+    ["alt-erledigt", vor(400)],
+    ["frisch-google", vor(29.7)], // Bericht 06:00 vor dem Upload 06:20 — erwartet, kein Alarm
+  ]);
+  const klick = new Set(["alt-google", "alt-erledigt", "frisch-google"]);
+  const erledigt = new Set(["alt-erledigt"]);
+  assertEquals(wartendeUploads(erste, klick, erledigt, JETZT), [400]);
+  assertEquals(UPLOAD_ALARM_STUNDEN, 32);
+});
+
+Deno.test("#129: erstesJeLead nimmt je Lead das erste Ereignis (Upload zählt das erste Speichern)", () => {
+  const m = erstesJeLead([
+    { leadId: "a", zeit: vor(50) },
+    { leadId: "a", zeit: vor(10) },
+    { leadId: "b", zeit: vor(5) },
+  ]);
+  assertEquals(m.get("a"), vor(50));
+  assertEquals(m.size, 2);
+});
+
+Deno.test("#129: wartende Profile ⇒ roter Block, Prüfhinweis, 🚨 im Betreff", () => {
+  const { html, subject, text } = bauen({
+    uploadHealth: { wartendeProfile: 7, wartendeBuchungen: 1, aeltesteStunden: 410, letzterUpload: "2026-10-01T06:20:07Z" },
+  });
+  assertStringIncludes(html, "Google-Upload steht: 7 Profile und 1 Buchung warten länger als 32 Stunden");
+  assertStringIncludes(html, "die älteste seit 410 Stunden");
+  assertStringIncludes(html, "Letzter Upload: 01.10., 08:20 Uhr.");
+  assertStringIncludes(html, "Probelauf");
+  assertStringIncludes(subject, "🚨");
+  assertStringIncludes(text, "🚨 Google-Upload steht");
+});
+
+Deno.test("#129: nichts wartet ⇒ graue Zeile mit letztem Upload, kein Alarm", () => {
+  const { html, subject } = bauen({
+    uploadHealth: { wartendeProfile: 0, wartendeBuchungen: 0, aeltesteStunden: 0, letzterUpload: "2026-10-20T12:12:00Z" },
+  });
+  assertStringIncludes(html, "Google-Upload: nichts wartet. Letzter Upload: 20.10., 14:12 Uhr.");
+  assertEquals(html.includes("Google-Upload steht"), false);
+  assertEquals(subject.includes("🚨"), false);
+});
+
+Deno.test("#129: Lesefehler ist sichtbar und alarmiert", () => {
+  const { html, subject } = bauen({
+    uploadHealth: { wartendeProfile: 0, wartendeBuchungen: 0, aeltesteStunden: 0, letzterUpload: null, error: "permission denied for table offline_conversion_uploads" },
+  });
+  assertStringIncludes(html, "Google-Upload-Check nicht lesbar: permission denied");
+  assertStringIncludes(subject, "🚨");
+});
+
+Deno.test("#129: Einzahl und „noch nie“ richtig formuliert", () => {
+  assertEquals(
+    uploadZusammenfassung({ wartendeProfile: 1, wartendeBuchungen: 0, aeltesteStunden: 40, letzterUpload: null }),
+    "Google-Upload steht: 1 Profil wartet länger als 32 Stunden, die älteste seit 40 Stunden. Letzter Upload: noch nie.",
+  );
+});

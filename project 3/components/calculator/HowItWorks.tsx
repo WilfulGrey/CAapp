@@ -29,8 +29,11 @@ export function HowItWorks() {
               <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug">
                 Sofort Angebot und Pflegekräfte einsehen
               </h3>
+              {/* 23.09.2026 (Martin „alles auf ja", Vorschlag aus der OpenAI-Prüfung): „für die Kopie des Angebots"
+                  klang vorgeschoben — die Kontaktdaten sind die Voraussetzung für Preis und Pflegekräfte, die Kopie per
+                  Mail ist ein Zusatz. Derselbe Satz steht auf primundus.de (Startseite, /24-stunden-pflege, /ablauf). */}
               <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5">
-                Sie machen wenige preisrelevante Angaben und hinterlassen für die Kopie des Angebots Ihre Kontaktdaten. Sofort danach sehen Sie Ihr Angebot samt Zuschüssen und Steuervorteilen sowie die passenden Pflegekräfte — die Kopie kommt zusätzlich per E-Mail.
+                Sie machen wenige preisrelevante Angaben und hinterlassen Ihre Kontaktdaten. Sofort danach sehen Sie Ihr Angebot samt Zuschüssen und Steuervorteilen sowie die passenden Pflegekräfte. Eine Kopie kommt zusätzlich per E-Mail.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Clock className="w-3.5 h-3.5" strokeWidth={2} />
@@ -58,7 +61,7 @@ export function HowItWorks() {
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
-                Unverbindlich
+                Bewerbungen am selben Werktag
               </span>
             </div>
           </div>
@@ -83,7 +86,7 @@ export function HowItWorks() {
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Clock className="w-3.5 h-3.5" strokeWidth={2} />
-                Start in 4–7 Werktagen
+                Anreise in 3 Tagen möglich
               </span>
             </div>
           </div>
@@ -95,7 +98,7 @@ export function HowItWorks() {
             onClick={() => openCalculator('ablauf')}
             className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 sm:px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
           >
-            Kosten & Pflegekräfte ansehen
+            Preis & Pflegekräfte ansehen
             <svg className="hidden sm:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>

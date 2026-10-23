@@ -8,7 +8,7 @@ export function FinalCTA() {
       <div className="max-w-[640px] mx-auto">
         <div className="text-center mb-10">
           <h2 className="text-[26px] leading-[1.25] font-bold text-white mb-2">
-            Jetzt Kosten & Pflegekräfte ansehen
+            Jetzt Preis & Pflegekräfte ansehen
           </h2>
           <p className="text-base text-white/90 leading-relaxed mb-7">
             In 2 Minuten sehen Sie Ihr Angebot & passende Pflegekräfte – inkl. Finanzierungsmöglichkeiten.
@@ -20,7 +20,7 @@ export function FinalCTA() {
             onClick={() => openCalculator('final_cta')}
             className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 sm:px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white rounded-xl text-base md:text-lg font-bold shadow-lg hover:shadow-xl transition-all duration-200"
           >
-            Kosten & Pflegekräfte ansehen
+            Preis & Pflegekräfte ansehen
             <svg className="hidden sm:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
@@ -54,7 +54,7 @@ export function FinalCTA() {
               <span className="text-white font-semibold text-[16px]">089 200 000 830</span>
             </a>
             <a
-              href={`https://wa.me/4989200000830?text=${encodeURIComponent("Hallo Frau Wysocki, ich habe eine Rückfrage:")}`}
+              href={`https://wa.me/4989200000830?text=${encodeURIComponent("Hallo Frau Kapcio, ich habe eine Rückfrage:")}`}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full flex items-center justify-center gap-3 px-5 py-3 rounded-xl bg-[#25D366] hover:bg-[#20C05A] transition-colors"

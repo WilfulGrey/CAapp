@@ -7,6 +7,7 @@ import type {
   MamamiaCaregiverFull,
   MamamiaJobOffer,
   MamamiaCustomer,
+  MamamiaCustomerContract,
 } from './types';
 import { STANDARD_NIGHT_OPS_DE } from './patientFormMapper';
 
@@ -195,12 +196,9 @@ const MOBILITY_DE: Record<string, string> = {
   Bedridden: 'Bettlägerig',
 };
 
-// Assignment length from start/end dates → human-readable German label.
-export function formatAssignmentDuration(arrival: string, departure: string): string {
-  const days = Math.max(
-    1,
-    Math.round((new Date(departure).getTime() - new Date(arrival).getTime()) / 86_400_000),
-  );
+// Einsatzdauer in Tagen → deutsches Wort ("9 Tage", "4 Wochen", "3 Monate").
+export function formatDauer(tage: number): string {
+  const days = Math.max(1, Math.round(tage));
   if (days < 14) return `${days} ${days === 1 ? 'Tag' : 'Tage'}`;
   if (days < 60) {
     const w = Math.round(days / 7);
@@ -209,6 +207,13 @@ export function formatAssignmentDuration(arrival: string, departure: string): st
   const m = Math.round(days / 30.44);
   return `${m} ${m === 1 ? 'Monat' : 'Monate'}`;
 }
+
+// Assignment length from start/end dates → human-readable German label.
+export function formatAssignmentDuration(arrival: string, departure: string): string {
+  return formatDauer((new Date(departure).getTime() - new Date(arrival).getTime()) / 86_400_000);
+}
+
+const deDatum = (s: string) => s.slice(0, 10).split('-').reverse().join('.');
 
 // Caregiver.personalities[].personality — values from beta sample.
 // Mapping covers the prod-most-common; unknown values pass through.
@@ -423,27 +428,30 @@ export function mapCaregiverToNurse(
   // UI currently stores avgDurationMonths — convert weeks→months (~4.3 weeks/month).
   const avgMonths = avgWeeks ? Number((avgWeeks / 4.3).toFixed(1)) : 0;
 
-  const detailedAssignments: Assignment[] = [];
-  if ('hp_recent_assignments' in cg && cg.hp_recent_assignments) {
-    const todayIso = opts.nowIso.slice(0, 10);
-    // beta tenant uses 'finish', preprod uses 'finished'/'completed'. Accept
-    // any finish-like status or null — date filter below excludes in-progress.
-    const completedStatuses = new Set(['finish', 'finished', 'completed', 'done', 'success']);
-    for (const a of cg.hp_recent_assignments) {
-      if (!a.arrival_date || !a.departure_date) continue;
-      if (a.status && !completedStatuses.has(a.status)) continue;
-      if (a.departure_date.slice(0, 10) >= todayIso) continue;
-      detailedAssignments.push({
-        startDate: a.arrival_date,
-        endDate: a.departure_date,
-        postalCode: a.postal_code ?? '—',
-        city: a.city ?? '—',
-        patientCount: a.patients_count ?? 1,
-        duration: formatAssignmentDuration(a.arrival_date, a.departure_date),
-      });
-      if (detailedAssignments.length >= 3) break;
-    }
-  }
+  // Einsätze im vollen Profil: CaregiverDeparturesWithPagination (Registry #126)
+  // — nur abgeschlossene (finish), neueste zuerst, höchstens 3. Die Zahl im
+  // Profil kommt ebenfalls von hier; Karten/Listen zählen weiter hp_total_jobs.
+  // Bei Fehler der Abfrage bleibt die Kartenzahl, die Liste zeigt den Fehler.
+  const fertig = 'einsaetze' in cg && cg.einsaetze
+    ? cg.einsaetze
+      .filter((a) => a.status === 'finish' && a.arrival_date && a.departure_date)
+      .sort((a, b) => (b.arrival_date as string).localeCompare(a.arrival_date as string))
+    : null;
+  const detailedAssignments: Assignment[] = (fertig ?? []).slice(0, 3).map((a) => ({
+    startDate: deDatum(a.arrival_date as string),
+    endDate: deDatum(a.departure_date as string),
+    postalCode: a.zip_code ?? '',
+    city: a.city ?? '',
+    duration: a.duration_days != null
+      ? formatDauer(a.duration_days)
+      : formatAssignmentDuration(a.arrival_date as string, a.departure_date as string),
+  }));
+  const einsatzTage = (fertig ?? []).reduce((sum, a) => sum + (a.duration_days ?? 0), 0);
+  const history: Nurse['history'] = fertig
+    ? (fertig.length ? { assignments: fertig.length, avgDurationMonths: Number((einsatzTage / fertig.length / 30.44).toFixed(1)) } : undefined)
+    : cg.hp_total_jobs
+      ? { assignments: cg.hp_total_jobs, avgDurationMonths: avgMonths }
+      : undefined;
 
   // Real Caregiver profile fields — only present when GET_CAREGIVER ran
   // (i.e. cg has the full type, not the matching ref). Anything missing
@@ -523,13 +531,10 @@ export function mapCaregiverToNurse(
     // (oft erfahrene) nicht ohne Foto erscheinen.
     image: cg.avatar_retouched_promo?.aws_url ?? cg.avatar_retouched?.aws_url ?? cg.avatar?.aws_url ?? undefined,
     referencePdfUrl: pickNewestReferenceUrl(cg),
-    history: cg.hp_total_jobs
-      ? {
-        assignments: cg.hp_total_jobs,
-        avgDurationMonths: avgMonths,
-      }
-      : undefined,
+    history,
     detailedAssignments: detailedAssignments.length > 0 ? detailedAssignments : undefined,
+    ...('on_other_job' in cg && cg.on_other_job ? { onOtherJob: true } : {}),
+    ...('einsaetze_error' in cg && cg.einsaetze_error ? { einsaetzeError: cg.einsaetze_error } : {}),
     profile,
   };
 }
@@ -755,7 +760,7 @@ export function pickFinalConfirmedJob(
   return confirmed[0];
 }
 
-/** Gebucht-Ableitung aus dem Mamamia-Stand (Fix Hagedorn 2026-07-15).
+/** Gebucht-Ableitung aus dem Mamamia-Stand (Fix 2026-07-15).
  *  Akzeptiert die AGENTUR die Bewerbung im SA-Portal, entsteht keine
  *  lead_application_acceptances-Zeile und Mamamia entfernt die Bewerbung aus
  *  listApplications — das Portal wäre blind und zeigte weiter Onboarding.
@@ -824,7 +829,7 @@ export function synthesizeAcceptedApplicationFromFinalConfirmation(
  *    1) Portal-Annahme, Application noch in listApplications → patchen.
  *    2) Portal-Annahme, Application weg → Synthese aus contract_snapshot.
  *    3) KEINE Portal-Annahme, aber Mamamia-final_confirmation (die Annahme
- *       kam agentur-seitig — Fix Hagedorn) → Synthese aus dem Job-Stand.
+ *       kam agentur-seitig — Fix) → Synthese aus dem Job-Stand.
  *  lead_application_acceptances hat VORRANG: sobald Pfad 1/2 greifen, läuft
  *  Pfad 3 nicht (keine Doppel-Synthese). Synthetische Apps werden jeden Lauf
  *  verworfen + frisch abgeleitet, damit die Platzhalter-Karte aufs volle
@@ -1217,6 +1222,14 @@ function mamamiaNightDescToForm(desc: string | null | undefined): string {
   return t;
 }
 
+/** Singular `customer_contract` als Vertrag der betreuten Person — außer er ist die
+ *  Zeile des Auftraggebers. Mamamia liefert beim Lesen den ersten Vertrag nach id;
+ *  nach einer Annahme ist das oft `contract_contact` (beta-e2e 21.10.2026, Registry #131). */
+export function patientenVertrag(cust: Pick<MamamiaCustomer, 'customer_contract'> | null | undefined): MamamiaCustomerContract | null {
+  const c = cust?.customer_contract ?? null;
+  return c?.contact_type === 'contract_contact' ? null : c;
+}
+
 export function mapMamamiaCustomerToPatientForm(
   cust: MamamiaCustomer | null,
 ): PatientFormPrefill {
@@ -1318,7 +1331,7 @@ export function mapMamamiaCustomerToPatientForm(
   // panel writes only to contract when an agent edits, so a customer who
   // has only contract.phone (manual panel edit) still round-trips into
   // the form cleanly.
-  const phoneValue = cust.phone || cust.customer_contract?.phone;
+  const phoneValue = cust.phone || patientenVertrag(cust)?.phone;
   if (phoneValue) out.phone = phoneValue;
 
   if (cust.day_care_facility === 'yes') out.pflegedienst = 'Ja';
@@ -1367,11 +1380,9 @@ export function mapMamamiaCustomerToPatientForm(
     cust.pets, cust.is_pet_dog, cust.is_pet_cat, cust.is_pet_other,
   );
 
-  // Address z customer_contract (singular, 1:1). Bug #16 (2026-05-12) refactor
-  // — beta miała plural customer_contracts[] z contact_type='patient_contact'
-  // discriminator. Prod ma singular. Singular field istnieje w obu środowiskach
-  // (na becie zwraca pierwszy z plural).
-  const contract = cust.customer_contract;
+  // Address z customer_contract (singular). Po akcepcie singular bywa wierszem
+  // Auftraggebera (contract_contact) — patientenVertrag() go wtedy pomija (Registry #131).
+  const contract = patientenVertrag(cust);
   if (contract?.zip_code) out.plz = contract.zip_code;
   if (contract?.city) out.ort = contract.city;
 

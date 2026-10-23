@@ -1,11 +1,10 @@
-"use client";
-
 import Image from "next/image";
 import { Header } from "@/components/calculator/Header";
 import { TestimonialCard } from "@/components/calculator/TestimonialCard";
 import { HowItWorks } from "@/components/calculator/HowItWorks";
-import { BestpriceGuarantee } from "@/components/calculator/BestpriceGuarantee";
+import { BestpriceGuarantee, BestpreisKarte } from "@/components/calculator/BestpriceGuarantee";
 import { TestsiegerSection } from "@/components/calculator/TestsiegerSection";
+import { BestpreisSiegelLink } from "@/components/calculator/BestpreisSiegelLink";
 import { FAQSection } from "@/components/calculator/FAQSection";
 import { ComparisonSection } from "@/components/calculator/ComparisonSection";
 import { FinalCTA } from "@/components/calculator/FinalCTA";
@@ -17,12 +16,32 @@ import { RequirementsSection } from "@/components/calculator/RequirementsSection
 import { KeyBenefitsBar } from "@/components/calculator/KeyBenefitsBar";
 import { PersonalContact } from "@/components/calculator/PersonalContact";
 import { homePageGraph, jsonLdString } from "@/lib/seo-schema";
+import { BewertungsZeile } from "@/components/calculator/BewertungsZeile";
+import { ladeSterneStand } from "@/lib/sterne-zeile-laden";
 
-export default function HomePage() {
+// Server-Komponente (seit 17.09.2026, vorher "use client"), damit die
+// Bewertungszahl im ersten HTML steht statt nachzuspringen. Alle Bausteine mit
+// Zustand oder Klicks tragen ihr eigenes "use client". Die Zahl kommt höchstens
+// eine Stunde alt von primundus.de/api/bewertungen-stand (lib/sterne-zeile.ts).
+//
+// Je Anfrage gerendert, KEIN ISR (Registry #81, 20.09.2026): Mit
+// `revalidate = 3600` lieferte Next 13.5.1 die Startseite am 20.09. früh an
+// jeden Besucher als HTTP 304 ohne Inhalt aus (`x-nextjs-cache: HIT`, auch
+// direkt am Render-Host) — weiße Seite für alle, die den Rechner nicht schon
+// im Browser-Cache hatten. Bekannter Fehler dieser Next-Version: nach der
+// Hintergrund-Neuberechnung bleibt ein 304 im ISR-Cache hängen. /kosten-berechnen
+// rendert seit jeher je Anfrage (`force-dynamic`) und war gesund. Die Sterne
+// bleiben trotzdem stündlich gecacht: der Abruf in lib/sterne-zeile-laden.ts
+// nutzt den Next-Datencache (`next: { revalidate: 3600 }`), der auch in
+// dynamischen Seiten gilt.
+export const dynamic = 'force-dynamic';
+
+export default async function HomePage() {
+  const bewertung = await ladeSterneStand();
   return (
     <div className="min-h-screen bg-[#F8F7F5]">
       {/* Service + FAQPage-JSON-LD: landet über den SSR-Prerender im
-          initialen HTML, auch wenn diese Page "use client" ist. */}
+          initialen HTML. */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdString(homePageGraph()) }}
@@ -76,7 +95,9 @@ export default function HomePage() {
             sonst klebt es bei grossen Breiten in der Ecke. */}
         {/* Der Abstand zum Menue sitzt am Wrapper darueber (lg:pt-12), nicht
             hier — sonst addieren sich zwei Paddings. */}
-        <div className="mx-auto grid w-full max-w-[1280px] items-center lg:grid-cols-[46fr_54fr] lg:gap-12 lg:px-8 xl:gap-16">
+        {/* Eine Seitenbreite mit primundus.de (Martin 27.09.2026): Inhalt 1216 px, Behälter 1256 px mit
+            px-5 — Logo im Kopf, Hero und Fußzeile schließen links und rechts gleich ab. */}
+        <div className="mx-auto grid w-full max-w-[1256px] items-center lg:grid-cols-[46fr_54fr] lg:gap-12 lg:px-5 xl:gap-16">
 
           <div className="relative aspect-[1100/941] w-full overflow-hidden bg-[#F8F7F5] lg:order-2 lg:rounded-2xl">
             <Image
@@ -105,6 +126,12 @@ export default function HomePage() {
                 className="block h-auto w-full drop-shadow-[0_2px_10px_rgba(0,0,0,0.25)]"
               />
             </a>
+            {/* Bestpreisgarantie-Siegel rechts im Foto (Martin 12.09.: „das ist
+                das Entscheidende — ich will das auf der Website sehen"),
+                Gegenstück zum WELT-Siegel links; führt zur Garantie-Seite. */}
+            {/* Bestpreisgarantie-Siegel links neben dem WELT-Siegel (Martin 12.09.),
+                unten bündig; öffnet das kompakte Pop-up. */}
+            <BestpreisSiegelLink className="absolute bottom-[4%] left-[25%] z-10 block w-[34%] min-w-[130px] max-w-[240px]" />
           </div>
 
           {/* Weisser Grund auf dem Handy (Martin 16.08.): die Medialogos
@@ -159,19 +186,26 @@ export default function HomePage() {
                   Aufmerksamkeit erzeugen, damit es nicht ueberlesen wird, dass
                   wir Angebot und passende Pflegekraefte zeigen?"). Die Zeile war
                   durchgehend grau — beim Ueberfliegen verschwanden genau die
-                  beiden Dinge, die sie wertvoll machen. Bewusst NUR zwei:
-                  "100 % kostenfrei und unverbindlich" mitzubetonen wuerde die
-                  Hierarchie aufheben, und der Punkt steht ohnehin unter dem
-                  Button. Dunkelgrau + halbfett statt Koralle — Koralle wuerde
-                  mit dem Button direkt darunter konkurrieren. */}
+                  beiden Dinge, die sie wertvoll machen. Bewusst NUR zwei —
+                  eine dritte Hervorhebung wuerde die Hierarchie aufheben.
+                  Dunkelgrau + halbfett statt Koralle — Koralle wuerde mit dem
+                  Button direkt darunter konkurrieren. */}
+              {/* Satzende seit 17.09.2026 „Anreise in 3 Tagen möglich" statt
+                  „100 % kostenfrei und unverbindlich" (Martin: „aus den 5
+                  Punkten rausnehmen und im Hero machen statt kostenlos und
+                  unverbindlich"). Wortlaut wie in Anzeigen und Ablauf-Plakette
+                  (seit 14.09.). Unverbindlich sagen konkreter die Punkte
+                  darunter („Kein Vertrag vor Ihrer Auswahl"). */}
               <p className="mb-6 max-w-[520px] text-[16px] leading-relaxed text-[#5B5B5B] lg:text-[18px]">
-                Wir zeigen Ihnen sofort,{" "}
+                Sehen Sie in 2 Minuten,{" "}
                 <span className="font-semibold text-[#3D3D3D]">was es kostet</span> und{" "}
-                <span className="font-semibold text-[#3D3D3D]">welche Pflegekräfte verfügbar sind</span>{" "}
-                {/* Geschuetztes Leerzeichen: durch die fetten Anker verschob
-                    sich der Umbruch, und bei 375 px stand "– 100" am Zeilenende
-                    und "% kostenfrei" in der naechsten Zeile. */}
-                – 100&nbsp;% kostenfrei und unverbindlich.
+                {/* Die Zusage bleibt als EINE Zeile zusammen, der Strich haengt
+                    am Wort davor. Ohne das brach es auf dem iPhone in
+                    „– Anreise" / „in 3 Tagen möglich." (gemessen 390 px). Nach
+                    einem Gedankenstrich darf der Browser trotz geschuetztem
+                    Leerzeichen umbrechen — deshalb nowrap statt &nbsp;. */}
+                <span className="font-semibold text-[#3D3D3D]">welche Pflegekräfte verfügbar sind</span>&nbsp;–{" "}
+                <span className="whitespace-nowrap">Anreise in 3 Tagen möglich.</span>
               </p>
 
               {/* CTA-Modus jetzt auf ALLEN Breiten. Vorher lief auf dem
@@ -179,9 +213,12 @@ export default function HomePage() {
                   Interaktionsmodelle auf einer Seite. Das Overlay ist seit
                   heute ein echtes Modal (fixed, oben im Bild, eigener
                   Scrollbereich) und funktioniert in jeder Breite.
-                  Die drei Punkte unter dem Button stecken in MultiStepForm. */}
+                  Die Punkte unter dem Button stecken in MultiStepForm. */}
               <div className="mb-7 max-w-md">
-                <MultiStepForm mode="cta" />
+                <MultiStepForm mode="cta" bewertung={bewertung} />
+                {/* Bewertungssterne zentriert unter dem letzten Punkt, vor den
+                    Logos (Martin 17.09.2026). */}
+                <BewertungsZeile stand={bewertung} />
               </div>
 
             </div>
@@ -197,7 +234,7 @@ export default function HomePage() {
             mit dem Beleg-PDF folgt weiter unten auf der Seite. Sie dreimal
             zu zeigen war Wiederholung, kein Beweis. */}
         <div className="bg-white lg:bg-transparent">
-          <div className="mx-auto w-full max-w-[1280px] px-5 pb-2 lg:px-8 lg:pb-0 lg:pt-10">
+          <div className="mx-auto w-full max-w-[1256px] px-5 pb-2 lg:pb-0 lg:pt-10">
             {/* Linie OBEN und UNTEN (Martin 16.08.: "auch unter den Logos
                 einen Strich wie drueber") — die Reihe wird dadurch zu einem
                 eigenen Band statt zu einem offenen Anhaengsel. */}
@@ -241,30 +278,11 @@ export default function HomePage() {
 
       {/* Desktop: Side-by-side */}
       <section className="hidden lg:block py-14 px-5 bg-white">
-        <div className="max-w-[1280px] mx-auto">
+        <div className="max-w-[1216px] mx-auto">
           <div className="grid grid-cols-2 gap-8">
-            <div className="bg-gradient-to-br from-[#FAF8F5] to-[#F2EDE6] border-2 border-[#E5DFD6] rounded-2xl p-8 relative">
-              <div className="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#5C9F6E] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
-                ★ 100% Sorgenfrei
-              </div>
-
-              <div className="relative flex items-start gap-6 mt-4">
-                <div className="w-14 h-14 bg-[#708A95] rounded-2xl flex items-center justify-center flex-shrink-0">
-                  <svg className="w-7 h-7 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                  </svg>
-                </div>
-
-                <div className="flex-1">
-                  <h3 className="text-[22px] font-bold text-[#3D3D3D] mb-3">
-                   Überlassen Sie die Betreuung nicht dem Zufall.
-                  </h3>
-                  <p className="text-[15px] leading-relaxed text-[#5A5A5A]">
-                     Vertrauen Sie auf über 20 Jahre Erfahrung aus mehr als 60.000 Betreuungen – ohne Vermittlungsgebühr, täglich kündbar, taggenau abgerechnet. Kosten entstehen erst, wenn die Betreuungskraft tatsächlich bei Ihnen ist.
-                  </p>
-                </div>
-              </div>
-            </div>
+            {/* Linke Karte = Bestpreisgarantie (Martin 12.09.2026), dieselbe
+                Karte wie im mobilen Block — eine Quelle, kein Zweittext. */}
+            <BestpreisKarte kompakt />
 
             <div className="bg-white border-2 border-[#D4A843] rounded-2xl p-8 relative">
               <div className="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#D4A843] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
@@ -298,7 +316,7 @@ export default function HomePage() {
                   </p>
 
                   <p className="text-[15px] text-[#5A5A5A] leading-relaxed">
-                    Als bester Vermittler von 24-Stunden-Pflegekräften ausgezeichnet: Primundus steht für die beste Kombination aus Preis, Qualität und Kundenservice.
+                    DIE WELT hat Primundus sechsmal in Folge ausgezeichnet: Primundus steht für die beste Kombination aus Preis, Qualität und Kundenservice.
                   </p>
                 </div>
               </div>
@@ -319,7 +337,8 @@ export default function HomePage() {
       <CareServicesSection />
 
       <main className="w-full mx-auto px-5 max-w-[520px] md:max-w-[720px] lg:max-w-[900px] xl:max-w-[1000px]">
-        <div className="mt-12 mb-6 max-w-3xl mx-auto">
+        {/* Sprungziel der Sterne-Zeile im Hero (BewertungsZeile). */}
+        <div id="kundenstimmen" className="mt-12 mb-6 max-w-3xl mx-auto scroll-mt-24">
           <p className="text-xs md:text-sm font-bold uppercase tracking-wider text-[#A89279] mb-2">
             Kundenstimmen
           </p>
@@ -329,7 +348,7 @@ export default function HomePage() {
         </div>
 
         <div className="max-w-3xl mx-auto">
-          <TestimonialCard />
+          <TestimonialCard bewertung={bewertung} />
         </div>
       </main>
 

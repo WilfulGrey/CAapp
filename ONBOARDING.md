@@ -124,7 +124,7 @@ Przejście end-to-end: http://localhost:3000 → wypełnij wizard → po submit 
 
 > **Lokalny dev = ten sam backend co Render beta slot.** Nie mamy lokalnej Supabase instancji ani lokalnego Mamamia — wszystko idzie do `ycdwtrklpoqprabtwahi.supabase.co` + Mamamia preprod (`backend.prod.mamamia.app`). To znaczy: każdy lokalny submit tworzy realny lead w Supabase + realnego customer'a w Mamamia preprod tenant'cie. Używaj test'owych emaili (`mailinator.com` zalecane) i test'owych imion (`Test [Co-testujesz]`).
 >
-> **⚠️ "beta" vs "preprod" terminologia:** nasz Render slot nazywa się `caapp-beta` / `kostenrechner-beta` — to nasz staging deploy. Ale **Mamamia** ma dwa osobne tenanty: `backend.beta.mamamia.app` (Mamamia dev env, forward-going schema) i `backend.prod.mamamia.app` (Mamamia production-grade, legacy schema — to którego aktualnie używamy jako preprod). Patrz CLAUDE.md §"Naming convention" dla szczegółów + Bug #16 dla schema diff między nimi.
+> **⚠️ "beta" vs "preprod" terminologia:** nasz Render slot nazywa się `caapp-beta` / `kostenrechner-beta` — to nasz staging deploy. Ale **Mamamia** ma dwa osobne tenanty: `backend.beta.mamamia.app` (Mamamia dev env, forward-going schema) i `backend.prod.mamamia.app` (Mamamia production-grade, legacy schema — to którego aktualnie używamy jako preprod). Patrz CLAUDE.md §"Naming convention" dla szczegółów.
 
 ---
 
@@ -339,6 +339,10 @@ i `mamamia-proxy` wymagają dodatkowo `MAMAMIA_AGENCY_ID` (prod `3`, staging `18
 `MAMAMIA_PANEL_URL`. Konto agencyjne = dedykowane `kundenportal@primundus.de` (oba
 tenanty, osobne hasła; Registry #53) — nigdy konto osobiste. Sprawdzenie:
 `npx supabase secrets list --project-ref <REF>`.
+
+Opcjonalny przełącznik **`ANREISE_MAILS`** (`aus` = brak / `test` / `live`, Registry #119):
+mail o przyjeździe opiekunki. Brak sekretu = `aus` (tylko log w `detect-caregiver-events`),
+`test` = mail do zespołu zamiast do klienta, `live` = do klientów. Działa bez redeployu.
 
 **Local manual deploy** (NIE rób tego dla prod — patrz CLAUDE.md §"Emergency hotfix"):
 

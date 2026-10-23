@@ -14,9 +14,12 @@ import {
 import { buildVertragAttachmentPdf, formatSignedAtBerlin } from '@/lib/vertrag';
 import { appendJobParam, PORTAL_BASIS } from '@/lib/portal-url';
 import { sendezeitIso } from '@/lib/quiet-hours';
+import { erinnerungsplan, reservierungsEnde } from '@/lib/erinnerungsplan';
 import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { createHash } from 'crypto';
 import { kundenEmpfaenger } from '@/lib/empfaenger';
+import { holeBewertungsStand } from '@/lib/bewertungen-stand';
+import { MESSPUNKTE } from '@/lib/messpunkte';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
 // kostenrechner lead so the Nachfass emails can branch. Token-authenticated —
@@ -44,8 +47,9 @@ const ALLOWED_EVENTS = [
   // reine Analyse-Events, KEINE Team-Mail/Nachfass-Verzweigung.
   'patient_form_step',
   'patient_form_save_failed',
-  // Einsatzort eingegeben, aber nicht auf einen Mamamia-location_id auflösbar
-  // (z. B. österreichische PLZ) — Analyse-Event fürs Team, KEINE Mail.
+  // Einsatzort nicht auf einen Mamamia-location_id auflösbar — das Portal hat
+  // deshalb GAR NICHT gespeichert (Registry #65), der Kunde hängt fest. Mit
+  // Team-Mail, sonst erfährt es niemand.
   'patient_form_location_unresolved',
   'caregiver_invited',
   'caregiver_interest_shown',
@@ -91,6 +95,14 @@ const ALLOWED_EVENTS = [
   // Alarm für immer). Kein Stempel mamamia_sync_alerted_at (gehört dem roten
   // Buchungs-Alarm). TEAM-MAIL-ONLY.
   'acceptance_contact_alarm',
+  // Registry #119: detect-caregiver-events ({ mode: "anreise" }) meldet einen
+  // vollständigen Anreise-Eintrag der Agentur in mamamia. Eigener Zweig in
+  // handlePost (planeAnreise): Kundenmail über die Warteschlange, keine Team-Mail
+  // (die Kopie geht per BCC an info@).
+  'caregiver_arrival_scheduled',
+  // Registry #123: unsichtbare Messpunkte des Portals (Profil geöffnet, Einladen getippt, Pop-ups, Kosten, Fragen,
+  // Kalender). Reine Aufzeichnung — bewusst in KEINER Mail-Liste und ohne eigenen Zweig (lib/messpunkte.ts).
+  ...MESSPUNKTE,
 ];
 const TEAM_NOTIFY_EVENTS = [
   'patient_data_saved',
@@ -107,6 +119,11 @@ const TEAM_NOTIFY_EVENTS = [
   'caregiver_interest_shown',
   'application_received',
   'application_accepted_internal',
+  // Der Kunde kann seinen Patientenbogen nicht abschliessen, weil Mamamia
+  // seine PLZ nicht kennt. Ohne diese Mail merkt es niemand — und die
+  // Nachfass-Kette schickt ihm weiter Erinnerungen an ein Profil, das das
+  // System nicht annimmt (Registry #65).
+  'patient_form_location_unresolved',
 ];
 // Events, die in der Team-Mail einen Pflegekraft-Namen anzeigen sollen.
 // Liest caregiver_name aus dem Event-Metadata und steckt ihn als
@@ -142,6 +159,20 @@ const NON_DEDUPED_EVENTS = new Set([
   'acceptance_sync_alarm',       // jeder Alarm-Versuch wird aufgezeichnet
   'angebots_feedback',           // Tap + Detail = zwei Einträge; darf sich später ändern
   'bewertungs_feedback',         // Tap + Detail = zwei Einträge (Bewertungs-Seite)
+  // Jede abgelehnte PLZ zählt: korrigiert der Kunde „50348" zu „50384" (auch
+  // falsch), wäre der zweite Versuch sonst stumm und das Team sähe für immer
+  // nur den ersten.
+  'patient_form_location_unresolved',
+  // Jeder erreichte Schritt des Patientenbogens (metadata.step, 0-basiert:
+  // 1 = „Pflegebedarf", 2 = „Einsatzort & Start", 3 = „Wünsche & Aufgaben").
+  // Der Dedupe prüft nur (Lead, Typ), also blieb bis Registry #109 nur der
+  // ERSTE Schritt je Lead stehen — wo im Bogen abgebrochen wird, war nicht
+  // messbar. Keine Mail: weder in TEAM_NOTIFY_EVENTS noch in
+  // CUSTOMER_MAIL_EVENTS. Das Portal meldet jeden Schritt einmal je Sitzung.
+  'patient_form_step',
+  // Registry #123: jeder Messpunkt zählt (Profil/Einladen je Pflegekraft, Fragen je Frage) — der Dedupe hier prüft nur
+  // (Lead, Typ) und ließe je Lead nur den ersten stehen. Keine Mail, das Portal meldet jeden einmal je Sitzung.
+  ...MESSPUNKTE,
 ]);
 // Customer-facing Mails (an die Lead-Email) je Event. Trigger sind die neuen
 // Caregiver-Lifecycle-Events; das eigentliche Hooking aus Mamamia kommt
@@ -179,6 +210,21 @@ interface AcceptanceAlarmInfo {
   confirmed: boolean;
   pdf_uploaded: boolean;
   permanent: boolean;
+  /**
+   * Registry #82: wir haben gestempelt, aber Mamamia zeigt die Confirmation
+   * NICHT am Job dieser Bewerbung (Upload-Bramka hat nachgelesen). Buchungs-
+   * Problem trotz confirmed=true — eigener roter Fall, nicht der bernsteinfarbene
+   * "PDF fehlt"-Fall, dessen Text ausdrücklich "kein Kundenrisiko" behauptet.
+   */
+  booking_not_visible?: 'not_processed' | 'foreign_confirmation' | null;
+  /**
+   * Registry #88: Mamamia hat UNSERE Vertragsdaten abgelehnt (alle
+   * Validation-Keys unter contract_patient.* / contract_contact.*, z. B. die
+   * Anrede). Die Bewerbung ist dann sehr wahrscheinlich in Ordnung — der Mail-
+   * Text darf nicht „von der Agentur zurückgezogen" behaupten. Die Edge Function
+   * klassifiziert nach Struktur; hier wird nur verzweigt.
+   */
+  ursache?: 'vertragsdaten' | null;
   error?: string | null;
   age_minutes?: number | null;
   source: 'bridge' | 'cron' | 'sync-retry' | string;
@@ -242,28 +288,54 @@ function buildAcceptanceContactAlarmTemplate(lead: any, info: ContactAlarmInfo):
 function buildAcceptanceSyncAlarmTemplate(lead: any, info: AcceptanceAlarmInfo): EmailTemplate {
   const kunde = [lead.vorname, lead.nachname].filter(Boolean).join(' ') || lead.email || lead.id;
   const confirmCase = !info.confirmed;
+  // Registry #82 (Fall Berg): confirmed=true heisst nur, dass WIR gestempelt
+  // haben. Sagt die Upload-Bramka, dass Mamamia die Confirmation nicht am Job
+  // zeigt, ist das Kundenrisiko wie im confirmCase — also rot, nicht bernstein.
+  const bookingCase = !confirmCase && !!info.booking_not_visible;
+  const rot = confirmCase || bookingCase;
   const subject = confirmCase
     ? `🚨 ALARM: Buchung OHNE Mamamia-Bestätigung — ${kunde} (Bewerbung ${info.application_id})`
-    : `⚠️ ALARM: Vertrags-PDF fehlt in Mamamia — ${kunde} (Bewerbung ${info.application_id})`;
+    : bookingCase
+      ? `🚨 ALARM: Buchung nicht in Mamamia sichtbar — ${kunde} (Bewerbung ${info.application_id})`
+      : `⚠️ ALARM: Vertrags-PDF fehlt in Mamamia — ${kunde} (Bewerbung ${info.application_id})`;
 
   const lage = confirmCase
     ? 'Der Kunde hat die Buchung im Portal abgeschlossen (Unterschrift + Bestätigungsseite), aber in Mamamia existiert KEINE verbindliche Confirmation für diese Bewerbung. Der Kunde glaubt an eine Buchung, die aktuell nicht besteht.'
-    : 'Die Buchung ist in Mamamia bestätigt, aber der signierte Vertrag (PDF) konnte seit über 24 Stunden nicht hochgeladen werden. Kein unmittelbares Kundenrisiko — das Vertragsarchiv in Mamamia ist aber unvollständig.';
+    : bookingCase
+      ? 'Der Akzept wurde an Mamamia gesendet und bei uns als erledigt gestempelt — beim Nachlesen zeigt Mamamia die Confirmation aber NICHT am Job dieser Bewerbung. Der Kunde hat die Buchungs-Mail bekommen; in Mamamia bestätigt sie nichts.'
+      : 'Die Buchung ist in Mamamia bestätigt, aber der signierte Vertrag (PDF) konnte seit über 24 Stunden nicht hochgeladen werden. Kein unmittelbares Kundenrisiko — das Vertragsarchiv in Mamamia ist aber unvollständig.';
   const ursache = confirmCase
-    ? (info.permanent
+    ? (info.permanent && info.ursache === 'vertragsdaten'
+        ? 'Mamamia hat den Akzept abgelehnt, weil UNSERE Vertragsdaten nicht angenommen wurden (welches Feld: siehe „Mamamia-Fehler" unten). Die Bewerbung selbst ist davon nicht betroffen und sehr wahrscheinlich noch offen. Automatische Wiederholungen ändern nichts — die Daten bleiben dieselben.'
+        : info.permanent
         ? 'Mamamia hat den Akzept DAUERHAFT abgelehnt — wahrscheinlichste Ursache: die Bewerbung wurde von der Agentur zurückgezogen oder existiert nicht mehr. Automatische Wiederholungen ändern daran nichts.'
         : 'Der automatische Sync schlägt bisher fehl (transienter Fehler). Weitere automatische Versuche laufen alle 15 Minuten weiter — dieser Alarm kommt trotzdem, damit niemand auf den Automatismus wartet.')
-    : 'Der Upload-Schritt (StoreFile/UpdateConfirmation bzw. das PDF-Rendering) schlägt wiederholt fehl — Details in den Supabase-Logs (sync-acceptance / detect-caregiver-events).';
-  const schritte = confirmCase
+    : bookingCase
+      ? (info.booking_not_visible === 'foreign_confirmation'
+          ? 'Der gespeicherte Confirmation-Stempel gehört zu einer ANDEREN Bewerbung bzw. einem anderen Job (Registry #78). Der Vertrag wurde deshalb NICHT hochgeladen — sonst würde die fremde Confirmation umgehängt.'
+          : 'Mamamia hat die Confirmation auch nach mehreren Versuchen nicht am Job veröffentlicht. Entweder verarbeitet Mamamia sie noch nicht, oder sie ist dort gar nicht angekommen.')
+      : 'Der Upload-Schritt (StoreFile/UpdateConfirmation bzw. das PDF-Rendering) schlägt wiederholt fehl — Details in den Supabase-Logs (sync-acceptance / detect-caregiver-events).';
+  const schritte = confirmCase && info.permanent && info.ursache === 'vertragsdaten'
+    ? [
+        'SA-Portal → Kunde → Bewerbung öffnen und die Annahme manuell durchführen; das abgelehnte Feld dort von Hand setzen.',
+        'Nur bei Unklarheit den Kunden anrufen (z. B. Anrede, wenn ein Ehepaar betreut wird).',
+      ]
+    : confirmCase
     ? [
         'SA-Portal → Kunde → Bewerbung öffnen: existiert sie noch, welcher Status?',
         'Bewerbung zurückgezogen/weg: Kunden SOFORT kontaktieren — er wartet auf eine Pflegekraft, die nicht kommt.',
         'Bewerbung in Ordnung: Annahme manuell im SA-Portal durchführen.',
       ]
-    : [
-        'Supabase-Logs (sync-acceptance / detect-caregiver-events) prüfen.',
-        'Notfalls Vertrag aus der Buchungs-Team-Mail manuell in Mamamia hochladen.',
-      ];
+    : bookingCase
+      ? [
+          'SA-Portal → Kunde → Job der Bewerbung öffnen: ist dort eine verbindliche Buchung eingetragen?',
+          'Keine Buchung: Annahme manuell im SA-Portal durchführen — der Kunde wartet auf eine Pflegekraft.',
+          'Buchung vorhanden: Stempel (mamamia_confirmation_id) der Zeile prüfen — er zeigt auf die falsche Confirmation.',
+        ]
+      : [
+          'Supabase-Logs (sync-acceptance / detect-caregiver-events) prüfen.',
+          'Notfalls Vertrag aus der Buchungs-Team-Mail manuell in Mamamia hochladen.',
+        ];
 
   const daten: Array<[string, string]> = [
     ['Kunde', String(kunde)],
@@ -293,10 +365,10 @@ function buildAcceptanceSyncAlarmTemplate(lead: any, info: AcceptanceAlarmInfo):
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto;">
-      <div style="background-color: ${confirmCase ? '#dc2626' : '#d97706'}; color: white; padding: 16px 20px; border-radius: 8px 8px 0 0;">
+      <div style="background-color: ${rot ? '#dc2626' : '#d97706'}; color: white; padding: 16px 20px; border-radius: 8px 8px 0 0;">
         <h2 style="margin: 0; font-size: 18px;">${subject}</h2>
       </div>
-      <div style="border: 2px solid ${confirmCase ? '#dc2626' : '#d97706'}; border-top: none; border-radius: 0 0 8px 8px; padding: 20px;">
+      <div style="border: 2px solid ${rot ? '#dc2626' : '#d97706'}; border-top: none; border-radius: 0 0 8px 8px; padding: 20px;">
         <p style="margin-top: 0;"><strong>${lage}</strong></p>
         <p>${ursache}</p>
         <table style="border-collapse: collapse; width: 100%; font-size: 14px;">
@@ -526,25 +598,13 @@ async function resolveLeadJobUuid(
 // damit die Edge Function beim Versand die richtige Mail bauen kann.
 //
 // caregiver_interest_shown → 1 Reminder nach 1h (interest_reminder).
-// application_received → 4 Reminder im Crescendo (Ton: persönliche Nachfrage
-// von Marta, keine Drohkulisse — Martin, 2026-07-20):
-//   1h  (application_reminder)        "schon gesehen?"
-//   4h  (application_reminder_4h)     "kurze Frage"
-//   12h (application_reminder_12h)    "wie ist Ihr Eindruck?"
-//   70h (application_last_chance)     letzte Erinnerung vor dem 72h-Auto-Reject
-// Alle 3 tragen identische Cancel-Logik (siehe Edge Function): sobald der
-// Kunde reagiert hat (accept/reject) ODER der Lead beauftragt/nicht
-// interessiert ist, cancelt sich der jeweilige Reminder beim nächsten Tick.
+// application_received → drei Erinnerungen vom Ende der Reservierung aus gerechnet
+// (lib/erinnerungsplan.ts, Vorschau v2 26.09.2026): Ende − 52 h, − 24 h, − 8 h, nie
+// nachts, die letzte sicher vor der automatischen Absage. Jede Zeile trägt
+// `reserviert_bis`, damit die Mail den Countdown nennt. Abbruch beim Versand
+// (Edge Function): Reaktion auf die Bewerbung, beauftragt / nicht interessiert,
+// Reservierung abgelaufen (stopRegeln.ts).
 const REMINDER_DELAY_INTEREST_MIN = 60;
-const REMINDER_DELAYS_APPLICATION_MIN: { emailType: string; delay: number }[] = [
-  { emailType: 'application_reminder',     delay: 60 },
-  { emailType: 'application_reminder_4h',  delay: 4 * 60 },
-  { emailType: 'application_reminder_12h', delay: 12 * 60 },
-  // 70h — "letzte Chance"-Mail, ~2h vor dem 72h-Auto-Reject (separater
-  // Cron in detect-caregiver-events). Kündigt das automatische Freigeben
-  // an und bittet um Reaktion.
-  { emailType: 'application_last_chance',  delay: 70 * 60 },
-];
 
 async function scheduleReactionReminder(
   supabaseAdmin: any,
@@ -584,16 +644,31 @@ async function scheduleReactionReminder(
     mamamia_job_offer_id: jobOfferId,
   };
 
-  const tiers = triggerEvent === 'caregiver_interest_shown'
-    ? [{ emailType: 'interest_reminder', delay: REMINDER_DELAY_INTEREST_MIN }]
-    : REMINDER_DELAYS_APPLICATION_MIN;
+  let zeilen: { emailType: string; scheduledFor: string; extra?: Record<string, unknown> }[];
+  if (triggerEvent === 'caregiver_interest_shown') {
+    // Nachtruhe (Martin, 19.08.): zwischen 21:00 und 08:00 Berliner Zeit auf 8:00.
+    zeilen = [{ emailType: 'interest_reminder', scheduledFor: sendezeitIso(new Date(Date.now() + REMINDER_DELAY_INTEREST_MIN * 60 * 1000)) }];
+  } else {
+    // Ende der Reservierung wie Server und Portal: frühester echter Eingang des Paars.
+    const ende = await reservierungsEndeFuer(supabaseAdmin, leadId, caregiverId, jobOfferId);
+    // Schon geplant (dieselbe Bewerbung kam erneut an)? Dann nichts doppelt einplanen.
+    const { data: offen } = await supabaseAdmin
+      .from('scheduled_emails')
+      .select('id')
+      .eq('lead_id', leadId)
+      .eq('status', 'pending')
+      .like('email_type', 'application_erinnerung_%')
+      .filter('metadata->>caregiver_id', 'eq', String(caregiverId ?? ''))
+      .limit(1);
+    if (Array.isArray(offen) && offen.length > 0) return;
+    zeilen = erinnerungsplan(ende, new Date()).map((z) => ({
+      emailType: z.emailType,
+      scheduledFor: z.scheduledFor.toISOString(),
+      extra: { reserviert_bis: ende.toISOString() },
+    }));
+  }
 
-  for (const { emailType, delay } of tiers) {
-    // Nachtruhe (Martin, 19.08.): faellt die Erinnerung zwischen 21:00 und
-    // 08:00 Berliner Zeit, wird sie auf 8:00 morgens geschoben. Der
-    // 12-Stunden-Tier war der groesste Nacht-Sender (72 Mails in 30 Tagen),
-    // weil eine Bewerbung am fruehen Nachmittag zwangslaeufig nachts erinnert.
-    const scheduledFor = sendezeitIso(new Date(Date.now() + delay * 60 * 1000));
+  for (const { emailType, scheduledFor, extra } of zeilen) {
     try {
       await supabaseAdmin.from('scheduled_emails').insert({
         lead_id: leadId,
@@ -601,14 +676,120 @@ async function scheduleReactionReminder(
         recipient_email: recipientEmail,
         scheduled_for: scheduledFor,
         status: 'pending',
-        metadata,
+        metadata: { ...metadata, ...(extra ?? {}) },
       });
     } catch (e) {
       // Fire-and-forget — falls das Scheduling fehlschlägt, sollen weder
-      // die ursprüngliche Mail (A/B) noch die anderen Tiers blockiert sein.
+      // die ursprüngliche Mail (A/B) noch die anderen Erinnerungen blockiert sein.
       console.error(`scheduleReactionReminder ${emailType} failed:`, e instanceof Error ? e.message : String(e));
     }
   }
+}
+
+/** Ende der Reservierung einer Bewerbung: frühester echter (nicht `seeded`)
+ *  application_received desselben Paars (Pflegekraft, Job) + 72 h, abgerundet.
+ *  Jobfreie Ereignisse zählen mit (Altbestand, ein Job). Ohne Treffer: ab jetzt. */
+async function reservierungsEndeFuer(
+  supabaseAdmin: any, leadId: string, caregiverId: number | string | undefined, jobOfferId: number | null,
+): Promise<Date> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('lead_events')
+      .select('created_at, metadata')
+      .eq('lead_id', leadId)
+      .eq('event_type', 'application_received')
+      .filter('metadata->>caregiver_id', 'eq', String(caregiverId ?? ''));
+    const anker = ((data ?? []) as { created_at: string; metadata?: Record<string, unknown> | null }[])
+      .filter((e) => {
+        const m = e.metadata ?? {};
+        if (m.seeded === true) return false;
+        const job = m.mamamia_job_offer_id;
+        return jobOfferId == null || job == null || Number(job) === jobOfferId;
+      })
+      .map((e) => Date.parse(e.created_at));
+    const ende = reservierungsEnde(anker);
+    if (ende) return ende;
+  } catch (e) {
+    console.warn('reservierungsEndeFuer failed:', e instanceof Error ? e.message : String(e));
+  }
+  return reservierungsEnde([Date.now()])!;
+}
+
+/** „Reservierung abgelaufen" nach der automatischen Absage (Vorschau v2, Mail 16). Der Name
+ *  kommt aus dem letzten Eingang dieser Bewerbung — detect-caregiver-events schickt ihn nicht
+ *  mit. Pro Lead, Pflegekraft und Job nur einmal. Mehrere am selben Tag fasst die Edge
+ *  Function beim Versand zu einer Mail zusammen. */
+async function planeReservierungBeendet(
+  supabaseAdmin: any, lead: { id: string; email?: string | null }, caregiverId: unknown, jobOfferId: number | null,
+): Promise<void> {
+  if (caregiverId == null || !lead.email) return;
+  const cg = String(caregiverId);
+  const { data: vorhanden } = await supabaseAdmin
+    .from('scheduled_emails')
+    .select('id, metadata')
+    .eq('lead_id', lead.id)
+    .eq('email_type', 'reservierung_beendet')
+    .filter('metadata->>caregiver_id', 'eq', cg);
+  const doppelt = ((vorhanden ?? []) as { metadata?: Record<string, unknown> | null }[])
+    .some((z) => (z.metadata?.mamamia_job_offer_id ?? null) == jobOfferId);
+  if (doppelt) return;
+  const { data: eingang } = await supabaseAdmin
+    .from('lead_events')
+    .select('metadata')
+    .eq('lead_id', lead.id)
+    .eq('event_type', 'application_received')
+    .filter('metadata->>caregiver_id', 'eq', cg)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  const name = String(((eingang ?? [])[0]?.metadata as Record<string, unknown> | undefined)?.caregiver_name ?? '').trim();
+  if (!name) {
+    console.warn(`reservierung_beendet: kein Name für Pflegekraft ${cg} (lead ${lead.id}) — keine Mail`);
+    return;
+  }
+  await supabaseAdmin.from('scheduled_emails').insert({
+    lead_id: lead.id,
+    email_type: 'reservierung_beendet',
+    recipient_email: lead.email,
+    scheduled_for: sendezeitIso(new Date()),
+    status: 'pending',
+    metadata: { caregiver_id: caregiverId, caregiver_name: name, mamamia_job_offer_id: jobOfferId },
+  });
+}
+
+/** Anreise-Mail (Registry #119): Zeile in der Warteschlange, send-scheduled-emails baut die
+ *  Mail. Ein Stand = Job + Confirmation + test/live. Offene Zeilen desselben Stands werden
+ *  gecancelt (die Agentur hat vor dem Versand noch einmal geändert); „Geänderte Anreisedaten"
+ *  heißt es nur, wenn zu diesem Stand schon eine Mail RAUS ist. Liefert die Fehlermeldung
+ *  oder null. */
+async function planeAnreise(
+  supabaseAdmin: any, lead: { id: string; email: string }, jobOfferId: number, m: Record<string, unknown>, test: boolean,
+): Promise<string | null> {
+  const { data: zeilen, error } = await supabaseAdmin
+    .from('scheduled_emails')
+    .select('id, status, metadata')
+    .eq('lead_id', lead.id)
+    .eq('email_type', 'anreise')
+    .filter('metadata->>confirmation_id', 'eq', String(m.confirmation_id));
+  if (error) return error.message;
+  const eigene = ((zeilen ?? []) as { id: string; status: string; metadata?: Record<string, unknown> | null }[])
+    .filter((z) => Number(z.metadata?.mamamia_job_offer_id) === jobOfferId && (z.metadata?.test === true) === test);
+  const offen = eigene.filter((z) => z.status === 'pending').map((z) => z.id);
+  if (offen.length > 0) {
+    await supabaseAdmin
+      .from('scheduled_emails')
+      .update({ status: 'cancelled', error_message: 'neuere Anreisedaten', updated_at: new Date().toISOString() })
+      .in('id', offen)
+      .eq('status', 'pending');
+  }
+  const { error: insErr } = await supabaseAdmin.from('scheduled_emails').insert({
+    lead_id: lead.id,
+    email_type: 'anreise',
+    recipient_email: lead.email,
+    scheduled_for: sendezeitIso(new Date()),
+    status: 'pending',
+    metadata: { ...m, geaendert: eigene.some((z) => z.status === 'sent') },
+  });
+  return insErr ? insErr.message : null;
 }
 
 const corsHeaders = {
@@ -908,6 +1089,7 @@ async function handlePost(request: NextRequest) {
               confirmed: false,
               pdf_uploaded: false,
               permanent: true,
+              ursache: confErr.ursache === 'vertragsdaten' ? 'vertragsdaten' : null,
               error: typeof confErr.message === 'string' ? confErr.message : String(confErr.message ?? ''),
               age_minutes: 0,
               source: 'bridge',
@@ -976,6 +1158,61 @@ async function handlePost(request: NextRequest) {
       return NextResponse.json({ ok: true }, { headers: corsHeaders });
     }
 
+    // 🚐 Anreise-Mail (Registry #119) — eigener Zweig VOR dem generischen Dedupe:
+    // Stand = (Job, Confirmation, arrival_key), test und live getrennt. Gleicher
+    // Stand wie zuletzt ⇒ nichts. Sonst Mail einplanen, DANACH das Ereignis —
+    // scheitert das Einplanen, fehlt das Ereignis und detect meldet im nächsten
+    // Lauf erneut (planeAnreise räumt dann die alte offene Zeile ab, kein Doppel).
+    // Vermittler (Registry #59) und Leads ohne Adresse bekommen keine Mail, aber
+    // das Ereignis (seeded) — sonst fragt detect jede Viertelstunde wieder.
+    if (event === 'caregiver_arrival_scheduled') {
+      const m = (metadata ?? {}) as Record<string, unknown>;
+      const confId = Number(m.confirmation_id);
+      const key = typeof m.arrival_key === 'string' ? m.arrival_key : '';
+      if (!Number.isFinite(confId) || !key || mamamiaJobOfferId == null) {
+        return NextResponse.json(
+          { error: 'confirmation_id, arrival_key, mamamia_job_offer_id required' },
+          { status: 400, headers: corsHeaders },
+        );
+      }
+      const test = m.test === true;
+      const { data: vorher, error: vorherErr } = await supabase
+        .from('lead_events')
+        .select('metadata')
+        .eq('lead_id', lead.id)
+        .eq('event_type', event)
+        .eq('mamamia_job_offer_id', mamamiaJobOfferId)
+        .filter('metadata->>confirmation_id', 'eq', String(confId))
+        .order('created_at', { ascending: false });
+      if (vorherErr) {
+        return NextResponse.json({ error: vorherErr.message }, { status: 500, headers: corsHeaders });
+      }
+      const letzter = ((vorher ?? []) as { metadata?: Record<string, unknown> | null }[])
+        .find((v) => (v.metadata?.test === true) === test);
+      if (letzter?.metadata?.arrival_key === key) {
+        return NextResponse.json({ ok: true, deduped: true }, { headers: corsHeaders });
+      }
+      const ohneMail = lead.vermittler ? 'vermittler' : !lead.email ? 'keine_email' : null;
+      if (!ohneMail) {
+        const fehler = await planeAnreise(supabase, lead, mamamiaJobOfferId, m, test);
+        if (fehler) {
+          console.error(`anreise schedule failed (lead=${lead.id}, job=${mamamiaJobOfferId}):`, fehler);
+          return NextResponse.json({ error: 'schedule failed' }, { status: 500, headers: corsHeaders });
+        }
+      }
+      const { error: evErr } = await supabase.from('lead_events').insert({
+        lead_id: lead.id,
+        event_type: event,
+        mamamia_job_offer_id: mamamiaJobOfferId,
+        metadata: { source: 'detect', ...m, ...(ohneMail ? { seeded: true, skipped: ohneMail } : {}) },
+      });
+      if (evErr) {
+        console.error(`anreise event insert failed (lead=${lead.id}):`, evErr.message);
+        return NextResponse.json({ error: 'event insert failed' }, { status: 500, headers: corsHeaders });
+      }
+      return NextResponse.json({ ok: true, ...(ohneMail ? { skipped: ohneMail } : {}) }, { headers: corsHeaders });
+    }
+
     // Dedupe rule per event:
     // - portal_opened / patient_data_saved → milestone (only first matters
     //   for Nachfass branching). Skip if already recorded.
@@ -1034,6 +1271,11 @@ async function handlePost(request: NextRequest) {
         confirmed: m.confirmed === true,
         pdf_uploaded: m.pdf_uploaded === true,
         permanent: m.permanent === true,
+        booking_not_visible: m.booking_not_visible === 'not_processed' ||
+            m.booking_not_visible === 'foreign_confirmation'
+          ? m.booking_not_visible
+          : null,
+        ursache: m.ursache === 'vertragsdaten' ? 'vertragsdaten' : null,
         error: typeof m.error === 'string' ? m.error : null,
         age_minutes: typeof m.age_minutes === 'number' ? m.age_minutes : null,
         // 'cron' (15-Min-Backstop) oder 'sync-retry' (Chain 15/30/60 s).
@@ -1129,7 +1371,19 @@ async function handlePost(request: NextRequest) {
                     ? (metadata as Record<string, unknown>).mamamia_accepted
                     : undefined,
                 }
-              : undefined);
+              : (event === 'patient_form_location_unresolved' && metadata && typeof metadata === 'object'
+                  ? {
+                      // Ohne diese Felder stünde in der Mail nur „Lead-Update" —
+                      // das Team braucht die PLZ, um anrufen zu können.
+                      PLZ: (metadata as Record<string, unknown>).plz || '(leer)',
+                      Ort: (metadata as Record<string, unknown>).ort || '(leer)',
+                      // Nur wenn zutreffend — sonst stünde in jeder Mail ein
+                      // „false", das niemand braucht.
+                      ...((metadata as Record<string, unknown>).lookup_down === '1'
+                        ? { Hinweis: 'Die Ortssuche war nicht erreichbar — evtl. eine Störung, nicht die PLZ.' }
+                        : {}),
+                    }
+                  : undefined));
       const teamTemplate = getTeamNotificationTemplate(lead as any, event, additionalData as any);
       // Nur die Accept-/Buchungs-Mail bekommt das erweiterte interne BCC.
       const teamMailOptions = event === 'application_accepted_internal'
@@ -1154,6 +1408,18 @@ async function handlePost(request: NextRequest) {
        fuenf Reaktions-Reminder. Team-Mails laufen weiter — wir wollen jede
        Bewerbung sehen. */
     const istVermittlerLead = Boolean((lead as any)?.vermittler);
+    // Automatische Absage nach 72 h ohne Antwort (detect-caregiver-events): Kunde
+    // erfährt, dass die Reservierung abgelaufen ist und die Suche weiterläuft.
+    if (
+      event === 'application_rejected' && !istVermittlerLead && !teamOnlyResend && !silent &&
+      metadata && typeof metadata === 'object' && (metadata as Record<string, unknown>).reason === 'auto_timeout_72h'
+    ) {
+      try {
+        await planeReservierungBeendet(supabase, lead as any, (metadata as Record<string, unknown>).caregiver_id, mamamiaJobOfferId);
+      } catch (e) {
+        console.error('reservierung_beendet schedule failed:', e instanceof Error ? e.message : String(e));
+      }
+    }
     if (istVermittlerLead && CUSTOMER_MAIL_EVENTS.has(event)) {
       console.log(`[lead-event] ${event}: Vermittler-Lead ${lead.id} — keine Kundenmail, kein Reminder`);
     }
@@ -1200,13 +1466,31 @@ async function handlePost(request: NextRequest) {
           console.log(`lead-event patient_data_saved: Einsatzort unresolved — Mail D unterdrückt (lead ${lead.id})`);
         } else {
           const portalUrl = buildPortalUrl(lead as any);
-          const template = getPatientDataSavedEmailTemplate(lead as any, portalUrl);
           // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
           const umlD = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
-          sendEmail(umlD?.empfaenger ?? (lead as any).email, umlD ? { ...template, subject: umlD.betreffPraefix + template.subject } : template, undefined,
-            umlD ? undefined : { cc: kundenEmpfaenger(lead as any).cc }).catch((e) =>
-            console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
-          );
+          // Bewertungsstand in der Kette, nicht davor: die Antwort an das
+          // Portal wartet nicht auf primundus.de (holeBewertungsStand wirft nie).
+          holeBewertungsStand()
+            .then((bewertung) => {
+              const template = getPatientDataSavedEmailTemplate(lead as any, portalUrl, bewertung);
+              return sendEmail(umlD?.empfaenger ?? (lead as any).email, umlD ? { ...template, subject: umlD.betreffPraefix + template.subject } : template, undefined,
+                umlD ? undefined : { cc: kundenEmpfaenger(lead as any).cc });
+            })
+            .catch((e) =>
+              console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
+            );
+          // „Noch keine Bewerbung? So geht es schneller" nach 48 h (Vorschau v2, Mail 08).
+          // Entfällt beim Versand, wenn bis dahin eine Bewerbung oder ein Interesse kam.
+          supabase.from('scheduled_emails').insert({
+            lead_id: lead.id,
+            email_type: 'suche_stand_2tage',
+            recipient_email: (lead as any).email,
+            scheduled_for: sendezeitIso(new Date(Date.now() + 48 * 60 * 60 * 1000)),
+            status: 'pending',
+            metadata: {},
+          }).then(({ error }: { error: { message: string } | null }) => {
+            if (error) console.error('suche_stand_2tage schedule failed:', error.message);
+          });
         }
       } else if (event === 'offer_updated') {
         // Aktualisiertes Angebot — alter/neuer Preis + geänderte Angaben aus
@@ -1221,25 +1505,30 @@ async function handlePost(request: NextRequest) {
         } else {
           const rawChanged = Array.isArray(m.changed) ? (m.changed as Array<Record<string, unknown>>) : [];
           const portalUrl = buildPortalUrl(lead as any);
-          const template = getOfferUpdatedEmailTemplate(
-            lead as any,
-            {
-              oldBruttopreis: oldB,
-              newBruttopreis: newB,
-              newEigenanteil: Number.isFinite(Number(m.new_eigenanteil)) ? Number(m.new_eigenanteil) : null,
-              changed: rawChanged.map((c) => ({
-                name: typeof c?.name === 'string' ? c.name : undefined,
-                alt: typeof c?.alt === 'string' ? c.alt : undefined,
-                neu: typeof c?.neu === 'string' ? c.neu : undefined,
-              })),
-            },
-            portalUrl,
-          );
           const umlO = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
-          sendEmail(umlO?.empfaenger ?? (lead as any).email, umlO ? { ...template, subject: umlO.betreffPraefix + template.subject } : template, undefined,
-            umlO ? undefined : { cc: kundenEmpfaenger(lead as any).cc }).catch((e) =>
-            console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
-          );
+          holeBewertungsStand()
+            .then((bewertung) => {
+              const template = getOfferUpdatedEmailTemplate(
+                lead as any,
+                {
+                  oldBruttopreis: oldB,
+                  newBruttopreis: newB,
+                  newEigenanteil: Number.isFinite(Number(m.new_eigenanteil)) ? Number(m.new_eigenanteil) : null,
+                  changed: rawChanged.map((c) => ({
+                    name: typeof c?.name === 'string' ? c.name : undefined,
+                    alt: typeof c?.alt === 'string' ? c.alt : undefined,
+                    neu: typeof c?.neu === 'string' ? c.neu : undefined,
+                  })),
+                },
+                portalUrl,
+                bewertung,
+              );
+              return sendEmail(umlO?.empfaenger ?? (lead as any).email, umlO ? { ...template, subject: umlO.betreffPraefix + template.subject } : template, undefined,
+                umlO ? undefined : { cc: kundenEmpfaenger(lead as any).cc });
+            })
+            .catch((e) =>
+              console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
+            );
         }
       } else {
         // Caregiver-Event-Mails (A/B/C) — Foto inline einbetten (CID) —
@@ -1261,6 +1550,7 @@ async function handlePost(request: NextRequest) {
             caregiver,
             portalUrl,
             offer,
+            !!contractAttachment,
           )
             .then(({ template, attachments }) => {
               // Mail C (Buchungsbestätigung): Vertrag-HTML zusätzlich anhängen.

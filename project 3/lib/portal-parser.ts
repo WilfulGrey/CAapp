@@ -146,7 +146,7 @@ function zuordnen(
 }
 
 export function parsePflegehilfe(text: string): ParseErgebnis {
-  /* Weitergeleitete Mails lesbar machen (Test Zauner 01.09., prod uid 14):
+  /* Weitergeleitete Mails lesbar machen (Test-Lead 01.09., prod uid 14):
    * ein "Fwd:" verpackt jede Zeile in Zitat-Marker ("> \t...") und streut
    * Soft-Hyphens in die Labels ("Datenschutz­erklärung") — beides
    * unsichtbar, beides toedlich fuer den zeilenweisen "Label: Wert"-Blick
@@ -223,7 +223,7 @@ export function parsePflegehilfe(text: string): ParseErgebnis {
   const mobilitaet = map('Mobilität', [
     [/rollstuhl/i, 'rollstuhl'],
     [/bettl|immobil|liegend/i, 'bettlaegerig'],
-    /* VOR der hilfsmittel-Zeile: "Mobil ohne Hilfsmittel" (CSV Zauner)
+    /* VOR der hilfsmittel-Zeile: "Mobil ohne Hilfsmittel" (CSV-Fixture)
        enthaelt "hilfsmittel" und rutschte sonst in 'rollator'. */
     [/ohne hilfsmittel/i, 'mobil'],
     [/rollator|hilfsmittel|gehhilfe|eingeschr/i, 'rollator'],
@@ -372,7 +372,7 @@ export function parsePflegehilfe(text: string): ParseErgebnis {
  *
  * Nur der HTML-Teil der Pflegehilfe-Mail traegt Festnetz UND Mobil
  * (`<b>Festnetz:</b>` / `<b>Mobil:</b>` + `<a href="tel:…" title="Telefon">`,
- * prod uid 71 Steinbeck, 07.09.). Der text/plain-Teil hat an der Stelle nur
+ * prod uid 71, 07.09.). Der text/plain-Teil hat an der Stelle nur
  * "( tel: )", die CSV EINE Phone-Spalte (+ PhoneType). Zweite Nummern gingen
  * bis Registry #56 verloren.
  *

@@ -6,8 +6,8 @@ export function KeyBenefitsBar() {
   const benefits = [
     {
       icon: Clock,
-      title: 'Kurzfristiger',
-      subtitle: 'Betreuungsbeginn (4–7 Werktagen)',
+      title: 'Schneller Start',
+      subtitle: 'Anreise in 3 Tagen möglich',
     },
     {
       icon: Shield,

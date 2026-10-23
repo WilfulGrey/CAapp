@@ -533,6 +533,18 @@ export async function POST(request: NextRequest) {
               if (!rd.ok) {
                 const f = await rd.text().catch(() => '');
                 console.error(`Portal-Lead: Detailfelder nach Mamamia fehlgeschlagen (HTTP ${rd.status})`, f.slice(0, 200));
+              } else {
+                /* Auch die 200 lesen: die Identitaet (Kundenname = Haushalt,
+                   Kontaktzeile, Vermittler als Kontaktperson) laeuft in einer
+                   eigenen Mutation und meldet ihren Fehler im Body statt im
+                   Status — sonst bliebe der Kunde still "Bernd Walde".
+                   Retry ist derselbe Aufruf von Hand. */
+                const rj = await rd.json().catch(() => ({} as any));
+                const idErr = rj?.resync?.identity_error;
+                if (idErr) {
+                  console.error(`Portal-Lead: Identitaet nach Mamamia fehlgeschlagen (lead=${lead.id})`, String(idErr).slice(0, 300));
+                  await logEvent(lead.id, 'mamamia_identity_sync_failed', { error: String(idErr).slice(0, 300) });
+                }
               }
             } catch (e) {
               console.error('Portal-Lead: Detailfelder threw:', e instanceof Error ? e.message : String(e));

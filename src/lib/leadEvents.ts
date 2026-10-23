@@ -18,10 +18,41 @@ export type LeadEvent =
   | 'caregiver_declined'           // customer hat eine Pflegekraft abgelehnt (matching ODER interest)
   | 'caregiver_declined_undone'    // customer hat die Ablehnung rückgängig gemacht (Undo)
   | 'application_rejected'        // customer Bewerbung abgelehnt
-  | 'patient_form_step'           // Patientenbogen: Schritt erreicht (metadata.step) — Abbruch-Analyse
+  | 'patient_form_step'           // Patientenbogen: Schritt erreicht (metadata.step) — Abbruch-Analyse; Server speichert jeden (nicht dedupliziert, Registry #109), Sitzungs-Schlüssel mit Schritt (Registry #122)
   | 'patient_form_save_failed'    // Patientenbogen: Server-Save gescheitert (metadata.error)
-  | 'patient_form_location_unresolved' // Einsatzort eingegeben, aber kein Mamamia-location_id (z. B. AT-PLZ) — Team-Flag, keine Mail
-  | 'angebots_feedback';          // Rückmeldung zum Angebot: ein Tap + optionales Detail
+  | 'patient_form_location_unresolved' // Einsatzort nicht auf einen Mamamia-location_id auflösbar → Speichern abgelehnt (Registry #65); Team-Mail
+  | 'angebots_feedback'           // Rückmeldung zum Angebot: ein Tap + optionales Detail
+  // Unsichtbare Messpunkte (Registry #123, Martin 14.10.2026): nur aufzeichnen, nie eine Mail, nie ein Status-Wechsel.
+  // Der Server dedupliziert sie nicht (NON_DEDUPED_EVENTS); einmal je Sitzung zählt der Schlüssel in `dedupeKey`.
+  | Messpunkt;
+
+/** Die unsichtbaren Messpunkte des Portals (Registry #123). Spiegel von `project 3/lib/messpunkte.ts` (MESSPUNKTE) —
+ *  ein Test vergleicht beide Listen. */
+export const MESSPUNKTE = [
+  'profil_geoeffnet',         // Profil einer Pflegekraft geöffnet {caregiver_id, quelle, vor_speichern}
+  'einladen_getippt',         // „Einladen" getippt, auch mit Schloss vor dem Speichern {caregiver_id, quelle, vor_speichern}
+  'warum_geoeffnet',          // Pop-up „Warum erst die Pflegesituation?" geöffnet
+  'bestpreis_geoeffnet',      // Pop-up Bestpreisgarantie geöffnet
+  'kosten_aufgeklappt',       // „Alle Kosten im Überblick" aufgeklappt
+  'faq_geoeffnet',            // eine Häufige Frage aufgeklappt {frage}
+  'kalender_geoeffnet',       // Kalender des Startdatums geöffnet
+  'kalender_zu_ohne_datum',   // Kalender zu, ohne dass ein Tag gewählt wurde und das Feld leer ist
+  // Feld-Messung im Patientenbogen (Registry #132, Martin 16.10. „Ja“, 20.10. „mach was sinnvoll ist“):
+  'formular_sichtbar',        // erstes Feld des Patientenbogens zur Hälfte im Bild {schritt, vor_speichern}
+  'feld_beruehrt',            // ein Feld auf Seite 1 oder 3 angetippt oder fokussiert {schritt, feld, vor_speichern}
+  'weiter_blockiert',         // „Weiter“/„Speichern“ getippt, Pflichtangaben fehlen {schritt, offen, vor_speichern}
+  'zur_pflegesituation',      // Knopf oder Link ins Formular getippt {quelle, vor_speichern}
+] as const;
+export type Messpunkt = typeof MESSPUNKTE[number];
+
+/** Woher ein Profil geöffnet wurde. */
+export type ProfilQuelle = 'karte' | 'liste' | 'interesse' | 'bewerbung' | 'bearbeitet' | 'gebucht' | 'mail' | 'sonstige';
+/** Wo „Einladen" getippt wurde. */
+export type EinladenQuelle = 'karte' | 'interesse' | 'profil';
+/** Welcher Weg ins Formular führte (Registry #132): Kasten über den Pflegekräften, Pop-up „Warum erst die
+ *  Pflegesituation?", Karte einer Pflegekraft, „So geht es weiter", schwebende Frage, Mail-Link `goto=anfragen`,
+ *  „Stand heute" nach dem Absenden. */
+export type FormularQuelle = 'kasten' | 'warum' | 'karte' | 'schritte' | 'frage' | 'mail' | 'stand';
 
 // Mini-Snapshot der Nurse-Daten, die wir brauchen um eine declined-from-
 // Interest Pflegekraft im bearbeitet-Bereich als virtuelle MatchCard zu
@@ -74,15 +105,19 @@ export interface LeadEventMetadata {
   // 'matching' (oder undefined) wenn normal aus declineNurse.
   decline_origin?: 'interest' | 'matching';
   // patient_form_location_unresolved: die vom Kunden eingegebene PLZ + Ort,
-  // die sich nicht auf einen Mamamia-location_id auflösen ließen (z. B. AT).
+  // die sich nicht auf einen Mamamia-location_id auflösen ließen.
   plz?: string;
   ort?: string;
+  // patient_form_location_unresolved: gesetzt ('1'), wenn nicht Mamamia „kenne
+  // ich nicht" gesagt hat, sondern der Lookup selbst scheiterte (Proxy/Netz).
+  // Diese Variante geht mit notify=false raus — eine Störung ist Sache des
+  // Monitorings, nicht des Postfachs (Registry #65).
+  lookup_down?: string;
   // patient_data_saved: gesetzt ('1'), wenn der Einsatzort nicht aufgelöst
-  // werden konnte → Kostenrechner unterdrückt die "fertig"-Mail.
+  // werden konnte. Seit Registry #65 setzt das Portal die Flagge nicht mehr
+  // (ohne location_id wird gar nicht gespeichert); der Kostenrechner wertet
+  // sie weiter aus, weil ein vor dem Deploy geöffneter Tab sie noch schickt.
   location_unresolved?: string;
-  // patient_form_location_unresolved: gesetzt ('1') bei 4-stelliger PLZ
-  // (Österreich/Schweiz — nicht bedient) → Team weiß: nicht nachfassen.
-  outside_germany?: string;
   // angebots_feedback: die Antwort auf „Wie geht es bei Ihnen weiter?" und —
   // sofern der Kunde die Rückfrage nicht übersprungen hat — das Detail
   // (Grund bei „passt_nicht", Zeitpunkt bei „spaeter"). Das Detail kommt in
@@ -95,11 +130,23 @@ export interface LeadEventMetadata {
   // niemand wüsste, welche eine Mail ausgelöst hat (Lehre aus den Seed-
   // Events, Bug #25).
   feedback_final?: string;
+  // Messpunkte (Registry #123) — keine Personendaten, nur Kennungen und Zustände.
+  // profil_geoeffnet / einladen_getippt: woher, und ob die Pflegesituation noch nie gespeichert wurde.
+  quelle?: ProfilQuelle | EinladenQuelle | FormularQuelle;
+  vor_speichern?: boolean;
+  // faq_geoeffnet: kurzer Schlüssel der Frage (FAQ_SCHLUESSEL in FaqListe), nie der Wortlaut.
+  frage?: string;
+  // Feld-Messung (Registry #132): Schritt des Patientenbogens (0-basiert), Schlüssel des Felds (`data-field`, z. B.
+  // 'geschlecht'), offene Pflichtfelder als Schlüssel. Nie ein eingegebener Wert.
+  schritt?: number;
+  feld?: string;
+  offen?: string[];
 }
 
 // Session-level dedupe so a re-render or repeated save doesn't spam the
 // endpoint. For caregiver_invited we include the caregiver id in the key so
 // inviting different caregivers in the same session each produces an event.
+// For patient_form_step the step is part of the key (Registry #122).
 // For patient_data_saved we include phone so a re-save with an edited
 // number actually reaches the server (where leads.telefon gets refreshed).
 const sent = new Set<string>();
@@ -118,6 +165,40 @@ function dedupeKey(token: string, event: LeadEvent, metadata?: LeadEventMetadata
   if (event === 'angebots_feedback') {
     return `${token}:${event}:${metadata?.feedback_answer ?? ''}:${metadata?.feedback_detail ?? ''}`;
   }
+  // Einsatzort: PLZ UND die Störungs-Variante gehören in den Schlüssel. Ohne
+  // die PLZ bliebe eine Korrektur („50348" → „50384", auch falsch) stumm; ohne
+  // lookup_down würde ein Proxy-Ausfall (silent) den Schlüssel besetzen und die
+  // spätere ECHTE Ablehnung derselben PLZ schlucken — also genau die Mail, für
+  // die das Team-Ereignis existiert (Registry #65).
+  if (event === 'patient_form_location_unresolved') {
+    return `${token}:${event}:${metadata?.plz ?? ''}:${metadata?.lookup_down ?? ''}`;
+  }
+  // Patientenbogen: der erreichte Schritt gehört in den Schlüssel (Registry #122). Ohne ihn besetzte der erste Schritt
+  // den Schlüssel, und je Seitenaufruf kam nur er beim Server an — obwohl der Server seit Registry #109 jeden Schritt
+  // speichert. Wo im Bogen abgebrochen wird, war deshalb nicht messbar.
+  if (event === 'patient_form_step') {
+    return `${token}:${event}:${metadata?.step ?? ''}`;
+  }
+  // Messpunkte (Registry #123): je Pflegekraft einmal, getrennt vor und nach dem ersten Speichern (dieselbe Pflegekraft
+  // nach dem Speichern noch einmal anzusehen ist eine eigene Aussage); je Frage einmal. Die übrigen einmal je Sitzung.
+  if (event === 'profil_geoeffnet' || event === 'einladen_getippt') {
+    return `${token}:${event}:${metadata?.caregiver_id ?? ''}:${metadata?.vor_speichern ? 1 : 0}`;
+  }
+  if (event === 'faq_geoeffnet') {
+    return `${token}:${event}:${metadata?.frage ?? ''}`;
+  }
+  // Feld-Messung (Registry #132): je Feld einmal; „Weiter“ ohne Pflichtangaben je Schritt und Satz offener Felder
+  // einmal (wer ein Feld nachträgt und wieder scheitert, ist eine neue Aussage).
+  if (event === 'feld_beruehrt') {
+    return `${token}:${event}:${metadata?.feld ?? ''}`;
+  }
+  if (event === 'weiter_blockiert') {
+    return `${token}:${event}:${metadata?.schritt ?? ''}:${(metadata?.offen ?? []).join(',')}`;
+  }
+  // Weg ins Formular: je Quelle einmal (wer erst den Kasten, später den Karten-Knopf nimmt, zählt bei beiden).
+  if (event === 'zur_pflegesituation') {
+    return `${token}:${event}:${metadata?.quelle ?? ''}`;
+  }
   return `${token}:${event}`;
 }
 
@@ -131,7 +212,8 @@ export function reportLeadEvent(
    *  die endgültige Antwort feststeht. */
   notify?: boolean,
 ): void {
-  if (!token) return;
+  // Vorschau (?preview=…, Token „preview-token"): nichts an den Server senden.
+  if (!token || token === 'preview-token') return;
   const key = dedupeKey(token, event, metadata);
   if (sent.has(key)) return;
   sent.add(key);
@@ -170,7 +252,7 @@ export async function fetchLeadEvents(
   token: string | null | undefined,
   eventTypes?: LeadEvent[] | string[],
 ): Promise<FetchedLeadEvent[]> {
-  if (!token) return [];
+  if (!token || token === 'preview-token') return [];
   const params = new URLSearchParams({ token });
   if (eventTypes && eventTypes.length > 0) params.set('types', eventTypes.join(','));
   try {

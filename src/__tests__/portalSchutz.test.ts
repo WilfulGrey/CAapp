@@ -62,7 +62,7 @@ describe('ANSPRECHBARE_STATUS — Status der Partner-API (pflege-helfer24)', () 
   });
 });
 
-describe('parseDatum + Schutzregeln — deutsches Datumsformat (Bug: Zauner uid 14)', () => {
+describe('parseDatum + Schutzregeln — deutsches Datumsformat (Bug: uid 14)', () => {
   const jetzt = new Date(2026, 8, 1, 14, 0); // 01.09.2026 14:00
 
   it('liest "01.09.2026 11:05 Uhr" (echtes Portal-Format) — frische Anfrage passiert', () => {

@@ -5,13 +5,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { createClient } from '@supabase/supabase-js';
+import { adminDb as supabase } from '@/lib/admin-db';
 import { Loader2, Save, Edit2, Info } from 'lucide-react';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export default function ZuschussePage() {
   const [subsidies, setSubsidies] = useState<any[]>([]);

@@ -5,7 +5,7 @@ import { Phone, Calculator, Check } from "lucide-react";
 import Image from "next/image";
 import { openCalculator } from '@/lib/scroll-to-calculator';
 
-const WA_URL = `https://wa.me/4989200000830?text=${encodeURIComponent("Hallo Frau Wysocki, ich habe eine Rückfrage:")}`;
+const WA_URL = `https://wa.me/4989200000830?text=${encodeURIComponent("Hallo Frau Kapcio, ich habe eine Rückfrage:")}`;
 
 function WhatsAppIcon() {
   return (
@@ -99,7 +99,7 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
             className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#E76F63] hover:bg-[#D65E52] text-white font-semibold text-sm rounded-xl transition-all duration-200 shadow-md hover:shadow-lg"
           >
             <Calculator className="w-4 h-4" />
-            <span>Kosten & Pflegekräfte ansehen</span>
+            <span>Preis & Pflegekräfte ansehen</span>
           </a>
         </div>
       </DialogContent>

@@ -44,6 +44,8 @@ export interface SyncStore {
   fetchAcceptance(leadId: string, applicationId: number): Promise<AcceptanceRow | null>;
   stampConfirmed(leadId: string, applicationId: number, confirmationId: number | null): Promise<void>;
   stampPdfUploaded(leadId: string, applicationId: number, sha256: string | null): Promise<void>;
+  /** Job der Bewerbung aus dem Akzept-Event (Guard-Weg 3, Registry #78). Optional für Test-Fakes. */
+  fetchAcceptanceJobOfferId?(leadId: string, applicationId: number): Promise<number | null>;
 }
 
 export interface HandlerDeps {
@@ -190,6 +192,7 @@ async function runSyncOnce(
     supabase: {
       stampConfirmed: deps.store.stampConfirmed.bind(deps.store),
       stampPdfUploaded: deps.store.stampPdfUploaded.bind(deps.store),
+      fetchAcceptanceJobOfferId: (l, a) => deps.store.fetchAcceptanceJobOfferId?.(l, a) ?? Promise.resolve(null),
     } satisfies AcceptanceSyncSupabase,
     getAgencyToken: deps.getAgencyToken ?? (() =>
       getOrRefreshAgencyToken({
@@ -241,7 +244,13 @@ export async function runRetryChain(
     const lead = await deps.store.fetchLead(leadId);
     const row = await deps.store.fetchAcceptance(leadId, applicationId);
     if (!lead || !row) return;
-    if (row.mamamia_confirmed_at) {
+    // Registry #82: "confirm OK" heißt nur, dass WIR einen Stempel gesetzt haben.
+    // Sagt die Upload-Bramka nach der ganzen Chain, dass Mamamia unsere
+    // Confirmation am Job NICHT zeigt, ist das ein Buchungs-Problem — der Kunde
+    // hat "Neue Buchung" bekommen, Mamamia bestätigt nichts. Alarm jetzt, nicht
+    // in 24 h unter der Etikette "PDF fehlt" (Fall Berg schwieg 7 Tage).
+    const bookingNotVisible = lastResult?.booking_not_visible;
+    if (row.mamamia_confirmed_at && !bookingNotVisible) {
       console.log(`[retry-chain] exhausted — confirm OK, PDF pending, Cron-Backstop übernimmt (lead=${leadId}, app=${applicationId})`);
       return;
     }
@@ -256,11 +265,15 @@ export async function runRetryChain(
         metadata: {
           application_id: applicationId,
           caregiver_id: row.caregiver_id,
-          confirmed: false,
+          confirmed: !!row.mamamia_confirmed_at,
           pdf_uploaded: !!row.mamamia_pdf_uploaded_at,
           permanent: lastResult?.confirm_error?.permanent === true,
-          error: lastResult?.confirm_error?.message
-            ?? "confirm still missing after 15/30/60s retry chain",
+          booking_not_visible: bookingNotVisible,
+          ursache: lastResult?.confirm_error?.ursache,
+          error: bookingNotVisible
+            ? `Buchung nicht in Mamamia sichtbar (${bookingNotVisible}) — Confirmation ${row.mamamia_confirmation_id ?? "?"} nach 15/30/60s nicht am Job der Bewerbung`
+            : lastResult?.confirm_error?.message
+              ?? "confirm still missing after 15/30/60s retry chain",
           age_minutes: 2,
           source: "sync-retry",
         },
@@ -326,6 +339,25 @@ export function makeRealStore(url: string, serviceKey: string): SyncStore {
         .eq("lead_id", leadId)
         .eq("application_id", applicationId);
       if (error) throw new Error(`supabase stampPdfUploaded: ${error.message}`);
+    },
+    // Job der Bewerbung: die Bridge promotet metadata.mamamia_job_offer_id des
+    // Akzept-Events in die Spalte (route.ts, seit #25). Textvergleich auf dem
+    // JSON-Pfad — kein Cast, alte Events könnten Nicht-Zahlen tragen. Kopie in
+    // detect-caregiver-events (Edge Fns teilen keine Store-Module) — synchron halten.
+    async fetchAcceptanceJobOfferId(leadId, applicationId) {
+      const { data, error } = await client
+        .from("lead_events")
+        .select("mamamia_job_offer_id")
+        .eq("lead_id", leadId)
+        .eq("event_type", "application_accepted_internal")
+        .eq("metadata->>application_id", String(applicationId))
+        .not("mamamia_job_offer_id", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw new Error(`supabase fetchAcceptanceJobOfferId: ${error.message}`);
+      const id = (data as { mamamia_job_offer_id?: unknown } | null)?.mamamia_job_offer_id;
+      return typeof id === "number" ? id : null;
     },
   };
 }

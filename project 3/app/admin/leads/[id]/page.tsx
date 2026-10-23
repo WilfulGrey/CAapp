@@ -4,15 +4,11 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { createClient } from '@supabase/supabase-js';
+import { adminDb as supabase } from '@/lib/admin-db';
 import { Loader as Loader2, ArrowLeft, Mail, Phone, Calendar, MapPin, FileText, Clock, Download, CreditCard as Edit, Save, X, RefreshCw, User, BellOff, CircleCheck as CheckCircle, MessageSquare, Copy, Check } from 'lucide-react';
 import { PORTAL_BASIS } from '@/lib/portal-url';
 import { LABELS, FD_LABEL_KEYS } from '@/lib/angaben-labels';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { kontaktAnzeige } from '@/lib/portal-lead';
 
 export default function LeadDetailPage() {
   const params = useParams();
@@ -483,7 +479,7 @@ export default function LeadDetailPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              {[lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(' ') || 'Lead'} #{lead.id.slice(0, 8)}
+              {kontaktAnzeige(lead).name} #{lead.id.slice(0, 8)}
             </h1>
             <p className="text-gray-600 mt-1">Lead-Details und Timeline</p>
           </div>
@@ -674,6 +670,26 @@ export default function LeadDetailPage() {
               </div>
             ) : (
               <div className="space-y-3">
+                {/* Bei einem Vermittler-Lead adressieren die Felder oben die
+                    Agentur; der Haushalt steht in patient_* und war hier bisher
+                    nirgends zu sehen (der Block weiter unten haengt an
+                    order_confirmed_at, das ein Vermittler-Lead nie hat). */}
+                {lead.vermittler && lead.patient_nachname && (
+                  <div className="flex items-start gap-3 rounded-md bg-amber-50 border border-amber-200 p-3">
+                    <User className="w-5 h-5 text-amber-700 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-amber-800">Kunde (über Vermittler)</p>
+                      <p className="font-medium">
+                        {[lead.patient_anrede, lead.patient_vorname, lead.patient_nachname].filter(Boolean).join(' ')}
+                      </p>
+                      {(lead.patient_street || lead.kalkulation?.formularDaten?.plz) && (
+                        <p className="text-sm text-gray-600">
+                          {[lead.patient_street, [lead.kalkulation?.formularDaten?.plz, lead.kalkulation?.formularDaten?.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {lead.anrede && (
                   <div className="flex items-center gap-3">
                     <User className="w-5 h-5 text-gray-400" />
@@ -934,7 +950,7 @@ export default function LeadDetailPage() {
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Ab wann wird eine Betreuung benötigt?</p>
                       {isEditMode ? (
-                        angabenSelect('care_start_timing', [['sofort', 'Sofort (4–7 Werktage)'], ['2-4-wochen', 'In 2–4 Wochen'], ['1-2-monate', 'In 1–2 Monaten'], ['unklar', 'Ich informiere mich nur']], true)
+                        angabenSelect('care_start_timing', [['sofort', 'Sofort'], ['2-4-wochen', 'In 2–4 Wochen'], ['1-2-monate', 'In 1–2 Monaten'], ['unklar', 'Ich informiere mich nur']], true)
                       ) : (
                         <p className="font-medium">
                           {lead.care_start_timing
@@ -1669,6 +1685,7 @@ export default function LeadDetailPage() {
                   const eventLabels: Record<string, { label: string; color: string }> = {
                     angebot_requested: { label: 'Anfrage eingegangen', color: 'bg-blue-600' },
                     angebot_requested_duplicate: { label: 'Erneute Anfrage (Duplikat)', color: 'bg-gray-400' },
+                    website_einstieg: { label: 'Einstieg auf primundus.de', color: 'bg-gray-400' },
                     info_requested: { label: 'Info angefordert', color: 'bg-blue-400' },
                     info_requested_duplicate: { label: 'Info erneut angefordert (Duplikat)', color: 'bg-gray-400' },
                     email_eingangsbestaetigung_sent: { label: 'Eingangsbestätigung gesendet', color: 'bg-green-600' },
@@ -1694,6 +1711,7 @@ export default function LeadDetailPage() {
                     portal_opened: { label: 'Portal geöffnet', color: 'bg-blue-500' },
                     portal_reopened: { label: 'Portal erneut geöffnet', color: 'bg-blue-300' },
                     patient_data_saved: { label: 'Patientendaten gespeichert', color: 'bg-green-600' },
+                    patient_form_location_unresolved: { label: 'Einsatzort unbekannt — nicht gespeichert', color: 'bg-red-600' },
                     caregiver_invited: { label: 'Pflegekraft eingeladen', color: 'bg-[#8B7355]' },
                     caregiver_interest_shown: { label: 'Pflegekraft-Interesse (Mail A)', color: 'bg-[#8B7355]' },
                     caregiver_declined: { label: 'Pflegekraft abgelehnt (Kunde)', color: 'bg-gray-400' },
@@ -1701,6 +1719,11 @@ export default function LeadDetailPage() {
                     application_received: { label: 'Bewerbung eingegangen (Mail B)', color: 'bg-[#E76F63]' },
                     application_rejected: { label: 'Bewerbung abgelehnt (Kunde)', color: 'bg-gray-500' },
                     application_accepted_internal: { label: 'Pflegekraft gebucht (Mail C)', color: 'bg-green-700' },
+                    // Registry #119 — metadata.test = nur ans Team (ANREISE_MAILS=test).
+                    caregiver_arrival_scheduled: { label: 'Anreisedaten aus Mamamia (Mail eingeplant)', color: 'bg-green-600' },
+                    email_anreise_sent: { label: 'Anreise-Mail gesendet', color: 'bg-green-600' },
+                    email_anreise_failed: { label: 'Anreise-Mail fehlgeschlagen', color: 'bg-red-500' },
+                    email_anreise_cancelled: { label: 'Anreise-Mail abgebrochen', color: 'bg-gray-400' },
                     offer_updated: { label: 'Angebot angepasst', color: 'bg-amber-500' },
                     acceptance_sync_alarm: { label: '🚨 Mamamia-Sync-Alarm (Team-Mail)', color: 'bg-red-600' },
                     acceptance_contact_alarm: { label: '⚠️ Kontaktdaten nicht in Mamamia (Team-Mail)', color: 'bg-amber-500' },
@@ -1708,6 +1731,13 @@ export default function LeadDetailPage() {
                     folge_einsatz_detected: { label: 'Folge-Einsatz erkannt (neuer Mamamia-Job)', color: 'bg-[#E76F63]' },
                     angebots_feedback: { label: 'Rückmeldung zum Angebot', color: 'bg-[#8B7355]' },
                     rueckruf_erbeten: { label: '📞 Rückruf erbeten (aus dem Chat)', color: 'bg-amber-500' },
+                    kunde_kein_interesse: { label: '🛑 Kunde abgemeldet (Abschiedsmail)', color: 'bg-gray-600' },
+                    kunde_pausiert: { label: '⏸ Kunde: später melden (Wiedervorlage)', color: 'bg-amber-500' },
+                    kontakt_variante: { label: '🧪 Kontakt-Variante im Rechner', color: 'bg-gray-400' },
+                    telefon_nachgetragen: { label: '📞 Telefonnummer nachgetragen', color: 'bg-blue-500' },
+                    kunde_rueckmeldung: { label: '💬 Kunde nennt Grund (Abschiedsmail)', color: 'bg-amber-600' },
+                    rueckruf_erbeten_mail: { label: '📞 Rückruf erbeten (Abschiedsmail)', color: 'bg-amber-500' },
+                    email_wiedervorlage_sent: { label: 'Wiedervorlage gesendet', color: 'bg-green-600' },
                     // Postfach-Protokoll (Registry #47): Mail wurde kein
                     // echter Lead — Details (Betreff, Grund, Auszug) in
                     // den Metadaten.

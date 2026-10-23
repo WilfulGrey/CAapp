@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Primundus 24h-Pflege</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+    .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 20px 0; }
+    .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .email-header { background: #ffffff; padding: 24px 40px 20px 40px; border-bottom: 1px solid #f0ebe4; }
+    .email-content { padding: 40px 40px 32px; text-align: left; }
+    .email-footer { background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e0e0e0; }
+    /* Mouseover fuer den "Zum Profil"-Hinweis an der Empfehlung. Greift in
+       Apple Mail, iOS Mail und der Gmail-Weboberflaeche; Outlook Desktop
+       kennt kein :hover — dort bleibt der Link statisch, das ist in Ordnung.
+       Bewusst AUSSERHALB der Media-Query: Mauszeiger gibt es am Desktop. */
+    a.profil-link:hover { color: #E76F63 !important; text-decoration: underline !important; }
+    @media only screen and (max-width: 600px) {
+      .email-content { padding: 30px 20px; }
+      .price-stage-cell { display: block !important; width: 100% !important; padding: 18px 22px 16px !important; border-right: none !important; border-bottom: 1px solid #ebe2d2 !important; }
+      .price-stage-cell:last-child { border-bottom: none !important; }
+      /* Empfehlungs-Karte: Foto und Name bleiben AUCH auf dem Handy
+         nebeneinander — genau wie die Karte im Portal (MatchCard). 64 px Foto
+         plus Text passen bei 375 px bequem; ein Umbruch haette die Mail von
+         der Ansicht entfernt, die der Kunde eine Sekunde spaeter sieht.
+         Die Faktenzeile laeuft ohnehin ueber die volle Kartenbreite. */
+      .empf-foto { padding-left: 0 !important; }
+    }
+    /* Handy (11.09.2026): Signatur-Karte (buildMartaSig) — "DIE WELT" in eine
+       eigene Zeile, Siegelbild kleiner, sonst passt die Siegel-Spalte nicht
+       neben Foto + Name; Anrufen/WhatsApp duerfen umbrechen (17.09.2026,
+       Regeln aus martaKarte.ts). Kopfzeile mit 20 statt 40 px Rand wie in
+       lib/email-template.ts (Logo 160 + Siegel-Block brauchten mit 40 px
+       Rand 363 px). Eigene Grenze 480 statt 600 px: ein 600 px breites
+       Fenster behaelt exakt die Desktop-Optik. */
+    @media only screen and (max-width: 480px) {
+      .email-header { padding: 20px 20px 16px 20px !important; }
+      .sig-siegel-welt { display: block !important; }
+      .sig-siegel-bild { width: 48px !important; }
+      .sig-siegel-innen { padding: 6px 8px !important; }
+      .sig-pille { padding: 0 8px 0 0 !important; }
+      .sig-pille-link { display: inline-block !important; width: 44px !important; height: 44px !important; padding: 0 !important; border-radius: 22px !important; line-height: 44px !important; text-align: center !important; }
+      .sig-pille-text { display: none !important; }
+      .sig-pille-bild { width: 20px !important; height: 20px !important; margin: 0 !important; }
+      .sig-sterne-desktop { display: none !important; }
+      .sig-sterne-mobil { display: block !important; max-height: none !important; overflow: visible !important; }
+      /* Bestpreisgarantie-Zeile der Eingangsbestaetigung (Siegel 190 px +
+         Linktext) war auf 360–390 px breiter als der Bildschirm: Siegel
+         ueber den Link statt daneben (17.09.2026). */
+      .bpg-bild { display: block !important; width: auto !important; padding: 0 0 10px 0 !important; }
+      .bpg-text { display: block !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-wrapper">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+      <tr><td align="center">
+        <div class="email-container">
+          <div class="email-header">
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+              <tr>
+                <td style="vertical-align:middle;">
+                  <img src="https://kostenrechner.primundus.de/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
+                </td>
+                <td style="vertical-align:middle;text-align:right;">
+                  <table cellpadding="0" cellspacing="0" role="presentation" style="margin-left:auto;">
+                    <tr>
+                      <td style="text-align:center;vertical-align:middle;padding-right:8px;border-right:1px solid #f0ebe4;">
+                        <img src="https://kostenrechner.primundus.de/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="36" style="display:block;width:36px;height:auto;" />
+                      </td>
+                      <td style="text-align:left;padding-left:8px;">
+                        <!-- Siegel bewusst KOMPAKT: "6× Testsieger" statt "Testsieger" +
+                             eigener Zeile "6× in Folge". Der Block sitzt neben dem Logo in
+                             der Kopfzeile und hat wenig Platz — vier Zeilen wirkten
+                             gedraengt und liessen "Testsieger" ohne die Zahl stehen
+                             (Martin 28.08.2026). Im FLIESSTEXT, wo eine ganze Zeile zur
+                             Verfuegung steht, bleibt "6× in Folge" erwuenscht. -->
+                        <p style="margin:0 0 1px 0;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger</p>
+                        <p style="margin:0 0 1px 0;font-size:10px;color:#B5A184;white-space:nowrap;font-weight:600;">DIE WELT</p>
+                        <p style="margin:0;font-size:9px;color:#aaa;white-space:nowrap;">Preis &amp; Qualit&auml;t</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </div>
+          <div class="email-content">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#ffffff;">Ihre Anreisedaten: {{ANKUNFT_DATUM}}, {{ANKUNFT_ZEIT}}.</div>
+    <p style="font-size:16px;line-height:1.65;color:#4A4540;margin:0 0 14px;">{{ANREDE_ZEILE}},</p>
+    <p style="font-size:16px;line-height:1.65;color:#4A4540;margin:0 0 22px;">wir haben die Anreise Ihrer Pflegekraft organisiert. Nachfolgend finden Sie die Anreisedaten:</p>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 14px;border:1.5px solid #E5E3DF;border-radius:20px;background:#ffffff;border-collapse:separate;">
+      <tr><td style="background:#F2EDE6;color:#6B5A44;border-radius:18px 18px 0 0;padding:12px 18px;font-size:15.5px;font-weight:800;line-height:1.3;">Ihre Anreisedaten</td></tr>
+      <tr><td style="padding:4px 18px 4px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+          <tr>
+            <td width="112" style="width:112px;padding:12px 12px 12px 0;vertical-align:top;font-size:14.5px;line-height:1.45;color:#6B6B6B;">Pflegekraft</td>
+            <td style="padding:12px 0;vertical-align:top;font-size:15.5px;line-height:1.45;color:#2D1F0F;font-weight:700;overflow-wrap:anywhere;"><table cellpadding="0" cellspacing="0" role="presentation"><tr><td style="padding:0 10px 0 0;vertical-align:middle;"><!--[if mso]><img src="{{FOTO_URL}}" alt="" width="36" style="display:block;border:0;" /><![endif]--><!--[if !mso]><!--><img src="{{FOTO_URL}}" alt="" width="36" height="36" style="display:block;width:36px;height:36px;border-radius:18px;object-fit:cover;border:0;outline:none;" /><!--<![endif]--></td><td style="vertical-align:middle;font-size:15.5px;line-height:1.3;font-weight:700;color:#2D1F0F;">{{PFLEGEKRAFT_NAME}}</td></tr></table></td>
+          </tr>
+          <tr>
+            <td width="112" style="width:112px;padding:12px 12px 12px 0;vertical-align:top;font-size:14.5px;line-height:1.45;color:#6B6B6B;border-top:1px solid #EFEBE5;">Adresse</td>
+            <td style="padding:12px 0;vertical-align:top;font-size:15.5px;line-height:1.45;color:#2D1F0F;font-weight:700;overflow-wrap:anywhere;border-top:1px solid #EFEBE5;">{{STRASSE}}<br>{{PLZ_ORT}}<br><span style="font-weight:400;font-size:14px;color:#6B6B6B;">Hierhin wird {{PFLEGEKRAFT_VORNAME}} gebracht.</span></td>
+          </tr>
+          <tr>
+            <td width="112" style="width:112px;padding:12px 12px 12px 0;vertical-align:top;font-size:14.5px;line-height:1.45;color:#6B6B6B;border-top:1px solid #EFEBE5;">Verkehrsmittel</td>
+            <td style="padding:12px 0;vertical-align:top;font-size:15.5px;line-height:1.45;color:#2D1F0F;font-weight:700;overflow-wrap:anywhere;border-top:1px solid #EFEBE5;">{{VERKEHRSMITTEL}}</td>
+          </tr>
+          <tr>
+            <td width="112" style="width:112px;padding:12px 12px 12px 0;vertical-align:top;font-size:14.5px;line-height:1.45;color:#6B6B6B;border-top:1px solid #EFEBE5;">Ankunft</td>
+            <td style="padding:12px 0;vertical-align:top;font-size:15.5px;line-height:1.45;color:#2D1F0F;font-weight:700;overflow-wrap:anywhere;border-top:1px solid #EFEBE5;"><span style="white-space:nowrap;">{{ANKUNFT_DATUM}},</span> <span style="white-space:nowrap;">{{ANKUNFT_ZEIT}}</span></td>
+          </tr>
+          <!-- Zeile „Hinweis“ entfällt, wenn kein Hinweis eingetragen ist -->
+          <tr>
+            <td width="112" style="width:112px;padding:12px 12px 12px 0;vertical-align:top;font-size:14.5px;line-height:1.45;color:#6B6B6B;border-top:1px solid #EFEBE5;">Hinweis</td>
+            <td style="padding:12px 0;vertical-align:top;font-size:15.5px;line-height:1.45;color:#2D1F0F;font-weight:700;overflow-wrap:anywhere;border-top:1px solid #EFEBE5;"><span style="font-weight:400;color:#4A4540;">{{HINWEIS}}</span></td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+    <p style="font-size:16px;line-height:1.65;color:#4A4540;margin:8px 0 14px;">Sollte etwas nicht stimmen, melden Sie sich bitte bei mir unter <a href="tel:+4989200000830" style="color:#6B5A44;font-weight:700;text-decoration:none;white-space:nowrap;">089&nbsp;200&nbsp;000&nbsp;830</a> (auch per WhatsApp) oder antworten Sie auf diese E-Mail. Ansonsten melde ich mich nach der Anreise bei Ihnen und frage nach, ob alles gut klappt.</p>
+    <p style="font-size:16px;line-height:1.65;color:#4A4540;margin:0;">Ich wünsche Ihnen und {{PFLEGEKRAFT_VORNAME}} einen guten Start.</p>
+    <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
+    
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
+  <tr>
+    <td style="padding:18px 20px 16px;background:#ffffff;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="vertical-align:top;">
+            <table cellpadding="0" cellspacing="0" role="presentation">
+              <tr>
+                <td style="padding-right:12px;vertical-align:top;">
+                  <img src="https://primundus.de/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
+                </td>
+                <td style="vertical-align:middle;">
+                  <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;text-align:left;">Marta Kapcio</p>
+                  <p style="margin:0 0 2px;font-size:13px;color:#555;text-align:left;">Pflegeberaterin</p>
+                  <p style="margin:0;font-size:12px;color:#9a8a73;text-align:left;"><span style="white-space:nowrap;">Mo – So,</span> <span style="white-space:nowrap;">8 – 20 Uhr</span></p>
+                </td>
+              </tr>
+            </table>
+            <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
+              <tr>
+                <td class="sig-pille" style="padding-right:6px;"><a class="sig-pille-link" href="tel:+4989200000830" aria-label="Marta anrufen: 089 200 000 830" title="Marta anrufen: 089 200 000 830" style="display:inline-block;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;white-space:nowrap;background-color:#f0ebe4;font-weight:500;color:#3D2B1F;"><img class="sig-pille-bild" src="https://kostenrechner.primundus.de/images/mail-icon-telefon.png" alt="" width="16" height="16" style="display:inline-block;width:16px;height:16px;border:0;vertical-align:middle;margin-right:6px;" /><span class="sig-pille-text" style="vertical-align:middle;">Anrufen</span></a></td>
+                <td class="sig-pille"><a class="sig-pille-link" href="https://wa.me/4989200000830" aria-label="WhatsApp an Marta: 089 200 000 830" title="WhatsApp an Marta: 089 200 000 830" style="display:inline-block;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;white-space:nowrap;background-color:#25D366;font-weight:600;color:#ffffff;"><img class="sig-pille-bild" src="https://kostenrechner.primundus.de/images/mail-icon-whatsapp.png" alt="" width="16" height="16" style="display:inline-block;width:16px;height:16px;border:0;vertical-align:middle;margin-right:6px;" /><span class="sig-pille-text" style="vertical-align:middle;">WhatsApp</span></a></td>
+              </tr>
+            </table>
+            <div class="sig-sterne-desktop"><p style="margin:10px 0 0;font-size:12.5px;line-height:1.5;color:#555;text-align:left;"><span style="white-space:nowrap;"><span style="color:#D4A843;letter-spacing:1px;">&#9733;&#9733;&#9733;&#9733;&#9733;</span>&nbsp;<strong style="color:#3D2B1F;">4,9</strong> von 5&nbsp;&middot;</span> <a href="https://primundus.de/erfahrungen" style="color:#8B7355;font-weight:600;text-decoration:none;white-space:nowrap;">126 Bewertungen&nbsp;&rarr;</a></p></div>
+          </td>
+          <td style="vertical-align:top;text-align:right;padding-left:12px;">
+            <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
+              <tr>
+                <td class="sig-siegel-innen" style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
+                  <img class="sig-siegel-bild" src="https://kostenrechner.primundus.de/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
+                  <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;text-align:center;"><span style="white-space:nowrap;">6× Testsieger</span> <span class="sig-siegel-welt" style="color:#B5A184;white-space:nowrap;">DIE WELT</span></p>
+                  <p style="margin:0;font-size:10px;color:#888;line-height:1.4;text-align:center;"><span style="white-space:nowrap;">Preis, Qualität &amp;</span><br>Kundenservice</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+      <div class="sig-sterne-mobil" style="display:none;mso-hide:all;max-height:0;overflow:hidden;"><p style="margin:12px 0 0;font-size:12px;line-height:1.5;color:#555;text-align:left;"><span style="white-space:nowrap;"><span style="color:#D4A843;letter-spacing:1px;">&#9733;&#9733;&#9733;&#9733;&#9733;</span>&nbsp;<strong style="color:#3D2B1F;">4,9</strong> von 5&nbsp;&middot;</span> <a href="https://primundus.de/erfahrungen" style="color:#8B7355;font-weight:600;text-decoration:none;white-space:nowrap;">126 Bewertungen&nbsp;&rarr;</a></p></div>
+    </td>
+  </tr>
+  <tr>
+    <td style="background:#f9f6f2;border-top:1px solid #e8ddd0;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+        <td style="padding:12px 4px;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Über 20 Jahre<br>Erfahrung</p></td>
+        <td style="padding:12px 4px;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">60.000+<br>betreute Einsätze</p></td>
+        <td style="padding:12px 4px;text-align:center;width:33%;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Bestpreisgarantie,<br>keine Vermittlungs&shy;gebühr</p></td>
+      </tr></table>
+    </td>
+  </tr>
+  <tr>
+    <td style="background:#ffffff;border-top:1px solid #e8ddd0;padding:12px 16px;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+        <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="https://kostenrechner.primundus.de/images/media/die-welt.webp" alt="DIE WELT" width="68" height="14" style="display:inline-block;width:68px;max-width:100%;height:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+        <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="https://kostenrechner.primundus.de/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" width="103" height="14" style="display:inline-block;width:103px;max-width:100%;height:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+        <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="https://kostenrechner.primundus.de/images/media/ard.webp" alt="ARD" width="38" height="14" style="display:inline-block;width:38px;max-width:100%;height:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+        <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="https://kostenrechner.primundus.de/images/media/ndr.webp" alt="NDR" width="21" height="14" style="display:inline-block;width:21px;max-width:100%;height:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+        <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="https://kostenrechner.primundus.de/images/media/sat1.webp" alt="SAT.1" width="45" height="14" style="display:inline-block;width:45px;max-width:100%;height:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+        <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="https://kostenrechner.primundus.de/images/media/bild-der-frau.webp" alt="Bild der Frau" width="12" height="14" style="display:inline-block;width:12px;max-width:100%;height:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+      </tr></table>
+    </td>
+  </tr>
+</table>
+          </div>
+          <div class="email-footer">
+            <div style="font-weight:600;font-size:15px;color:#3D2B1F;margin-bottom:6px;">Primundus Deutschland</div>
+            <div style="font-size:13px;color:#666;line-height:1.8;">
+              24h-Pflege und Betreuung zu Hause<br>
+              <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> |
+              <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a><br>
+              <a href="https://primundus.de" style="color:#0066CC;text-decoration:none;">www.primundus.de</a>
+            </div>
+            <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">
+              Diese E-Mail wurde versendet an: {{EMAIL}}<br>
+              Primundus Deutschland<br><br>
+              Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.<br><a href="{{ABMELDE_URL}}" style="color:#999;text-decoration:underline;">Keine E-Mails mehr erhalten</a>
+            </div>
+          </div>
+        </div>
+      </td></tr>
+    </table>
+  </div>
+</body>
+</html>

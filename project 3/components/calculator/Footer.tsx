@@ -11,7 +11,7 @@ export function Footer() {
   };
   return (
     <footer className="bg-[#3D3D3D] text-white">
-      <div className="max-w-[1200px] mx-auto px-5 py-12">
+      <div className="max-w-[1256px] mx-auto px-5 py-12">
         <div className="flex justify-between items-start mb-10">
           <div>
             <Link href="/">

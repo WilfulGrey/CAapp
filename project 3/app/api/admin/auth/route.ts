@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'primundus2026';
+// Kein Ersatzwert (öffentliches Repo) — ohne Variable gibt es keinen Login.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 export async function POST(request: NextRequest) {
   const { password } = await request.json();
 
-  if (password !== ADMIN_PASSWORD) {
+  if (!ADMIN_PASSWORD || password !== ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Ungültiges Passwort' }, { status: 401 });
   }
 

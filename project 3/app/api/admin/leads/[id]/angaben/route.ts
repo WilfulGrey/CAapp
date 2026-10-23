@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { berechnePreis, type FormularDaten, type Kalkulation } from '@/lib/calculation';
 import { diffAngaben, mamamiaFelder, type Aenderung } from '@/lib/angaben-diff';
 import { angabenLabel, FELD_NAMEN } from '@/lib/angaben-labels';
+import { ohnePending, syncMamamia } from '@/lib/mamamia-abgleich';
 
 /**
  * Admin-Korrektur der Kundenangaben (Registry #55, Fall Rapp).
@@ -13,9 +14,10 @@ import { angabenLabel, FELD_NAMEN } from '@/lib/angaben-labels';
  *   2. Optional Neuberechnung (berechnePreis) — der Admin entscheidet.
  *   3. Erster leads-Update (kalkulation, care_start_timing) — Supabase ist die
  *      Kundenwahrheit und darf nicht an einem Mamamia-Timeout hängen.
- *   4. Mamamia-Sync über onboard-to-mamamia { lead_id, resync } (service_role),
- *      diff-driven; jedes non-2xx ⇒ kalkulation.mamamia_sync_pending (nie
- *      verloren, Retry per Body B), 2xx löscht es.
+ *   4. Mamamia-Sync über onboard-to-mamamia { lead_id, resync } (service_role,
+ *      lib/mamamia-abgleich.ts), diff-driven; mit Budget auch der Preis des
+ *      Jobs (Registry #113); jedes non-2xx ⇒ kalkulation.mamamia_sync_pending
+ *      (nie verloren, Retry per Body B), 2xx löscht es.
  *   5. Event `offer_updated` über den Bridge-Loopback (/api/lead-event) —
  *      Kundenmail nur bei Neuberechnung + Preisänderung + Häkchen.
  *
@@ -33,19 +35,6 @@ type LeadRow = {
   mamamia_customer_id: number | null;
 };
 
-type MamamiaStatus = {
-  status: 'ok' | 'skipped' | 'error';
-  http?: number;
-  message: string;
-  patients_before?: number;
-  patients_after?: number;
-  removed_ids?: number[];
-  patient_ids?: number[];
-};
-
-type Pending = NonNullable<Kalkulation['mamamia_sync_pending']>;
-
-const RESYNC_TIMEOUT_MS = 25_000;
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const cookie = request.cookies.get('admin_auth')?.value ?? '';
@@ -183,91 +172,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     mail,
     mamamia: synced.mamamia,
   });
-}
-
-function ohnePending(k: Kalkulation): Kalkulation {
-  const { mamamia_sync_pending: _drop, ...rest } = k;
-  return rest as Kalkulation;
-}
-
-async function syncMamamia(
-  supabase: SupabaseClient,
-  row: LeadRow,
-  kalk: Kalkulation,
-  felder: string[],
-  budget: number | undefined,
-  supabaseUrl: string,
-  serviceKey: string,
-): Promise<{ mamamia: MamamiaStatus; kalkulation: Kalkulation }> {
-  if (!row.mamamia_customer_id) {
-    return { mamamia: { status: 'skipped', message: 'Lead ist nicht mit Mamamia verknüpft' }, kalkulation: kalk };
-  }
-  if (!felder.length && budget === undefined) {
-    return { mamamia: { status: 'skipped', message: 'Keine Mamamia-relevanten Änderungen' }, kalkulation: kalk };
-  }
-
-  let mamamia: MamamiaStatus;
-  try {
-    const res = await fetch(`${supabaseUrl}/functions/v1/onboard-to-mamamia`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
-      body: JSON.stringify({ lead_id: row.id, resync: { felder, ...(budget !== undefined ? { budget } : {}) } }),
-      signal: AbortSignal.timeout(RESYNC_TIMEOUT_MS),
-    });
-    let payload: Record<string, unknown> = {};
-    try { payload = await res.json(); } catch { /* kein JSON */ }
-    if (res.ok) {
-      const r = (payload.resync ?? {}) as Record<string, unknown>;
-      const before = Number(r.patients_before);
-      const after = Number(r.patients_after);
-      mamamia = {
-        status: 'ok',
-        http: res.status,
-        message: Number.isFinite(before) && Number.isFinite(after)
-          ? `${before} → ${after} Patient${after === 1 ? '' : 'en'}${budget !== undefined ? `, Budget ${budget} €` : ''}`
-          : 'synchronisiert',
-        patients_before: before,
-        patients_after: after,
-        removed_ids: Array.isArray(r.removed_ids) ? (r.removed_ids as number[]) : [],
-      };
-    } else {
-      mamamia = {
-        status: 'error',
-        http: res.status,
-        message: `Mamamia-Sync fehlgeschlagen (HTTP ${res.status}): ${String(payload.error ?? res.statusText)}`,
-        ...(Array.isArray(payload.patient_ids) ? { patient_ids: payload.patient_ids as number[] } : {}),
-      };
-    }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    mamamia = {
-      status: 'error',
-      message: /abort|timeout/i.test(msg) ? `Mamamia-Sync: Zeitüberschreitung (${RESYNC_TIMEOUT_MS / 1000} s)` : `Mamamia-Sync: Netzfehler — ${msg}`,
-    };
-  }
-
-  // 2. leads-Update: pending setzen (jedes non-2xx — letzte nicht angekommene
-  // Absicht, nie verloren) oder räumen (nur 2xx).
-  let kalkulation: Kalkulation;
-  if (mamamia.status === 'ok') {
-    kalkulation = ohnePending(kalk);
-  } else {
-    const pending: Pending = {
-      felder,
-      ...(budget !== undefined ? { budget } : {}),
-      error: mamamia.message,
-      ...(mamamia.http !== undefined ? { http: mamamia.http } : {}),
-      at: new Date().toISOString(),
-    };
-    kalkulation = { ...kalk, mamamia_sync_pending: pending };
-  }
-  const { error } = await supabase.from('leads').update({ kalkulation }).eq('id', row.id);
-  if (error) {
-    console.error(`[admin-angaben] lead=${row.id} kalkulation nach Mamamia-Sync nicht gespeichert: ${error.message}`);
-    mamamia = { ...mamamia, message: `${mamamia.message} (Status nicht gespeichert: ${error.message})` };
-  }
-  console.log(`[admin-angaben] lead=${row.id} mamamia=${mamamia.status} felder=${felder.join(',') || '-'} budget=${budget ?? '-'} ${mamamia.message}`);
-  return { mamamia, kalkulation };
 }
 
 async function postOfferUpdated(

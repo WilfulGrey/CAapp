@@ -7,7 +7,7 @@ import { parsePflegehilfe, anredeAusBeziehung, telefoneAusHtml, waehleTelefone }
 import { ergaenzeAngaben } from '../../project 3/lib/portal-lead';
 
 const mail = `
-Verbund Pflegehilfe Kontakt: Elke Preis
+Verbund Pflegehilfe Kontakt: Maria Muster
 An: kundenservice@primundus.de
 
 Sehr geehrte Damen und Herren,
@@ -16,10 +16,10 @@ Anfragen-Nummer 3196061. Wir danken Ihnen für eine zeitnahe Kontaktaufnahme.
 Die Kontaktdaten wurden an bis zu drei Anbieter gesendet.
 
 Kontaktinformationen des Interessenten
-Ansprechpartner	Frau Elke Preis
-Mobil	+49 1731720012
-Email	elke.preis@freenet.de
-Anschrift	Am Goldfischteich 18
+Ansprechpartner	Frau Maria Muster
+Mobil	+49 1700000002
+Email	maria.muster@example.de
+Anschrift	Musterstraße 1
 DE-39615 Seehausen
 Erreichbarkeit	Tel. ganztags erreichbar
 
@@ -52,7 +52,7 @@ Körpergewicht des Patienten: 73kg
 Multiresistente Keime: Liegt nicht vor
 Bedarf: Schnellstmöglich
 
-Beratungsgespräch durchgeführt: Annalena Hill
+Beratungsgespräch durchgeführt: Max Muster
 Beratungsgespräch durchgeführt: 25. April 08:35
 
 Datenschutz
@@ -67,9 +67,9 @@ describe('parsePflegehilfe (Portal-Lead-Mail)', () => {
   const r = parsePflegehilfe(mail);
 
   it('Kontakt: Name, E-Mail des Kunden (nicht die des Portals!), Telefon, PLZ', () => {
-    expect(r.kontakt.name).toBe('Frau Elke Preis');
-    expect(r.kontakt.email).toBe('elke.preis@freenet.de');
-    expect(r.kontakt.telefon).toBe('+49 1731720012');
+    expect(r.kontakt.name).toBe('Frau Maria Muster');
+    expect(r.kontakt.email).toBe('maria.muster@example.de');
+    expect(r.kontakt.telefon).toBe('+49 1700000002');
     expect(r.kontakt.plz).toBe('39615');
   });
 
@@ -123,7 +123,7 @@ describe('anredeAusBeziehung (Registry #45)', () => {
 });
 
 describe('parsePflegehilfe — weitergeleitete Mail (Fwd)', () => {
-  /* Test Zauner 01.09. (prod uid 14): ein "Fwd:" setzt Zitat-Marker vor
+  /* Test-Lead uid 14, 01.09. (prod uid 14): ein "Fwd:" setzt Zitat-Marker vor
    * jede Zeile und streut Soft-Hyphens in die Labels — ohne Normalisierung
    * las der Parser 0 Felder und fand keinen Einwilligungsnachweis. */
   const fwd = mail
@@ -135,14 +135,14 @@ describe('parsePflegehilfe — weitergeleitete Mail (Fwd)', () => {
   it('Zitat-Marker + Soft-Hyphens: Einwilligung und Felder werden trotzdem gelesen', () => {
     const f = parsePflegehilfe(fwd);
     expect(f.einwilligung?.zeitpunkt).toBe('25. April 08:35');
-    expect(f.kontakt.email).toBe('elke.preis@freenet.de');
+    expect(f.kontakt.email).toBe('maria.muster@example.de');
     expect(f.angaben.pflegegrad).toBe(1);
     expect(f.portal_lead_id).toBe('3196061');
   });
 });
 
 describe('parsePflegehilfe — Direktmail des Portals: Zustimmungen in EINER Zeile (Registry #51)', () => {
-  /* Prod uid 40/45/46 (Trageser, Berg, Wagner, 04.09.): die Direktmail von
+  /* Prod uid 40/45/46 (uid 40/45/46, 04.09.): die Direktmail von
    * Pflegehilfe stellt beide Zustimmungen und das Beratungsgespräch in eine
    * Zeile, nur durch Leerzeichen getrennt, mit Soft-Hyphen im Label. Der
    * zeilenweise "Label: Wert"-Blick fand „Kontaktweitergabe" nicht und
@@ -158,7 +158,7 @@ describe('parsePflegehilfe — Direktmail des Portals: Zustimmungen in EINER Zei
     const f = parsePflegehilfe(direkt);
     expect(f.einwilligung?.zeitpunkt).toBe('04.09.2026 11:02 Uhr');
     expect(f.einwilligung?.text).toContain('Datenschutzerklärung bestätigt am 04.09.2026 10:59 Uhr');
-    expect(f.kontakt.email).toBe('elke.preis@freenet.de');
+    expect(f.kontakt.email).toBe('maria.muster@example.de');
     expect(f.unbekannt).toEqual([]);
   });
 
@@ -206,23 +206,23 @@ describe('Pflegehilfe-Vokabeln aus dem Fall Epple (Registry #49)', () => {
   });
 });
 
-/* HTML-Teil der Direktmail — VERBATIM-Fragmente aus prod uid 71 (Steinbeck,
+/* HTML-Teil der Direktmail — VERBATIM-Fragmente aus prod uid 71 (anonymisiert,
  * 07.09.2026): Ueberschrift mit &shy;, Festnetz + Mobil als tel:-Links, das
  * Ende „Informationen zum Senior“ und die Hotline des Portals im Footer, die
  * DASSELBE title="Telefon" traegt. Nicht abtippen — sonst beweist der Test
  * nichts ueber das echte Template. */
 const htmlUid71 = `<td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 18px; line-height:23px; color: #4c8ba5; text-align:left; padding-top:3px;"><b>Kontakt&shy;informationen des Interessenten</b></td>
 <td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 14px; line-height:19px; color: #48453b; text-align:left;"><b>Festnetz:</b></td>
-<td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 14px; line-height:19px; color: #48453b; text-align:left;"><a style="color:#4c8ba5; text-decoration:none;" href="tel:+49 878192447" title="Telefon" target="_blank">+49 878192447</a></td>
+<td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 14px; line-height:19px; color: #48453b; text-align:left;"><a style="color:#4c8ba5; text-decoration:none;" href="tel:+49 301234567" title="Telefon" target="_blank">+49 301234567</a></td>
 <td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 14px; line-height:19px; color: #48453b; text-align:left;"><b>Mobil:</b></td>
-<td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 14px; line-height:19px; color: #48453b; text-align:left;"><a style="color:#4c8ba5; text-decoration:none;" href="tel:+49 15207607612" title="Telefon" target="_blank">+49 15207607612</a></td>
+<td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 14px; line-height:19px; color: #48453b; text-align:left;"><a style="color:#4c8ba5; text-decoration:none;" href="tel:+49 15100000000" title="Telefon" target="_blank">+49 15100000000</a></td>
 <td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 14px; line-height:19px; color: #48453b; text-align:left;"><b>E-Mail-Adresse:</b></td>
 <td style="text-align:left; color:#98c44c; font-size: 20px; line-height: 25px; font-family: Arial, Helvetica, Tahoma, sans-serif; padding:0px 25px 15px 25px; background-color:#ffffff;"><b>Informationen zum Senior</b></td>
 <td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 14px; line-height:19px; color: #48453b; text-align:left; padding-top:15px;"><nobr><a style="color:#48453b; text-decoration:none;" href="tel:004961312652011" title="Telefon" target="_blank"><b>06131/26 52 011</b></a></nobr></td>`;
 
 describe('telefoneAusHtml — Festnetz + Mobil nur im HTML-Teil (Registry #56)', () => {
   it('liest beide Kundennummern, NICHT die Hotline aus dem Footer', () => {
-    expect(telefoneAusHtml(htmlUid71)).toEqual(['+49 878192447', '+49 15207607612']);
+    expect(telefoneAusHtml(htmlUid71)).toEqual(['+49 301234567', '+49 15100000000']);
   });
 
   it('ohne Ende-Marker lieber nichts als die Hotline', () => {
@@ -237,14 +237,14 @@ describe('telefoneAusHtml — Festnetz + Mobil nur im HTML-Teil (Registry #56)',
 
 describe('waehleTelefone — welche Nummer wird telefon, welche telefon_2', () => {
   it('CSV-Phone gewinnt; die andere HTML-Nummer wird telefon_2 (Formate egal)', () => {
-    expect(waehleTelefone('+49 15207607612', '', ['0878192447', '+49 15207607612']))
-      .toEqual({ telefon: '+49 15207607612', telefon_2: '0878192447' });
+    expect(waehleTelefone('+49 15100000000', '', ['0301234567', '+49 15100000000']))
+      .toEqual({ telefon: '+49 15100000000', telefon_2: '0301234567' });
   });
 
   it('CSV ohne Phone: erste HTML-Nummer wird telefon, NICHT telefon_2', () => {
-    expect(waehleTelefone(undefined, '', ['+49 878192447', '+49 15207607612']))
-      .toEqual({ telefon: '+49 878192447', telefon_2: '+49 15207607612' });
-    expect(waehleTelefone(undefined, '', ['+49 878192447'])).toEqual({ telefon: '+49 878192447', telefon_2: undefined });
+    expect(waehleTelefone(undefined, '', ['+49 301234567', '+49 15100000000']))
+      .toEqual({ telefon: '+49 301234567', telefon_2: '+49 15100000000' });
+    expect(waehleTelefone(undefined, '', ['+49 301234567'])).toEqual({ telefon: '+49 301234567', telefon_2: undefined });
     expect(waehleTelefone(undefined, '+49 1', [])).toEqual({ telefon: '+49 1', telefon_2: undefined });
   });
 });

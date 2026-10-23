@@ -3,7 +3,6 @@ export interface Assignment {
   endDate: string;
   postalCode: string;
   city: string;
-  patientCount: number;
   /** Human-readable assignment length, derived from start/end dates
    *  (e.g. "3 Monate", "6 Wochen"). */
   duration: string;
@@ -38,6 +37,10 @@ export interface Nurse {
     avgDurationMonths: number;
   };
   detailedAssignments?: Assignment[];
+  /** Nur volles Profil: gerade bei einem anderen Kunden im Einsatz. */
+  onOtherJob?: boolean;
+  /** Nur volles Profil: Einsätze nicht abrufbar (Fehlertext der API). */
+  einsaetzeError?: string;
   /** URL zur Referenzen-PDF der Pflegekraft — eine Datei, die eine oder
    *  mehrere Empfehlungen früherer Familien enthalten kann. Wird im
    *  Profil-Modal als prominenter Link gerendert und in den Listen-Karten

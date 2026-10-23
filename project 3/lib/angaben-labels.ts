@@ -20,7 +20,7 @@ export const LABELS: Record<string, Record<string, string>> = {
   geschlecht: { 'egal': 'Egal', 'weiblich': 'Weiblich', 'maennlich': 'Männlich' },
   erfahrung: { 'einsteiger': 'Einsteiger', 'erfahren': 'Erfahren', 'sehr-erfahren': 'Sehr erfahren' },
   weitere_personen: { 'ja': 'Ja', 'nein': 'Nein' },
-  care_start_timing: { 'sofort': 'Sofort (4–7 Werktage)', '2-4-wochen': 'In 2–4 Wochen', '1-2-monate': 'In 1–2 Monaten', 'spaeter': 'Zu einem späteren Zeitpunkt', 'unklar': 'Ich informiere mich nur' },
+  care_start_timing: { 'sofort': 'Sofort', '2-4-wochen': 'In 2–4 Wochen', '1-2-monate': 'In 1–2 Monaten', 'spaeter': 'Zu einem späteren Zeitpunkt', 'unklar': 'Ich informiere mich nur' },
 };
 
 // Feldnamen für die Kundenmail „Aktualisiertes Angebot" (changed[].name) und

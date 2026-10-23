@@ -2,7 +2,7 @@ import type { Lead } from '../../src/lib/supabase';
 
 export const baseLead: Lead = {
   id: '11111111-1111-1111-1111-111111111111',
-  email: 'graefinnorman@gmx.de',
+  email: 'kundin@example.de',
   vorname: 'hildegard',
   nachname: 'von norman',
   anrede: 'Frau',

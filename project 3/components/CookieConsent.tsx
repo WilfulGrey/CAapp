@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Settings, Cookie } from "lucide-react";
+import { X, Cookie } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -68,50 +68,50 @@ export function CookieConsent() {
     <>
       {/* CRO 15.08.: kompaktes Banner. Vorher 307px hoch (38 % eines
           Handy-Bildschirms) und damit genau über der ersten Wizard-Frage;
-          12 % aller Taps der Seite gingen ans Banner. Jetzt: 2-Zeilen-Text,
-          Buttons in einer Reihe, „Nur notwendige" gleichwertig sichtbar. */}
+          12 % aller Taps der Seite gingen ans Banner. Kompakte Höhe bleibt.
+          24.09. (Martin: „ja" — gleicher Wortlaut wie auf primundus.de, nach
+          OpenAI-Prüfung): „Alle akzeptieren" schaltet auch Marketing ein, also
+          steht Marketing in der Zeile; „Einstellungen" als Wort statt Zahnrad;
+          beide Knöpfe gleich gestaltet — Ablehnen so leicht wie Zustimmen. */}
       {/* id: /beratung hebt den Banner per CSS über den Voll-Chat (z-50 des
           Panels läge sonst darüber, und auf dem Handy wäre der Consent nie
           erreichbar — keine Einwilligung, keine Analytics-Events). */}
       <div id="cookie-consent" className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-            <div className="flex-1 min-w-0 flex items-start gap-2.5">
-              <Cookie className="w-4 h-4 text-[#708A95] flex-shrink-0 mt-0.5" aria-hidden="true" />
-              <p className="text-xs text-gray-600 leading-snug">
-                <span className="font-semibold text-gray-900">Cookies:</span>{" "}
-                Funktion &amp; Analyse.{" "}
-                <a
-                  href="/datenschutz"
-                  className="text-[#708A95] hover:underline font-medium"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Mehr erfahren
-                </a>
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <p className="flex-1 min-w-0 text-xs text-gray-600 leading-snug">
+              <span className="font-semibold text-gray-900">Cookies:</span>{" "}
+              Funktion, Analyse &amp; Marketing.{" "}
               <button
+                type="button"
                 onClick={handleOpenSettings}
-                aria-label="Cookie-Einstellungen öffnen"
-                className="h-8 w-8 flex flex-shrink-0 items-center justify-center rounded-md border border-gray-300 text-gray-500 hover:bg-gray-50"
+                className="text-[#708A95] underline underline-offset-2 hover:text-[#62808A] font-medium"
               >
-                <Settings className="w-4 h-4" />
+                Einstellungen
               </button>
+              <span aria-hidden="true"> · </span>
+              <a
+                href="/datenschutz"
+                className="text-[#708A95] underline underline-offset-2 hover:text-[#62808A] font-medium"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Datenschutz
+              </a>
+            </p>
+
+            <div className="grid grid-cols-2 sm:flex sm:flex-none gap-2 w-full sm:w-auto">
               <Button
-                variant="outline"
                 size="sm"
                 onClick={handleAcceptNecessary}
-                className="h-8 flex-1 sm:flex-none text-xs border-gray-300 hover:bg-gray-50"
+                className="h-8 sm:flex-none text-xs bg-[#708A95] hover:bg-[#62808A] text-white"
               >
                 Nur notwendige
               </Button>
               <Button
                 size="sm"
                 onClick={handleAcceptAll}
-                className="h-8 flex-1 sm:flex-none text-xs bg-[#708A95] hover:bg-[#62808A] text-white"
+                className="h-8 sm:flex-none text-xs bg-[#708A95] hover:bg-[#62808A] text-white"
               >
                 Alle akzeptieren
               </Button>

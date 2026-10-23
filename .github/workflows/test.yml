@@ -63,6 +63,20 @@ jobs:
         working-directory: supabase/functions/onboard-to-mamamia
         run: deno task test
 
+  deno-openai-conversions:
+    name: deno tests (openai-conversions)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: "v2.x"
+
+      - name: Run openai-conversions tests
+        working-directory: supabase/functions/openai-conversions
+        run: deno task test
+
   deno-kraefte-vorschau:
     name: deno tests (kraefte-vorschau)
     runs-on: ubuntu-latest
@@ -152,6 +166,12 @@ jobs:
       - name: Run send-scheduled-emails tests
         working-directory: project 3/supabase/functions/send-scheduled-emails
         run: deno task test
+
+      # index.ts importiert kein Test (startet beim Import einen Server). Ein Typfehler dort
+      # hielte die ganze Warteschlange an — deshalb vor dem Deploy prüfen (26.09.2026).
+      - name: Type-check send-scheduled-emails/index.ts
+        working-directory: project 3/supabase/functions/send-scheduled-emails
+        run: deno check index.ts
 
   # Smoke renderera PDF umowy (pdfkit, Registry #27): renderuje 3 syntetyczne
   # fixture'y i asertuje %PDF-, 8 stron, komplet stringów modelu, ń/▸/✓,

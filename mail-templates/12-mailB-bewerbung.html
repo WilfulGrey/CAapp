@@ -12,13 +12,23 @@
       .cond-top-cell { display: block !important; width: 100% !important; padding: 18px 22px 16px !important; border-right: none !important; border-bottom: 1px solid #ebe2d2 !important; }
       .cond-top-cell:last-child { border-bottom: none !important; }
     }
+    /* Handy: Kopfzeile mit 20 statt 40 px Rand und schmalere Siegel-Spalte in
+       der Signaturkarte — sonst ist die Mail auf 360–390 px breiter als der
+       Bildschirm. Grenze 480 px, damit 600 px exakt die Desktop-Optik behalten.
+       Gleiche Regeln wie im Code (buildEmailWrapper / lib/email.ts). */
+    @media only screen and (max-width: 480px) {
+      .email-header { padding: 20px 20px 16px 20px !important; }
+      .sig-siegel-welt { display: block !important; }
+      .sig-siegel-bild { width: 48px !important; }
+      .sig-siegel-innen { padding: 6px 8px !important; }
+    }
   </style>
 </head>
 <body>
   <div style="width:100%;background-color:#f4f4f4;padding:20px 0;">
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr><td align="center">
       <div style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-        <div style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
+        <div class="email-header" style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
             <td style="vertical-align:middle;">
               <img src="https://kostenrechner.primundus.de/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
@@ -182,9 +192,9 @@
                       <img src="https://kostenrechner.primundus.de/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
                     </td>
                     <td style="vertical-align:middle;">
-                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Ilka Wysocki</p>
-                      <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
-                      <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
+                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;">Ilka Wysocki</p>
+                      <p style="margin:0 0 2px;font-size:13px;color:#555;">Pflegeberaterin</p>
+                      <p style="margin:0;font-size:12px;color:#9a8a73;"><span style="white-space:nowrap;">Mo – So,</span> <span style="white-space:nowrap;">8 – 20 Uhr</span></p>
                     </td>
                   </tr>
                 </table>
@@ -197,12 +207,12 @@
                   </td></tr>
                 </table>
               </td>
-              <td style="vertical-align:top;text-align:right;">
+              <td style="vertical-align:top;text-align:right;padding-left:10px;">
                 <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
-                  <tr><td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
-                    <img src="https://kostenrechner.primundus.de/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
-                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
-                    <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
+                  <tr><td class="sig-siegel-innen" style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
+                    <img class="sig-siegel-bild" src="https://kostenrechner.primundus.de/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
+                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;"><span style="white-space:nowrap;">Testsieger</span> <span class="sig-siegel-welt" style="color:#B5A184;white-space:nowrap;">DIE WELT</span></p>
+                    <p style="margin:0;font-size:10px;color:#888;line-height:1.4;"><span style="white-space:nowrap;">Preis, Qualität &amp;</span><br>Kundenservice</p>
                   </td></tr>
                 </table>
               </td>

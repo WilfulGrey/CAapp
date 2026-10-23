@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock } from 'lucide-react';
+import { adminDb, ADMIN_EMAIL } from '@/lib/admin-db';
 
 export default function AdminLoginPage() {
   const [password, setPassword] = useState('');
@@ -21,12 +22,24 @@ export default function AdminLoginPage() {
       body: JSON.stringify({ password }),
     });
 
-    if (res.ok) {
-      window.location.href = '/admin';
-    } else {
+    if (!res.ok) {
       setError('Falsches Passwort. Bitte erneut versuchen.');
       setLoading(false);
+      return;
     }
+
+    /* Zweite Anmeldung mit demselben Passwort: am Konto des Panels in Supabase.
+       Ohne diese Sitzung lässt RLS die Admin-Seiten keine Leads lesen. Schlägt
+       sie fehl, nehmen wir das Cookie wieder weg — sonst landet man in einem
+       Panel, das nichts zeigen kann. */
+    const { error: authFehler } = await adminDb.auth.signInWithPassword({ email: ADMIN_EMAIL, password });
+    if (authFehler) {
+      await fetch('/api/admin/auth', { method: 'DELETE' });
+      setError(`Anmeldung an der Datenbank fehlgeschlagen: ${authFehler.message}`);
+      setLoading(false);
+      return;
+    }
+    window.location.href = '/admin';
   }
 
   return (

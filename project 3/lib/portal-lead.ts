@@ -284,3 +284,40 @@ export function reiterFuer(
     ...quellen.map((q) => ({ key: q, label: quellenName(q), anzahl: zaehle((l) => l.source === q) })),
   ];
 }
+
+/* Wer in der Admin-Liste als Kontakt steht.
+
+   Normalfall: die Kontaktspalten des Leads — der Mensch, der die Anfrage
+   gestellt hat. Bei einem VERMITTLER stehen dort aber nicht der Kunde,
+   sondern der Ansprechpartner der Vermittler-Agentur (`ansprechpartner`
+   oben), und der ist bei jeder Anfrage derselbe: acht Leads, acht Mal
+   "Herr Bernd Walde", man sieht nicht, welcher Fall welcher ist. Dann
+   zeigen wir den Haushalt und schieben den Vermittler in die Unterzeile.
+
+   Anker ist der NACHNAME: einen Fall ohne Nachnamen gibt es nicht, ein
+   fehlender Vorname ist normal ("Familie Maier"). Fehlt er, faellt die
+   Anzeige auf den Ansprechpartner zurueck — lieber der immer gleiche Name
+   als gar keiner.
+
+   PLZ/Ort in der Unterzeile, weil zwei Anfragen desselben Vermittlers zum
+   selben Haushalt sonst in der Liste identisch aussehen.
+
+   Die Kontaktspalten selbst bleiben unangetastet: aus ihnen baut die
+   Eingangsbestaetigung die Anrede der Mail AN DEN VERMITTLER. */
+export function kontaktAnzeige(lead: {
+  anrede_text?: string | null; vorname?: string | null; nachname?: string | null;
+  patient_anrede?: string | null; patient_vorname?: string | null; patient_nachname?: string | null;
+  vermittler?: string | null;
+  kalkulation?: { formularDaten?: { plz?: unknown; ort?: unknown } | null } | null;
+}): { name: string; via: string | null } {
+  const kontakt = [lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(' ');
+  if (!lead.vermittler || !lead.patient_nachname?.trim()) {
+    return { name: kontakt || 'Unbekannt', via: null };
+  }
+  const fd = lead.kalkulation?.formularDaten ?? {};
+  const ort = [fd.plz, fd.ort].filter((v) => typeof v === 'string' && v.trim()).join(' ');
+  return {
+    name: [lead.patient_anrede, lead.patient_vorname, lead.patient_nachname].filter(Boolean).join(' '),
+    via: [kontakt && `über ${kontakt}`, ort].filter(Boolean).join(' · ') || null,
+  };
+}

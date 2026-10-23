@@ -64,21 +64,23 @@ Diese Regeln stehen im System-Prompt, nicht in den Antworten.
 > Verhältnis aus Preis und Qualität.
 > *Regel: keine Prozentzahlen, kein WELT-Zitat, immer als unsere Aussage.*
 
-**1.4 — Unsere vier Versprechen** (freigegebener Wortlaut aus der Mailkette,
-\`send-scheduled-emails/index.ts\`, \`buildWarumPrimundusText\`. Pria streut sie einzeln
-ein, nie als Liste.)
+**1.4 — Unsere vier Versprechen** (freigegebener Wortlaut der Mail „Vier Dinge, die
+Primundus anders macht“, Martin 26.09.2026, \`send-scheduled-emails/kundenMails.ts\`. Pria
+streut sie einzeln ein, nie als Liste.)
 
-> **Sie wissen vorher, wer ins Haus kommt.** Tausende bewährte Pflegekräfte in unserem
-> Bestand — Sie sehen vorab, wer die Betreuung übernehmen möchte, und entscheiden in Ruhe.
+> **Bei uns ist alles transparent.** Ihren Preis kennen Sie sofort. Passende Pflegekräfte
+> sehen Sie mit Profil, Erfahrung und Deutschkenntnissen und wählen selbst aus, bevor Sie
+> sich festlegen.
 >
-> **Sie binden sich nicht.** Kein Vertrag vor Auswahl, täglich kündbar, tagesgenaue
-> Abrechnung — Kosten erst ab Anreise der Pflegekraft.
+> **Sie binden sich nicht.** Kein Vertrag vor Ihrer Auswahl. Danach täglich kündbar und
+> taggenau abgerechnet. Kosten entstehen erst ab Anreise.
 >
-> **Sie zahlen nie zu viel.** Keine Vermittlungsgebühren — als **Direktanbieter** sparen
-> wir die Vermittler-Provision: Die Pflegekraft verdient mehr, und Sie zahlen trotzdem weniger.
+> **Sie zahlen nie zu viel.** Keine Vermittlungsgebühr: Als **Direktanbieter** sparen wir
+> die Provision. Die Pflegekraft verdient mehr, und Sie zahlen trotzdem weniger. Dazu gilt
+> unsere Bestpreisgarantie.
 >
-> **Sie sind nie allein.** Persönlicher Ansprechpartner 7 Tage die Woche — mit der
-> Erfahrung aus **über 60.000 Einsätzen**.
+> **Sie sind nie allein.** Über 20 Jahre Erfahrung, **mehr als 60.000 Einsätze**, 6× in
+> Folge Testsieger bei DIE WELT. Die Ansprechpartnerin ist 7 Tage die Woche erreichbar.
 
 *„Direktanbieter" und „in unserem Bestand" sind die tragenden Wörter — sie sagen dasselbe
 wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
@@ -253,11 +255,11 @@ wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
 ## 4. Ablauf & Zeiten
 
 **4.1 — Wie schnell geht das?**
-> **4 bis 7 Werktage** bis zum Start — im Notfall auch schneller. Ihr Angebot mit
+> Die Pflegekraft kann **ab 3 Tagen nach Ihrer Zusage** anreisen. Ihr Angebot mit
 > passenden Kräften sehen Sie sofort, Sie müssen nicht warten, um zu wissen, woran
 > Sie sind. Wenn es eilt, gleich sagen: Dann priorisieren wir.
-> *Quelle: faqData.ts · **entschieden am 20.08. (Martin)**: 4–7 Werktage ist die
-> gültige Zahl, die 7–14 Tage waren falsch.*
+> *Quelle: Kundenportal „Anreise ab 3 Tagen nach Ihrer Zusage“ (Martin 24./25.09.2026);
+> ersetzt „4–7 Werktage“ (20.08.). Die 7–14 Tage waren falsch.*
 
 **4.2 — Wie läuft es ab?**
 > Vier Schritte: Sie beschreiben die Situation (Angaben) → Sie sehen Angebot
@@ -564,9 +566,9 @@ dem Portal als Ziel (\`send-scheduled-emails\`).
 
 ## 14. Widersprüche — bitte entscheiden
 
-**14.1 — Wie schnell startet die Betreuung?** ✅ **entschieden (Martin, 20.08.)**
-Es gilt **4 bis 7 Werktage, im Notfall schneller**. Die 7–14 Tage waren falsch und
-sind aus Prias Antworten entfernt.
+**14.1 — Wie schnell startet die Betreuung?** ✅ **entschieden (Martin, 20.08., aktualisiert 25.09.)**
+Es gilt **Anreise ab 3 Tagen nach der Zusage**, wie im Kundenportal. Die 7–14 Tage waren
+falsch und sind aus Prias Antworten entfernt; „4–7 Werktage“ gilt nicht mehr.
 
 **14.2 — Vertragspartner** ✅ **entschieden (Martin, 20.08.)**
 **Vitanas gibt es nicht mehr. Wir sind Primundus, das Personal ist bei uns angestellt.**

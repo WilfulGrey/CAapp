@@ -55,7 +55,7 @@ export const metadata: Metadata = {
   },
   metadataBase: new URL(SEITE),
   title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
-  description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× in Folge ausgezeichneten Testsieger mit Preisgarantie.',
+  description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× in Folge ausgezeichneten Testsieger mit Bestpreisgarantie.',
   alternates: {
     canonical: '/',
   },
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
     url: '/',
     siteName: 'PRIMUNDUS',
     title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
-    description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× in Folge ausgezeichneten Testsieger mit Preisgarantie.',
+    description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× in Folge ausgezeichneten Testsieger mit Bestpreisgarantie.',
     images: [
       {
         url: '/images/primundus_logo_header.webp',
@@ -75,7 +75,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
-    description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× in Folge ausgezeichneten Testsieger mit Preisgarantie.',
+    description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× in Folge ausgezeichneten Testsieger mit Bestpreisgarantie.',
     images: [
       {
         url: '/images/primundus_logo_header.webp',
@@ -128,6 +128,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     gtag('config', 'G-W2QEQ18EE7');
   }
 
+  var wahl = null;
   try {
     // Bugfix CRO 15.08.: Der Consent-Manager speichert unter
     // 'primundus_cookie_consent' als {version, consent:{analytics,...}} —
@@ -135,11 +136,18 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     var stored = localStorage.getItem('primundus_cookie_consent');
     if (stored) {
       var data = JSON.parse(stored);
-      if (data && data.consent && data.consent.analytics) {
-        loadGoogleAnalytics();
-      }
+      if (data && data.consent) wahl = data.consent;
     }
   } catch(e) {}
+  // Zweite Quelle (Registry #99): das Cookie pm_consent auf .primundus.de —
+  // die Wahl von primundus.de oder von hier (lib/cookie-consent.ts)
+  if (!wahl) {
+    try {
+      var m = document.cookie.match(/(?:^|; )pm_consent=([^;]*)/);
+      if (m) wahl = JSON.parse(decodeURIComponent(m[1]));
+    } catch(e) {}
+  }
+  if (wahl && wahl.analytics) loadGoogleAnalytics();
 
   window.addEventListener('cookie-consent-changed', function(e) {
     if (e.detail && e.detail.analytics) {
@@ -182,13 +190,22 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     window.oaiq('consent', true);
   }
 
+  var auswahl = null;
   try {
     var gespeichert = localStorage.getItem('primundus_cookie_consent');
     if (gespeichert) {
       var daten = JSON.parse(gespeichert);
-      if (daten && daten.consent && daten.consent.marketing) ladeOaiq();
+      if (daten && daten.consent) auswahl = daten.consent;
     }
   } catch(e) {}
+  // Zweite Quelle wie oben (Registry #99): Cookie pm_consent auf .primundus.de
+  if (!auswahl) {
+    try {
+      var treffer = document.cookie.match(/(?:^|; )pm_consent=([^;]*)/);
+      if (treffer) auswahl = JSON.parse(decodeURIComponent(treffer[1]));
+    } catch(e) {}
+  }
+  if (auswahl && auswahl.marketing) ladeOaiq();
 
   window.addEventListener('cookie-consent-changed', function(e) {
     var erlaubt = !!(e.detail && e.detail.marketing);
@@ -216,48 +233,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           </CalculatorProvider>
         </AnalyticsProvider>
         <CookieConsent />
-        {/* Pria — Beratungs-Chat, vorerst nur auf Staging.
-
-            KEINE Umgebungsvariable: Staging und Prod bauen denselben Commit,
-            und eine Variable haette jemand in Render pflegen muessen. Die
-            Seite kann selbst sehen, wo sie laeuft — das ist ehrlicher und
-            kostet niemanden einen Handgriff.
-
-            Der Lader ist absichtlich winzig und laeuft VOR dem Zeichnen: auf
-            Prod wird die 240-KB-Datei so gar nicht erst geladen, und das
-            data-pria am <html> ist da, bevor gezeichnet wird.
-            (Der WhatsApp-Knopf, der sich hier frueher ausblendete, ist am
-            29.08. ganz entfallen — er blitzte beim Laden kurz auf, weil er
-            VOR der Hydration gezeichnet wurde. WhatsApp bleibt als Link in
-            den Kontaktbloecken und im Chat.)
-
-            Wenn Pria auf Prod soll: diese Liste um kostenrechner.primundus.de
-            erweitern — bewusst eine Code-Aenderung mit PR, kein stiller
-            Schalter irgendwo im Dashboard.
-
-            Hier stand am 22.08. kurzzeitig ein Eingriff, der dem Viewport
-            `interactive-widget=resizes-content` nachtragen sollte — nur fuer
-            Staging. Er war WIRKUNGSLOS und ist wieder raus: Safari liest
-            `interactive-widget` beim Parsen der Seite; ein spaeteres
-            Umschreiben des Attributs schaut niemand mehr an. Auch
-            `next/script` mit `beforeInteractive` half nicht, das Skript
-            landet trotzdem im Body (im erzeugten HTML nachgemessen:
-            Position 100279, </head> endet bei 4579).
-
-            Wirksam waere nur der `viewport`-Export von Next — und der gilt
-            fuer JEDE Seite und JEDEN Host, also auch fuer den Rechner auf
-            Prod. Das ist eine Entscheidung, keine Reparatur, und sie liegt
-            bei Martin. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              "(function(){var h=location.hostname;" +
-              "if(h!=='kostenrechner-staging.onrender.com'&&h!=='localhost'&&h!=='127.0.0.1')return;" +
-              "document.documentElement.setAttribute('data-pria','1');" +
-              "var s=document.createElement('script');s.src='/pria-widget.js';s.defer=true;" +
-              "document.head.appendChild(s);})();",
-          }}
-        />
+        {/* Pria-Lader (Staging/localhost) entfernt am 13.09.2026 — Test beendet,
+            Registry #67. */}
       </body>
     </html>
   );

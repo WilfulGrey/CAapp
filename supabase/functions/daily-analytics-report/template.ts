@@ -9,7 +9,7 @@
 // zeigt das aktuelle Plateau. Conversion-% als Tabelle, weil absolute
 // Zahlen wenig aussagen wenn Traffic schwankt.
 
-import { PORTAL_PREISE } from "./queries.ts";
+import { PORTAL_PREISE, UPLOAD_ALARM_STUNDEN } from "./queries.ts";
 import type { BesucherKohorte, DailyStats, LeadKohorte, PeriodStats } from "./queries.ts";
 
 // Spiegelt MultiStepForm.getStepId() — 9 Schritte (Betreuungsbeginn /
@@ -46,6 +46,33 @@ function pctRaw(numerator: number, denominator: number): string {
   return `${((numerator / denominator) * 100).toFixed(1)}%`;
 }
 
+/** „20.10., 14:12 Uhr" in Berliner Zeit. */
+function berlinZeitpunkt(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const teile = new Intl.DateTimeFormat("de-DE", {
+    timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+  }).formatToParts(d);
+  const t = (typ: string) => teile.find((p) => p.type === typ)?.value ?? "";
+  return `${t("day")}.${t("month")}., ${t("hour")}:${t("minute")} Uhr`;
+}
+
+/** Eine Zeile zum Google-Upload (Registry #129), für HTML und Text gleich. */
+export function uploadZusammenfassung(u: {
+  wartendeProfile: number; wartendeBuchungen: number; aeltesteStunden: number; letzterUpload: string | null; error?: string;
+}): string {
+  if (u.error) return `Google-Upload-Check nicht lesbar: ${u.error}`;
+  const letzter = `Letzter Upload: ${u.letzterUpload ? berlinZeitpunkt(u.letzterUpload) : "noch nie"}.`;
+  const teile = [
+    u.wartendeProfile > 0 ? `${u.wartendeProfile} ${u.wartendeProfile === 1 ? "Profil" : "Profile"}` : "",
+    u.wartendeBuchungen > 0 ? `${u.wartendeBuchungen} ${u.wartendeBuchungen === 1 ? "Buchung" : "Buchungen"}` : "",
+  ].filter(Boolean);
+  if (teile.length === 0) return `Google-Upload: nichts wartet. ${letzter}`;
+  const anzahl = u.wartendeProfile + u.wartendeBuchungen;
+  return `Google-Upload steht: ${teile.join(" und ")} ${anzahl === 1 ? "wartet" : "warten"} länger als ${UPLOAD_ALARM_STUNDEN} Stunden, `
+    + `die älteste seit ${u.aeltesteStunden} Stunden. ${letzter}`;
+}
+
 export function buildReportEmail(opts: {
   yesterday: DailyStats;
   period: PeriodStats;     // 7-Tage-Aggregat (avg + top + conv-rates)
@@ -56,6 +83,13 @@ export function buildReportEmail(opts: {
   totalBookings: number;     // Buchungs-Vorgänge insgesamt (lifetime)
   siteUrl: string;
   mailHealth?: { failed24h: number; overduePending: number; samples: Array<{ type: string; error: string }> };
+  /** Registry #82 — unterschrieben, aber Mamamia zeigt die Buchung nicht.
+   *  Steht IMMER als Zeile im Report (auch bei 0), damit "kein Block" Gesundheit
+   *  heisst und nicht "Abfrage kaputt". */
+  buchungHealth?: { offen: number; rows: Array<{ lead: string; leadId: string; applicationId: number; ageHours: number; grund?: string }>; error?: string };
+  /** Registry #129 — Profile/Buchungen, die zu lange auf den Google-Upload warten.
+   *  Steht wie der Buchungs-Check IMMER als Zeile im Report. */
+  uploadHealth?: { wartendeProfile: number; wartendeBuchungen: number; aeltesteStunden: number; letzterUpload: string | null; error?: string };
   prevPeriod?: PeriodStats;   // die 7 Tage VOR der Vergleichsperiode (Trend)
   agentNotes?: { notes: Array<{ source: string; note: string }>; error?: string };
   /** Google-Ads-Kosten (SEA, 16.08.) — null/undefined = Block entfällt (fail-soft). */
@@ -67,7 +101,7 @@ export function buildReportEmail(opts: {
    *  entfällt das Diagramm (fail-soft wie die Lead-Kohorten). */
   besucherKohorten?: BesucherKohorte[];
 }): { subject: string; html: string; text: string } {
-  const { yesterday, period, yesterdayLabel, periodLabel, totalLeads, bookedCustomers, totalBookings, siteUrl, mailHealth, prevPeriod, agentNotes, adsSpend } = opts;
+  const { yesterday, period, yesterdayLabel, periodLabel, totalLeads, bookedCustomers, totalBookings, siteUrl, mailHealth, buchungHealth, uploadHealth, prevPeriod, agentNotes, adsSpend } = opts;
   const leadKohorten = opts.leadKohorten ?? [];
   const besucherKohorten = opts.besucherKohorten ?? [];
 
@@ -78,6 +112,9 @@ export function buildReportEmail(opts: {
   const perPiece = (spend: number, count: number) => (count > 0 ? euro(spend / count) : "—");
 
   const mailAlarm = mailHealth && (mailHealth.failed24h > 0 || mailHealth.overduePending > 0);
+  const buchungAlarm = !!buchungHealth && (buchungHealth.offen > 0 || !!buchungHealth.error);
+  const uploadWartend = uploadHealth ? uploadHealth.wartendeProfile + uploadHealth.wartendeBuchungen : 0;
+  const uploadAlarm = !!uploadHealth && (uploadWartend > 0 || !!uploadHealth.error);
 
   // Tagesfazit (Martin, 15.08.): die Mail beantwortet selbst, ob es ein
   // guter Tag war und wohin der Trend zeigt — Klartext oben statt nur
@@ -133,7 +170,7 @@ export function buildReportEmail(opts: {
         </div>`;
   })();
 
-  const subject = `${mailAlarm ? '🚨 ' : ''}📊 Primundus Daily — ${yesterdayLabel} · ${yesterday.wizardCompleted} neue Leads · ${verdict.wort} ${trend.pfeil}`;
+  const subject = `${mailAlarm || buchungAlarm || uploadAlarm ? '🚨 ' : ''}📊 Primundus Daily — ${yesterdayLabel} · ${yesterday.wizardCompleted} neue Leads · ${verdict.wort} ${trend.pfeil}`;
 
   // Mail-Ausfall-Alarm ganz oben — der stille Reminder-Blackout (25.05.–25.06.,
   // 207 Fehlschläge) darf sich nicht wiederholen.
@@ -143,6 +180,34 @@ export function buildReportEmail(opts: {
         ${mailHealth!.samples.map((s) => `<p style=\"margin:2px 0;font-size:12px;color:#b91c1c;\">· ${s.type}: ${s.error}</p>`).join('')}
        </div>`
     : '';
+
+  // Buchungs-Check (Registry #82): unterschrieben, aber Mamamia zeigt die
+  // Confirmation nicht am Job. Der Cron-Alarm feuert nur EINMAL je Zeile —
+  // hier bleibt der Befund stehen, bis er weg ist.
+  const buchungHtml = !buchungHealth
+    ? ''
+    : buchungHealth.error
+      ? `<div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:10px;padding:14px 16px;margin:0 0 16px;">
+        <p style="margin:0;font-size:15px;font-weight:bold;color:#b91c1c;">🚨 Buchungs-Check nicht lesbar: ${buchungHealth.error}</p>
+       </div>`
+      : buchungHealth.offen > 0
+        ? `<div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:10px;padding:14px 16px;margin:0 0 16px;">
+        <p style="margin:0 0 6px;font-size:15px;font-weight:bold;color:#b91c1c;">🚨 Buchung nicht in Mamamia sichtbar: ${buchungHealth.offen} offen</p>
+        ${buchungHealth.rows.map((r) => `<p style=\"margin:2px 0;font-size:12px;color:#b91c1c;\">· ${r.lead} — Bewerbung ${r.applicationId}, seit ${r.ageHours} h${r.grund ? ` (${r.grund})` : ''}</p>`).join('')}
+       </div>`
+        : `<p style="margin:0 0 12px;font-size:12px;color:#9a8a73;">Buchungs-Check: 0 offen.</p>`;
+
+  // Google-Upload-Check (Registry #129): Profile und Buchungen mit Klick-ID, die
+  // länger als UPLOAD_ALARM_STUNDEN auf den Upload warten. Bei 0 steht trotzdem eine Zeile da.
+  const uploadZeile = uploadHealth ? uploadZusammenfassung(uploadHealth) : '';
+  const uploadHtml = !uploadHealth
+    ? ''
+    : uploadAlarm
+      ? `<div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:10px;padding:14px 16px;margin:0 0 16px;">
+        <p style="margin:0 0 6px;font-size:15px;font-weight:bold;color:#b91c1c;">🚨 ${uploadZeile}</p>
+        ${uploadHealth.error ? '' : `<p style="margin:2px 0;font-size:12px;color:#b91c1c;">Prüfen: Cron-Job „upload-offline-conversions“ (läuft er nur als Probelauf?), die Funktion und den Google-Zugang.</p>`}
+       </div>`
+      : `<p style="margin:0 0 12px;font-size:12px;color:#9a8a73;">${uploadZeile}</p>`;
 
   // Absolutwerte-Tabelle: Gestern · 7-T-Ø · Top (Datum)
   /* Hier standen eine Kennzahlen-Tabelle (rows/rowsHtml) und darueber adsRows.
@@ -571,6 +636,8 @@ export function buildReportEmail(opts: {
         </td></tr>
         <tr><td>
           ${mailAlarmHtml}
+          ${buchungHtml}
+          ${uploadHtml}
           ${fazitHtml}
           ${kachelnHtml}
           ${gruppeEigene}
@@ -598,6 +665,7 @@ export function buildReportEmail(opts: {
 
 ${verdict.emoji} ${verdict.wort} · Trend ${trend.pfeil} ${trend.text}
 ${fazitPunkte.map((p) => "  " + p.replace(/<[^>]+>/g, "")).join("\n")}
+${uploadHealth ? `\n${uploadAlarm ? "🚨 " : ""}${uploadZeile}\n` : ""}
 
 GESTERN
   Besucher                 ${yesterday.visitors}

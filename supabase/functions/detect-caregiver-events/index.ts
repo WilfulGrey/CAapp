@@ -38,7 +38,15 @@ import {
   type ListInterestsResponse,
   REJECT_APPLICATION,
   type RejectApplicationResponse,
+  GET_JOB_OFFER_ARRIVAL,
 } from "./queries.ts";
+import {
+  type AnreiseDaten,
+  anreiseAusConfirmation,
+  anreiseModus,
+  type ArrivalConfirmation,
+  berlinDatumMinus,
+} from "./anreise.ts";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -105,9 +113,29 @@ export interface AppStatusEventRow {
 }
 
 // Reminder-Mail-Typen in scheduled_emails — geteilt von Photo-Refresh und
-// Orphan-Cancel-Sweep.
-const REMINDER_TYPES = [
+// Orphan-Cancel-Sweep (Bewerbung aus mamamia verschwunden ⇒ offene Erinnerungen
+// dieser Pflegekraft abbrechen).
+//
+// SPIEGEL von `ERINNERUNG_TYPEN` in
+// `project 3/supabase/functions/send-scheduled-emails/stopRegeln.ts` plus
+// `interest_reminder` — Edge Functions können nicht über Ordnergrenzen importieren
+// (Muster appendJobParam / names.ts). Neue Erinnerungstypen IMMER in beiden Listen
+// eintragen; `_tests/reminderTypes.test.ts` vergleicht die Kopien.
+//
+// Registry #124 (16.10.2026, Kundin Kopka): Die neuen Typen
+// `application_erinnerung_1/2/letzte` (Registry #96/#97, seit 27.09.) fehlten hier.
+// Folge: Zog die Agentur im SA-Portal eine Bewerbung zurück, blieben die drei
+// Erinnerungen stehen und gingen raus („… noch 2 Tage für Sie reserviert“ zu einer
+// Bewerbung, die es nicht mehr gab). Der Sweep hat seit dem 27.09. keine einzige
+// neue Zeile mehr abgebrochen (0 Ereignisse `email_application_erinnerung_*_cancelled`
+// mit reason application_no_longer_active auf PROD).
+export const REMINDER_TYPES = [
   "interest_reminder",
+  // neue Erinnerungen (Plan in project 3/lib/erinnerungsplan.ts)
+  "application_erinnerung_1",
+  "application_erinnerung_2",
+  "application_erinnerung_letzte",
+  // alte Zeilen aus der Warteschlange (+1 h / +4 h / +12 h / +70 h)
   "application_reminder",
   "application_reminder_4h",
   "application_reminder_12h",
@@ -127,7 +155,7 @@ export interface DetectSupabase {
   // ist beim Versand also ≤15 Min alt und damit gültig. Liefert Anzahl
   // aktualisierter Rows.
   refreshReminderPhotos(leadId: string, photoByCaregiver: Map<number, string>): Promise<number>;
-  // Reminder-Stopp (Martin, 2026-07-11 — Kunde Hagedorn): Bewerbungen, die
+  // Reminder-Stopp (Martin, 2026-07-11): Bewerbungen, die
   // in mamamia nicht mehr aktiv sind (Panel-/SA-Ablehnung LOESCHT die
   // Application, Portal-Reject setzt rejected_at), duerfen keine weiteren
   // Reminder ausloesen. Cancelt pending Reminder-Rows, deren Pflegekraft
@@ -155,6 +183,8 @@ export interface DetectSupabase {
   stampAcceptanceConfirmed?(leadId: string, applicationId: number, confirmationId: number | null): Promise<void>;
   stampAcceptancePdfUploaded?(leadId: string, applicationId: number, sha256: string | null): Promise<void>;
   stampAcceptanceSyncAlerted?(leadId: string, applicationId: number): Promise<void>;
+  /** Job der Bewerbung aus dem Akzept-Event (Guard-Weg 3, Registry #78). Optional wie die vier oben. */
+  fetchAcceptanceJobOfferId?(leadId: string, applicationId: number): Promise<number | null>;
   // Follow-up Discovery (Bug #25): Leads außerhalb des Active-Sets, deren
   // Mamamia-Customer einen NEU eröffneten geplanten Job haben könnte.
   // Selbst-taktend via leads.mamamia_jobs_checked_at. Alle drei optional —
@@ -162,6 +192,26 @@ export interface DetectSupabase {
   fetchDiscoveryLeads?(recheckHours: number, batchSize: number): Promise<Array<LeadRow & { status?: string | null }>>;
   stampLeadJobsChecked?(leadId: string): Promise<void>;
   markLeadFolgeEinsatz?(leadId: string, mamamiaJobOfferId: number): Promise<void>;
+  // Anreise-Mail (Registry #119): gebuchte Jobs mit Anreise ab `abDatum`
+  // (lead_jobs-Spiegel) + bisher gemeldete Anreise-Stände dieser Leads.
+  // Optional — fehlen sie, macht der Modus "anreise" nichts.
+  fetchAnreiseKandidaten?(abDatum: string, limit: number): Promise<AnreiseKandidat[]>;
+  fetchAnreiseStand?(leadIds: string[]): Promise<AnreiseStandRow[]>;
+}
+
+export interface AnreiseKandidat {
+  lead_id: string;
+  token: string;
+  mamamia_job_offer_id: number;
+}
+
+// Ein gemeldeter Anreise-Stand (lead_events caregiver_arrival_scheduled),
+// neueste zuerst. test=true stammt aus ANREISE_MAILS=test und zählt nur dort.
+export interface AnreiseStandRow {
+  mamamia_job_offer_id: number | null;
+  confirmation_id: number | null;
+  arrival_key: string | null;
+  test: boolean;
 }
 
 // Pending-Row inkl. Lead-Anker (Join) — alles, was syncAcceptance braucht.
@@ -233,13 +283,22 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
   if (req.method !== "POST") return jsonError(405, "method not allowed");
 
   // Empty/{} body = batch mode (cron path). { lead_id } = single-lead path
-  // (manual curl, useful for testing or one-off triggers).
-  let body: { lead_id?: unknown } = {};
+  // (manual curl, useful for testing or one-off triggers). { mode: "anreise" }
+  // = Anreise-Mails (eigener Cron-Aufruf: der Batch braucht schon ~110 s von
+  // ~150 s, Registry #119).
+  let body: { lead_id?: unknown; mode?: unknown } = {};
   try {
     const raw = await req.text();
     if (raw.trim()) body = JSON.parse(raw);
   } catch {
     return jsonError(400, "invalid json body");
+  }
+
+  if (body.mode === "anreise") {
+    return new Response(JSON.stringify(await meldeAnreisen(deps)), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   if (body.lead_id != null) {
@@ -421,6 +480,178 @@ export async function discoverFolgeEinsaetze(
   return out;
 }
 
+// ─── Anreise-Mail (Registry #119) ──────────────────────────────────────────
+// Die Agentur trägt die Anreise der Pflegekraft in mamamia ein
+// (final_confirmation.arrival). Dieser Modus ({ mode: "anreise" }, eigener
+// Cron-Aufruf) findet vollständige Einträge an gebuchten Jobs und meldet sie
+// der Bridge — die legt die Kundenmail in die Warteschlange (Muster
+// reservierung_beendet, route.ts planeAnreise). Neuer Schlüssel (Datum,
+// Uhrzeit, Verkehrsmittel) ⇒ neue Meldung ⇒ Mail „Geänderte Anreisedaten".
+//
+// ANREISE_MAILS (Supabase-Secret, wirkt ohne Redeploy):
+//   aus  (Standard) — nichts an die Bridge, nur Log (ohne Personendaten, #68)
+//   test — ganze Kette, die Mail geht aber ans Team (metadata.test)
+//   live — an die Kunden
+// test- und live-Stände zählen getrennt: der Wechsel test → live schickt
+// jedem Kunden seine Mail, auch wenn das Team sie schon gesehen hat.
+const ANREISE_FENSTER_TAGE = 30;
+// ponytail: höchstens 60 Jobs je Lauf (Okt. 2026: 46) — wird es mehr, die
+// weit in der Zukunft liegenden abschneiden (Sortierung ist schon aufsteigend).
+const ANREISE_KANDIDATEN_LIMIT = 60;
+
+export interface AnreiseResult {
+  mode: "anreise";
+  modus: "aus" | "test" | "live";
+  kandidaten: number;
+  gemeldet: number;
+  bekannt: number;
+  uebersprungen: number;
+  fehler: number;
+}
+
+export async function meldeAnreisen(deps: HandlerDeps, jetzt: Date = new Date()): Promise<AnreiseResult> {
+  const modus = anreiseModus(Deno.env.get("ANREISE_MAILS"));
+  const out: AnreiseResult = { mode: "anreise", modus, kandidaten: 0, gemeldet: 0, bekannt: 0, uebersprungen: 0, fehler: 0 };
+  const supa = deps.supabase;
+  if (!supa.fetchAnreiseKandidaten || !supa.fetchAnreiseStand) return out;
+  const fetcher = deps.fetchFn ?? globalThis.fetch;
+
+  try {
+    const kandidaten = await supa.fetchAnreiseKandidaten(
+      berlinDatumMinus(jetzt, ANREISE_FENSTER_TAGE),
+      ANREISE_KANDIDATEN_LIMIT,
+    );
+    out.kandidaten = kandidaten.length;
+    if (kandidaten.length > 0) {
+      // Letzter gemeldeter Schlüssel je (Job, Confirmation) in DIESEM Modus.
+      // Zeilen kommen neueste zuerst → der erste Treffer gewinnt.
+      const stand = new Map<string, string>();
+      for (const r of await supa.fetchAnreiseStand([...new Set(kandidaten.map((k) => k.lead_id))])) {
+        if (r.test !== (modus === "test") || !r.arrival_key) continue;
+        const k = `${r.mamamia_job_offer_id}:${r.confirmation_id}`;
+        if (!stand.has(k)) stand.set(k, r.arrival_key);
+      }
+
+      const agencyToken = await getOrRefreshAgencyToken({
+        authEndpoint: deps.secrets.mamamiaAuthEndpoint,
+        email: deps.secrets.mamamiaAgencyEmail,
+        password: deps.secrets.mamamiaAgencyPassword,
+        fetchFn: fetcher,
+      });
+
+      for (const k of kandidaten) {
+        const job = k.mamamia_job_offer_id;
+        try {
+          const r = await mamamiaRequest<{ JobOffer: { final_confirmation?: ArrivalConfirmation | null } | null }>({
+            endpoint: deps.secrets.mamamiaEndpoint,
+            token: agencyToken,
+            query: GET_JOB_OFFER_ARRIVAL,
+            variables: { id: job },
+            fetchFn: fetcher,
+          });
+          const fc = r.JobOffer?.final_confirmation ?? null;
+          const e = anreiseAusConfirmation(job, fc, jetzt);
+          if (modus === "aus") {
+            const d = "daten" in e ? e.daten : null;
+            console.log(
+              `[anreise][aus] lead=${k.lead_id} job=${job} conf=${fc?.id ?? "-"} arrival=${fc?.arrival ? "set" : "null"} ` +
+                (d
+                  ? `datum=${d.anreise_datum} von=${d.anreise_von} bis=${d.anreise_bis ?? "-"} typ=${d.verkehrsmittel} ` +
+                    `hinweis_zeichen=${d.hinweis?.length ?? 0} strasse=${d.einsatzort_strasse ? "ja" : "nein"} ` +
+                    `bekannt=${stand.get(`${job}:${d.confirmation_id}`) === d.arrival_key ? "ja" : "nein"}`
+                  : `grund=${"grund" in e ? e.grund : "-"}`),
+            );
+          }
+          if ("grund" in e) {
+            out.uebersprungen += 1;
+            // Häufige, erwartbare Gründe nicht loggen — nur die, bei denen
+            // jemand in mamamia nachsehen sollte.
+            if (modus !== "aus" && ["format", "datum_konflikt", "unvollstaendig", "keine_pflegekraft"].includes(e.grund)) {
+              console.warn(`[anreise] lead=${k.lead_id} job=${job} conf=${fc?.id ?? "-"} grund=${e.grund}`);
+            }
+            continue;
+          }
+          if (stand.get(`${job}:${e.daten.confirmation_id}`) === e.daten.arrival_key) {
+            out.bekannt += 1;
+            continue;
+          }
+          if (modus === "aus") continue;
+          if (await postAnreise(deps, k, fc!, e.daten, modus === "test")) out.gemeldet += 1;
+          else out.fehler += 1;
+        } catch (err) {
+          out.fehler += 1;
+          console.error(`[anreise] lead=${k.lead_id} job=${job} failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
+  } catch (err) {
+    out.fehler += 1;
+    console.error(`[anreise] scan failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // pg_net speichert die Antwort nicht — diese Zeile ist der Beleg des Laufs.
+  console.log(
+    `[anreise] modus=${out.modus} kandidaten=${out.kandidaten} gemeldet=${out.gemeldet} ` +
+      `bekannt=${out.bekannt} uebersprungen=${out.uebersprungen} fehler=${out.fehler}`,
+  );
+  return out;
+}
+
+// Meldung an die Bridge (Muster postAcceptanceAlarm). Pflegekraft-Name und
+// Foto kommen wie bei allen Kundenmails aus buildCaregiverMetadata.
+async function postAnreise(
+  deps: HandlerDeps,
+  k: AnreiseKandidat,
+  fc: ArrivalConfirmation,
+  d: AnreiseDaten,
+  test: boolean,
+): Promise<boolean> {
+  const cg = fc.caregiver!;
+  const node: CaregiverNode = {
+    id: cg.id as number,
+    first_name: cg.first_name ?? null,
+    last_name: cg.last_name ?? null,
+    year_of_birth: null,
+    care_experience: null,
+    germany_skill: null,
+    hp_caregiver_id: null,
+    hp_total_jobs: null,
+    hp_total_days: null,
+    hp_avg_mission_days: null,
+    avatar_retouched_promo: cg.avatar_retouched_promo ?? null,
+    avatar_retouched: cg.avatar_retouched ?? null,
+    avatar: cg.avatar ?? null,
+    about_de: null,
+  };
+  const metadata: Record<string, unknown> = {
+    ...buildCaregiverMetadata(node.id, node),
+    // Vor- + Nachname statt Kurzname (Michał 09.10.: nach der Buchung soll der
+    // Kunde wissen, wer kommt). Die API maskiert last_name heute zum Initial
+    // („H.") — sobald mamamia entmaskiert, steht hier der volle Name.
+    caregiver_name: [cg.first_name, cg.last_name].map((x) => (x ?? "").trim()).filter(Boolean).join(" "),
+    ...d,
+    mamamia_job_offer_id: k.mamamia_job_offer_id,
+    ...(test ? { test: true } : {}),
+  };
+  const fetcher = deps.fetchFn ?? globalThis.fetch;
+  try {
+    const res = await fetcher(`${deps.secrets.kostenrechnerUrl.replace(/\/$/, "")}/api/lead-event`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: k.token, event: "caregiver_arrival_scheduled", notify: true, metadata }),
+    });
+    if (!res.ok) {
+      console.error(`[anreise] bridge HTTP ${res.status} (lead=${k.lead_id}, job=${k.mamamia_job_offer_id})`);
+      return false;
+    }
+    console.log(`[anreise] gemeldet lead=${k.lead_id} job=${k.mamamia_job_offer_id} conf=${d.confirmation_id}${test ? " (test)" : ""}`);
+    return true;
+  } catch (err) {
+    console.error(`[anreise] bridge threw (lead=${k.lead_id}): ${err instanceof Error ? err.message : String(err)}`);
+    return false;
+  }
+}
+
 // ─── Acceptance-Sync-Retry ─────────────────────────────────────────────────
 // Dopycha niedokończone sekwencje (UpdateCustomer→Confirm→PDF-Upload) przez
 // wspólny moduł _shared/acceptanceSync — te same guardy co ścieżka
@@ -444,6 +675,12 @@ export async function discoverFolgeEinsaetze(
 const ACCEPTANCE_SYNC_MAX_AGE_DAYS = 30;
 const ACCEPTANCE_CONFIRM_ALERT_AFTER_MS = 5 * 60 * 1000;
 const ACCEPTANCE_PDF_ALERT_AFTER_MS = 24 * 60 * 60 * 1000;
+// Registry #82: Mamamia zeigt unsere Confirmation NICHT am Job der Bewerbung
+// (Upload-Bramka hat nachgelesen). Buchungs-Problem, kein Archiv-Problem —
+// eigene, kurze Schwelle statt der 24 h von pdfOverdue. Länger als die
+// Retry-Chain (15/30/60 s) plus ein Cron-Intervall, damit der normale Fall
+// "Mamamia braucht ein paar Sekunden" nicht alarmiert.
+const ACCEPTANCE_BOOKING_ALERT_AFTER_MS = 15 * 60 * 1000;
 
 // Team-Alarm über die Bridge — sie besitzt den SMTP-Transport. Das Event
 // acceptance_sync_alarm ist in route.ts team-mail-only (nicht in
@@ -455,6 +692,8 @@ async function postAcceptanceAlarm(
     confirmed: boolean;
     pdf_uploaded: boolean;
     permanent: boolean;
+    booking_not_visible?: "not_processed" | "foreign_confirmation" | null;
+    ursache?: "vertragsdaten" | null;
     error: string | null;
     age_minutes: number | null;
   },
@@ -474,6 +713,8 @@ async function postAcceptanceAlarm(
           confirmed: info.confirmed,
           pdf_uploaded: info.pdf_uploaded,
           permanent: info.permanent,
+          booking_not_visible: info.booking_not_visible ?? undefined,
+          ursache: info.ursache ?? undefined,
           error: info.error,
           age_minutes: info.age_minutes,
           source: "cron",
@@ -521,6 +762,8 @@ export async function retryAcceptanceSyncs(
     let confirmedNow = !!row.mamamia_confirmed_at;
     let pdfNow = !!row.mamamia_pdf_uploaded_at;
     let permanentConfirmError = false;
+    let bookingNotVisible: "not_processed" | "foreign_confirmation" | null = null;
+    let ursache: "vertragsdaten" | null = null;
     let lastError: string | null = null;
     try {
       const result = await syncAcceptance({
@@ -539,6 +782,7 @@ export async function retryAcceptanceSyncs(
         supabase: {
           stampConfirmed: supa.stampAcceptanceConfirmed.bind(supa),
           stampPdfUploaded: supa.stampAcceptancePdfUploaded.bind(supa),
+          fetchAcceptanceJobOfferId: (l, a) => supa.fetchAcceptanceJobOfferId?.(l, a) ?? Promise.resolve(null),
         },
         getAgencyToken: () =>
           getOrRefreshAgencyToken({
@@ -553,6 +797,8 @@ export async function retryAcceptanceSyncs(
       confirmedNow = result.confirmed;
       pdfNow = result.pdf_uploaded;
       permanentConfirmError = result.confirm_error?.permanent === true;
+      bookingNotVisible = result.booking_not_visible ?? null;
+      ursache = result.confirm_error?.ursache ?? null;
       lastError = result.confirm_error?.message ?? null;
       if (result.confirmed && result.pdf_uploaded) out.completed += 1;
     } catch (e) {
@@ -568,15 +814,29 @@ export async function retryAcceptanceSyncs(
     const confirmOverdue = !confirmedNow &&
       (permanentConfirmError ||
         (Number.isFinite(ageMs) && ageMs > ACCEPTANCE_CONFIRM_ALERT_AFTER_MS));
-    const pdfOverdue = confirmedNow && !pdfNow &&
+    // Buchung nicht sichtbar (Registry #82) VOR pdfOverdue prüfen: derselbe
+    // Row erfüllt beides (confirm ok, PDF offen), aber die Ursachen sind
+    // verschieden — hier hat Mamamia unsere Confirmation nicht am Job, das ist
+    // Kundenrisiko und darf nicht 24 h unter "PDF fehlt" warten.
+    const bookingOverdue = !!bookingNotVisible && !confirmOverdue &&
+      Number.isFinite(ageMs) && ageMs > ACCEPTANCE_BOOKING_ALERT_AFTER_MS;
+    const pdfOverdue = confirmedNow && !pdfNow && !bookingOverdue &&
       Number.isFinite(ageMs) && ageMs > ACCEPTANCE_PDF_ALERT_AFTER_MS;
-    if ((confirmOverdue || pdfOverdue) && !row.mamamia_sync_alerted_at && supa.stampAcceptanceSyncAlerted) {
+    if (
+      (confirmOverdue || bookingOverdue || pdfOverdue) && !row.mamamia_sync_alerted_at &&
+      supa.stampAcceptanceSyncAlerted
+    ) {
       const ageMin = Number.isFinite(ageMs) ? Math.round(ageMs / 60000) : null;
+      const bookingMsg = `Buchung NICHT in Mamamia sichtbar (${bookingNotVisible}, ` +
+        `confirmation=${row.mamamia_confirmation_id ?? "?"}, alter=${ageMin ?? "?"}min) — ` +
+        `Kunde hat "Neue Buchung" erhalten`;
       console.error(
         `🚨 ACCEPTANCE-SYNC ALARM: lead=${row.lead_id} app=${row.application_id} ` +
           (confirmOverdue
             ? `Buchung OHNE Mamamia-Bestätigung (permanent=${permanentConfirmError}, ` +
               `alter=${ageMin ?? "?"}min, error=${lastError ?? "—"})`
+            : bookingOverdue
+            ? bookingMsg
             : "Vertrags-PDF fehlt seit >24h") +
           " — Team-Mail via Bridge + SA-Portal prüfen.",
       );
@@ -584,7 +844,9 @@ export async function retryAcceptanceSyncs(
         confirmed: confirmedNow,
         pdf_uploaded: pdfNow,
         permanent: permanentConfirmError,
-        error: lastError,
+        booking_not_visible: bookingNotVisible,
+        ursache,
+        error: bookingOverdue ? bookingMsg : lastError,
         age_minutes: ageMin,
       });
       // Ohne lead_token ist die Mail für immer unmöglich → trotzdem stempeln,
@@ -754,7 +1016,7 @@ export async function detect(
         seenAppIds,
         pairsWithAppId,
         seenInterests,
-        // Notify-Regel (Bug #25, Fall 9239 „Elke Zwolan"):
+        // Notify-Regel (Bug #25, Fall 9239):
         //   - DEFAULT-Job: immer (heutiges Verhalten — erste Bewerbung mailt).
         //   - Job mit Event-Historie: immer (auch geseedete Events zählen).
         //   - Job LIVE 'geplant': IMMER — ein geplanter Folge-Einsatz ist
@@ -1549,6 +1811,23 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
         .eq("application_id", applicationId);
       if (error) throw new Error(`supabase stampAcceptancePdfUploaded: ${error.message}`);
     },
+    // Kopie von sync-acceptance/acceptanceJobOfferIdFromEvents (Edge Fns
+    // teilen keine Store-Module) — Änderungen synchron halten.
+    async fetchAcceptanceJobOfferId(leadId: string, applicationId: number) {
+      const { data, error } = await client
+        .from("lead_events")
+        .select("mamamia_job_offer_id")
+        .eq("lead_id", leadId)
+        .eq("event_type", "application_accepted_internal")
+        .eq("metadata->>application_id", String(applicationId))
+        .not("mamamia_job_offer_id", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw new Error(`supabase fetchAcceptanceJobOfferId: ${error.message}`);
+      const id = (data as { mamamia_job_offer_id?: unknown } | null)?.mamamia_job_offer_id;
+      return typeof id === "number" ? id : null;
+    },
     async stampAcceptanceSyncAlerted(leadId: string, applicationId: number) {
       const { error } = await client
         .from("lead_application_acceptances")
@@ -1656,6 +1935,41 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
         cancelled += 1;
       }
       return cancelled;
+    },
+    // ── Anreise-Mail (Registry #119) ──
+    async fetchAnreiseKandidaten(abDatum: string, limit: number) {
+      const { data, error } = await client
+        .from("lead_jobs")
+        .select("lead_id, mamamia_job_offer_id, leads!inner(token)")
+        .eq("status", "gebucht")
+        .gte("anreise", abDatum)
+        .order("anreise", { ascending: true })
+        .limit(limit);
+      if (error) throw new Error(`supabase fetchAnreiseKandidaten: ${error.message}`);
+      const out: AnreiseKandidat[] = [];
+      for (const r of (data ?? []) as Array<{ lead_id: string; mamamia_job_offer_id: number; leads: { token?: string | null } | null }>) {
+        if (r.leads?.token) out.push({ lead_id: r.lead_id, token: r.leads.token, mamamia_job_offer_id: r.mamamia_job_offer_id });
+      }
+      return out;
+    },
+    async fetchAnreiseStand(leadIds: string[]) {
+      if (leadIds.length === 0) return [];
+      const { data, error } = await client
+        .from("lead_events")
+        .select("mamamia_job_offer_id, metadata")
+        .in("lead_id", leadIds)
+        .eq("event_type", "caregiver_arrival_scheduled")
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(`supabase fetchAnreiseStand: ${error.message}`);
+      return (data ?? []).map((row: { mamamia_job_offer_id: number | null; metadata: unknown }) => {
+        const md = (row.metadata ?? {}) as Record<string, unknown>;
+        return {
+          mamamia_job_offer_id: row.mamamia_job_offer_id ?? extractMetadataInt(md, "mamamia_job_offer_id"),
+          confirmation_id: extractMetadataInt(md, "confirmation_id"),
+          arrival_key: typeof md.arrival_key === "string" ? md.arrival_key : null,
+          test: md.test === true,
+        };
+      });
     },
     async upsertLeadJobs(leadId, jobs) {
       if (jobs.length === 0) return;

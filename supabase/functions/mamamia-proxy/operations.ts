@@ -117,6 +117,7 @@ export const GET_CUSTOMER = /* GraphQL */ `
       }
       customer_contract {
         id
+        contact_type
         salutation
         first_name
         last_name
@@ -131,7 +132,7 @@ export const GET_CUSTOMER = /* GraphQL */ `
         id
         equipment
       }
-      # Gebucht-Ableitung (Fix Hagedorn 2026-07-15): akzeptiert die AGENTUR
+      # Gebucht-Ableitung (Fix 2026-07-15): akzeptiert die AGENTUR
       # eine Bewerbung im SA-Portal, entsteht KEINE
       # lead_application_acceptances-Zeile und Mamamia entfernt die Bewerbung
       # aus listApplications — der einzige sichtbare Beleg ist
@@ -347,13 +348,6 @@ export const GET_CAREGIVER = /* GraphQL */ `
       avatar { aws_url }
       avatar_retouched_promo { aws_url }
       avatar_retouched { aws_url }
-      hp_recent_assignments(limit: 5) {
-        arrival_date
-        departure_date
-        postal_code
-        city
-        status
-      }
     }
     # Reference/certificate uploads. NB: the Caregiver.certificates RELATION
     # 500s the Mamamia backend ("Internal server error") — verified live on
@@ -366,6 +360,20 @@ export const GET_CAREGIVER = /* GraphQL */ `
       description
       valid_from
       file { original_name aws_url created_at mime_type }
+    }
+  }
+`;
+
+// Einsätze der Pflegekraft (Registry #126): alle Missionen — HP, mamamia aller
+// Agenturen (fremde ohne customer_id) und web_mission —, status accepted |
+// on_job | finish aus den Daten. Ersetzt `hp_recent_assignments` (kannte keine
+// mamamia-Missionen). Eigene Abfrage, damit ein Fehler hier das Profil nicht
+// mitreisst. Gleiche Quelle wie das SA-Portal (Sadash CaregiverController).
+export const CAREGIVER_DEPARTURES = /* GraphQL */ `
+  query CaregiverDepartures($id: Int!) {
+    CaregiverDeparturesWithPagination(caregiver_id: $id, limit: 200, page: 1) {
+      has_more_pages
+      data { customer_id arrival_date departure_date duration_days status zip_code city }
     }
   }
 `;
@@ -615,3 +623,22 @@ export const UPDATE_CONFIRMATION_FILES = /* GraphQL */ `
     }
   }
 `;
+
+// Vorbelegung des Vertragsformulars ab dem zweiten Einsatz (Registry #130,
+// Martin 20.10.2026: „beim 2. Job muss der Kunde beim Annehmen alle Kunden- und
+// Kontaktdaten neu eingeben"). Die erste Annahme schreibt die drei Personen nach
+// Mamamia (_shared/acceptanceSync.ts): Leistungsempfänger = customer_contracts
+// mit contact_type "patient_contact", Auftraggeber = "contract_contact",
+// Kontaktperson = customer_contacts. Felder 1:1 wie das SA-Portal sie täglich
+// liest (mamamia-sadash DashboardController, ohne title/location). EIGENE Abfrage,
+// nicht in GET_CUSTOMER: schlägt sie fehl, bleibt das Portal heil (fail-soft).
+export const GET_CUSTOMER_KONTAKTE = /* GraphQL */ `
+  query GetCustomerKontakte($id: Int!) {
+    Customer(id: $id) {
+      id
+      customer_contracts { id contact_type salutation first_name last_name phone email street_number zip_code city }
+      customer_contacts { id salutation first_name last_name phone email }
+    }
+  }
+`;
+

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail, getTokenRegenerationEmailTemplate } from '@/lib/email';
+import { holeBewertungsStand } from '@/lib/bewertungen-stand';
 import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { generateToken, getTokenExpiry } from '@/lib/calculation';
 
@@ -69,6 +70,12 @@ async function handlePost(request: NextRequest) {
     // even if sent — never trust portal callers to address arbitrary leads.
     if (!token) return jsonError(400, 'token_required');
   } else {
+    /* Admin-Pfade nur mit Admin-Cookie: diese Route liegt nicht unter
+       /api/admin, die middleware schützt sie also nicht — vorher reichte eine
+       Lead-UUID, um einen frischen Portal-Token zurückzubekommen. Aufrufer ist
+       nur die Admin-Detailseite (same-origin, das Cookie geht mit). */
+    const pw = process.env.ADMIN_PASSWORD;
+    if (!pw || request.cookies.get('admin_auth')?.value !== pw) return jsonError(401, 'unauthorized');
     // Admin paths use lead_id. Portal token there would be a misconfig.
     if (!leadId) return jsonError(400, 'lead_id_required');
   }
@@ -205,13 +212,18 @@ async function handlePost(request: NextRequest) {
     const leadWithNewToken = { ...lead, token: newToken };
     // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
     const uml = testphaseUmleitung(lead, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
-    const tpl = getTokenRegenerationEmailTemplate(leadWithNewToken, portalUrl);
-    sendEmail(uml?.empfaenger ?? lead.email, uml ? { ...tpl, subject: uml.betreffPraefix + tpl.subject } : tpl, undefined,
-      uml ? undefined : { cc: kundenEmpfaenger(lead).cc }).catch(
-      (e) => {
-        console.error('token regen email failed:', e instanceof Error ? e.message : String(e));
-      },
-    );
+    // Bewertungsstand in der Kette: die Antwort wartet nicht auf primundus.de.
+    holeBewertungsStand()
+      .then((bewertung) => {
+        const tpl = getTokenRegenerationEmailTemplate(leadWithNewToken, portalUrl, bewertung);
+        return sendEmail(uml?.empfaenger ?? lead.email, uml ? { ...tpl, subject: uml.betreffPraefix + tpl.subject } : tpl, undefined,
+          uml ? undefined : { cc: kundenEmpfaenger(lead).cc });
+      })
+      .catch(
+        (e) => {
+          console.error('token regen email failed:', e instanceof Error ? e.message : String(e));
+        },
+      );
   }
 
   return NextResponse.json(
