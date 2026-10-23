@@ -3,6 +3,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { GARANTIE } from '@/lib/kraefte-vorschau';
 import { PORTAL_BASIS } from '@/lib/portal-url';
+import { linkToken } from '@/lib/link-token';
 import {
   ANLAESSE,
   knopfAus,
@@ -57,7 +58,7 @@ export default function RueckmeldungPage() {
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
-    const t = p.get('token');
+    const t = linkToken(window.location.search, document.cookie);
     const k = knopfAus(p.get('knopf'));
     setKnopf(k);
     if (!t) return setStand('ohne-token');
