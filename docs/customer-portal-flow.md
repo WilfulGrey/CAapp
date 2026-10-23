@@ -544,6 +544,26 @@ Kolumny `mamamia_*` dodane migracją
 
 Vite + React 18 + TS, `caapp-beta.onrender.com/?token=X`.
 
+### B.0 Schlüssel raus aus der Adresse (Registry #134)
+
+GTM (Google Analytics, Clarity) meldet die volle Seitenadresse. Bis 23.10.2026 lag
+damit `?token=…` — der Zugang zum Portal — in Google Analytics (2.276 Aufrufe in 28
+Tagen). Jetzt nimmt ein Inline-Skript ganz oben in `index.html`, VOR dem GTM-Snippet,
+den Schlüssel aus der Adresse: `window.__pmPortalToken` für diesen Aufruf,
+`localStorage['pm_portal_token']` für Neuladen und Lesezeichen, dann
+`history.replaceState` ohne `token` (übrige Parameter wie `m`, `goto`, `job`, `view`
+bleiben). Verweigert der Browser den Speicher, bleibt die Adresse wie bisher. Das Portal
+liest den Schlüssel nur über `src/lib/portalToken.ts` (`portalToken()`: dieser Aufruf →
+Adresse → Speicher); ein neuer Mail-Link überschreibt den gespeicherten. Links im Portal
+(z. B. `?view=jobs`) dürfen den Schlüssel weiter tragen — jeder Seitenaufruf läuft
+wieder durch das Skript.
+
+Rechner-Seiten aus Mail-Links (`/abmelden`, `/feedback`, `/rueckmeldung`): `middleware.ts`
+legt den Schlüssel in das Cookie `pm_link_token` (Pfad = die Seite, 1 Stunde, SameSite
+Lax, Secure auf Prod) und leitet auf dieselbe Adresse ohne `token` um; die Seiten lesen
+über `project 3/lib/link-token.ts`. Die Kalkulationsseite `/kalkulation/<leadId>` trägt
+keinen Schlüssel.
+
 ### B.1 Pobranie leada (funkcja `lead_by_token`, Registry #107)
 
 `src/pages/CustomerPortalPage.tsx` → `src/lib/supabase.ts` `fetchLeadByToken`:
@@ -1324,6 +1344,9 @@ Edge Fn   ←─── Sanctum session cookie (agency login) ──────�
 - `mamamia-proxy` waliduje **ownership** każdej operacji
   (`session.customer_id` / `session.job_offer_id`). Klient nie może czytać/pisać
   cudzych danych.
+- **Zugangsschlüssel nie an Dritte** (Registry #133/#134): Clarity bekommt als Kennung
+  nur die Lead-ID; aus der Adresse nehmen `index.html` (Portal) und `middleware.ts`
+  (Abmelden, Feedback, Rückmeldung) den Schlüssel, bevor GTM die Seite meldet.
 - Allowlisty pól (`UPDATE_CUSTOMER_ALLOWED`, `WISH_ALLOWED`,
   `CONTRACT_PATIENT_ALLOWED`, `CONTRACT_CONTACT_ALLOWED`) chronią przed
   injectowaniem nieoczekiwanych pól od klienta.

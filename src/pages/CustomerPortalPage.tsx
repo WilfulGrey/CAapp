@@ -18,6 +18,7 @@ import { isAboutDeStale, regenerateGermanDescription } from '../lib/mamamia/care
 import { feedbackInRuhezeit, reportLeadEvent, fetchLeadEvents, KOSTENRECHNER_URL } from '../lib/leadEvents';
 import type { CaregiverSnapshot, EinladenQuelle, FormularQuelle, LeadEventMetadata, Messpunkt, ProfilQuelle } from '../lib/leadEvents';
 import { identifyClarity } from '../lib/clarity';
+import { portalToken } from '../lib/portalToken';
 import {
   useRejectApplication,
   useStoreConfirmation,
@@ -179,10 +180,9 @@ const JOB_ID_PARAM =
   typeof window !== 'undefined'
     ? new URLSearchParams(window.location.search).get('job')
     : null;
-const TOKEN_PARAM =
-  typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search).get('token')
-    : null;
+// Token kommt nicht mehr aus der Adresse allein: index.html nimmt ihn dort
+// heraus, bevor GTM die Seite meldet (Registry #134).
+const TOKEN_PARAM = portalToken();
 // Diagnose-Leiste auch auf Prod einschaltbar (?debug=1) — siehe Kommentar
 // an der Leiste selbst. Bewusst ein URL-Parameter und keine Bauzeit-
 // Variable: gebraucht wird sie genau dort, wo nicht gebaut wird.
@@ -494,8 +494,7 @@ const CustomerPortalPage: FC = () => {
 
   useEffect(() => {
     if (IS_PREVIEW_ANY) return;
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+    const token = portalToken();
     setTokenFromUrl(token);
     if (!token) {
       // No token → nothing to show. No demo fallback (CLAUDE.md §1).
@@ -2462,7 +2461,7 @@ const CustomerPortalPage: FC = () => {
       <div style={{color:'#ff0',fontWeight:'bold',marginBottom:4}}>🔧 DEBUG (?debug=1)</div>
       <div>UA: {typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 100) : '?'}</div>
       <div>online: {typeof navigator !== 'undefined' ? String(navigator.onLine) : '?'} · cookieEnabled: {typeof navigator !== 'undefined' ? String(navigator.cookieEnabled) : '?'}</div>
-      <div>lead.token URL: {new URLSearchParams(window.location.search).get('token')?.slice(0, 12) ?? 'MISSING'}…</div>
+      <div>lead.token: {portalToken()?.slice(0, 12) ?? 'MISSING'}…</div>
       <hr style={{borderColor:'#0f04',margin:'4px 0'}}/>
       <div style={{color:'#ff0'}}>auth via: {authMethod}</div>
       <div>sessionStorage.mamamia_session_token: {tokenPreview(sessionTokenInStorage)}</div>

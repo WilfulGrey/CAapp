@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react';
+import { linkToken } from '@/lib/link-token';
 
 // Rückmeldungs-Seite nach dem Angebot (/feedback?token=...).
 //
@@ -110,9 +111,9 @@ export default function FeedbackSeite() {
   const [sendet, setSendet] = useState(false);
 
   const melden = (a: Antwort, detail?: string) => {
-    // Token direkt aus der URL statt aus dem State: Beim Sprung aus der Mail
+    // Token direkt (Adresse oder Cookie, Registry #134) statt aus dem State: Beim Sprung aus der Mail
     // laeuft melden() im selben Durchlauf wie setToken — der State waere noch leer.
-    const tk = token ?? new URLSearchParams(window.location.search).get('token');
+    const tk = token ?? linkToken(window.location.search, document.cookie);
     fetch('/api/lead-event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -130,7 +131,7 @@ export default function FeedbackSeite() {
   // die Frage selbst, damit sie nie ins Leere läuft.
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
-    setToken(p.get('token'));
+    setToken(linkToken(window.location.search, document.cookie));
     const a = p.get('a');
     if (a === 'hilfreich' || a === 'teils' || a === 'nein') {
       setAntwort(a);
