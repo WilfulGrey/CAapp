@@ -93,7 +93,6 @@ describe('Wortlaut Nachtrag 3, Zeichen für Zeichen', () => {
     expect(T.nachSatz).toBe('Wir melden uns bei Ihnen und fragen nach, ob alles gut klappt.');
     expect(nb(T.folgeAb(`Sonntag,${NBSP}29.11.`))).toBe('Folgeeinsatz ab Sonntag, 29.11.');
     expect(T.folgeSucht).toBe('Für den Folgeeinsatz suchen wir eine Pflegekraft für Sie.');
-    expect(T.einladen).toBe(`Pflegekräfte einladen${NBSP}›`);
   });
   it('NEU R6 / R6b und wiederverwendete Texte', () => {
     expect(T.etikett).toEqual({ gebucht: 'Gebucht', heuteGeplant: 'Anreise heute geplant', endetBald: 'Endet bald', endetHeute: 'Endet heute', beendet: 'Beendet' });
@@ -108,7 +107,10 @@ describe('Wortlaut Nachtrag 3, Zeichen für Zeichen', () => {
     expect(T.folgeAb(T.heute)).toBe('Folgeeinsatz ab heute');
     expect(nb(T.folgeGebucht(`Anna${NBSP}B.`))).toBe('Für den Folgeeinsatz ist Anna B. gebucht.');
     expect(T.folgeGebuchtOhneName).toBe('Für den Folgeeinsatz ist eine Pflegekraft gebucht.');
-    expect(T.folgeAnsehen).toBe(`Folgeeinsatz ansehen${NBSP}›`);
+    expect(T.folgeTitel).toBe('Folgeeinsatz');
+    expect(T.folgeNochNicht).toBe('Wir legen den Folgeeinsatz normalerweise einige Wochen vor dem Ende dieses Einsatzes an, oft etwa einen Monat vorher. Danach sehen Sie ihn hier und können Pflegekräfte einladen. Außerdem suchen wir selbst eine passende Pflegekraft für Sie.');
+    expect(T.folgeBaldOhne).toBe('Wenn Sie eine weitere Betreuung wünschen und hier noch kein Folgeeinsatz steht, melden Sie sich bitte bei uns.');
+    expect(T.zumFolgeeinsatz).toBe(`Zum Folgeeinsatz wechseln${NBSP}›`);
     expect(T.bewerbungenAnsehen(1)).toBe(`1${NBSP}Bewerbung ansehen${NBSP}›`);
     expect(T.bewerbungenAnsehen(2)).toBe(`2${NBSP}Bewerbungen ansehen${NBSP}›`);
     expect(T.ihreUnterlagen).toBe('Ihre Unterlagen');
@@ -161,7 +163,7 @@ describe('Wortlaut-Wächter (N3.2 Regel 11, N3.7, N3.8)', () => {
   it('keine Gedankenstriche in neuen Texten (Striche nur in Zeitbereichen und im live Text der Einsatzübersicht)', () => {
     const neu = [T.etikett.heuteGeplant, T.etikett.endetBald, T.etikett.endetHeute, T.etikett.beendet, T.vertragUnterschreiben,
       T.vertragVorbereitung, T.vertragFrueher, T.unterschriebenAm('X'), T.anreiseAbgestimmt, T.anreiseHeuteOffen, T.folgeGebucht('X'),
-      T.folgeGebuchtOhneName, T.folgeAnsehen, T.bewerbungenAnsehen(2), T.trenner, T.kostenGrundlage];
+      T.folgeGebuchtOhneName, T.folgeTitel, T.folgeNochNicht, T.folgeBaldOhne, T.zumFolgeeinsatz, T.bewerbungenAnsehen(2), T.trenner, T.kostenGrundlage];
     for (const t of neu) expect(t, t).not.toMatch(/[—–]/);
   });
   it('nie „wir vermitteln", nie Martin', () => {

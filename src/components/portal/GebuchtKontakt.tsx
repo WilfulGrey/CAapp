@@ -15,6 +15,7 @@
 // Bausteine: Personenzeile und runde Knöpfe aus MartaBox, Abschnitt mit Überschrift aus KompaktEinstieg. Der Notfallblock
 // hat keinen eigenen runden Knopf: die sichtbare Nummer ist der Anruf-Link (leiser, Skeptiker-Befund Runde 1).
 import type { ReactNode } from 'react';
+import { Phone } from 'lucide-react';
 import { ERREICHBAR, TELEFON, TELEFON_HREF } from '../../lib/kontakt';
 import { MartaZeile } from './MartaBox';
 import { AngebotAbschnitt } from './KompaktEinstieg';
@@ -51,6 +52,11 @@ export const KONTAKT_TEXTE = {
   /** V2 */
   v2Notfall: `Bitte melden Sie sich ${NOTFALL_GELTUNG}, unter der Primundus-Notfallnummer:`,
   hinweis112: 'Bei medizinischen Notfällen: 112',
+  /** Gebucht-Seite neu (Martin 24.10.): Geltung als eigener Satz unter dem Namen, Wortlaut NOTFALL_GELTUNG unverändert. */
+  notfallGeltungSatz: `${NOTFALL_GELTUNG.charAt(0).toUpperCase()}${NOTFALL_GELTUNG.slice(1)}.`,
+  /** Gebucht-Seite neu: Zeile über Marta, wenn die Notfallnummer darüber steht (OpenAI R7, Frage 4: sonst liest man die
+   *  Notfallnummer als ersten Anlaufpunkt). */
+  alleAnderenFragen: 'Für alle anderen Fragen',
   /** Screenreader der sichtbaren Tagesnummer („oder ein Kollege" steht daneben, daher nicht „Marta Kapcio anrufen"). */
   ariaTag: `Primundus anrufen: ${TELEFON}`,
 } as const;
@@ -215,8 +221,10 @@ export function GebuchtKontakt({ variante, notfallTelefon, className = 'mt-8' }:
 
 // ─── Gebucht-Seite neu (PROTOTYP 15.10.2026, nur Vorschau) ─────────────────────
 // Spezifikation gebucht-seite-2026-10-15, Abschnitt 6.5: Kontakt als eigener Abschnitt mit Überschrift (Martin: „Ihr Kontakt
-// zur Agentur … schöner"), Notfallnummer als GETÖNTES Feld in der Karte (statt Linie). Wortlaut aus KONTAKT_TEXTE (V1/V3,
-// geprüft 14.10.); Martins Phrase NOTFALL_GELTUNG wörtlich. Die alten Varianten oben bleiben für `&seite=alt`.
+// zur Agentur … schöner"). Martin 24.10.: „Die Notfallnummer ist mir nicht prominent genug. Die ist wichtiger als der andere
+// Kontakt." Deshalb steht das Notfallfeld OBEN in der Karte, die Nummer selbst ist ein großer Anruf-Knopf, Martas
+// Tageskontakt folgt darunter. Wortlaut aus KONTAKT_TEXTE; Martins Phrase NOTFALL_GELTUNG wörtlich (nur als eigener Satz mit
+// großem Anfangsbuchstaben). Die alten Varianten oben bleiben für `&seite=alt`.
 
 /** Entscheidung 2: A = Martins Wortlaut (steht im Bau, bis er wählt), B = Empfehlung (texte_final.md). */
 export const KONTAKT_TITEL = {
@@ -242,28 +250,41 @@ export function notfallAnzeige(nummer: string | null | undefined): { nummer: str
   return wert === NOTFALL_PLATZHALTER ? { nummer: wert, href: null } : null;
 }
 
-/** Getöntes Notfallfeld: Zeile, Nummer als Anruf-Link (44 px, kein runder Knopf), 112 klein. Ohne gültige Nummer: nichts. */
+// Nummer als Knopf über die volle Breite: 52 px hoch, 20 px fett, bricht nie um.
+const NOTFALL_KNOPF = 'mt-3 flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-[14px] px-4 text-[20px] font-bold tabular-nums text-white';
+
+/**
+ * Notfallfeld (Martin 24.10.: wichtiger als der Tageskontakt): Name, Geltung, die Nummer als großer Anruf-Knopf, 112 klein
+ * darunter. Platzhalter der Vorschau im selben Look, aber ohne Link. Ohne gültige Nummer: nichts.
+ */
 export function NotfallFeld({ nummer, className = '' }: { nummer: string | null | undefined; className?: string }) {
   const anzeige = notfallAnzeige(nummer);
   if (!anzeige) return null;
+  const inhalt = (
+    <>
+      <Phone className="h-5 w-5 flex-none" aria-hidden="true" />
+      <span className="whitespace-nowrap">{ohneUmbruch(anzeige.nummer)}</span>
+    </>
+  );
   return (
-    <div className={`rounded-[14px] bg-pm-shell px-4 pb-3 pt-3.5 ${className}`.trim()} data-clarity-mask="true" data-notfall="">
-      <p className={ZEILE}>{KONTAKT_TEXTE.notfallZeile}</p>
+    <div className={`rounded-[16px] border border-pm-coral/30 bg-pm-coral-tint px-4 pb-3.5 pt-4 ${className}`.trim()} data-clarity-mask="true" data-notfall="">
+      <p className="text-[16px] font-bold leading-[1.3] text-pm-coral-ink">{KONTAKT_TEXTE.notfallName}</p>
+      <p className={`mt-1 ${ZEILE}`}>{KONTAKT_TEXTE.notfallGeltungSatz}</p>
       {anzeige.href ? (
-        <NummerLink href={anzeige.href} aria={notfallAria(anzeige.nummer)} nummer={anzeige.nummer} />
+        <a href={anzeige.href} aria-label={notfallAria(anzeige.nummer)} className={`${NOTFALL_KNOPF} bg-pm-coral-ink hover:bg-pm-ink`} data-teil="notfall-knopf">
+          {inhalt}
+        </a>
       ) : (
-        <p className="-mt-1">
-          <span data-platzhalter="notfall" className="inline-flex min-h-[44px] items-center text-[17px] font-semibold text-pm-ink">{anzeige.nummer}</span>
-        </p>
+        <p className={`${NOTFALL_KNOPF} bg-pm-coral-ink`} data-platzhalter="notfall">{inhalt}</p>
       )}
-      <p className="text-[13.5px] leading-[1.4] text-pm-muted">{KONTAKT_TEXTE.hinweis112}</p>
+      <p className="mt-2.5 text-[13.5px] leading-[1.4] text-pm-muted">{KONTAKT_TEXTE.hinweis112}</p>
     </div>
   );
 }
 
 /**
- * Kontakt-Abschnitt der neuen Gebucht-Seite: h2 (Entscheidung 2) + Karte mit Marta, Tageszeile, Tagesnummer und — nur mit
- * gültiger Nummer und `mitNotfall` — dem getönten Notfallfeld. `mitNotfall` = false im beendeten Einsatz.
+ * Kontakt-Abschnitt der neuen Gebucht-Seite: h2 (Entscheidung 2) + Karte mit — nur mit gültiger Nummer und `mitNotfall` —
+ * dem Notfallfeld OBEN, darunter Marta, Tageszeile und Tagesnummer. `mitNotfall` = false im beendeten Einsatz.
  */
 export function GebuchtKontaktKarte({ titel, notfallTelefon, mitNotfall, className = 'mt-10' }: {
   titel: KontaktTitel;
@@ -271,14 +292,18 @@ export function GebuchtKontaktKarte({ titel, notfallTelefon, mitNotfall, classNa
   mitNotfall: boolean;
   className?: string;
 }) {
+  const notfall = mitNotfall && !!notfallAnzeige(notfallTelefon);
   return (
     <section aria-labelledby="kontakt-gebucht" className={className} data-baustein="kontakt">
       <h2 id="kontakt-gebucht" className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">{KONTAKT_TITEL[titel]}</h2>
       <div className={`mt-4 ${KARTE}`}>
-        <MartaZeile eng unterzeile={KONTAKT_TEXTE.kollege} />
-        <p className={`mt-4 ${ZEILE}`}>{mitZeiten(KONTAKT_TEXTE.tagZeile)}</p>
-        <NummerLink href={TELEFON_HREF} aria={KONTAKT_TEXTE.ariaTag} nummer={TELEFON} />
-        {mitNotfall && <NotfallFeld nummer={notfallTelefon} className="mt-3" />}
+        {notfall && <NotfallFeld nummer={notfallTelefon} />}
+        <div className={notfall ? 'mt-5 border-t border-pm-line-soft pt-5' : ''} data-teil="tageskontakt">
+          {notfall && <p className="mb-3 text-[13.5px] font-semibold leading-[1.4] text-pm-muted">{KONTAKT_TEXTE.alleAnderenFragen}</p>}
+          <MartaZeile eng unterzeile={KONTAKT_TEXTE.kollege} />
+          <p className={`mt-4 ${ZEILE}`}>{mitZeiten(KONTAKT_TEXTE.tagZeile)}</p>
+          <NummerLink href={TELEFON_HREF} aria={KONTAKT_TEXTE.ariaTag} nummer={TELEFON} />
+        </div>
       </div>
     </section>
   );

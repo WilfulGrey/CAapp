@@ -106,10 +106,11 @@ describe('Vorschau-Schalter', () => {
     expect(vorschauAlteSeite('?preview=gebucht&seite=alt')).toBe(true);
     expect(vorschauAlteSeite('?preview=gebucht')).toBe(false);
   });
-  it('Daten liegen relativ zu heute; AD hat wie im Bild einen geplanten Folgeeinsatz ohne Bewerbung', () => {
+  it('Daten liegen relativ zu heute; vor der Anreise ist noch kein Folgeeinsatz angelegt (Martin 24.10.), &folge=geplant legt ihn an', () => {
     const ad = vorschau('zustand=anreise-da').daten;
     expect(ad.einsatz).toMatchObject({ anreise: '2026-10-19', abreise: '2026-11-29' });
-    expect(ad.jobs[1]).toMatchObject({ status: 'geplant', anreise: '2026-11-29', bewerbungen: 0 });
+    expect(ad.jobs).toHaveLength(1);
+    expect(vorschau('zustand=anreise-da&folge=geplant').daten.jobs[1]).toMatchObject({ status: 'geplant', anreise: '2026-11-29', bewerbungen: 0 });
     expect(vorschau('zustand=anreisetag').daten.einsatz.anreise).toBe(HEUTE);
     expect(vorschau('zustand=beendet').daten.einsatz.abreise).toBe('2026-09-05');
     expect(vorschau('zustand=endet-heute').daten.einsatz.abreise).toBe(HEUTE);
@@ -149,7 +150,7 @@ describe('freigegebener Bildschirm (AD): Aufbau und Wortlaut Zeichen für Zeiche
   it('Schritte: Überschrift, Kreise (✓, ✓, 3, 4), Linie, Wortlaut je Schritt', () => {
     const r = zeige('zustand=anreise-da');
     expect(r.txt('#schritte-titel')).toBe(N3);
-    expect(r.schritte).toEqual([V_FERTIG, 'fertig:Anreise organisiert', 'jetzt:Nach der Anreise', 'spaeter:Folgeeinsatz ab Sonntag, 29.11.']);
+    expect(r.schritte).toEqual([V_FERTIG, 'fertig:Anreise organisiert', 'jetzt:Nach der Anreise', 'spaeter:Folgeeinsatz']);
     const li = [...r.seite.querySelectorAll('[data-schritt]')] as HTMLElement[];
     expect(li.map((x) => nb(x.querySelector('[data-teil="kreis"]')?.textContent))).toEqual(['', '', '3', '4']);
     expect(li.map((x) => x.querySelector('[data-teil="kreis"] svg') !== null)).toEqual([true, true, false, false]);
@@ -166,18 +167,22 @@ describe('freigegebener Bildschirm (AD): Aufbau und Wortlaut Zeichen für Zeiche
     ]);
     expect(li[1].querySelector('[data-zeile="adresse"]')?.getAttribute('data-clarity-mask')).toBe('true');
     expect(nb(li[2].querySelector('[data-zeile="text"]')?.textContent)).toBe('Wir melden uns bei Ihnen und fragen nach, ob alles gut klappt.');
-    expect(nb(li[3].querySelector('[data-zeile="text"]')?.textContent)).toBe('Für den Folgeeinsatz suchen wir eine Pflegekraft für Sie.');
-    expect(screen.getByRole('button', { name: 'Pflegekräfte einladen ›' })).toBeTruthy();
+    expect(nb(li[3].querySelector('[data-zeile="text"]')?.textContent)).toBe('Wir legen den Folgeeinsatz normalerweise einige Wochen vor dem Ende dieses Einsatzes an, oft etwa einen Monat vorher. Danach sehen Sie ihn hier und können Pflegekräfte einladen. Außerdem suchen wir selbst eine passende Pflegekraft für Sie.');
+    expect(li[3].querySelector('a, button')).toBeNull();
   });
-  it('Kontakt wie GebuchtKontakt (Marta, Tagesnummer, Notfallfeld unter der Tagesnummer) und Siegel', () => {
+  it('Kontakt: Notfallfeld OBEN (Martin 24.10.), darunter Marta mit Tagesnummer; Siegel', () => {
     const r = zeige('zustand=anreise-da');
     const kontakt = r.txt('[data-baustein="kontakt"]');
-    expect(kontakt.startsWith('Ihr Kontakt zur Agentur')).toBe(true);
+    expect(kontakt.startsWith('Ihr Kontakt zur Agentur Primundus-Notfallnummer')).toBe(true);
     expect(kontakt).toContain('Marta Kapcio');
     expect(kontakt).toContain('oder ein Kollege');
     expect(kontakt).toContain('Telefon und WhatsApp, täglich 8–20 Uhr:');
-    expect(kontakt.indexOf('089 200 000 830')).toBeLessThan(kontakt.indexOf('Primundus-Notfallnummer'));
-    expect(kontakt).toContain(`Primundus-Notfallnummer, ${NOTFALL_GELTUNG}:`);
+    expect(kontakt.indexOf('Primundus-Notfallnummer')).toBeLessThan(kontakt.indexOf('Marta Kapcio'));
+    expect(kontakt.indexOf('Für alle anderen Fragen')).toBeGreaterThan(kontakt.indexOf('Bei medizinischen Notfällen: 112'));
+    expect(kontakt.indexOf('Für alle anderen Fragen')).toBeLessThan(kontakt.indexOf('Marta Kapcio'));
+    expect(kontakt.indexOf(FANTASIE_PL)).toBeLessThan(kontakt.indexOf('089 200 000 830'));
+    expect(kontakt).toContain(KONTAKT_TEXTE.notfallGeltungSatz);
+    expect(KONTAKT_TEXTE.notfallGeltungSatz).toBe(`I${NOTFALL_GELTUNG.slice(1)}.`);
     expect(r.txt('[data-baustein="ende"]')).toContain('6× Testsieger');
   });
   it('„Vertrag als PDF" öffnet das PDF in einem neuen Fenster, mit Screenreader-Text und erweiterter Tippfläche', () => {
@@ -206,59 +211,59 @@ describe('freigegebener Bildschirm (AD): Aufbau und Wortlaut Zeichen für Zeiche
     await userEvent.click(knopf);
     expect(r.q1('[data-baustein="monatszeilen"]')).toBeNull();
   });
-  it('Pflegekraft-Zeile öffnet das Profil; „Pflegekräfte einladen ›" führt zum Folgeeinsatz', async () => {
-    const r = zeige('zustand=anreise-da');
+  it('Pflegekraft-Zeile öffnet das Profil; „Zum Folgeeinsatz wechseln ›" führt zum angelegten Folgeeinsatz', async () => {
+    const r = zeige('zustand=anreise-da&folge=geplant');
     await userEvent.click(screen.getByRole('button', { name: 'Profil von Maria K. ansehen' }));
     expect(r.props.onPflegekraft).toHaveBeenCalledTimes(1);
-    await userEvent.click(screen.getByRole('button', { name: 'Pflegekräfte einladen ›' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Zum Folgeeinsatz wechseln ›' }));
     expect(r.props.onEinsatz).toHaveBeenCalledWith('vorschau-einsatz-2');
   });
   it('mit einsatzHref sind die Links echte Links ?job=…', () => {
-    zeige('zustand=anreise-da', { einsatzHref: (id) => `?token=t&job=${id}` });
-    expect(screen.getByRole('link', { name: 'Pflegekräfte einladen ›' }).getAttribute('href')).toBe('?token=t&job=vorschau-einsatz-2');
+    zeige('zustand=anreise-da&folge=geplant', { einsatzHref: (id) => `?token=t&job=${id}` });
+    expect(screen.getByRole('link', { name: 'Zum Folgeeinsatz wechseln ›' }).getAttribute('href')).toBe('?token=t&job=vorschau-einsatz-2');
   });
 });
 
 describe('alle Zustände nach der Zustandstabelle N3.5', () => {
   const FALL: Array<[string, ReturnType<typeof uebersicht>]> = [
     ['zustand=anreise-da', { zustand: 'AD', etikett: 'Gebucht (warnung)', an: 'Anreise Montag 19.10.', ab: 'Abreise Sonntag 29.11. geplant', kosten: MIT_KOSTEN, titel: N3,
-      schritte: [V_FERTIG, 'fertig:Anreise organisiert', 'jetzt:Nach der Anreise', 'spaeter:Folgeeinsatz ab Sonntag, 29.11.'], notfall: true }],
+      schritte: [V_FERTIG, 'fertig:Anreise organisiert', 'jetzt:Nach der Anreise', 'spaeter:Folgeeinsatz'], notfall: true }],
     ['zustand=vertrag-offen', { zustand: 'VO', etikett: 'Gebucht (warnung)', an: 'Anreise Montag 19.10. geplant', ab: 'Abreise Sonntag 29.11. geplant', kosten: null, titel: N3,
-      schritte: ['jetzt:Vertrag unterschreiben', 'spaeter:Anreise wird abgestimmt', 'spaeter:Nach der Anreise'], notfall: true }],
+      schritte: ['jetzt:Vertrag unterschreiben', 'spaeter:Anreise wird abgestimmt', 'spaeter:Nach der Anreise', 'spaeter:Folgeeinsatz'], notfall: true }],
     ['zustand=vertrag-offen&eintrag=ja', { zustand: 'VO', etikett: 'Gebucht (warnung)', an: 'Anreise Montag 19.10.', ab: 'Abreise Sonntag 29.11. geplant', kosten: null, titel: N3,
-      schritte: ['jetzt:Vertrag unterschreiben', 'fertig:Anreise organisiert', 'spaeter:Nach der Anreise'], notfall: true }],
+      schritte: ['jetzt:Vertrag unterschreiben', 'fertig:Anreise organisiert', 'spaeter:Nach der Anreise', 'spaeter:Folgeeinsatz'], notfall: true }],
     ['zustand=vorbereitung', { zustand: 'VV', etikett: 'Gebucht (warnung)', an: 'Anreise Montag 19.10. geplant', ab: 'Abreise Sonntag 29.11. geplant', kosten: null, titel: N3,
-      schritte: ['jetzt:Vertrag in Vorbereitung', 'spaeter:Anreise wird abgestimmt', 'spaeter:Nach der Anreise'], notfall: true }],
+      schritte: ['jetzt:Vertrag in Vorbereitung', 'spaeter:Anreise wird abgestimmt', 'spaeter:Nach der Anreise', 'spaeter:Folgeeinsatz'], notfall: true }],
     ['zustand=vorbereitung&eintrag=ja', { zustand: 'AD', etikett: 'Gebucht (warnung)', an: 'Anreise Montag 19.10.', ab: 'Abreise Sonntag 29.11. geplant', kosten: null, titel: N3,
-      schritte: ['jetzt:Vertrag in Vorbereitung', 'fertig:Anreise organisiert', 'spaeter:Nach der Anreise'], notfall: true }],
+      schritte: ['jetzt:Vertrag in Vorbereitung', 'fertig:Anreise organisiert', 'spaeter:Nach der Anreise', 'spaeter:Folgeeinsatz'], notfall: true }],
     ['zustand=anreise-offen', { zustand: 'AF', etikett: 'Gebucht (warnung)', an: 'Anreise Montag 19.10. geplant', ab: 'Abreise Sonntag 29.11. geplant', kosten: MIT_KOSTEN, titel: N3,
-      schritte: [V_FERTIG, 'jetzt:Anreise wird abgestimmt', 'spaeter:Nach der Anreise'], notfall: true }],
+      schritte: [V_FERTIG, 'jetzt:Anreise wird abgestimmt', 'spaeter:Nach der Anreise', 'spaeter:Folgeeinsatz'], notfall: true }],
     ['zustand=anreisetag', { zustand: 'AT', etikett: 'Anreise heute geplant (warnung)', an: 'Anreise Donnerstag 15.10.', ab: 'Abreise Mittwoch 25.11. geplant', kosten: MIT_KOSTEN, titel: N3,
-      schritte: [V_FERTIG, 'fertig:Anreise organisiert', 'jetzt:Nach der Anreise'], notfall: true }],
+      schritte: [V_FERTIG, 'fertig:Anreise organisiert', 'jetzt:Nach der Anreise', 'spaeter:Folgeeinsatz'], notfall: true }],
     ['zustand=anreisetag-offen', { zustand: 'AT', etikett: 'Anreise heute geplant (warnung)', an: 'Anreise Donnerstag 15.10. geplant', ab: 'Abreise Mittwoch 25.11. geplant', kosten: MIT_KOSTEN, titel: N3,
-      schritte: [V_FERTIG, 'jetzt:Anreisedaten', 'spaeter:Nach der Anreise'], notfall: true }],
-    ['zustand=im-einsatz', { zustand: 'L', etikett: null, an: 'Anreise Donnerstag 01.10.', ab: 'Abreise Sonntag 29.11. geplant', kosten: MIT_KOSTEN, titel: UNTERLAGEN,
-      schritte: [V_FERTIG], notfall: true }],
+      schritte: [V_FERTIG, 'jetzt:Anreisedaten', 'spaeter:Nach der Anreise', 'spaeter:Folgeeinsatz'], notfall: true }],
+    ['zustand=im-einsatz', { zustand: 'L', etikett: null, an: 'Anreise Donnerstag 01.10.', ab: 'Abreise Sonntag 29.11. geplant', kosten: MIT_KOSTEN, titel: N3,
+      schritte: [V_FERTIG, 'jetzt:Folgeeinsatz'], notfall: true }],
     ['zustand=folgeeinsatz', { zustand: 'L', etikett: null, an: 'Anreise Donnerstag 01.10.', ab: 'Abreise Sonntag 29.11. geplant', kosten: MIT_KOSTEN, titel: N3,
       schritte: [V_FERTIG, 'jetzt:Folgeeinsatz ab Sonntag, 29.11.'], notfall: true }],
     ['zustand=endet-bald', { zustand: 'EB', etikett: 'Endet bald (warnung)', an: 'Anreise Samstag 05.09.', ab: 'Abreise Montag 26.10. geplant', kosten: MIT_KOSTEN, titel: N3,
       schritte: [V_FERTIG, 'jetzt:Folgeeinsatz ab Montag, 26.10.'], notfall: true }],
     ['zustand=endet-heute', { zustand: 'EB', etikett: 'Endet heute (warnung)', an: 'Anreise Samstag 05.09.', ab: 'Abreise Donnerstag 15.10. geplant', kosten: MIT_KOSTEN, titel: N3,
       schritte: [V_FERTIG, 'jetzt:Folgeeinsatz ab heute'], notfall: true }],
-    ['zustand=endet-bald&folge=keiner', { zustand: 'EB', etikett: 'Endet bald (warnung)', an: 'Anreise Samstag 05.09.', ab: 'Abreise Montag 26.10. geplant', kosten: MIT_KOSTEN, titel: UNTERLAGEN,
-      schritte: [V_FERTIG], notfall: true }],
+    ['zustand=endet-bald&folge=keiner', { zustand: 'EB', etikett: 'Endet bald (warnung)', an: 'Anreise Samstag 05.09.', ab: 'Abreise Montag 26.10. geplant', kosten: MIT_KOSTEN, titel: N3,
+      schritte: [V_FERTIG, 'jetzt:Folgeeinsatz'], notfall: true }],
     ['zustand=beendet&folge=keiner', { zustand: 'B', etikett: 'Beendet (neutral)', an: 'Anreise Dienstag 07.07.', ab: 'Abreise Samstag 05.09.', kosten: MIT_KOSTEN, titel: UNTERLAGEN,
       schritte: [V_FERTIG], notfall: false }],
-    ['zustand=im-einsatz&vertrag=anderer', { zustand: 'L', etikett: null, an: 'Anreise Donnerstag 01.10.', ab: 'Abreise Sonntag 29.11. geplant', kosten: null, titel: UNTERLAGEN,
-      schritte: ['fertig:Vertrag aus früherer Buchung'], notfall: true }],
+    ['zustand=im-einsatz&vertrag=anderer', { zustand: 'L', etikett: null, an: 'Anreise Donnerstag 01.10.', ab: 'Abreise Sonntag 29.11. geplant', kosten: null, titel: N3,
+      schritte: ['fertig:Vertrag aus früherer Buchung', 'jetzt:Folgeeinsatz'], notfall: true }],
     ['zustand=im-einsatz&vertrag=offen', { zustand: 'VO', etikett: null, an: 'Anreise Donnerstag 01.10.', ab: 'Abreise Sonntag 29.11. geplant', kosten: null, titel: N3,
-      schritte: ['jetzt:Vertrag unterschreiben'], notfall: true }],
+      schritte: ['jetzt:Vertrag unterschreiben', 'spaeter:Folgeeinsatz'], notfall: true }],
     ['zustand=im-einsatz&ohne=abreise', { zustand: 'L', etikett: null, an: 'Anreise Donnerstag 01.10.', ab: null, kosten: 'Tagessatz 95 € / Tag', titel: UNTERLAGEN,
       schritte: [V_FERTIG], notfall: true }],
     ['zustand=anreise-offen&ohne=anreise', { zustand: 'AF', etikett: 'Gebucht (warnung)', an: null, ab: null, kosten: 'Tagessatz 95 € / Tag', titel: N3,
-      schritte: [V_FERTIG, 'jetzt:Anreise wird abgestimmt', 'spaeter:Nach der Anreise'], notfall: true }],
+      schritte: [V_FERTIG, 'jetzt:Anreise wird abgestimmt', 'spaeter:Nach der Anreise', 'spaeter:Folgeeinsatz'], notfall: true }],
     ['zustand=anreise-da&jahr=wechsel', { zustand: 'AD', etikett: 'Gebucht (warnung)', an: 'Anreise Donnerstag 31.12.2026', ab: 'Abreise Mittwoch 24.02.2027 geplant', kosten: MIT_KOSTEN, titel: N3,
-      schritte: [V_FERTIG, 'fertig:Anreise organisiert', 'jetzt:Nach der Anreise', 'spaeter:Folgeeinsatz ab Mittwoch, 24.02.2027'], notfall: true }],
+      schritte: [V_FERTIG, 'fertig:Anreise organisiert', 'jetzt:Nach der Anreise', 'spaeter:Folgeeinsatz'], notfall: true }],
     ['zustand=beendet&jahr=wechsel&folge=keiner', { zustand: 'B', etikett: 'Beendet (neutral)', an: 'Anreise Mittwoch 03.12.2025', ab: 'Abreise Mittwoch 04.02.2026', kosten: MIT_KOSTEN, titel: UNTERLAGEN,
       schritte: [V_FERTIG], notfall: false }],
   ];
@@ -323,11 +328,21 @@ describe('Inhalt der Schritte je Zustand', () => {
     eins.unmount();
     const gebucht = zeige('zustand=endet-bald');
     expect(gebucht.txt('[data-schritt="folge"] [data-zeile="text"]')).toBe('Für den Folgeeinsatz ist Anna B. gebucht.');
-    expect(screen.getByRole('button', { name: 'Folgeeinsatz ansehen ›' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Zum Folgeeinsatz wechseln ›' })).toBeTruthy();
     gebucht.unmount();
     const geplant = zeige('zustand=endet-bald&folge=geplant');
-    expect(screen.getByRole('button', { name: 'Pflegekräfte einladen ›' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Zum Folgeeinsatz wechseln ›' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Pflegekräfte einladen/ })).toBeNull();
     geplant.unmount();
+    const nochNicht = zeige('zustand=im-einsatz');
+    expect(nochNicht.txt('[data-schritt="folge"] h3')).toBe('Folgeeinsatz');
+    expect(nochNicht.txt('[data-schritt="folge"] [data-zeile="text"]')).toBe('Wir legen den Folgeeinsatz normalerweise einige Wochen vor dem Ende dieses Einsatzes an, oft etwa einen Monat vorher. Danach sehen Sie ihn hier und können Pflegekräfte einladen. Außerdem suchen wir selbst eine passende Pflegekraft für Sie.');
+    expect(nochNicht.q1('[data-schritt="folge"] a, [data-schritt="folge"] button')).toBeNull();
+    nochNicht.unmount();
+    const baldOhne = zeige('zustand=endet-bald&folge=keiner');
+    expect(baldOhne.txt('[data-schritt="folge"] [data-zeile="text"]')).toBe('Wenn Sie eine weitere Betreuung wünschen und hier noch kein Folgeeinsatz steht, melden Sie sich bitte bei uns.');
+    expect(nochNicht.q1('[data-schritt="folge"] a, [data-schritt="folge"] button')).toBeNull();
+    nochNicht.unmount();
     const lang = zeige('zustand=endet-bald&name=lang');
     expect(lang.txt('[data-schritt="folge"] [data-zeile="text"]')).toBe('Für den Folgeeinsatz ist Bogumiła S. gebucht.');
   });
@@ -404,15 +419,19 @@ const ALLE = [
 ];
 
 describe('Notfallnummer nur mit gültigem Wert', () => {
-  it('gültige Nummer: getöntes Feld, Martins Phrase wörtlich, Anruf-Link 44 px, 112-Zeile, Clarity-Maske', () => {
+  it('gültige Nummer: Feld oben, Martins Phrase wörtlich, Nummer als großer Anruf-Knopf (52 px), 112-Zeile, Clarity-Maske', () => {
     const r = zeige('zustand=im-einsatz');
     const feld = r.seite.querySelector('[data-notfall]') as HTMLElement;
     expect(feld.getAttribute('data-clarity-mask')).toBe('true');
-    expect(nb(feld.textContent)).toContain(NOTFALL_GELTUNG);
-    expect(nb(feld.textContent)).toContain(KONTAKT_TEXTE.notfallZeile);
+    expect(nb(feld.textContent)).toContain(NOTFALL_GELTUNG.slice(1));
+    expect(lesen(feld).startsWith(`Primundus-Notfallnummer ${KONTAKT_TEXTE.notfallGeltungSatz}`)).toBe(true);
     const link = within(feld).getByRole('link', { name: `Primundus-Notfallnummer anrufen: ${FANTASIE_PL}` });
     expect(link.getAttribute('href')).toBe('tel:+48123456789');
-    expect(link.className).toContain('min-h-[44px]');
+    expect(link.className).toContain('min-h-[52px]');
+    expect(link.className).toContain('w-full');
+    expect(nb(link.textContent)).toBe(FANTASIE_PL);
+    const tages = r.seite.querySelector('[data-teil="tageskontakt"]') as HTMLElement;
+    expect(feld.compareDocumentPosition(tages) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(nb(feld.textContent)).toContain('Bei medizinischen Notfällen: 112');
     expect(nb(feld.textContent)).not.toMatch(/WhatsApp|Uhr/);
   });
@@ -476,12 +495,16 @@ describe('nur Belegtes', () => {
       r.unmount();
     }
   });
-  it('kein Folgeeinsatz-Schritt ohne Folgejob, nie im beendeten Einsatz', () => {
+  it('Folgeeinsatz-Schritt nie im beendeten Einsatz; ohne Folgejob ohne Datum und ohne Link', () => {
     for (const q of ALLE) {
       const v = vorschau(q);
       const r = zeige(q);
-      const hatFolgejob = v.daten.jobs.length > 1 && r.seite.getAttribute('data-zustand') !== 'B';
-      if (!hatFolgejob) expect(r.q1('[data-schritt="folge"]'), q).toBeNull();
+      const schritt = r.q1('[data-schritt="folge"]');
+      if (r.seite.getAttribute('data-zustand') === 'B') expect(schritt, q).toBeNull();
+      else if (v.daten.jobs.length <= 1 && schritt) {
+        expect(lesen(schritt.querySelector('h3')), q).toBe('Folgeeinsatz');
+        expect(schritt.querySelector('a, button'), q).toBeNull();
+      }
       r.unmount();
     }
   });
@@ -529,7 +552,7 @@ describe('Quelltext-Wächter', () => {
     expect(quelle).not.toMatch(/gebuchtVorschau/);
   });
   it('Hilfe-Blatt: Notfallfeld am berechneten Zustand, nicht am Vorschau-Etikett', () => {
-    expect(seite).toMatch(/nachKontakt=\{gebuchtNeu && notfallImHilfeBlatt\(gebuchtNeu\.daten\)/);
+    expect(seite).toMatch(/vorKontakt=\{gebuchtNeu && notfallImHilfeBlatt\(gebuchtNeu\.daten\)/);
     expect(seite).not.toMatch(/gebuchtNeu\.zustand !== 'beendet'/);
   });
 });
@@ -556,7 +579,7 @@ describe('Bausteine außerhalb der Seite (nur mit den neuen Props anders)', () =
     render(<CustomerNurseModal nurse={n} onClose={() => {}} nurProfil ohneVerfuegbarkeit />);
     expect(screen.queryByText('ab sofort')).toBeNull();
   });
-  it('Hilfe-Blatt: ohne Props unverändert, mit `nachKontakt` Notfallfeld UNTER Martas Tageskontakt, X bleibt oben, „täglich 8–20 Uhr"', async () => {
+  it('Hilfe-Blatt: ohne Props unverändert, mit `vorKontakt` Notfallfeld VOR Martas Tageskontakt (Martin 24.10.), X bleibt oben, „täglich 8–20 Uhr"', async () => {
     const { ContactPopup } = await import('../../components/portal/ContactPopup');
     const { NotfallFeld } = await import('../../components/portal/GebuchtKontakt');
     const alt = render(<ContactPopup onClose={() => {}} />);
@@ -564,20 +587,18 @@ describe('Bausteine außerhalb der Seite (nur mit den neuen Props anders)', () =
     expect(screen.queryByText(/Notfallnummer/)).toBeNull();
     alt.unmount();
     const zu = vi.fn();
-    const neu = render(<ContactPopup onClose={zu} nachKontakt={<NotfallFeld nummer={FANTASIE_PL} />} zeiten="täglich 8–20 Uhr" />);
+    const neu = render(<ContactPopup onClose={zu} vorKontakt={<NotfallFeld nummer={FANTASIE_PL} />} zeiten="täglich 8–20 Uhr" />);
     expect(screen.getByText('täglich 8–20 Uhr')).toBeTruthy();
     const anruf = screen.getByRole('link', { name: `Primundus-Notfallnummer anrufen: ${FANTASIE_PL}` });
     expect(screen.getByText('Bekannt aus')).toBeTruthy();
-    // Kopfzeile „Ihre Beraterin" mit dem X steht oben, das Notfallfeld darunter.
-    const kopf = screen.getByText('Ihre Beraterin').parentElement as HTMLElement;
-    const x = kopf.querySelector('button') as HTMLButtonElement;
-    expect(x).not.toBeNull();
+    // Das X steht oben, darunter das Notfallfeld, dann „Ihre Beraterin" und Marta (Martin 24.10.: Notfall zuerst).
+    const x = screen.getByRole('button') as HTMLButtonElement;
     const feld = anruf.closest('[data-notfall]') as HTMLElement;
-    expect(kopf.compareDocumentPosition(feld) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(kopf.contains(feld)).toBe(false);
-    // Erreichbarkeit zuerst (Martin 02.10.): Martas Tagesnummer steht VOR dem Notfallfeld.
+    expect(x.compareDocumentPosition(feld) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const beraterin = screen.getByText('Ihre Beraterin');
+    expect(feld.compareDocumentPosition(beraterin) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const tagesnummer = screen.getByText('täglich 8–20 Uhr').closest('div') as HTMLElement;
-    expect(tagesnummer.compareDocumentPosition(feld) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(feld.compareDocumentPosition(tagesnummer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await userEvent.click(x);
     expect(zu).toHaveBeenCalledTimes(1);
     neu.unmount();

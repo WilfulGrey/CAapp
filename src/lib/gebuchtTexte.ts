@@ -74,9 +74,15 @@ export const GEBUCHT_TEXTE = {
   folgeSucht: 'Für den Folgeeinsatz suchen wir eine Pflegekraft für Sie.', // frei 15.10. abends
   folgeGebucht: (name: string) => `Für den Folgeeinsatz ist ${name} gebucht.`, // NEU R6 (R6-7)
   folgeGebuchtOhneName: 'Für den Folgeeinsatz ist eine Pflegekraft gebucht.', // NEU R6 (R6-7)
-  folgeAnsehen: `Folgeeinsatz ansehen${NBSP}›`, // NEU R6 (R6-8)
   bewerbungenAnsehen: (n: number) => `${n}${NBSP}${n === 1 ? 'Bewerbung' : 'Bewerbungen'} ansehen${NBSP}›`, // NEU R6 (R6-9)
-  einladen: `Pflegekräfte einladen${NBSP}›`, // frei 15.10. abends (live KompaktEinstieg `{EINLADEN_TITEL}&nbsp;›`)
+  // Martin 24.10.: Vor der Anlage gibt es nichts einzuladen. Der Schritt sagt, wann wir den Folgeeinsatz anlegen; erst
+  // danach steht er mit Datum da und führt per Link in diesen Einsatz. Zeitpunkt gemessen (Prod, n=60): Median 33 Tage
+  // vor dem Ende, mittlere Hälfte 17–57 Tage. NEU R7 (Freigabe offen).
+  folgeTitel: 'Folgeeinsatz', // NEU R7
+  folgeNochNicht: 'Wir legen den Folgeeinsatz normalerweise einige Wochen vor dem Ende dieses Einsatzes an, oft etwa einen Monat vorher. Danach sehen Sie ihn hier und können Pflegekräfte einladen. Außerdem suchen wir selbst eine passende Pflegekraft für Sie.', // NEU R7 (OpenAI R7 A)
+  /** Ab „endet bald" (14 Tage) ohne angelegten Folgeeinsatz: kein Versprechen, ob es weitergeht, nur der Weg (OpenAI R7, Frage 2). */
+  folgeBaldOhne: 'Wenn Sie eine weitere Betreuung wünschen und hier noch kein Folgeeinsatz steht, melden Sie sich bitte bei uns.', // NEU R7
+  zumFolgeeinsatz: `Zum Folgeeinsatz wechseln${NBSP}›`, // NEU R7 (ersetzt „Folgeeinsatz ansehen ›" und „Pflegekräfte einladen ›")
 
   // ─── Nur im beendeten Einsatz mit neuerem Einsatz (N3.5 „B mit neuerem Einsatz") ───
   aktuellerEinsatz: 'Ihr aktueller Einsatz', // NEU R1/R2

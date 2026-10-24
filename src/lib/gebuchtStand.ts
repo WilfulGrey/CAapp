@@ -475,16 +475,25 @@ function anreiseSchritt(e: SchritteEingabe): Entwurf | null {
   });
 }
 
+/**
+ * Martin 24.10.: Solange kein Folgeeinsatz angelegt ist, steht der Schritt ohne Datum und ohne Link mit dem Satz, wann wir
+ * ihn anlegen (nur mit Abreisedatum: ohne Ende gibt es keinen Folgeeinsatz); ab „endet bald" stattdessen die Bitte, sich zu
+ * melden. Ist er angelegt, steht er mit Datum und führt in diesen Einsatz.
+ */
 function folgeSchritt(e: SchritteEingabe): Entwurf | null {
+  if (e.stand.zeit === 'beendet') return null;
   const f = e.folge;
-  if (!f || e.stand.zeit === 'beendet') return null;
+  if (!f) {
+    if (!e.stand.abreiseDatum) return null;
+    return entwurf('folge', false, T.folgeTitel, { text: e.stand.zeit === 'endet-bald' ? T.folgeBaldOhne : T.folgeNochNicht });
+  }
   const an = isoTag(f.anreise);
   if (!an) return null;
   const tag = an === e.heute ? T.heute : einsatzTag(an, jahrNoetig([an], e.heute)).text;
   const gebucht = f.status === 'gebucht';
   const bewerbungen = f.bewerbungen ?? 0;
   const text = gebucht ? (f.pflegekraft ? T.folgeGebucht(nameFest(f.pflegekraft)) : T.folgeGebuchtOhneName) : T.folgeSucht;
-  const linkText = gebucht ? T.folgeAnsehen : bewerbungen > 0 ? T.bewerbungenAnsehen(bewerbungen) : T.einladen;
+  const linkText = !gebucht && bewerbungen > 0 ? T.bewerbungenAnsehen(bewerbungen) : T.zumFolgeeinsatz;
   return entwurf('folge', false, T.folgeAb(tag), { text, link: { ziel: 'einsatz', text: linkText, jobId: f.id } });
 }
 

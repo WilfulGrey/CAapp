@@ -12,13 +12,12 @@ const MEDIA_LOGOS = [
 ];
 
 /**
- * Hilfe-Blatt. PROTOTYP Gebucht-Seite neu (15.10.2026, nur Vorschau): `nachKontakt` setzt einen Block direkt unter
- * Martas Tageskontakt (das Notfallfeld, Spezifikation 6.10). Erst die Erreichbarkeit, dann die Notfallnummer als
- * Absicherung (Martin 02.10.); das X bleibt oben (Gegenprüfung 15.10.),
- * `zeiten` ersetzt „Mo–So, 8–20 Uhr" (Entscheidung 10). Ohne beide Props: unverändert. „Bekannt aus" und die Kacheln
- * bleiben immer.
+ * Hilfe-Blatt. PROTOTYP Gebucht-Seite neu (nur Vorschau): `vorKontakt` setzt einen Block VOR Martas Tageskontakt (das
+ * Notfallfeld; Martin 24.10.: „wichtiger als der andere Kontakt"). Das X bleibt oben rechts (Gegenprüfung 15.10.), die
+ * Zeile „Ihre Beraterin" rückt dann unter das Notfallfeld direkt über Marta. `zeiten` ersetzt „Mo–So, 8–20 Uhr"
+ * (Entscheidung 10). Ohne beide Props: unverändert. „Bekannt aus" und die Kacheln bleiben immer.
  */
-export const ContactPopup: FC<{ onClose: () => void; nachKontakt?: ReactNode; zeiten?: string }> = ({ onClose, nachKontakt, zeiten }) => (
+export const ContactPopup: FC<{ onClose: () => void; vorKontakt?: ReactNode; zeiten?: string }> = ({ onClose, vorKontakt, zeiten }) => (
   <>
     <div
       className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]"
@@ -39,8 +38,8 @@ export const ContactPopup: FC<{ onClose: () => void; nachKontakt?: ReactNode; ze
         </div>
 
         <div className="px-5 pt-4 pb-6 space-y-5">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Ihre Beraterin</p>
+          <div className={`flex items-center ${vorKontakt ? 'justify-end' : 'justify-between'}`}>
+            {!vorKontakt && <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Ihre Beraterin</p>}
             <button
               onClick={onClose}
               className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
@@ -48,6 +47,9 @@ export const ContactPopup: FC<{ onClose: () => void; nachKontakt?: ReactNode; ze
               <X className="w-4 h-4 text-gray-400" />
             </button>
           </div>
+
+          {vorKontakt}
+          {vorKontakt && <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Ihre Beraterin</p>}
 
           <div className="flex items-center gap-4">
             <div className="relative flex-shrink-0">
@@ -77,7 +79,6 @@ export const ContactPopup: FC<{ onClose: () => void; nachKontakt?: ReactNode; ze
               <p className="text-xs text-gray-500 mt-0.5">{zeiten ?? 'Mo–So, 8–20 Uhr'}</p>
             </div>
           </div>
-          {nachKontakt}
 
           <div className="grid grid-cols-3 gap-2">
             <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">

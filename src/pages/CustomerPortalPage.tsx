@@ -4829,9 +4829,10 @@ const CustomerPortalPage: FC = () => {
       {showContactPopup && (
         <ContactPopup
           onClose={() => setShowContactPopup(false)}
-          // PROTOTYP Gebucht-Seite neu (nur Vorschau): Notfallfeld unter der Kopfzeile, solange der berechnete Zustand nicht
-          // „beendet" ist (Spezifikation 6.10, Entscheidung 3), „täglich 8–20 Uhr" statt „Mo–So, 8–20 Uhr" (Entscheidung 10).
-          nachKontakt={gebuchtNeu && notfallImHilfeBlatt(gebuchtNeu.daten) ? <NotfallFeld nummer={gebuchtNeu.daten.notfallTelefon} /> : undefined}
+          // PROTOTYP Gebucht-Seite neu (nur Vorschau): Notfallfeld vor Martas Tageskontakt (Martin 24.10.), solange der
+          // berechnete Zustand nicht „beendet" ist (Spezifikation 6.10, Entscheidung 3), „täglich 8–20 Uhr" statt „Mo–So,
+          // 8–20 Uhr" (Entscheidung 10).
+          vorKontakt={gebuchtNeu && notfallImHilfeBlatt(gebuchtNeu.daten) ? <NotfallFeld nummer={gebuchtNeu.daten.notfallTelefon} /> : undefined}
           zeiten={gebuchtNeu ? ERREICHBAR : undefined}
         />
       )}

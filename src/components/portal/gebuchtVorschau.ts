@@ -7,8 +7,8 @@
 // Schalter (alle optional), Zustände wie texte_final.md, Nachtrag 3 (N3.5):
 //   &zustand=vertrag-offen|vorbereitung|unterschrieben|anreise-offen|anreise-da|anreisetag|anreisetag-offen|im-einsatz|
 //            endet-bald|endet-heute|beendet|folgeeinsatz   (Kürzel vo|vv|af|ad|at|l|eb|b gehen auch; ohne: anreise-da)
-//   &folge=keiner|geplant|bewerbungen|gebucht  Folgeeinsatz (bei „beendet": der andere Einsatz; ohne: je Zustand, AD wie
-//                                              im freigegebenen Bild „geplant" ohne Bewerbung)
+//   &folge=keiner|geplant|bewerbungen|gebucht  Folgeeinsatz (bei „beendet": der andere Einsatz; ohne: je Zustand, vor der
+//                                              Anreise „keiner" = noch nicht angelegt)
 //   &eintrag=ja|nein                           Anreise-Eintrag erzwingen/weglassen (z. B. VO oder VV mit Eintrag)
 //   &verkehr=minibus|sindbad|eigen             Verkehrsmittel im Anreise-Eintrag
 //   &ohne=abreise|anreise                      ohne Abreise- bzw. Anreisedatum (Randfälle)
@@ -146,10 +146,10 @@ export function gebuchtVorschau({ search, heute, nurse, kopf, hostname }: {
     : null;
 
   const folgeParam = q.get('folge') as Folge | null;
-  // Standard je Zustand wie N3.5: AD wie im freigegebenen Bild mit Folgeeinsatz „geplant" ohne Bewerbung.
+  // Standard je Zustand: vor der Anreise ist der Folgeeinsatz noch nicht angelegt (Martin 24.10.; angelegt wird er meist
+  // etwa einen Monat vor dem Ende), „endet bald" mit gebuchter Folgekraft, „folgeeinsatz" mit 2 Bewerbungen.
   const folgeStandard: Folge = zustand === 'endet-bald' || zustand === 'endet-heute' ? 'gebucht'
     : zustand === 'folgeeinsatz' ? 'bewerbungen'
-    : zustand === 'anreise-da' ? 'geplant'
     : beendet ? 'laufend' : 'keiner';
   const folgeArt: Folge = folgeParam && ['keiner', 'geplant', 'bewerbungen', 'gebucht', 'laufend'].includes(folgeParam) ? folgeParam : folgeStandard;
 
