@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { istAdmin } from '@/lib/admin-sitzung';
 import { createClient } from '@supabase/supabase-js';
 import { quellenAuswertung, gruppenSumme } from '@/lib/lead-kosten';
 
@@ -14,8 +15,7 @@ import { quellenAuswertung, gruppenSumme } from '@/lib/lead-kosten';
  * Kostendaten gehören dort nicht hin.
  */
 export async function GET(request: NextRequest) {
-  const cookie = request.cookies.get('admin_auth')?.value ?? '';
-  if (cookie !== (process.env.ADMIN_PASSWORD || 'primundus2026')) {
+  if (!(await istAdmin(request))) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
