@@ -110,6 +110,10 @@ export interface AppStatusEventRow {
   // the customer → auto-reject must NOT use them as the "informed" anchor
   // (guard 1). Derived from metadata.seeded. Optional (defaults to not-seeded).
   seeded?: boolean;
+  // Registry #136: mamamia application_id aus metadata (Zahl oder Text). Anker und
+  // Reaktion gelten je Bewerbung; null = Ereignis von vor Registry #35 bzw. Annahme
+  // des Annahme-Detektors (trägt nur den Job). Optional, damit Fixtures sie weglassen.
+  application_id?: number | null;
 }
 
 // Reminder-Mail-Typen in scheduled_emails — geteilt von Photo-Refresh und
@@ -1353,9 +1357,23 @@ async function detectForJob(
 //   1. Nur Bewerbungen mit bestätigtem application_received-Event ablehnen
 //      (kein created_at ⇒ kein Reject) — wir lehnen nie etwas ab, worüber
 //      der Kunde nie informiert wurde.
-//   2. Nie ablehnen, wenn der Kunde für diese Pflegekraft bereits reagiert
+//   2. Nie ablehnen, wenn der Kunde auf DIESE Bewerbung bereits reagiert
 //      hat (application_accepted_internal ODER application_rejected).
 //   3. Erst ab Alter ≥ AUTO_REJECT_AFTER_HOURS.
+//
+// Je Bewerbung (Registry #136, 16.10.2026): Anker = frühester echter Eingang mit
+// DERSELBEN application_id; Reaktion = gleiche application_id, oder vom Paar
+// (Job, Pflegekraft) und NACH diesem Eingang (Annahmen des Annahme-Detektors
+// tragen nur den Job). Vorher galt beides je Paar: eine nach einer Absage neu
+// eingestellte Bewerbung derselben Kraft erbte den Eingang der alten — und wurde
+// bis zu 72 h zu früh abgesagt, wenn die Absage (Portal, ohne Job im Ereignis)
+// auf den Standard-Job fiel (Kundin 52dc3e9d, App 14746: Eingang 15.10. 09:18,
+// Anker 14.10. 14:17). Bewerbungen ohne eigenen Eingang mit application_id
+// (vor Registry #35) rechnen mit den Eingängen des Paars OHNE application_id und
+// jeder Reaktion des Paars — wie bisher; hat das Paar nur Eingänge ANDERER
+// Bewerbungen, gibt es keinen Anker (Guard 1: nie absagen, worüber der Kunde
+// nicht informiert wurde). Bewerbungen mit Eingang vor `JE_BEWERBUNG_AB` behalten
+// die alte Regel je Paar (Übergang ohne Absage-Welle).
 //
 // SCHARF per Default (Default-Live). Kill-Switch: Edge-Function-Secret
 // AUTO_REJECT_ENABLED="false"|"0" → zurück in den Dry-Run (loggt nur
@@ -1382,6 +1400,16 @@ const NOTIFY_CAP_PER_JOB_RUN = 3;
 // Die Konstante ist ein historischer Stempel und muss NICHT gepflegt werden:
 // jede neue Bewerbung stempelt ihre id ins Event, damit läuft Fall (b) aus.
 const PRE_SWITCH_MAX_APP_ID = 11652;
+
+// Übergang für Registry #136 (Anker und Reaktion je Bewerbung): Die neue Regel gilt
+// für Bewerbungen mit eigenem Eingang ab diesem Zeitpunkt (Tag der Änderung − 72 h,
+// also jede Reservierung, die beim Umstellen noch lief). Ältere behalten die Regel je
+// Paar — sonst sagte der erste Lauf nach dem Deploy auf einen Schlag Bewerbungen aus
+// dem September ab, die bisher eine frühere Reaktion auf dasselbe Paar schützte (PROD
+// 16.10.: 10 solche Bewerbungen, 4 davon bei Leads im Scan). Spiegel:
+// `JE_BEWERBUNG_AB` in src/lib/reservierung.ts (Test vergleicht beide).
+export const JE_BEWERBUNG_AB = "2026-10-13T00:00:00Z";
+const JE_BEWERBUNG_AB_MS = Date.parse(JE_BEWERBUNG_AB);
 const AUTO_REJECT_MESSAGE =
   "Automatische Absage — keine Rückmeldung des Kunden innerhalb 72 Stunden.";
 const AUTO_REJECT_DEFAULT_LIVE = true;
@@ -1412,25 +1440,35 @@ async function autoRejectStaleApplications(
   if (lead.vermittler) return 0;
   const live = autoRejectIsLive();
 
-  // Per-(job, caregiver) age anchor + reaction set. Legacy NULL-job events map
-  // onto the lead's default job. SEEDED application_received events (silent
-  // first-scan, never mailed) are NOT anchors — guard 1: never auto-reject what
-  // the customer was never told about.
-  const receivedAt = new Map<string, number>(); // `${job}:${cg}` → ms
-  const reacted = new Set<string>();
+  // Age anchors + reactions (Registry #136: per application, legacy per pair).
+  // Legacy NULL-job events map onto the lead's default job. SEEDED
+  // application_received events (silent first-scan, never mailed) are NOT
+  // anchors — guard 1: never auto-reject what the customer was never told about.
+  const receivedAtApp = new Map<number, number>(); // application_id → ms
+  const receivedAtPairLegacy = new Map<string, number>(); // `${job}:${cg}` → ms (Eingänge ohne application_id)
+  const receivedAtPair = new Map<string, number>(); // `${job}:${cg}` → ms (alle echten Eingänge, Regel vor #136)
+  const reactionsAt = new Map<string, number[]>(); // `${job}:${cg}` → Zeitpunkte der Reaktionen
+  const reactedAppIds = new Set<number>();
+  const fruehester = <K,>(m: Map<K, number>, key: K, ms: number) => {
+    const prev = m.get(key);
+    if (prev == null || ms < prev) m.set(key, ms);
+  };
   for (const ev of statusEvents) {
     if (ev.caregiver_id == null) continue;
     const job = ev.mamamia_job_offer_id ?? lead.mamamia_job_offer_id;
     const k = jk(job, ev.caregiver_id);
+    const ms = Date.parse(ev.created_at);
+    const appId = ev.application_id ?? null;
     if (ev.event_type === "application_received") {
       if (ev.seeded) continue; // seeded == never mailed → not a reject anchor
-      const ms = Date.parse(ev.created_at);
       if (!Number.isFinite(ms)) continue;
-      const prev = receivedAt.get(k);
-      if (prev == null || ms < prev) receivedAt.set(k, ms);
+      fruehester(receivedAtPair, k, ms);
+      if (appId != null) fruehester(receivedAtApp, appId, ms);
+      else fruehester(receivedAtPairLegacy, k, ms);
     } else {
       // application_accepted_internal | application_rejected
-      reacted.add(k);
+      if (appId != null) reactedAppIds.add(appId);
+      reactionsAt.set(k, [...(reactionsAt.get(k) ?? []), ms]);
     }
   }
 
@@ -1441,8 +1479,22 @@ async function autoRejectStaleApplications(
   for (const app of apps) {
     if (app.caregiver_id == null) continue;
     const k = jk(jobOfferId, app.caregiver_id);
-    if (reacted.has(k)) continue;                        // Guard 2
-    const received = receivedAt.get(k);
+    const own = receivedAtApp.get(app.id);
+    let received: number | undefined;
+    if (own != null && own >= JE_BEWERBUNG_AB_MS) {
+      received = own;
+      const reagiert = reactedAppIds.has(app.id) ||
+        (reactionsAt.get(k) ?? []).some((ms) => Number.isFinite(ms) && ms > own);
+      if (reagiert) continue;                            // Guard 2 (je Bewerbung)
+    } else if (own != null) {
+      // Übergang: Eingang vor JE_BEWERBUNG_AB → alte Regel je Paar (eine Reaktion mit der
+      // eigenen application_id schützt zusätzlich, auch wenn sie ohne Job auf den Standard-Job fiel).
+      if (reactionsAt.has(k) || reactedAppIds.has(app.id)) continue; // Guard 2
+      received = receivedAtPair.get(k);
+    } else {
+      if (reactionsAt.has(k)) continue;                  // Guard 2 (Altbestand je Paar)
+      received = receivedAtPairLegacy.get(k);
+    }
     if (received == null) continue;                      // Guard 1
     const ageMs = now - received;
     if (ageMs < cutoffMs) continue;                      // Guard 3
@@ -1870,6 +1922,7 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
         created_at: row.created_at,
         mamamia_job_offer_id: row.mamamia_job_offer_id ?? null,
         seeded: !!(row.metadata && typeof row.metadata === "object" && (row.metadata as Record<string, unknown>).seeded === true),
+        application_id: extractMetadataInt(row.metadata, "application_id"),
       }));
     },
     async refreshReminderPhotos(leadId: string, photoByCaregiver: Map<number, string>) {

@@ -3,7 +3,7 @@
  * Regeln: nie in der Nachtruhe (21–8 Uhr Berlin), die letzte sicher vor dem Ende, ≥ 6 h Abstand.
  */
 import { describe, it, expect } from 'vitest';
-import { erinnerungsplan, reservierungsEnde } from '../../project 3/lib/erinnerungsplan';
+import { eingaengeDerBewerbung, erinnerungenSchonOffen, erinnerungsplan, reservierungsEnde } from '../../project 3/lib/erinnerungsplan';
 import { inNachtruhe } from '../../project 3/lib/quiet-hours';
 
 const H = 60 * 60 * 1000;
@@ -110,5 +110,41 @@ describe('erinnerungsplan', () => {
     const p = erinnerungsplan(ende, new Date('2026-10-10T02:00:00Z')); // 10 h Rest, 04:00 Berlin
     expect(p.map((x) => x.emailType)).toEqual(['application_erinnerung_letzte']);
     expect(berlin(p[0].scheduledFor)).toBe('Sa., 10.10., 08:00');
+  });
+});
+
+// Registry #136: neue Bewerbung derselben Pflegekraft nach einer Absage (PROD 52dc3e9d, cg 15184).
+describe('je Bewerbung statt je Pflegekraft', () => {
+  const eingaenge = [
+    { created_at: '2026-10-14T14:17:00.779Z', metadata: { caregiver_id: 15184, application_id: 14728, mamamia_job_offer_id: 38118 } },
+    { created_at: '2026-10-15T09:18:15.916Z', metadata: { caregiver_id: 15184, application_id: 14746, mamamia_job_offer_id: 38118 } },
+  ];
+
+  it('Ende der Reservierung aus dem Eingang DIESER Bewerbung, nicht der alten', () => {
+    const anker = eingaengeDerBewerbung(eingaenge, { jobOfferId: 38118, applicationId: 14746 });
+    expect(reservierungsEnde(anker)?.toISOString()).toBe('2026-10-18T09:00:00.000Z');
+    // vorher (je Paar): 17.10. 14:00 — 19 Stunden zu früh
+    const paar = eingaengeDerBewerbung(eingaenge, { jobOfferId: 38118 });
+    expect(reservierungsEnde(paar)?.toISOString()).toBe('2026-10-17T14:00:00.000Z');
+  });
+
+  it('ohne Treffer für die application_id und ohne application_id: wie bisher das Paar (jobfreie zählen mit, seeded nie)', () => {
+    const mit = [...eingaenge, { created_at: '2026-10-13T08:00:00Z', metadata: { caregiver_id: 15184, seeded: true } },
+      { created_at: '2026-10-12T08:00:00Z', metadata: { caregiver_id: 15184, mamamia_job_offer_id: 38673 } }];
+    expect(eingaengeDerBewerbung(mit, { jobOfferId: 38118, applicationId: 99999 }))
+      .toEqual([Date.parse('2026-10-14T14:17:00.779Z'), Date.parse('2026-10-15T09:18:15.916Z')]);
+    expect(eingaengeDerBewerbung([{ created_at: '2026-10-14T10:00:00Z', metadata: { caregiver_id: 1 } }], { jobOfferId: 38118, applicationId: '5' }))
+      .toEqual([Date.parse('2026-10-14T10:00:00Z')]);
+  });
+
+  it('offene Zeilen der alten Bewerbung halten die Planung der neuen nicht auf', () => {
+    const alteZeilen = [{ metadata: { caregiver_id: 15184 } }, { metadata: { caregiver_id: 15184 } }]; // vor #136, ohne application_id
+    expect(erinnerungenSchonOffen(alteZeilen, 14746)).toBe(false);
+    expect(erinnerungenSchonOffen([{ metadata: { caregiver_id: 15184, application_id: 14728 } }], 14746)).toBe(false);
+    // dieselbe Bewerbung kam erneut an: nichts doppelt einplanen (Zahl und Text gleich)
+    expect(erinnerungenSchonOffen([{ metadata: { caregiver_id: 15184, application_id: 14746 } }], '14746')).toBe(true);
+    // Ereignis ohne application_id: wie bisher jede offene Zeile der Pflegekraft
+    expect(erinnerungenSchonOffen(alteZeilen, null)).toBe(true);
+    expect(erinnerungenSchonOffen([], null)).toBe(false);
   });
 });

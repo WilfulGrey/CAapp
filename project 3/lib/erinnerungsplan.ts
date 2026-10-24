@@ -29,6 +29,50 @@ export function reservierungsEnde(eingaengeMs: number[]): Date | null {
   return new Date(Math.floor((Math.min(...gueltig) + RESERVIERUNG_STUNDEN * STUNDE) / STUNDE) * STUNDE);
 }
 
+// ── Je Bewerbung statt je Pflegekraft (Registry #136, 16.10.2026) ──────────
+// Bewirbt sich dieselbe Pflegekraft nach einer Absage neu (neue application_id), sah die Planung
+// die noch offenen Zeilen der ALTEN Bewerbung als „schon geplant“ und plante nichts, und das Ende
+// der Reservierung kam aus dem Eingang der alten Bewerbung (Kundin 52dc3e9d, App 14746).
+
+type Eingang = { created_at: string; metadata?: Record<string, unknown> | null };
+
+function idText(v: unknown): string {
+  return v == null ? '' : String(v);
+}
+
+/** Eingänge, aus denen das Ende der Reservierung folgt (für `reservierungsEnde`). Mit
+ *  `applicationId` nur die echten Eingänge DIESER Bewerbung; ohne application_id oder ohne
+ *  Treffer wie bisher alle echten Eingänge des Paars (Pflegekraft, Job), jobfreie zählen mit.
+ *  `eingaenge` = application_received derselben Pflegekraft. */
+export function eingaengeDerBewerbung(
+  eingaenge: Eingang[],
+  { jobOfferId, applicationId }: { jobOfferId: number | null; applicationId?: number | string | null },
+): number[] {
+  const echt = eingaenge.filter((e) => (e.metadata ?? {}).seeded !== true);
+  const app = idText(applicationId);
+  const eigene = app ? echt.filter((e) => idText(e.metadata?.application_id) === app) : [];
+  const basis = eigene.length > 0
+    ? eigene
+    : echt.filter((e) => {
+      const job = e.metadata?.mamamia_job_offer_id;
+      return jobOfferId == null || job == null || Number(job) === jobOfferId;
+    });
+  return basis.map((e) => Date.parse(e.created_at)).filter((ms) => Number.isFinite(ms));
+}
+
+/** Sind für diese Bewerbung schon Erinnerungen offen? Mit `applicationId` zählen nur offene
+ *  Zeilen genau dieser Bewerbung — Zeilen ohne application_id stammen von vor #136 und damit von
+ *  einer früheren Bewerbung (detect meldet jeden Eingang nur einmal je application_id). Ohne
+ *  `applicationId` wie bisher jede offene Zeile der Pflegekraft. */
+export function erinnerungenSchonOffen(
+  offeneZeilen: { metadata?: Record<string, unknown> | null }[],
+  applicationId?: number | string | null,
+): boolean {
+  const app = idText(applicationId);
+  if (!app) return offeneZeilen.length > 0;
+  return offeneZeilen.some((z) => idText(z.metadata?.application_id) === app);
+}
+
 export function erinnerungsplan(ende: Date, jetzt: Date): GeplanteErinnerung[] {
   const e = ende.getTime();
   const j = jetzt.getTime();

@@ -60,7 +60,9 @@ import {
   ERINNERUNG_TYPEN,
   erinnerungStopp,
   erinnerungStufe,
+  type LeadEreignis,
   neuePflegekraefteEntscheidung,
+  reaktionAufBewerbung,
   reservierungAktiv,
   reserviertBisAus,
   sucheStandStopp,
@@ -1020,12 +1022,18 @@ async function notifyOpsOfFailures(
 // caregiver_interest_shown / application_received reagiert hat (Reaktion =
 // invite/decline für Interesse, accept/reject für Bewerbung). Wenn ja →
 // Reminder cancelt sich selbst. Wenn nein → Mail raus.
+//
+// Bewerbungen (Registry #136): je Bewerbung, nicht je Pflegekraft — eine Absage
+// der alten Bewerbung gilt nicht für eine neue derselben Kraft. Regel in
+// stopRegeln.ts:reaktionAufBewerbung; Zeilen ohne `application_id` (geplant vor
+// #136) behalten die alte Regel je Pflegekraft.
 
 async function hasReactionForCaregiver(
   supabase: any,
   leadId: string,
   reminderType: "interest_reminder" | "application_reminder",
   caregiverId: number | string,
+  applicationId: number | string | null = null,
 ): Promise<boolean> {
   const positiveEvent = reminderType === "interest_reminder"
     ? "caregiver_invited"
@@ -1036,19 +1044,25 @@ async function hasReactionForCaregiver(
   // PostgREST kann jsonb-Felder mit ->> filtern. caregiver_id ist als Number
   // im Metadata gespeichert; Vergleich als String passt.
   const cgIdStr = String(caregiverId);
+  const typen = reminderType === "application_reminder"
+    ? ["application_received", positiveEvent, negativeEvent]
+    : [positiveEvent, negativeEvent];
   const { data, error } = await supabase
     .from("lead_events")
-    .select("id, event_type")
+    .select("event_type, created_at, metadata")
     .eq("lead_id", leadId)
-    .in("event_type", [positiveEvent, negativeEvent])
-    .filter("metadata->>caregiver_id", "eq", cgIdStr)
-    .limit(1);
+    .in("event_type", typen)
+    .filter("metadata->>caregiver_id", "eq", cgIdStr);
   if (error) {
     console.error(`hasReactionForCaregiver query failed (${reminderType}, lead ${leadId}, cg ${cgIdStr}):`, error.message);
     // Im Zweifel skip senden — Reminder nicht doppelt rauspusten.
     return true;
   }
-  return Array.isArray(data) && data.length > 0;
+  const ereignisse = (Array.isArray(data) ? data : []) as LeadEreignis[];
+  if (reminderType === "interest_reminder") {
+    return ereignisse.some((e) => e.event_type === positiveEvent || e.event_type === negativeEvent);
+  }
+  return reaktionAufBewerbung(ereignisse, { caregiverId, applicationId });
 }
 
 /** Fünf-Liste für die Nudge-Mail — von Versand UND Testversand benutzt.
@@ -1188,6 +1202,7 @@ function angebotAus(m: Record<string, unknown> | null | undefined): BewerbungsAn
  *  (Eingang = Mail B, oder gesendete Erinnerung) und ob die letzte Erinnerung schon raus ist. */
 async function bewerbungsLage(
   supabase: any, leadId: string, caregiverId: number | string, jobId: number | null, standardJobId: number | null,
+  applicationId: number | string | null = null,
 ): Promise<{ eingaengeMs: number[]; angebot: BewerbungsAngebot; letzteMailMs: number | null; letzteGesendet: boolean }> {
   const cg = String(caregiverId);
   const { data: evts } = await supabase
@@ -1204,19 +1219,25 @@ async function bewerbungsLage(
       return jobId == null || job == null || Number(job) === Number(jobId);
     })
     .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
-  const eingaengeMs = zumPaar.map((e) => Date.parse(e.created_at)).filter((ms) => Number.isFinite(ms));
+  // Registry #136: Kennt die Zeile ihre Bewerbung, zählen nur deren Eingang und deren Mails —
+  // sonst gälte die „letzte“ Erinnerung einer alten Bewerbung derselben Kraft als `doppelt`.
+  const app = applicationId == null ? "" : String(applicationId);
+  const eigene = app ? zumPaar.filter((e) => String(e.metadata?.application_id ?? "") === app) : [];
+  const basis = eigene.length > 0 ? eigene : zumPaar;
+  const eingaengeMs = basis.map((e) => Date.parse(e.created_at)).filter((ms) => Number.isFinite(ms));
   const { data: gesendet } = await supabase
     .from("scheduled_emails")
-    .select("email_type, sent_at")
+    .select("email_type, sent_at, metadata")
     .eq("lead_id", leadId)
     .eq("status", "sent")
     .in("email_type", [...ERINNERUNG_TYPEN])
     .filter("metadata->>caregiver_id", "eq", cg);
-  const zeilen = (gesendet ?? []) as { email_type: string; sent_at: string | null }[];
+  const zeilen = ((gesendet ?? []) as { email_type: string; sent_at: string | null; metadata?: Record<string, unknown> | null }[])
+    .filter((z) => !app || String(z.metadata?.application_id ?? "") === app);
   const alle = [...eingaengeMs, ...zeilen.map((z) => Date.parse(z.sent_at ?? "")).filter((ms) => Number.isFinite(ms))];
   return {
     eingaengeMs,
-    angebot: angebotAus(zumPaar[zumPaar.length - 1]?.metadata),
+    angebot: angebotAus(basis[basis.length - 1]?.metadata),
     letzteMailMs: alle.length ? Math.max(...alle) : null,
     letzteGesendet: zeilen.some((z) => erinnerungStufe(z.email_type) === "letzte"),
   };
@@ -1260,6 +1281,9 @@ interface ReminderMeta {
   caregiver_about_text?: string | null;
   // Registry #125: Zähler der Fehlversuche der mamamia-Nachfrage vor dem Versand.
   stand_fehlschlaege?: number;
+  // Registry #136: die Bewerbung, an die die Zeile erinnert (mamamia application_id). Fehlt bei
+  // Zeilen, die vor #136 geplant wurden — dann gelten die Regeln je Pflegekraft wie bisher.
+  application_id?: number | string | null;
   // Multi-Job (Bug #25): Job, zu dem dieser Reminder gehört. Reminder eines
   // AKTUELL geplanten Jobs überleben den lead-weiten "beauftragt"-Cancel
   // (die alte Buchung betraf einen ANDEREN Einsatz).
@@ -2534,12 +2558,14 @@ Deno.serve(async (req: Request) => {
               ? "interest_reminder"
               : "application_reminder";
 
-          // Hat der Kunde reagiert (invite/decline bzw. accept/reject)?
+          // Hat der Kunde reagiert (invite/decline bzw. accept/reject)? Bei Bewerbungen je
+          // Bewerbung (Registry #136), sofern die Zeile ihre application_id kennt.
           const reacted = await hasReactionForCaregiver(
             supabase,
             scheduledEmail.lead_id,
             reminderVariant,
             cgId,
+            reminderVariant === "application_reminder" ? meta.application_id ?? null : null,
           );
           if (reacted) {
             await supabase
@@ -2612,7 +2638,7 @@ Deno.serve(async (req: Request) => {
             } else if (standJob != null) {
               let stand: BewerbungStand | null = null;
               try {
-                stand = await bewerbungStand(standDeps, Number(standJob), cgId);
+                stand = await bewerbungStand(standDeps, Number(standJob), cgId, meta.application_id ?? null);
               } catch (e) {
                 const grund = e instanceof Error ? e.message : String(e);
                 const fehlschlaege = Number(meta.stand_fehlschlaege ?? 0) + 1;
@@ -2640,6 +2666,7 @@ Deno.serve(async (req: Request) => {
             const lage = await bewerbungsLage(
               supabase, scheduledEmail.lead_id, cgId, meta.mamamia_job_offer_id ?? null,
               ((lead as any).mamamia_job_offer_id ?? null) as number | null,
+              meta.application_id ?? null,
             );
             const jetzt = Date.now();
             const bis = reserviertBisAus((scheduledEmail.metadata ?? {}).reserviert_bis, lage.eingaengeMs);

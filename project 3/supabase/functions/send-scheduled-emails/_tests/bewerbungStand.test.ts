@@ -19,6 +19,17 @@ Deno.test("standAus: Pflegekraft in der Liste ⇒ aktiv, sonst weg (Zahl und Tex
   assertEquals(standAus([{ id: 1, caregiver_id: null }], 32527), "weg");
 });
 
+Deno.test("standAus je Bewerbung (Registry #136): mit application_id zählt nur genau diese", () => {
+  const liste = [{ id: 14746, caregiver_id: 15184 }];
+  assertEquals(standAus(liste, 15184, 14746), "aktiv");
+  assertEquals(standAus(liste, 15184, "14746"), "aktiv");
+  // Die alte Bewerbung 14728 ist weg, auch wenn die Kraft mit der neuen in der Liste steht.
+  assertEquals(standAus(liste, 15184, 14728), "weg");
+  // Ohne application_id (Zeile von vor #136): wie bisher je Pflegekraft.
+  assertEquals(standAus(liste, 15184, null), "aktiv");
+  assertEquals(standAus(liste, 15184), "aktiv");
+});
+
 Deno.test("standNochmalUm: zehn Minuten später, höchstens dreimal, danach null (= wie bisher senden)", () => {
   const jetzt = new Date("2026-10-16T10:00:00Z");
   assertEquals(standNochmalUm(1, jetzt), "2026-10-16T10:10:00.000Z");
@@ -83,10 +94,13 @@ Deno.test("bewerbungStand: Login, dann Liste des Jobs — aktiv / weg; Token wir
   assertEquals(await bewerbungStand({ ...DEPS, fetchFn: f }, 38118, 36358), "weg");
   // Job-genau: dieselbe Pflegekraft auf einem anderen Job zählt nicht
   assertEquals(await bewerbungStand({ ...DEPS, fetchFn: f }, 38673, 32527), "weg");
+  // Registry #136: Zeile kennt ihre Bewerbung — nur genau diese zählt
+  assertEquals(await bewerbungStand({ ...DEPS, fetchFn: f }, 38118, 15184, 14746), "aktiv");
+  assertEquals(await bewerbungStand({ ...DEPS, fetchFn: f }, 38118, 15184, 14728), "weg");
   const logins = aufrufe.filter((a) => a.url.endsWith("/auth"));
   assertEquals(logins.length, 1, "ein Login je warmer Instanz");
   const listen = aufrufe.filter((a) => !a.url.endsWith("/auth"));
-  assertEquals(listen.length, 3);
+  assertEquals(listen.length, 5);
   assertEquals(listen[0].auth, "Bearer tok-1");
   assertEquals((listen[0].body.variables as Record<string, unknown>).limit, 100);
   assertStringIncludes(String(listen[0].body.query), "JobOfferApplicationsWithPagination");
