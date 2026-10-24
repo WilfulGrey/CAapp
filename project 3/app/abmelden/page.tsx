@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { linkToken } from '@/lib/link-token';
 
 // Abmelde-Bestätigungsseite. Vom Abmelde-Link im Mail-Footer aufgerufen
 // (/abmelden?token=...). Ruft /api/unsubscribe auf und zeigt das Ergebnis.
+// Den Schlüssel nimmt die Middleware aus der Adresse (Registry #134).
 export default function AbmeldenPage() {
   const [status, setStatus] = useState<'loading' | 'done' | 'error' | 'notoken'>('loading');
 
   useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get('token');
+    const token = linkToken(window.location.search, document.cookie);
     if (!token) {
       setStatus('notoken');
       return;

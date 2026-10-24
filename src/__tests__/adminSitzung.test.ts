@@ -15,7 +15,7 @@ import {
 import { FENSTER_MS, FehlversuchZaehler, MAX_FEHLVERSUCHE, passwortStimmt } from '../../project 3/lib/admin-anmeldung';
 
 /*
- * Admin-Login (Audit C, 22.10.2026; Registry #132): das Cookie trug das
+ * Admin-Login (Audit C, 22.10.2026; Registry #135): das Cookie trug das
  * Klartext-Passwort, und der Login ließ beliebig viele Versuche zu. Jetzt:
  * signiertes, ablaufendes Token und 5 Fehlversuche je IP in 15 Minuten.
  * Testwerte, keine echten Geheimnisse.

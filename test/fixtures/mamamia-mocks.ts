@@ -18,7 +18,7 @@ const SUPABASE_URL = 'https://test.supabase.co';
 // ─── Sample data ──────────────────────────────────────────────────────────
 
 export const defaultLead = {
-  id: 'integration-lead-uuid-0000',
+  id: '11111111-2222-4333-8444-555555555555',
   email: 'itest@test.local',
   vorname: 'anna',
   nachname: 'testerin',

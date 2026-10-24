@@ -11,6 +11,7 @@ import { useMamamiaSession } from '../hooks/useMamamiaSession';
 import { useLeadJobs, useCustomer } from '../lib/mamamia/hooks';
 import type { LeadJobRow, LeadJobDisplayStatus, MamamiaCustomer } from '../lib/mamamia/types';
 import { deriveJobDisplayStatus, sortLeadJobs, formatJobZeitraum } from '../lib/mamamia/leadJobs';
+import { portalToken } from '../lib/portalToken';
 
 // "Guten Tag, Frau Dachs." — salutation from gender, last name from the
 // Mamamia customer. Falls back to a plain greeting when the name is unknown.
@@ -112,7 +113,7 @@ const Centered: FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 export const JobsOverviewPage: FC = () => {
-  const token = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('token') : null;
+  const token = portalToken();
   const { ready, loading, expired, error } = useMamamiaSession(token);
   const { data: jobs, loading: jobsLoading, error: jobsError } = useLeadJobs(ready);
   const { data: customer } = useCustomer(ready);

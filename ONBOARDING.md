@@ -79,7 +79,7 @@ Pliki `.env` dostaniesz **osobnym kanałem** od Michała (Signal / encrypted ema
 | Ścieżka | Source |
 |---|---|
 | `/.env.local` | dla CAapp (Vite) — 3 zmienne |
-| `/project 3/.env` | dla calculatora (Next.js) — 19 zmiennych (m.in. `ADMIN_PASSWORD` + `ADMIN_SESSION_SECRET`, Registry #132) |
+| `/project 3/.env` | dla calculatora (Next.js) — 19 zmiennych (m.in. `ADMIN_PASSWORD` + `ADMIN_SESSION_SECRET`, Registry #135) |
 
 Template'y są w repo (`.env.example` w obu lokalizacjach) — pokazują które klucze są potrzebne, ale wartości są puste; podstawisz je z paczki Michała.
 

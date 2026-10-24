@@ -3,7 +3,7 @@ import { FehlversuchZaehler, passwortStimmt } from '@/lib/admin-anmeldung';
 import { ALTES_COOKIE, neueSitzung, SITZUNG_COOKIE, SITZUNG_DAUER_S, sitzungsKonfig } from '@/lib/admin-sitzung';
 import { clientIp } from '@/lib/bewertungen';
 
-/* Login des Admin-Panels. Das Cookie trägt seit Registry #132 ein signiertes,
+/* Login des Admin-Panels. Das Cookie trägt seit Registry #135 ein signiertes,
    ablaufendes Token statt des Passworts (lib/admin-sitzung.ts), und nach
    5 Fehlversuchen in 15 Minuten je IP ist 15 Minuten zu (lib/admin-anmeldung.ts,
    dort auch die Grenzen dieses Zählers). Kein Ersatzwert für Passwort oder

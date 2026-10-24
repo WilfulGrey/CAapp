@@ -4,7 +4,7 @@
  * (ADMIN_PASSWORD). Wer das Cookie sah — Browser-Profil, Proxy-Log,
  * Screenshot der DevTools —, hatte damit das Passwort des Panels und, weil
  * dasselbe Passwort das Supabase-Konto info@primundus.de öffnet, auch die
- * Datenbank-Sitzung (Audit C, 22.10.2026; Registry #132).
+ * Datenbank-Sitzung (Audit C, 22.10.2026; Registry #135).
  *
  * Jetzt: Cookie `admin_sitzung` = `v1.<ausgestellt>.<nonce>.<hmac>`
  *   - ausgestellt: Unix-Sekunden, Ablauf nach SITZUNG_DAUER_S (7 Tage, wie

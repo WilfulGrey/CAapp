@@ -7,7 +7,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
  *
  * Bis 10/2026 gab es kein Limit: das Repo ist öffentlich, der Login-Weg also
  * bekannt, und man konnte beliebig oft raten (Audit C, 22.10.2026;
- * Registry #132).
+ * Registry #135).
  *
  * GRENZEN des Limits (bewusst einfach gehalten):
  *  - Der Zähler liegt im Speicher der Instanz. Ein Deploy oder Neustart setzt

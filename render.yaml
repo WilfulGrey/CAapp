@@ -104,7 +104,7 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
-      # Signs the admin session cookie (Registry #132): random, >= 32 chars,
+      # Signs the admin session cookie (Registry #135): random, >= 32 chars,
       # own value per slot. Missing ⇒ admin login closed (no fallback).
       - key: ADMIN_SESSION_SECRET
         sync: false

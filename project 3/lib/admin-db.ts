@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 
    Angemeldet wird in /admin-login mit demselben Passwort, das auch das
    Admin-Cookie freischaltet (ADMIN_PASSWORD auf Render; das Cookie selbst trägt
-   seit Registry #132 nur ein signiertes Token) — das Passwort steht also an
+   seit Registry #135 nur ein signiertes Token) — das Passwort steht also an
    zwei Stellen und wird immer an beiden geändert. Die Sitzung (Token-Erneuerung, Realtime) hält
    supabase-js selbst; AdminLayoutClient leitet ohne Sitzung zum Login, weil der
    Client sonst still auf den Anon-Schlüssel zurückfällt und leere Listen zeigt. */
