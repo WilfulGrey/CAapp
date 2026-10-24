@@ -54,6 +54,17 @@ describe('Kontakt-Schritt B2 (Registry #121)', () => {
     expect(rumpf('const validateForm = () => {')).toContain('kontaktFehlerAlt()');
   });
 
+  it('Feldzähler (Registry #138): jedes fehlende oder ungültige Feld zählt, ohne Inhalt, und ein Absenden nach Hinweis zählt extra', () => {
+    const r = rumpf('const kontaktUnvollstaendig = () => {');
+    for (const e of ['name_fehlt', 'email_fehlt', 'email_ungueltig', 'telefon_fehlt', 'telefon_ungueltig']) {
+      expect(r).toContain(`zaehle('${e}', zaehlVariante())`);
+    }
+    expect(r).toContain('hinweisGezeigtRef.current = true');
+    // Der Zähler bekommt nur Ereignis und Variante, nie formData-Werte.
+    expect(r).not.toMatch(/zaehle\([^)]*formData/);
+    expect(rumpf('const meldeErfolg = (')).toContain("if (hinweisGezeigtRef.current) zaehle('abgeschickt_nach_hinweis', zaehlVariante())");
+  });
+
   it('alle drei Felder zählen das erste Antippen und tragen die ids, die der Fokus braucht', () => {
     expect(rumpf('const kontaktFeldFokus = (feld: KontaktFeld) => {')).toContain("zaehle('feld_angetippt'");
     for (const feld of ['name', 'email', 'phone']) {

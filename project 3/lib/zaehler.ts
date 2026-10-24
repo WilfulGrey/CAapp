@@ -34,6 +34,11 @@ export const ZAEHLER_EREIGNISSE = [
   // ungefähr je Person: Der Verlust liegt vor dem ersten Tastendruck, und das
   // sahen wir bisher nur bei den ca. 2 Einwilligenden am Tag.
   'feld_angetippt', 'knopf_unvollstaendig',
+  // Feldzähler (Registry #138, 24.10.2026, Martin: „B2 + Feldzähler, 09.11. entscheiden“):
+  // Beim Tipp auf den Knopf mit unvollständigen Angaben zählt jedes betroffene
+  // Feld, getrennt nach „fehlt“ und „ungültig“ (nie der Inhalt), dazu ob nach
+  // einem Hinweis doch noch abgeschickt wurde. Je Seitenaufruf einmal.
+  'name_fehlt', 'email_fehlt', 'email_ungueltig', 'telefon_fehlt', 'telefon_ungueltig', 'abgeschickt_nach_hinweis',
 ] as const;
 export type ZaehlerEreignis = (typeof ZAEHLER_EREIGNISSE)[number];
 
