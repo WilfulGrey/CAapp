@@ -36,10 +36,22 @@ import { ladeSterneStand } from "@/lib/sterne-zeile-laden";
 // dynamischen Seiten gilt.
 export const dynamic = 'force-dynamic';
 
-// Weihnachts-Störer im Hero bis einschließlich 26.12.2026 (Ende 27.12. 00:00 Uhr Berlin = 26.12. 23:00 UTC).
+// Weihnachtsband unter der Kopfzeile bis einschließlich 26.12.2026 (Ende 27.12. 00:00 Uhr Berlin = 26.12. 23:00 UTC).
 const WEIHNACHTEN_BIS = Date.UTC(2026, 11, 26, 23);
 function weihnachtsStoererAn(): boolean {
   return Date.now() < WEIHNACHTEN_BIS;
+}
+// Goldpunkte an den Rändern des Bandes, nur am Computer
+const WEIHNACHTS_PUNKTE: { l: string; t: string; g: number; hell?: boolean }[] = [
+  { l: '2%', t: '30%', g: 3 }, { l: '6%', t: '72%', g: 2, hell: true }, { l: '10%', t: '24%', g: 2.5 }, { l: '15%', t: '62%', g: 2, hell: true },
+  { l: '85%', t: '28%', g: 2.5 }, { l: '89%', t: '70%', g: 2, hell: true }, { l: '93%', t: '34%', g: 3 }, { l: '97%', t: '66%', g: 2 },
+];
+function WeihnachtsStern() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[13px] w-[13px] flex-none max-[374px]:hidden fill-[#D4A843] drop-shadow-[0_0_4px_rgba(212,168,67,0.6)] md:h-4 md:w-4">
+      <path d="M12 1.5l1.9 7.1L21 10.5l-7.1 1.9L12 19.5l-1.9-7.1L3 10.5l7.1-1.9z" />
+    </svg>
+  );
 }
 
 export default async function HomePage() {
@@ -53,6 +65,29 @@ export default async function HomePage() {
         dangerouslySetInnerHTML={{ __html: jsonLdString(homePageGraph()) }}
       />
       <Header />
+      {/* Weihnachtsband (Martin 24.10.2026: „Betreuung auch über Weihnachten gesichert“, Entwurf A „Nur Band,
+          überall“) — dasselbe Band wie unter der Kopfzeile von primundus.de (components/layout/WeihnachtsBand.tsx dort).
+          Im Fluss unter der Kopfzeile, ca. 38 px am Handy. Die Seite rendert dynamisch, das Band endet genau mit dem
+          26.12. (Berlin). Farben wie primundus.de: pm-green-nacht/-deep, pm-gold. */}
+      {weihnachtsStoererAn() && (
+        <aside aria-label="Weihnachten" className="relative overflow-hidden border-y border-[#D4A843]/60 bg-gradient-to-r from-[#123222] via-[#2A5C3F] to-[#123222] text-white">
+          {WEIHNACHTS_PUNKTE.map((p) => (
+            <span
+              key={p.l + p.t}
+              aria-hidden="true"
+              className={`absolute hidden rounded-full md:block ${p.hell ? 'bg-white/70' : 'bg-[#D4A843]'}`}
+              style={{ left: p.l, top: p.t, width: p.g, height: p.g }}
+            />
+          ))}
+          <p className="relative mx-auto flex max-w-[1256px] items-center justify-center gap-2 px-3 py-2.5 min-[375px]:px-3.5 md:gap-3.5 md:px-5 md:py-3">
+            <WeihnachtsStern />
+            <span className="whitespace-nowrap text-[14px] font-semibold leading-tight max-[374px]:text-[13px] min-[390px]:text-[14.5px] md:text-[16.5px]">
+              Betreuung auch über <strong className="font-extrabold text-[#D4A843]">Weihnachten</strong> gesichert
+            </span>
+            <WeihnachtsStern />
+          </p>
+        </aside>
+      )}
 
       {/* Hero Section - Split Layout on Desktop */}
       {/* FESTER Abstand statt vertikaler Zentrierung (Martin 16.08.: "oben
@@ -220,20 +255,7 @@ export default async function HomePage() {
                   heute ein echtes Modal (fixed, oben im Bild, eigener
                   Scrollbereich) und funktioniert in jeder Breite.
                   Die Punkte unter dem Button stecken in MultiStepForm. */}
-              <div className="relative mb-7 max-w-md">
-                {/* Weihnachts-Störer (Martin 24.10.2026: „einen schönen Weihnachten-Störer: Betreuung auch über
-                    Weihnachten gesichert“, hier und auf primundus.de, keine eigene Seite). Aufkleber auf der Oberkante
-                    des Knopfs, absolut gesetzt: verschiebt nichts, Klicks gehen durch auf den Knopf. Gleiche Farben
-                    wie auf primundus.de (pm-green-deep, pm-gold). Die Seite rendert dynamisch, der Aufkleber endet
-                    also genau mit dem 26.12. (Berlin). */}
-                {weihnachtsStoererAn() && (
-                  <span className="pointer-events-none absolute left-1/2 top-0 z-[1] flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-[#2A5C3F] px-3 py-[5px] text-[12.5px] font-semibold leading-none text-white shadow-[0_4px_12px_-4px_rgba(42,92,63,0.6)] min-[390px]:text-[13px] sm:text-[13.5px]">
-                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5 flex-none fill-[#D4A843]">
-                      <path d="M12 2.5l2.6 6.1 6.6.5-5 4.3 1.5 6.5L12 16.4l-5.7 3.5 1.5-6.5-5-4.3 6.6-.5z" />
-                    </svg>
-                    Betreuung auch über Weihnachten gesichert
-                  </span>
-                )}
+              <div className="mb-7 max-w-md">
                 <MultiStepForm mode="cta" bewertung={bewertung} />
                 {/* Bewertungssterne zentriert unter dem letzten Punkt, vor den
                     Logos (Martin 17.09.2026). */}
