@@ -36,6 +36,12 @@ import { ladeSterneStand } from "@/lib/sterne-zeile-laden";
 // dynamischen Seiten gilt.
 export const dynamic = 'force-dynamic';
 
+// Weihnachts-Störer im Hero bis einschließlich 26.12.2026 (Ende 27.12. 00:00 Uhr Berlin = 26.12. 23:00 UTC).
+const WEIHNACHTEN_BIS = Date.UTC(2026, 11, 26, 23);
+function weihnachtsStoererAn(): boolean {
+  return Date.now() < WEIHNACHTEN_BIS;
+}
+
 export default async function HomePage() {
   const bewertung = await ladeSterneStand();
   return (
@@ -214,7 +220,20 @@ export default async function HomePage() {
                   heute ein echtes Modal (fixed, oben im Bild, eigener
                   Scrollbereich) und funktioniert in jeder Breite.
                   Die Punkte unter dem Button stecken in MultiStepForm. */}
-              <div className="mb-7 max-w-md">
+              <div className="relative mb-7 max-w-md">
+                {/* Weihnachts-Störer (Martin 24.10.2026: „einen schönen Weihnachten-Störer: Betreuung auch über
+                    Weihnachten gesichert“, hier und auf primundus.de, keine eigene Seite). Aufkleber auf der Oberkante
+                    des Knopfs, absolut gesetzt: verschiebt nichts, Klicks gehen durch auf den Knopf. Gleiche Farben
+                    wie auf primundus.de (pm-green-deep, pm-gold). Die Seite rendert dynamisch, der Aufkleber endet
+                    also genau mit dem 26.12. (Berlin). */}
+                {weihnachtsStoererAn() && (
+                  <span className="pointer-events-none absolute left-1/2 top-0 z-[1] flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-[#2A5C3F] px-3 py-[5px] text-[12.5px] font-semibold leading-none text-white shadow-[0_4px_12px_-4px_rgba(42,92,63,0.6)] min-[390px]:text-[13px] sm:text-[13.5px]">
+                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5 flex-none fill-[#D4A843]">
+                      <path d="M12 2.5l2.6 6.1 6.6.5-5 4.3 1.5 6.5L12 16.4l-5.7 3.5 1.5-6.5-5-4.3 6.6-.5z" />
+                    </svg>
+                    Betreuung auch über Weihnachten gesichert
+                  </span>
+                )}
                 <MultiStepForm mode="cta" bewertung={bewertung} />
                 {/* Bewertungssterne zentriert unter dem letzten Punkt, vor den
                     Logos (Martin 17.09.2026). */}
