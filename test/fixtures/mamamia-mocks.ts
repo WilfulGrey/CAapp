@@ -18,7 +18,7 @@ const SUPABASE_URL = 'https://test.supabase.co';
 // ─── Sample data ──────────────────────────────────────────────────────────
 
 export const defaultLead = {
-  id: 'integration-lead-uuid-0000',
+  id: '11111111-2222-4333-8444-555555555555',
   email: 'itest@test.local',
   vorname: 'anna',
   nachname: 'testerin',
@@ -157,6 +157,7 @@ export interface ProxyActionHandlers {
   storeConfirmation?: (vars: Record<string, unknown>) => unknown;
   inviteCaregiver?: (vars: Record<string, unknown>) => unknown;
   listAcceptedApplications?: () => unknown;
+  getCustomerKontakte?: () => unknown;
 }
 
 export function proxyHandler(overrides: ProxyActionHandlers = {}) {
@@ -179,6 +180,7 @@ export function proxyHandler(overrides: ProxyActionHandlers = {}) {
     // — die Overlay-Logik (applyAcceptedOverlay) läuft damit fail-soft durch
     // wie in Produktion ohne Annahme. Tests überschreiben für Gebucht-Szenarien.
     listAcceptedApplications: () => ({ application_ids: [], rows: [] }),
+    getCustomerKontakte: () => ({ Customer: { id: TEST_CUSTOMER_ID, customer_contracts: [], customer_contacts: [] } }),
     ...overrides,
   };
 

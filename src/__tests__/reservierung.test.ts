@@ -45,7 +45,7 @@ describe('reserviertBis', () => {
   });
 });
 
-// Registry #126: je Bewerbung. PROD-Verlauf Kundin 52dc3e9d, Pflegekraft 15184, Job 38118
+// Registry #136: je Bewerbung. PROD-Verlauf Kundin 52dc3e9d, Pflegekraft 15184, Job 38118
 // (Standard-Job des Leads 35699; die Portal-Absage trägt die application_id als Text, keinen Job).
 describe('reserviertBis je Bewerbung', () => {
   const FALL = [
@@ -109,7 +109,7 @@ describe('Reservierung = Auto-Absage des Servers', () => {
     expect(m && Number(m[1])).toBe(RESERVIERUNG_STUNDEN);
   });
 
-  it('JE_BEWERBUNG_AB passt zum Übergang in detect-caregiver-events (Registry #126)', async () => {
+  it('JE_BEWERBUNG_AB passt zum Übergang in detect-caregiver-events (Registry #136)', async () => {
     const fs = await import('node:fs');
     const quelle = fs.readFileSync('supabase/functions/detect-caregiver-events/index.ts', 'utf8');
     const m = quelle.match(/JE_BEWERBUNG_AB\s*=\s*"([^"]+)"/);

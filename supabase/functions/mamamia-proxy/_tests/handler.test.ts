@@ -224,6 +224,7 @@ Deno.test("POST inviteCaregiver with cat=authorization surfaces category in 502 
     countRecentInviteAttempts: async () => 0,
     oldestInviteAttemptWithin: async () => null,
     recordInviteAttempt: async () => {},
+    invitedCaregiverIds: async () => [],
   };
   const res = await handleRequest(
     baseReq({ action: "inviteCaregiver", variables: { caregiver_id: 10061 } }, cookie),
@@ -335,6 +336,7 @@ Deno.test("dismissCaregiver: writes via Supabase adapter, idempotent", async () 
     countRecentInviteAttempts: async () => 0,
     oldestInviteAttemptWithin: async () => null,
     recordInviteAttempt: async () => {},
+    invitedCaregiverIds: async () => [],
   };
 
   const res = await handleRequest(
@@ -359,6 +361,7 @@ Deno.test("dismissCaregiver: rejects missing caregiver_id", async () => {
     countRecentInviteAttempts: async () => 0,
     oldestInviteAttemptWithin: async () => null,
     recordInviteAttempt: async () => {},
+    invitedCaregiverIds: async () => [],
   };
   const res = await handleRequest(
     baseReq({ action: "dismissCaregiver", variables: { kind: "interest" } }, cookie),
@@ -378,6 +381,7 @@ Deno.test("dismissCaregiver: rejects bad kind", async () => {
     countRecentInviteAttempts: async () => 0,
     oldestInviteAttemptWithin: async () => null,
     recordInviteAttempt: async () => {},
+    invitedCaregiverIds: async () => [],
   };
   const res = await handleRequest(
     baseReq({ action: "dismissCaregiver", variables: { caregiver_id: 50001, kind: "garbage" } }, cookie),
@@ -404,6 +408,7 @@ Deno.test("listDismissedCaregivers: reads via session.lead_id, returns caregiver
     countRecentInviteAttempts: async () => 0,
     oldestInviteAttemptWithin: async () => null,
     recordInviteAttempt: async () => {},
+    invitedCaregiverIds: async () => [],
   };
 
   const res = await handleRequest(
@@ -414,6 +419,27 @@ Deno.test("listDismissedCaregivers: reads via session.lead_id, returns caregiver
   assertEquals(selectArg, SESSION_PAYLOAD.lead_id);
   const body = await res.json();
   assertEquals(body.data.caregiver_ids, [50001, 50002]);
+});
+
+Deno.test("inviteCaregiver: schon eingeladen → 409 already-invited (Registry #128)", async () => {
+  _resetRateLimit(); _resetAgencyTokenCache();
+  const cookie = await makeCookie();
+  const supabase = {
+    selectLeadJobs: async () => [],
+    selectDismissedCaregivers: async () => [],
+    upsertDismissedCaregiver: async () => {},
+    selectAcceptedApplications: async () => [],
+    countRecentInviteAttempts: async () => 0,
+    oldestInviteAttemptWithin: async () => null,
+    recordInviteAttempt: async () => {},
+    invitedCaregiverIds: async () => [10061],
+  };
+  const res = await handleRequest(
+    baseReq({ action: "inviteCaregiver", variables: { caregiver_id: 10061 } }, cookie),
+    { secrets: SECRETS, supabase, fetchFn: okFetch({}) },
+  );
+  assertEquals(res.status, 409);
+  assertEquals((await res.json()).error, "already-invited");
 });
 
 // ─── Acceptance actions ────────────────────────────────────────────────────
@@ -436,6 +462,7 @@ Deno.test("listAcceptedApplications: reads via session.lead_id, returns applicat
     countRecentInviteAttempts: async () => 0,
     oldestInviteAttemptWithin: async () => null,
     recordInviteAttempt: async () => {},
+    invitedCaregiverIds: async () => [],
   };
 
   const res = await handleRequest(
@@ -462,6 +489,7 @@ Deno.test("listAcceptedApplications: empty returns application_ids=[]", async ()
     countRecentInviteAttempts: async () => 0,
     oldestInviteAttemptWithin: async () => null,
     recordInviteAttempt: async () => {},
+    invitedCaregiverIds: async () => [],
   };
 
   const res = await handleRequest(

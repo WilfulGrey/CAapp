@@ -10,13 +10,15 @@ import {
   setDeclinedCaregiver,
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
-import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers, useInviteRateState, useLeadJobs } from '../lib/mamamia/hooks';
+import { useCustomer, useCustomerKontakte, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers, useInviteRateState, useLeadJobs } from '../lib/mamamia/hooks';
+import { fruehereBuchung, vertragVorbelegung } from '../lib/vertragVorbelegung';
 import { rankComparator } from '../lib/mamamia/matchingsRanking';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { isAboutDeStale, regenerateGermanDescription } from '../lib/mamamia/caregiverAbout';
 import { feedbackInRuhezeit, reportLeadEvent, fetchLeadEvents, KOSTENRECHNER_URL } from '../lib/leadEvents';
-import type { CaregiverSnapshot, EinladenQuelle, LeadEventMetadata, Messpunkt, ProfilQuelle } from '../lib/leadEvents';
+import type { CaregiverSnapshot, EinladenQuelle, FormularQuelle, LeadEventMetadata, Messpunkt, ProfilQuelle } from '../lib/leadEvents';
 import { identifyClarity } from '../lib/clarity';
+import { portalToken } from '../lib/portalToken';
 import {
   useRejectApplication,
   useStoreConfirmation,
@@ -178,10 +180,9 @@ const JOB_ID_PARAM =
   typeof window !== 'undefined'
     ? new URLSearchParams(window.location.search).get('job')
     : null;
-const TOKEN_PARAM =
-  typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search).get('token')
-    : null;
+// Token kommt nicht mehr aus der Adresse allein: index.html nimmt ihn dort
+// heraus, bevor GTM die Seite meldet (Registry #134).
+const TOKEN_PARAM = portalToken();
 // Diagnose-Leiste auch auf Prod einschaltbar (?debug=1) — siehe Kommentar
 // an der Leiste selbst. Bewusst ein URL-Parameter und keine Bauzeit-
 // Variable: gebraucht wird sie genau dort, wo nicht gebaut wird.
@@ -305,8 +306,8 @@ const PREVIEW_INTEREST_PROFILE = {
 };
 
 const PREVIEW_INTEREST_ASSIGNMENTS = [
-  { startDate: '10.01.2026', endDate: '20.03.2026', postalCode: '80331', city: 'München', patientCount: 1, duration: '10 Wochen' },
-  { startDate: '01.09.2025', endDate: '15.11.2025', postalCode: '50667', city: 'Köln', patientCount: 1, duration: '10 Wochen' },
+  { startDate: '10.01.2026', endDate: '20.03.2026', postalCode: '80331', city: 'München', duration: '10 Wochen' },
+  { startDate: '01.09.2025', endDate: '15.11.2025', postalCode: '50667', city: 'Köln', duration: '10 Wochen' },
 ];
 
 const PREVIEW_INTEREST = {
@@ -493,8 +494,7 @@ const CustomerPortalPage: FC = () => {
 
   useEffect(() => {
     if (IS_PREVIEW_ANY) return;
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+    const token = portalToken();
     setTokenFromUrl(token);
     if (!token) {
       // No token → nothing to show. No demo fallback (CLAUDE.md §1).
@@ -529,9 +529,9 @@ const CustomerPortalPage: FC = () => {
         });
         // Stitch this portal session to the customer's earlier
         // kostenrechner session in Clarity. The kalkulation page does the
-        // matching identify on its side. Idempotent + retries until the
-        // GTM-loaded Clarity tag is ready.
-        identifyClarity(l.token);
+        // matching identify on its side. Lead-ID, nie den Token (Kontozugang).
+        // Idempotent + retries until the GTM-loaded Clarity tag is ready.
+        identifyClarity(l.id);
       }
       setLeadLoading(false);
     });
@@ -703,7 +703,12 @@ const CustomerPortalPage: FC = () => {
   // Token lief WÄHREND der Sitzung ab (z. B. beim Speichern erkannt) —
   // gleiches Ziel wie mmExpired: Selbst-Service-Screen für neuen Link.
   const [saveTokenExpired, setSaveTokenExpired] = useState(false);
-  const { data: mmCustomer, loading: mmCustomerLoading, error: mmCustomerError } = useCustomer(mmReady);
+  const { data: mmCustomer, loading: mmCustomerLoading, error: mmCustomerError, fertig: mmCustomerFertig } = useCustomer(mmReady);
+  // Registry #130: ab dem zweiten Einsatz die Personen der letzten Annahme aus
+  // Mamamia lesen (nur wenn schon ein anderer Einsatz gebucht ist) — für die
+  // Vorbelegung des Vertragsformulars. Fehler egal, dann wie bisher.
+  const kontakteNoetig = mmReady && !IS_PREVIEW_ANY && fruehereBuchung(mmCustomer?.job_offers, session?.job_offer_id ?? null);
+  const { data: mmKontakte, fertig: mmKontakteFertig } = useCustomerKontakte(kontakteNoetig);
   // Schon abgesendet: in dieser Sitzung, laut Lead oder laut mamamia.
   // `leads.patient_form_at` setzt der Proxy erst nach erfolgreichem
   // UpdateCustomer. Es kommt mit dem Lead, lange vor mamamia: Ohne das sahen
@@ -1399,7 +1404,7 @@ const CustomerPortalPage: FC = () => {
     caregiverId: app.nurse.caregiverId,
     jobOfferId: mmJobOffer?.id,
     standardJobId: lead?.mamamia_job_offer_id ?? null,
-    // Registry #126: Frist je Bewerbung (app.id = mamamia application_id).
+    // Registry #136: Frist je Bewerbung (app.id = mamamia application_id).
     applicationId: app.id,
   });
   const reservierungFuer = (app: Application): Date | null => {
@@ -1476,34 +1481,20 @@ const CustomerPortalPage: FC = () => {
     return () => clearInterval(t);
   }, [mmReady, mmApplicationsError, refetchApplications]);
 
-  // Prefill for AngebotPruefenModal step 2 — replaces the previous
-  // hardcoded fixture (Hildegard/Müller/Rosenstraße/München) that bled
-  // through to every customer regardless of their actual data.
-  // Priority: stage-B patient_* fields → stage-A lead.* → mmCustomer →
-  // empty string. KP (Kontaktperson) fields stay fresh — first time we
-  // ask for them.
-  const pruefenPrefill: Partial<ContractFormData> = (() => {
-    const stageBStreet = lead?.patient_street ?? '';
-    const stageBZip = lead?.patient_zip ?? mmCustomer?.customer_contract?.zip_code ?? '';
-    const stageBCity = lead?.patient_city ?? mmCustomer?.customer_contract?.city ?? '';
-    const ortLine = [stageBZip, stageBCity].filter(Boolean).join(', ');
-    return {
-      anrede: lead?.patient_anrede || lead?.anrede_text || 'Frau',
-      vorname: lead?.patient_vorname || lead?.vorname || '',
-      nachname: lead?.patient_nachname || lead?.nachname || '',
-      strasse: stageBStreet || mmCustomer?.customer_contract?.street_number || '',
-      einsatzort: ortLine,
-      // Patient hat meist KEINE eigene Telefon/E-Mail — die vorhandenen
-      // Kontaktdaten gehören i.d.R. der Kontaktperson, daher dort vorausfüllen.
-      telefon: '',
-      email: '',
-      kpAnrede: '',
-      kpVorname: '',
-      kpNachname: '',
-      kpTelefon: lead?.telefon || mmCustomer?.phone || mmCustomer?.customer_contract?.phone || '',
-      kpEmail: lead?.email || mmCustomer?.email || '',
-    };
-  })();
+  // Vorbelegung des Vertragsformulars (AngebotPruefenModal, „Ihre Angaben"):
+  // bisher Lead + mmCustomer, ab dem zweiten Einsatz die drei Personen der
+  // letzten Annahme aus Mamamia — lib/vertragVorbelegung.ts (Registry #130).
+  // Registry #131: Das Modal liest die Vorbelegung nur beim Öffnen und legt sie
+  // sofort als Entwurf ab — also erst öffnen, wenn mmCustomer (und ggf. die
+  // Kontakte) geantwortet haben. Sonst nahm der Link aus Mail B die Vorbelegung
+  // ohne die Daten der letzten Annahme und behielt sie für die ganze Sitzung.
+  const vorbelegungBereit = !mmReady || IS_PREVIEW_ANY || (mmCustomerFertig && (!kontakteNoetig || mmKontakteFertig));
+  const pruefenPrefill: Partial<ContractFormData> = vertragVorbelegung({
+    lead,
+    mmCustomer,
+    kontakte: mmKontakte,
+    aktuellerJob: session?.job_offer_id ?? null,
+  });
 
   // Compute visible interests — drop rejected-by-caregiver and locally-
   // dismissed-by-customer entries. Also drop interests whose caregiver
@@ -1969,6 +1960,12 @@ const CustomerPortalPage: FC = () => {
     // Rückbau (Stand 75b8df8): Das Formular steht offen unter dem Abschnittskopf, weich dorthin wie damals.
     ziel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+  // Messpunkt (Registry #132): welcher Knopf ins Formular führte. Nur Tipps des Kunden und der Mail-Link, nie ein
+  // Sprung, den das Portal selbst auslöst. Ohne ihn wüssten wir nicht, ob jemand über einen Knopf kam oder selbst scrollte.
+  const zurPflegesituationAus = (quelle: FormularQuelle) => () => {
+    messen('zur_pflegesituation', { quelle, vor_speichern: vorSpeichern });
+    zurPflegesituation();
+  };
 
   // Kompakt-Einstieg (Runde 14): der Textlink „Alle Kosten im Überblick ›" unter der kleinen Schrift
   // öffnet die Kostenaufstellung (samt „Was bleibt für Sie übrig" mit dem Eigenanteil) und springt an
@@ -2007,7 +2004,7 @@ const CustomerPortalPage: FC = () => {
       return;
     }
     requestAnimationFrame(() => {
-      if (!hasPending && !schonAbgesendet) zurPflegesituation();
+      if (!hasPending && !schonAbgesendet) zurPflegesituationAus('mail')();
       else ziel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2028,7 +2025,7 @@ const CustomerPortalPage: FC = () => {
       // 24.09. (Registry #109, Martin 02.10.). Das Fenster „Warum erst die
       // Pflegesituation?" aus Teil 3 (24.09.) ist weg: Seitdem speicherte nur noch
       // jeder 20. Neukunde die Pflegesituation in der ersten Stunde, vorher 28 %.
-      zurPflegesituation();
+      zurPflegesituationAus('karte')();
       return false;
     }
     // Serialize concurrent invite clicks. Backend gate is per-request
@@ -2466,7 +2463,7 @@ const CustomerPortalPage: FC = () => {
       <div style={{color:'#ff0',fontWeight:'bold',marginBottom:4}}>🔧 DEBUG (?debug=1)</div>
       <div>UA: {typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 100) : '?'}</div>
       <div>online: {typeof navigator !== 'undefined' ? String(navigator.onLine) : '?'} · cookieEnabled: {typeof navigator !== 'undefined' ? String(navigator.cookieEnabled) : '?'}</div>
-      <div>lead.token URL: {new URLSearchParams(window.location.search).get('token')?.slice(0, 12) ?? 'MISSING'}…</div>
+      <div>lead.token: {portalToken()?.slice(0, 12) ?? 'MISSING'}…</div>
       <hr style={{borderColor:'#0f04',margin:'4px 0'}}/>
       <div style={{color:'#ff0'}}>auth via: {authMethod}</div>
       <div>sessionStorage.mamamia_session_token: {tokenPreview(sessionTokenInStorage)}</div>
@@ -2826,6 +2823,10 @@ const CustomerPortalPage: FC = () => {
             const patch = mapPatientFormToUpdateCustomerInput(form, {
               existingPatientIds,
               locationId,
+              // Registry #131: Nach einer Annahme stehen Name/Anrede/Telefon der
+              // betreuten Person aus dem Vertragsformular in Mamamia — der Bogen
+              // überschreibt sie nicht mehr mit der Kontaktperson aus dem Lead.
+              vertragAusAnnahme: fruehereBuchung(mmCustomer?.job_offers, null),
               // Kontaktperson (Osoba Kontaktowa) aus dem Lead → customer_contract
               // (salutation/first_name/last_name), damit das Mamamia-Panel die
               // Kontaktdaten zeigt statt nur Customer.first_name top-level.
@@ -3800,7 +3801,7 @@ const CustomerPortalPage: FC = () => {
           heimEigenanteil={HEIM_EIGENANTEIL}
           heimQuelle={HEIM_QUELLE}
           onWarum={() => setWarumOffen(true)}
-          onVervollstaendigen={zurPflegesituation}
+          onVervollstaendigen={zurPflegesituationAus('kasten')}
           laedt={listeLaedt}
           karten={kartenVorSpeichern}
           gehalteneEinladungen={pflegekraftAuswahl.heldInvites}
@@ -4015,7 +4016,7 @@ const CustomerPortalPage: FC = () => {
               : null}
             bisherigeBewerbungen={applications.length}
             wunschstart={formularStart}
-            onAngaben={zurPflegesituation}
+            onAngaben={zurPflegesituationAus('stand')}
           />
         </div>
       )}
@@ -4253,7 +4254,7 @@ const CustomerPortalPage: FC = () => {
                   </p>
                   {/* Einziger Hauptknopf der Pflegekräfte (Koralle); einzeilig bei
                       360 px — deshalb schmale Innenabstände. */}
-                  <Button breit onClick={zurPflegesituation} className="px-2 whitespace-nowrap">
+                  <Button breit onClick={zurPflegesituationAus('kasten')} className="px-2 whitespace-nowrap">
                     Jetzt vervollständigen →
                   </Button>
                 </Card>
@@ -4512,7 +4513,7 @@ const CustomerPortalPage: FC = () => {
             Schritt 1 trägt seit Registry #109 wieder den Knopf ins Formular. */}
         {!patientSaved && !kompakt && (
           <div className="pt-6">
-            <SoGehtEsWeiter erledigt={[patientSaved, hasPending, false]} onVervollstaendigen={zurPflegesituation} />
+            <SoGehtEsWeiter erledigt={[patientSaved, hasPending, false]} onVervollstaendigen={zurPflegesituationAus('schritte')} />
           </div>
         )}
         <div className={kompakt || nachAbsendenNeu ? '' : 'pt-6'}>
@@ -4569,7 +4570,7 @@ const CustomerPortalPage: FC = () => {
       {/* Pop-up der Angebotsseite (Teil 3 des Redesigns). */}
       <BestpreisSheet offen={bestpreisOffen} onClose={() => setBestpreisOffen(false)} />
       {/* Rückbau Registry #122: „Warum erst die Pflegesituation?" nur vor dem ersten Speichern (Stand 75b8df8). */}
-      <WarumSheetVorSpeichern offen={rueckbau && warumOffen} onClose={() => setWarumOffen(false)} onVervollstaendigen={zurPflegesituation} />
+      <WarumSheetVorSpeichern offen={rueckbau && warumOffen} onClose={() => setWarumOffen(false)} onVervollstaendigen={zurPflegesituationAus('warum')} />
 
       {/* ── Rückmeldung zum Angebot (schwebend, unten rechts), zurück seit Registry #102 ────────────
            Als Kasten im Fluss saß sie ~3000 px weit unten und wurde kaum gesehen (Martin, 12.08.).
@@ -4582,7 +4583,7 @@ const CustomerPortalPage: FC = () => {
       {!rueckbau && !hasPending && !patientSaved && !schonAbgesendet && !feedbackWeg && feedbackReif && feedbackVerweilt && !formularImBlick && !chatNurse && !selectedApp && !selectedNurse && (
         <AngebotsFeedback
           onDismiss={feedbackErledigt}
-          onGoToForm={zurPflegesituation}
+          onGoToForm={zurPflegesituationAus('frage')}
           onAnswer={(answer, detail, endgueltig) => {
             // Der erste Tap geht STILL raus (notify:false) — er sichert die Antwort, falls der Kunde jetzt
             // abbricht, löst aber keine Mail aus. Die Team-Mail hängt am endgültigen Aufruf, der genau einmal
@@ -4602,7 +4603,7 @@ const CustomerPortalPage: FC = () => {
       )}
 
       {/* Angebot prüfen Modal */}
-      {selectedApp && (
+      {selectedApp && vorbelegungBereit && (
         <AngebotPruefenModal
           app={selectedApp}
           prefill={pruefenPrefill}
@@ -4616,7 +4617,7 @@ const CustomerPortalPage: FC = () => {
           (Vertragsformular). app.offer trägt die Eckdaten der gebuchten
           Kraft/des Jobs (Anreise/Abreise/Konditionen aus der fc-Synthese),
           pruefenPrefill die Personendaten aus Lead + mmCustomer. */}
-      {contractApp && (
+      {contractApp && vorbelegungBereit && (
         <AngebotPruefenModal
           app={contractApp}
           prefill={pruefenPrefill}

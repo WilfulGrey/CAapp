@@ -16,7 +16,9 @@ export { deriveLeadJobStatus };
 import {
   GENERATE_CAREGIVER_GERMAN_DESCRIPTION,
   GET_CAREGIVER,
+  CAREGIVER_DEPARTURES,
   GET_CUSTOMER,
+  GET_CUSTOMER_KONTAKTE,
   GET_JOB_OFFER,
   LIST_APPLICATIONS,
   LIST_INTERESTS,
@@ -134,6 +136,10 @@ const getJobOffer: ActionHandler = (session, _variables, deps) =>
 const getCustomer: ActionHandler = (session, _variables, deps) =>
   runGraphQL(deps, GET_CUSTOMER, { id: session.customer_id });
 
+// Registry #130: die drei Personen der letzten Annahme (nur lesen, nur der eigene Kunde).
+const getCustomerKontakte: ActionHandler = (session, _variables, deps) =>
+  runGraphQL(deps, GET_CUSTOMER_KONTAKTE, { id: session.customer_id });
+
 // Kill-Switch für den Rekruter-Hinweis (Michał 2026-07-31: „wyłącz/ukryj
 // wyświetlanie tego dodatkowego tekstu na razie u klientów — mamy jeszcze
 // kilku rekruterów którzy uzupełnili błędnie"). DEFAULT: AUS — `message` wird
@@ -223,32 +229,77 @@ const listMatchings: ActionHandler = async (session, variables, deps) => {
 //
 // We unwrap the GraphQL pagination shape into a flat { caregiver_ids }
 // payload so the client doesn't have to relearn it.
+//
+// Registry #128: plus our own ledger. After the caregiver declines, Mamamia
+// drops the matching from `is_request` and lists it as open again — the
+// portal then offered "Einladen" a second time. Once invited stays invited.
 const listInvitedCaregiverIds: ActionHandler = async (session, _variables, deps) => {
-  const r = await runGraphQL<{
-    JobOfferMatchingsWithPagination: {
-      total: number;
-      data: Array<{ caregiver: { id: number } }>;
-    };
-  }>(deps, LIST_INVITED_CAREGIVER_IDS, { job_offer_id: session.job_offer_id });
+  const [r, ledger] = await Promise.all([
+    runGraphQL<{
+      JobOfferMatchingsWithPagination: {
+        total: number;
+        data: Array<{ caregiver: { id: number } }>;
+      };
+    }>(deps, LIST_INVITED_CAREGIVER_IDS, { job_offer_id: session.job_offer_id }),
+    deps.supabase?.invitedCaregiverIds(session.lead_id, session.job_offer_id) ?? [],
+  ]);
   const ids = r.JobOfferMatchingsWithPagination.data.map(m => m.caregiver.id);
-  return { caregiver_ids: ids };
+  return { caregiver_ids: [...new Set([...ids, ...ledger])] };
 };
 
 // ─── Public/open actions (id from variables) ────────────────────────────────
 
-const getCaregiver: ActionHandler = async (_session, variables, deps) => {
+type DepartureRow = {
+  customer_id: number | null;
+  arrival_date: string | null;
+  departure_date: string | null;
+  duration_days: number | null;
+  status: string | null;
+  zip_code: string | null;
+  city: string | null;
+};
+
+// Departures → Felder am Caregiver. customer_id bleibt im Proxy: an den Browser
+// geht nur, ob die Kraft gerade bei einem ANDEREN Kunden im Einsatz ist (bei
+// diesem Kunden ist es kein Hinweis wert). Fehler sichtbar als einsaetze_error,
+// nie als leere Liste (Święta zasada 1).
+export function einsaetzeFelder(
+  dep: { CaregiverDeparturesWithPagination?: { has_more_pages: boolean; data: DepartureRow[] } | null } | Error,
+  customerId: number,
+): Record<string, unknown> {
+  if (dep instanceof Error) return { einsaetze_error: dep.message };
+  const page = dep.CaregiverDeparturesWithPagination;
+  if (!page) return { einsaetze_error: "CaregiverDeparturesWithPagination leer" };
+  // ponytail: 200 je Kraft (wie SA-Portal); darüber wäre die Zahl zu klein.
+  if (page.has_more_pages) return { einsaetze_error: "mehr als 200 Einsätze" };
+  return {
+    einsaetze: page.data.map(({ customer_id: _c, ...r }) => r),
+    on_other_job: page.data.some((r) => r.status === "on_job" && r.customer_id !== customerId),
+  };
+}
+
+const getCaregiver: ActionHandler = async (session, variables, deps) => {
   const id = (variables as { id?: unknown }).id;
   if (typeof id !== "number") throw new Error("id required");
   // GET_CAREGIVER fetches Caregiver(id) + the top-level CaregiverCertificates
   // (the relation 500s — see fetchCertificatesByCaregiver). Merge the cert
   // File objects onto Caregiver.certificates so the frontend mapper sees them
   // identically to the list path.
-  const r = await runGraphQL<{
-    Caregiver: Record<string, unknown> | null;
-    CaregiverCertificates?: Array<{ file?: CertFile | null }> | null;
-  }>(deps, GET_CAREGIVER, { id });
+  const [r, dep] = await Promise.all([
+    runGraphQL<{
+      Caregiver: Record<string, unknown> | null;
+      CaregiverCertificates?: Array<{ file?: CertFile | null }> | null;
+    }>(deps, GET_CAREGIVER, { id }),
+    runGraphQL<{ CaregiverDeparturesWithPagination?: { has_more_pages: boolean; data: DepartureRow[] } | null }>(
+      deps, CAREGIVER_DEPARTURES, { id },
+    ).catch((e: Error) => {
+      console.warn(`[einsaetze] cg=${id}: ${e.message}`);
+      return e;
+    }),
+  ]);
   if (r.Caregiver) {
     r.Caregiver.certificates = referenceFilesOnly(r.CaregiverCertificates ?? []);
+    Object.assign(r.Caregiver, einsaetzeFelder(dep, session.customer_id));
   }
   // Return only Caregiver — frontend reads data.Caregiver; the sibling
   // CaregiverCertificates is now merged in.
@@ -560,6 +611,13 @@ const inviteCaregiver: ActionHandler = async (session, variables, deps) => {
     throw new Error("supabase adapter required for invite rate limiting");
   }
 
+  // ── Schon eingeladen (Registry #128) ────────────────────────────────
+  // Einmal eingeladen = nie wieder für diesen Job, auch nach einer Absage.
+  if ((await deps.supabase.invitedCaregiverIds(session.lead_id, session.job_offer_id)).includes(id)) {
+    console.log(`[inviteCaregiver][already-invited] lead=${session.lead_id} cg=${id}`);
+    throw Object.assign(new Error("already-invited"), { alreadyInvited: true });
+  }
+
   // ── Rate-limit gate ──────────────────────────────────────────────────
   // Check BEFORE Mamamia call so 6th attempt is rejected without polluting
   // Mamamia (no orphan StoreRequest that we'd never count). Concurrency
@@ -766,12 +824,6 @@ const UPDATE_CUSTOMER_ALLOWED = new Set([
   // reads from customer_contract.location_id (NOT just Customer.location_id
   // top level). Patient form save propaguje resolved location_id na
   // customer_contract żeby panel renderował.
-  //
-  // Bug #16 (2026-05-12, prod Mamamia switch): pierwotnie pisaliśmy
-  // `patient_contracts: [...]` + `invoice_contract: {...}` (beta-only
-  // schema extension z N contracts per customer + contact_type discriminator).
-  // Prod ma legacy singular schema: `customer_contract` 1:1 z customer.
-  // Refactor na singular — universal, działa na obu środowiskach.
   "customer_contract",
 ]);
 
@@ -1291,6 +1343,7 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   searchLocations,
   getInviteRateState,
   listLeadJobs,
+  getCustomerKontakte,
   updateCustomer,
   updateJobDescription,
   updateJobOfferDates,

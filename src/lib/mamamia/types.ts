@@ -80,9 +80,9 @@ export interface MamamiaCaregiverWish {
 
 export interface MamamiaCustomerContract {
   id?: number;
-  // contact_type — beta-only field, prod nie zwraca (singular customer_contract
-  // jest 1:1 więc discriminator zbędny). Pole zostawione dla backward compat
-  // gdyby kod gdziekolwiek go odczytywał.
+  // contact_type — patient_contact (LE) | contract_contact (AG). GET_CUSTOMER liest
+  // es auch am Singular: der ist nach einer Annahme oft die AG-Zeile (Registry #131,
+  // mappers.ts patientenVertrag).
   contact_type?: string | null;
   salutation?: string | null;
   first_name?: string | null;
@@ -93,6 +93,22 @@ export interface MamamiaCustomerContract {
   zip_code?: string | null;
   city?: string | null;
   street_number?: string | null;
+}
+
+/** Registry #130: die drei Personen der letzten Annahme, wie die erste Annahme sie
+ *  nach Mamamia schreibt (_shared/acceptanceSync.ts) — Proxy-Aktion getCustomerKontakte. */
+export interface MamamiaKontaktperson {
+  id?: number;
+  salutation?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+}
+export interface MamamiaKontakte {
+  id?: number;
+  customer_contracts?: MamamiaCustomerContract[] | null;
+  customer_contacts?: MamamiaKontaktperson[] | null;
 }
 
 // Job-Offer-Teilmenge aus GET_CUSTOMER (Customer.job_offers). Für die
@@ -162,11 +178,9 @@ export interface MamamiaCustomer {
   /** Patients — full shape for prefill, not just { id }. */
   patients?: MamamiaPatient[];
   customer_caregiver_wish?: MamamiaCaregiverWish | null;
-  // Beta Mamamia ma plural `customer_contracts` (1:n contracts z contact_type
-  // discriminator) — prod Mamamia ma legacy singular `customer_contract`
-  // (1:1 z customer). Refactor 2026-05-12 (Bug #16) na singular — działa
-  // na obu środowiskach. Beta zwraca tu pierwszy contract z plural array,
-  // prod jedyny dostępny.
+  // Singular NIE jest pewnym wierszem pacjenta: przy ODCZYCIE Mamamia zwraca pierwszy
+  // wiersz wg id — po akcepcie bywa to contract_contact (Auftraggeber); przy ZAPISIE
+  // trafia w patient_contact (beta, 21.10.2026). Pewny odczyt: `customer_contracts` po contact_type.
   customer_contract?: MamamiaCustomerContract | null;
   /** Accommodation equipment — fetched by GET_CUSTOMER as `equipments { id equipment }`.
    *  id=1 = Own TV, id=2 = Own Bathroom. Used to prefill the `badezimmer` field. */
@@ -233,17 +247,20 @@ export interface MamamiaCaregiverFull extends MamamiaCaregiverRef {
   personalities?: Array<{ personality: string | null }>;
   mobilities?: Array<{ mobility: string | null }>;
   languagables?: Array<{ level: string | null; language: { name: string | null } | null }>;
-  hp_recent_assignments?: Array<{
+  /** Einsätze aus CaregiverDeparturesWithPagination (Proxy getCaregiver,
+   *  Registry #126). status accepted | on_job | finish. Ohne customer_id. */
+  einsaetze?: Array<{
     arrival_date: string | null;
     departure_date: string | null;
-    postal_code: string | null;
-    city: string | null;
+    duration_days: number | null;
     status: string | null;
-    /** Number of patients in this assignment (1 = single, 2 = couple care). */
-    patients_count?: number | null;
-    /** Patient's primary mobility level (1=Mobile…5=Bedridden), same scale as patient.mobility_id. */
-    patient_mobility_id?: number | null;
+    zip_code: string | null;
+    city: string | null;
   }>;
+  /** Gerade bei einem ANDEREN Kunden im Einsatz (status on_job). */
+  on_other_job?: boolean;
+  /** Departures-Abfrage gescheitert — Profil lebt, Liste nicht. */
+  einsaetze_error?: string;
 }
 
 export interface MamamiaApplication {

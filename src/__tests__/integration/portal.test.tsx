@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../../../test/mocks/server';
@@ -10,6 +10,7 @@ import {
   sampleMatching,
   TEST_LEAD_TOKEN,
   TEST_JOB_OFFER_ID,
+  TEST_CUSTOMER_ID,
   bridgeHandler,
   proxyHandler,
   sampleCustomer,
@@ -405,6 +406,37 @@ describe('Portal integration: golden paths', () => {
     mo.disconnect();
     expect(titel.some((t) => t.includes('Sie haben eine aktive Bewerbung'))).toBe(false);
     expect(screen.queryByRole('heading', { name: 'Angebot prüfen' })).toBeNull();
+  }, 15_000);
+
+  it('Registry #131: zweiter Einsatz, Link aus Mail B — Formular trägt die Personen der letzten Annahme, auch wenn sie später kommen', async () => {
+    const agZeile = { contact_type: 'contract_contact', first_name: 'Paul', last_name: 'Probe', street_number: 'Bahnhofstr. 9', zip_code: '80331', city: 'München' };
+    // Entwurf aus früheren Tests dieser Datei (gleiche Bewerbung 333) würde die Vorbelegung überdecken.
+    sessionStorage.removeItem('apm-entwurf-333');
+    server.use(
+      http.post('*/functions/v1/mamamia-proxy', async ({ request }) => {
+        const body = await request.clone().json() as { action: string };
+        if (body.action !== 'getCustomerKontakte') return undefined;
+        await delay(400);
+        return HttpResponse.json({ data: { Customer: { id: TEST_CUSTOMER_ID, customer_contracts: [
+          agZeile,
+          { contact_type: 'patient_contact', salutation: 'Mrs.', first_name: 'Erika', last_name: 'Probe', street_number: 'Lindenweg 3', zip_code: '94428', city: 'Eichendorf' },
+        ], customer_contacts: [] } } });
+      }),
+      ...defaultHandlers({ proxy: { getCustomer: () => ({ Customer: {
+        ...sampleCustomer,
+        // Singular = AG-Zeile, wie Mamamia ihn nach einer Annahme liefert
+        customer_contract: agZeile,
+        job_offers: [{ id: 6999, final_confirmation: { id: 1 } }, { id: TEST_JOB_OFFER_ID, final_confirmation: null }],
+      } }) } }),
+    );
+    setLocation(`?token=${TEST_LEAD_TOKEN}&view=application`);
+    render(<CustomerPortalPage />);
+    await screen.findByRole('heading', { name: 'Angebot prüfen' }, { timeout: 5000 });
+    await userEvent.click(screen.getByRole('button', { name: 'Weiter →' }));
+    const wert = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
+    expect(wert('apm-vorname')).toBe('Erika');
+    expect(wert('apm-strasse')).toBe('Lindenweg 3');
+    expect(wert('apm-agVorname')).toBe('Paul');
   }, 15_000);
 
   // ─── Startseiten-Punkte + Sprunglink goto=anfragen (Martin 26.09.) ───────
@@ -826,4 +858,28 @@ describe('Einstieg vor dem ersten Speichern wie Stand 75b8df8 (Rückbau Registry
     expect(screen.queryByRole('button', { name: 'Nein danke' })).toBeNull();
     expect(einladungen).toBe(0);
   }, 20_000);
+});
+
+describe('Portal integration: Clarity-Nutzer-ID', () => {
+  // Der Token ist der Kontozugang (kundenportal…/?token=…) und darf nicht an
+  // Clarity gehen. Verknüpfung Rechner↔Portal läuft über die Lead-ID.
+  afterEach(() => {
+    delete (window as { clarity?: unknown }).clarity;
+  });
+
+  it('taggt Clarity mit lead.id, nie mit dem Token', async () => {
+    const clarity = vi.fn();
+    (window as { clarity?: unknown }).clarity = clarity;
+    server.use(...defaultHandlers({}));
+
+    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    render(<CustomerPortalPage />);
+
+    await waitFor(() => expect(clarity).toHaveBeenCalledWith('set', 'userId', defaultLead.id), {
+      timeout: 5000,
+    });
+    for (const call of clarity.mock.calls) {
+      expect(call).not.toContain(TEST_LEAD_TOKEN);
+    }
+  }, 15_000);
 });

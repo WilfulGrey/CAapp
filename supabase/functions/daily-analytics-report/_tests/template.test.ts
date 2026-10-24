@@ -353,3 +353,78 @@ Deno.test("#82: Beleg zu EINER Bewerbung färbt die anderen Zeilen des Leads nic
   const t = offeneBuchungen([beleg(13074)], [zeile(13074, false), zeile(11198, false)], jetzt);
   assertEquals(t.map((x) => x.applicationId), [13074]);
 });
+
+/*
+ * Registry #129: Google-Upload-Check.
+ *
+ * Vom 02. bis 20.10.2026 lief der Upload nur als Probelauf — 200, kein Log,
+ * pg_cron „succeeded". Der Bericht prüft deshalb das Ergebnis: Wartet eine
+ * Conversion mit Klick-ID länger als UPLOAD_ALARM_STUNDEN, ist der Upload
+ * stehen geblieben. Dieselben zwei Zusagen wie beim Buchungs-Check:
+ * bei 0 steht eine Zeile da, und ein Lesefehler alarmiert.
+ */
+import { erstesJeLead, UPLOAD_ALARM_STUNDEN, wartendeUploads } from "../queries.ts";
+import { uploadZusammenfassung } from "../template.ts";
+
+const STUNDE = 3_600_000;
+const JETZT = Date.parse("2026-10-21T06:00:00Z");
+const vor = (h: number) => new Date(JETZT - h * STUNDE).toISOString();
+
+Deno.test("#129: wartendeUploads — nur mit Klick-ID, nicht erledigt, älter als die Grenze", () => {
+  const erste = new Map([
+    ["alt-google", vor(400)],
+    ["alt-ohne-klick", vor(400)],
+    ["alt-erledigt", vor(400)],
+    ["frisch-google", vor(29.7)], // Bericht 06:00 vor dem Upload 06:20 — erwartet, kein Alarm
+  ]);
+  const klick = new Set(["alt-google", "alt-erledigt", "frisch-google"]);
+  const erledigt = new Set(["alt-erledigt"]);
+  assertEquals(wartendeUploads(erste, klick, erledigt, JETZT), [400]);
+  assertEquals(UPLOAD_ALARM_STUNDEN, 32);
+});
+
+Deno.test("#129: erstesJeLead nimmt je Lead das erste Ereignis (Upload zählt das erste Speichern)", () => {
+  const m = erstesJeLead([
+    { leadId: "a", zeit: vor(50) },
+    { leadId: "a", zeit: vor(10) },
+    { leadId: "b", zeit: vor(5) },
+  ]);
+  assertEquals(m.get("a"), vor(50));
+  assertEquals(m.size, 2);
+});
+
+Deno.test("#129: wartende Profile ⇒ roter Block, Prüfhinweis, 🚨 im Betreff", () => {
+  const { html, subject, text } = bauen({
+    uploadHealth: { wartendeProfile: 7, wartendeBuchungen: 1, aeltesteStunden: 410, letzterUpload: "2026-10-01T06:20:07Z" },
+  });
+  assertStringIncludes(html, "Google-Upload steht: 7 Profile und 1 Buchung warten länger als 32 Stunden");
+  assertStringIncludes(html, "die älteste seit 410 Stunden");
+  assertStringIncludes(html, "Letzter Upload: 01.10., 08:20 Uhr.");
+  assertStringIncludes(html, "Probelauf");
+  assertStringIncludes(subject, "🚨");
+  assertStringIncludes(text, "🚨 Google-Upload steht");
+});
+
+Deno.test("#129: nichts wartet ⇒ graue Zeile mit letztem Upload, kein Alarm", () => {
+  const { html, subject } = bauen({
+    uploadHealth: { wartendeProfile: 0, wartendeBuchungen: 0, aeltesteStunden: 0, letzterUpload: "2026-10-20T12:12:00Z" },
+  });
+  assertStringIncludes(html, "Google-Upload: nichts wartet. Letzter Upload: 20.10., 14:12 Uhr.");
+  assertEquals(html.includes("Google-Upload steht"), false);
+  assertEquals(subject.includes("🚨"), false);
+});
+
+Deno.test("#129: Lesefehler ist sichtbar und alarmiert", () => {
+  const { html, subject } = bauen({
+    uploadHealth: { wartendeProfile: 0, wartendeBuchungen: 0, aeltesteStunden: 0, letzterUpload: null, error: "permission denied for table offline_conversion_uploads" },
+  });
+  assertStringIncludes(html, "Google-Upload-Check nicht lesbar: permission denied");
+  assertStringIncludes(subject, "🚨");
+});
+
+Deno.test("#129: Einzahl und „noch nie“ richtig formuliert", () => {
+  assertEquals(
+    uploadZusammenfassung({ wartendeProfile: 1, wartendeBuchungen: 0, aeltesteStunden: 40, letzterUpload: null }),
+    "Google-Upload steht: 1 Profil wartet länger als 32 Stunden, die älteste seit 40 Stunden. Letzter Upload: noch nie.",
+  );
+});

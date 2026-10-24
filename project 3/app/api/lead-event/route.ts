@@ -602,7 +602,7 @@ async function resolveLeadJobUuid(
 // (lib/erinnerungsplan.ts, Vorschau v2 26.09.2026): Ende − 52 h, − 24 h, − 8 h, nie
 // nachts, die letzte sicher vor der automatischen Absage. Jede Zeile trägt
 // `reserviert_bis`, damit die Mail den Countdown nennt, und `application_id`
-// (Registry #126), damit Versand und Planung DIESE Bewerbung von einer früheren
+// (Registry #136), damit Versand und Planung DIESE Bewerbung von einer früheren
 // derselben Pflegekraft unterscheiden. Abbruch beim Versand (Edge Function):
 // Reaktion auf die Bewerbung, beauftragt / nicht interessiert, Reservierung
 // abgelaufen (stopRegeln.ts).
@@ -621,7 +621,7 @@ async function scheduleReactionReminder(
   // Reichweite — der Griff danach traf die lokale Konstante unten und
   // damit sich selbst (ReferenceError zur Laufzeit, Build-Stopp).
   germanySkillRoh: unknown,
-  // Registry #126: mamamia application_id aus dem application_received-Ereignis.
+  // Registry #136: mamamia application_id aus dem application_received-Ereignis.
   applicationId: number | string | null = null,
 ): Promise<void> {
   // Pflegekraft-Snapshot für den Mail-Build beim Versand. Photo-URL ist
@@ -646,7 +646,7 @@ async function scheduleReactionReminder(
     // Multi-Job: which job this reminder belongs to (for future per-job
     // reminder handling; cancellation logic unchanged for now).
     mamamia_job_offer_id: jobOfferId,
-    // Registry #126: die Bewerbung, an die erinnert wird (nur application_received).
+    // Registry #136: die Bewerbung, an die erinnert wird (nur application_received).
     ...(triggerEvent === 'application_received' && applicationId != null ? { application_id: applicationId } : {}),
   };
 
@@ -659,7 +659,7 @@ async function scheduleReactionReminder(
     // (ohne application_id: des Paars, wie bisher).
     const ende = await reservierungsEndeFuer(supabaseAdmin, leadId, caregiverId, jobOfferId, applicationId);
     // Schon geplant (dieselbe Bewerbung kam erneut an)? Dann nichts doppelt einplanen. Offene
-    // Zeilen einer FRÜHEREN Bewerbung derselben Kraft zählen nicht (Registry #126) — die neue
+    // Zeilen einer FRÜHEREN Bewerbung derselben Kraft zählen nicht (Registry #136) — die neue
     // Bewerbung bekommt ihre eigenen Erinnerungen.
     const { data: offen } = await supabaseAdmin
       .from('scheduled_emails')
@@ -695,7 +695,7 @@ async function scheduleReactionReminder(
 }
 
 /** Ende der Reservierung einer Bewerbung: frühester echter (nicht `seeded`)
- *  application_received DIESER Bewerbung (Registry #126) + 72 h, abgerundet. Ohne
+ *  application_received DIESER Bewerbung (Registry #136) + 72 h, abgerundet. Ohne
  *  application_id wie bisher des Paars (Pflegekraft, Job); jobfreie Ereignisse zählen
  *  mit (Altbestand, ein Job). Ohne Treffer: ab jetzt. */
 async function reservierungsEndeFuer(
@@ -723,7 +723,7 @@ async function reservierungsEndeFuer(
 
 /** „Reservierung abgelaufen" nach der automatischen Absage (Vorschau v2, Mail 16). Der Name
  *  kommt aus dem letzten Eingang dieser Bewerbung — detect-caregiver-events schickt ihn nicht
- *  mit. Pro Bewerbung nur einmal (Registry #126: eine neue Bewerbung derselben Kraft auf
+ *  mit. Pro Bewerbung nur einmal (Registry #136: eine neue Bewerbung derselben Kraft auf
  *  demselben Job, die wieder abläuft, bekommt wieder eine Mail); ohne application_id wie
  *  bisher pro Lead, Pflegekraft und Job. Mehrere am selben Tag fasst die Edge Function beim
  *  Versand zu einer Mail zusammen. */
@@ -740,7 +740,7 @@ async function planeReservierungBeendet(
     .eq('lead_id', lead.id)
     .eq('email_type', 'reservierung_beendet')
     .filter('metadata->>caregiver_id', 'eq', cg);
-  // Zeilen ohne application_id stammen von vor #126, also von einer anderen (früheren)
+  // Zeilen ohne application_id stammen von vor #136, also von einer anderen (früheren)
   // Absage — detect sagt jede Bewerbung nur einmal ab.
   const doppelt = ((vorhanden ?? []) as { metadata?: Record<string, unknown> | null }[])
     .some((z) => app

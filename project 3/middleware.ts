@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { istSeiteMitLinkToken, LINK_TOKEN_COOKIE, LINK_TOKEN_MAX_AGE_S } from './lib/link-token';
 
 /* Kein Ersatzwert: das Repo ist öffentlich, ein Default-Passwort im Code wäre
    für jeden lesbar. Fehlt die Variable, ist das Panel zu (siehe istAngemeldet). */
@@ -63,6 +64,29 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  /* Mail-Links mit Zugangsschlüssel (Abmelden, Rückmeldung, Feedback): der
+     Schlüssel öffnet auch das Kundenportal, GTM meldet aber die volle Adresse
+     an Google Analytics und Clarity. Deshalb hier heraus damit — Cookie nur
+     für diese Seite, eine Stunde, dann dieselbe Adresse ohne `token`
+     (Registry #134). Die Seite liest ihn über lib/link-token.ts. */
+  if (istSeiteMitLinkToken(pathname)) {
+    const token = request.nextUrl.searchParams.get('token');
+    if (!token) return NextResponse.next();
+    const rest = new URLSearchParams(request.nextUrl.searchParams);
+    rest.delete('token');
+    const suche = rest.toString();
+    // Ziel wie bei /admin-login aus request.url gebaut (Next 13 verlangt in
+    // der Middleware eine absolute Location).
+    const antwort = NextResponse.redirect(new URL(`${pathname}${suche ? `?${suche}` : ''}`, request.url));
+    antwort.cookies.set(LINK_TOKEN_COOKIE, token, {
+      path: pathname,
+      maxAge: LINK_TOKEN_MAX_AGE_S,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+    return antwort;
+  }
+
   /* Startseite: kein Rewrite mehr. Ein altes `pm_variante`-Cookie wird
      gelöscht — sonst meldete variantenSeite() die Herkunft weiter als
      Variante B, obwohl alle dieselbe Seite sehen. */
@@ -81,5 +105,6 @@ export function middleware(request: NextRequest) {
 export const config = {
   // /_next/image wymaga JAWNEGO wpisu (Next domyślnie omija _next w matcherach).
   // '/' → löscht nur noch das alte Varianten-Cookie (Test beendet 13.09.2026).
-  matcher: ['/', '/admin/:path*', '/api/admin/:path*', '/_next/image'],
+  // '/abmelden', '/feedback', '/rueckmeldung' → Zugangsschlüssel aus der Adresse (Registry #134).
+  matcher: ['/', '/admin/:path*', '/api/admin/:path*', '/_next/image', '/abmelden', '/feedback', '/rueckmeldung'],
 };

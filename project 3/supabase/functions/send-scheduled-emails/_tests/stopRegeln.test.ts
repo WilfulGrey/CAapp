@@ -112,7 +112,7 @@ Deno.test("Stand nach 2 Tagen entfällt mit Bewerbung oder neuem Interesse", () 
   assertEquals(sucheStandStopp({ ...basis, beauftragt: true }), "betreuung_beauftragt");
 });
 
-// ── Registry #126: Reaktion je Bewerbung ──────────────────────────────────
+// ── Registry #136: Reaktion je Bewerbung ──────────────────────────────────
 
 // PROD-Verlauf Kundin 52dc3e9d, Pflegekraft 15184 (Job 38118), wörtlich aus lead_events:
 // Absage aus dem Portal mit application_id als TEXT und ohne Job, Eingänge mit Zahl und Job.

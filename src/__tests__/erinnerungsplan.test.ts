@@ -113,7 +113,7 @@ describe('erinnerungsplan', () => {
   });
 });
 
-// Registry #126: neue Bewerbung derselben Pflegekraft nach einer Absage (PROD 52dc3e9d, cg 15184).
+// Registry #136: neue Bewerbung derselben Pflegekraft nach einer Absage (PROD 52dc3e9d, cg 15184).
 describe('je Bewerbung statt je Pflegekraft', () => {
   const eingaenge = [
     { created_at: '2026-10-14T14:17:00.779Z', metadata: { caregiver_id: 15184, application_id: 14728, mamamia_job_offer_id: 38118 } },
@@ -138,7 +138,7 @@ describe('je Bewerbung statt je Pflegekraft', () => {
   });
 
   it('offene Zeilen der alten Bewerbung halten die Planung der neuen nicht auf', () => {
-    const alteZeilen = [{ metadata: { caregiver_id: 15184 } }, { metadata: { caregiver_id: 15184 } }]; // vor #126, ohne application_id
+    const alteZeilen = [{ metadata: { caregiver_id: 15184 } }, { metadata: { caregiver_id: 15184 } }]; // vor #136, ohne application_id
     expect(erinnerungenSchonOffen(alteZeilen, 14746)).toBe(false);
     expect(erinnerungenSchonOffen([{ metadata: { caregiver_id: 15184, application_id: 14728 } }], 14746)).toBe(false);
     // dieselbe Bewerbung kam erneut an: nichts doppelt einplanen (Zahl und Text gleich)

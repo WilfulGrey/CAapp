@@ -110,7 +110,7 @@ export interface AppStatusEventRow {
   // the customer → auto-reject must NOT use them as the "informed" anchor
   // (guard 1). Derived from metadata.seeded. Optional (defaults to not-seeded).
   seeded?: boolean;
-  // Registry #126: mamamia application_id aus metadata (Zahl oder Text). Anker und
+  // Registry #136: mamamia application_id aus metadata (Zahl oder Text). Anker und
   // Reaktion gelten je Bewerbung; null = Ereignis von vor Registry #35 bzw. Annahme
   // des Annahme-Detektors (trägt nur den Job). Optional, damit Fixtures sie weglassen.
   application_id?: number | null;
@@ -1361,7 +1361,7 @@ async function detectForJob(
 //      hat (application_accepted_internal ODER application_rejected).
 //   3. Erst ab Alter ≥ AUTO_REJECT_AFTER_HOURS.
 //
-// Je Bewerbung (Registry #126, 16.10.2026): Anker = frühester echter Eingang mit
+// Je Bewerbung (Registry #136, 16.10.2026): Anker = frühester echter Eingang mit
 // DERSELBEN application_id; Reaktion = gleiche application_id, oder vom Paar
 // (Job, Pflegekraft) und NACH diesem Eingang (Annahmen des Annahme-Detektors
 // tragen nur den Job). Vorher galt beides je Paar: eine nach einer Absage neu
@@ -1401,7 +1401,7 @@ const NOTIFY_CAP_PER_JOB_RUN = 3;
 // jede neue Bewerbung stempelt ihre id ins Event, damit läuft Fall (b) aus.
 const PRE_SWITCH_MAX_APP_ID = 11652;
 
-// Übergang für Registry #126 (Anker und Reaktion je Bewerbung): Die neue Regel gilt
+// Übergang für Registry #136 (Anker und Reaktion je Bewerbung): Die neue Regel gilt
 // für Bewerbungen mit eigenem Eingang ab diesem Zeitpunkt (Tag der Änderung − 72 h,
 // also jede Reservierung, die beim Umstellen noch lief). Ältere behalten die Regel je
 // Paar — sonst sagte der erste Lauf nach dem Deploy auf einen Schlag Bewerbungen aus
@@ -1440,13 +1440,13 @@ async function autoRejectStaleApplications(
   if (lead.vermittler) return 0;
   const live = autoRejectIsLive();
 
-  // Age anchors + reactions (Registry #126: per application, legacy per pair).
+  // Age anchors + reactions (Registry #136: per application, legacy per pair).
   // Legacy NULL-job events map onto the lead's default job. SEEDED
   // application_received events (silent first-scan, never mailed) are NOT
   // anchors — guard 1: never auto-reject what the customer was never told about.
   const receivedAtApp = new Map<number, number>(); // application_id → ms
   const receivedAtPairLegacy = new Map<string, number>(); // `${job}:${cg}` → ms (Eingänge ohne application_id)
-  const receivedAtPair = new Map<string, number>(); // `${job}:${cg}` → ms (alle echten Eingänge, Regel vor #126)
+  const receivedAtPair = new Map<string, number>(); // `${job}:${cg}` → ms (alle echten Eingänge, Regel vor #136)
   const reactionsAt = new Map<string, number[]>(); // `${job}:${cg}` → Zeitpunkte der Reaktionen
   const reactedAppIds = new Set<number>();
   const fruehester = <K,>(m: Map<K, number>, key: K, ms: number) => {

@@ -8,6 +8,14 @@
          Verankerung: X-Robots-Tag-Header in render.yaml. -->
     <meta name="robots" content="noindex, nofollow" />
     <title>Primundus · Kundenportal</title>
+    <!-- Zugangsschlüssel aus der Adresse nehmen, BEVOR GTM die Seite an Google
+         Analytics und Clarity meldet (Registry #134). Muss vor dem GTM-Snippet
+         stehen. Das Portal liest ihn über src/lib/portalToken.ts. Verweigert
+         der Browser den Speicher, bleibt die Adresse wie bisher. -->
+    <script>(function(){try{var u=new URL(window.location.href);var t=u.searchParams.get('token');
+    if(!t)return;window.__pmPortalToken=t;window.localStorage.setItem('pm_portal_token',t);
+    u.searchParams.delete('token');window.history.replaceState(window.history.state,'',u.pathname+u.search+u.hash);
+    }catch(e){}})();</script>
     <!-- Google Tag Manager — same container as kostenrechner (GTM-59V6N7RC). -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],

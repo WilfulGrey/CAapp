@@ -1023,10 +1023,10 @@ async function notifyOpsOfFailures(
 // invite/decline für Interesse, accept/reject für Bewerbung). Wenn ja →
 // Reminder cancelt sich selbst. Wenn nein → Mail raus.
 //
-// Bewerbungen (Registry #126): je Bewerbung, nicht je Pflegekraft — eine Absage
+// Bewerbungen (Registry #136): je Bewerbung, nicht je Pflegekraft — eine Absage
 // der alten Bewerbung gilt nicht für eine neue derselben Kraft. Regel in
 // stopRegeln.ts:reaktionAufBewerbung; Zeilen ohne `application_id` (geplant vor
-// #126) behalten die alte Regel je Pflegekraft.
+// #136) behalten die alte Regel je Pflegekraft.
 
 async function hasReactionForCaregiver(
   supabase: any,
@@ -1219,7 +1219,7 @@ async function bewerbungsLage(
       return jobId == null || job == null || Number(job) === Number(jobId);
     })
     .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
-  // Registry #126: Kennt die Zeile ihre Bewerbung, zählen nur deren Eingang und deren Mails —
+  // Registry #136: Kennt die Zeile ihre Bewerbung, zählen nur deren Eingang und deren Mails —
   // sonst gälte die „letzte“ Erinnerung einer alten Bewerbung derselben Kraft als `doppelt`.
   const app = applicationId == null ? "" : String(applicationId);
   const eigene = app ? zumPaar.filter((e) => String(e.metadata?.application_id ?? "") === app) : [];
@@ -1281,8 +1281,8 @@ interface ReminderMeta {
   caregiver_about_text?: string | null;
   // Registry #125: Zähler der Fehlversuche der mamamia-Nachfrage vor dem Versand.
   stand_fehlschlaege?: number;
-  // Registry #126: die Bewerbung, an die die Zeile erinnert (mamamia application_id). Fehlt bei
-  // Zeilen, die vor #126 geplant wurden — dann gelten die Regeln je Pflegekraft wie bisher.
+  // Registry #136: die Bewerbung, an die die Zeile erinnert (mamamia application_id). Fehlt bei
+  // Zeilen, die vor #136 geplant wurden — dann gelten die Regeln je Pflegekraft wie bisher.
   application_id?: number | string | null;
   // Multi-Job (Bug #25): Job, zu dem dieser Reminder gehört. Reminder eines
   // AKTUELL geplanten Jobs überleben den lead-weiten "beauftragt"-Cancel
@@ -2559,7 +2559,7 @@ Deno.serve(async (req: Request) => {
               : "application_reminder";
 
           // Hat der Kunde reagiert (invite/decline bzw. accept/reject)? Bei Bewerbungen je
-          // Bewerbung (Registry #126), sofern die Zeile ihre application_id kennt.
+          // Bewerbung (Registry #136), sofern die Zeile ihre application_id kennt.
           const reacted = await hasReactionForCaregiver(
             supabase,
             scheduledEmail.lead_id,

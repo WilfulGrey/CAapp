@@ -17,7 +17,7 @@
 // Jobs (eine erneut eingestellte Bewerbung derselben Kraft zählt — die Erinnerung meint sie
 // weiter). „weg“ = keine Bewerbung dieser Kraft mehr ⇒ Erinnerung abbrechen, Grund
 // `application_no_longer_active` wie beim Sweep.
-// Seit Registry #126 tragen neue Zeilen ihre `application_id`, und eine neue Bewerbung derselben
+// Seit Registry #136 tragen neue Zeilen ihre `application_id`, und eine neue Bewerbung derselben
 // Kraft bekommt eigene Erinnerungen. Für solche Zeilen zählt deshalb nur DIESE Bewerbung — sonst
 // liefen die Erinnerungen der alten (mit ihrem alten Countdown) neben denen der neuen weiter.
 // Zeilen ohne `application_id` behalten die Regel je Pflegekraft. Fehler (Timeout, HTTP, GraphQL) werfen —
@@ -42,8 +42,8 @@ export interface BewerbungZeile {
   caregiver_id?: number | string | null;
 }
 
-/** Pure: steht die Bewerbung noch in der Liste? Mit `applicationId` genau diese (Registry #126),
- *  ohne irgendeine Bewerbung der Pflegekraft (Zeilen von vor #126). */
+/** Pure: steht die Bewerbung noch in der Liste? Mit `applicationId` genau diese (Registry #136),
+ *  ohne irgendeine Bewerbung der Pflegekraft (Zeilen von vor #136). */
 export function standAus(
   zeilen: BewerbungZeile[], caregiverId: number | string, applicationId: number | string | null = null,
 ): BewerbungStand {

@@ -720,6 +720,129 @@ export async function fetchBuchungHealth(supabase: SupabaseClient): Promise<Buch
   return { offen: rows.length, rows };
 }
 
+// ─── Google-Upload-Check (Registry #129) ────────────────────────────────────
+// Vom 02. bis 20.10.2026 rief der Cron `upload-offline-conversions` die Funktion
+// nur als Probelauf auf ({"dryRun": true}, von Hand in der Datenbank gesetzt).
+// Die Funktion antwortete 200 und loggte nichts, pg_cron meldete „succeeded":
+// 18 Tage lang sah Google kein Profil und keine Buchung, und niemand merkte es.
+//
+// Geprüft wird deshalb das ERGEBNIS, nicht eine Einstellung: Wartet ein Profil
+// oder eine Buchung mit Klick-ID länger als UPLOAD_ALARM_STUNDEN, steht der
+// Upload — egal ob Probelauf, Cron aus, Google-Zugang tot oder Funktion kaputt.
+// Die Auswahl spiegelt `upload-offline-conversions/index.ts`: erstes
+// patient_data_saved bzw. erste Annahme je Lead in 90 Tagen, Lead mit
+// gclid/wbraid/gbraid, noch ohne Zeile in der Statustabelle. Ändert sich die
+// Auswahl dort, gehört sie hier mit.
+//
+// 32 h: Der Upload läuft täglich 06:20 UTC und nimmt nur, was mindestens 6 h alt
+// ist. Ein Profil von 00:21 UTC geht erst am Folgetag raus; der Bericht um
+// 06:00 UTC sieht es dann mit knapp 30 h. Was älter ist, ist liegen geblieben.
+export const UPLOAD_ALARM_STUNDEN = 32;
+const UPLOAD_FENSTER_TAGE = 90;
+
+export interface UploadHealth {
+  wartendeProfile: number;
+  wartendeBuchungen: number;
+  /** Alter der ältesten wartenden Conversion in Stunden, 0 wenn keine wartet. */
+  aeltesteStunden: number;
+  /** Jüngster erfolgreicher Upload (Profil oder Buchung), null = noch nie. */
+  letzterUpload: string | null;
+  error?: string;
+}
+
+/** Erstes Ereignis je Lead (Zeilen aufsteigend nach Zeit sortiert übergeben). */
+export function erstesJeLead(zeilen: Array<{ leadId: string; zeit: string }>): Map<string, string> {
+  const erste = new Map<string, string>();
+  for (const z of zeilen) if (!erste.has(z.leadId)) erste.set(z.leadId, z.zeit);
+  return erste;
+}
+
+/** Alter (Stunden) aller Conversions, die mit Klick-ID zu lange auf den Upload warten. */
+export function wartendeUploads(
+  ersteJeLead: Map<string, string>,
+  mitKlickId: Set<string>,
+  erledigt: Set<string>,
+  jetzt: number,
+  grenzeStunden = UPLOAD_ALARM_STUNDEN,
+): number[] {
+  const alter: number[] = [];
+  for (const [leadId, zeit] of ersteJeLead) {
+    if (erledigt.has(leadId) || !mitKlickId.has(leadId)) continue;
+    const stunden = (jetzt - Date.parse(zeit)) / 3_600_000;
+    if (Number.isFinite(stunden) && stunden > grenzeStunden) alter.push(Math.floor(stunden));
+  }
+  return alter;
+}
+
+type Seite = { data: unknown[] | null; error: { message: string } | null };
+
+/** PostgREST liefert je Antwort höchstens 1.000 Zeilen — darum seitenweise. */
+async function seitenweise(abfrage: (von: number, bis: number) => PromiseLike<Seite>): Promise<Record<string, unknown>[]> {
+  const SEITE = 1000;
+  const alle: Record<string, unknown>[] = [];
+  for (let von = 0; ; von += SEITE) {
+    const { data, error } = await abfrage(von, von + SEITE - 1);
+    if (error) throw new Error(error.message);
+    const teil = (data ?? []) as Record<string, unknown>[];
+    alle.push(...teil);
+    if (teil.length < SEITE) return alle;
+  }
+}
+
+export async function fetchUploadHealth(supabase: SupabaseClient): Promise<UploadHealth> {
+  try {
+    const seit = new Date(Date.now() - UPLOAD_FENSTER_TAGE * 86_400_000).toISOString();
+    const [profile, buchungen, upProfile, upBuchungen] = await Promise.all([
+      seitenweise((von, bis) =>
+        supabase.from("lead_events").select("lead_id, created_at")
+          .eq("event_type", "patient_data_saved").gte("created_at", seit)
+          .order("created_at", { ascending: true }).range(von, bis)),
+      seitenweise((von, bis) =>
+        supabase.from("lead_application_acceptances").select("lead_id, accepted_at")
+          .gte("accepted_at", seit).order("accepted_at", { ascending: true }).range(von, bis)),
+      seitenweise((von, bis) => supabase.from("offline_conversion_uploads").select("lead_id, status, uploaded_at").range(von, bis)),
+      seitenweise((von, bis) => supabase.from("offline_booking_uploads").select("lead_id, status, uploaded_at").range(von, bis)),
+    ]);
+
+    const erstesProfil = erstesJeLead(profile.map((r) => ({ leadId: String(r.lead_id), zeit: String(r.created_at) })));
+    const ersteBuchung = erstesJeLead(buchungen.map((r) => ({ leadId: String(r.lead_id), zeit: String(r.accepted_at) })));
+    // Wie die Upload-Funktion: jede Zeile (hochgeladen ODER dauerhaft gescheitert) gilt als erledigt.
+    const profilErledigt = new Set(upProfile.map((r) => String(r.lead_id)));
+    const buchungErledigt = new Set(upBuchungen.map((r) => String(r.lead_id)));
+
+    // Klick-IDs nur für die offenen Kandidaten lesen.
+    const offen = [...new Set([
+      ...[...erstesProfil.keys()].filter((id) => !profilErledigt.has(id)),
+      ...[...ersteBuchung.keys()].filter((id) => !buchungErledigt.has(id)),
+    ])];
+    const mitKlickId = new Set<string>();
+    for (let i = 0; i < offen.length; i += 100) {
+      const { data, error } = await supabase.from("leads").select("id, gclid, wbraid, gbraid").in("id", offen.slice(i, i + 100));
+      if (error) throw new Error(error.message);
+      for (const l of (data ?? []) as Array<Record<string, unknown>>) {
+        if (l.gclid || l.wbraid || l.gbraid) mitKlickId.add(String(l.id));
+      }
+    }
+
+    const jetzt = Date.now();
+    const profilAlter = wartendeUploads(erstesProfil, mitKlickId, profilErledigt, jetzt);
+    const buchungAlter = wartendeUploads(ersteBuchung, mitKlickId, buchungErledigt, jetzt);
+    const hochgeladen = [...upProfile, ...upBuchungen]
+      .filter((r) => r.status === "uploaded" && r.uploaded_at)
+      .map((r) => String(r.uploaded_at))
+      .sort();
+    return {
+      wartendeProfile: profilAlter.length,
+      wartendeBuchungen: buchungAlter.length,
+      aeltesteStunden: Math.max(0, ...profilAlter, ...buchungAlter),
+      letzterUpload: hochgeladen.at(-1) ?? null,
+    };
+  } catch (e) {
+    // Sichtbar (Muster fetchBuchungHealth) — ein kaputtes Query darf nicht wie „nichts wartet" aussehen.
+    return { wartendeProfile: 0, wartendeBuchungen: 0, aeltesteStunden: 0, letzterUpload: null, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 // ─── Google-Ads-Kosten (SEA, 16.08.) ───────────────────────────────────────
 // Spend gestern + Perioden-Summe fürs Kosten-je-Stück im Report. Fail-soft:
 // jeder Fehler (fehlende Vault-Secrets auf Staging, API-Ausfall) → null,

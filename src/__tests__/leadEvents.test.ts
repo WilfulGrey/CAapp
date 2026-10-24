@@ -191,6 +191,42 @@ describe('Messpunkte (Registry #123)', () => {
     }
   });
 
+  it('formular_sichtbar: einmal je Sitzung', () => {
+    reportLeadEvent('tok-m', 'formular_sichtbar', { schritt: 0, vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'formular_sichtbar', { schritt: 2, vor_speichern: true }, false);
+    expect(calls()).toHaveLength(1);
+    expect(bodyOf(0)).toEqual({
+      token: 'tok-m', event: 'formular_sichtbar', metadata: { schritt: 0, vor_speichern: true }, notify: false,
+    });
+  });
+
+  it('feld_beruehrt: je Feld einmal (Antippen und Fokus desselben Felds zählen einfach)', () => {
+    reportLeadEvent('tok-m', 'feld_beruehrt', { schritt: 0, feld: 'geschlecht', vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'feld_beruehrt', { schritt: 0, feld: 'geschlecht', vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'feld_beruehrt', { schritt: 2, feld: 'plz', vor_speichern: true }, false);
+    expect(calls()).toHaveLength(2);
+    expect(bodyOf(1).metadata).toEqual({ schritt: 2, feld: 'plz', vor_speichern: true });
+  });
+
+  it('weiter_blockiert: je Schritt und Satz offener Felder einmal', () => {
+    reportLeadEvent('tok-m', 'weiter_blockiert', { schritt: 2, offen: ['plz', 'startDate'], vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'weiter_blockiert', { schritt: 2, offen: ['plz', 'startDate'], vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'weiter_blockiert', { schritt: 2, offen: ['startDate'], vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'weiter_blockiert', { schritt: 0, offen: ['startDate'], vor_speichern: true }, false);
+    expect(calls()).toHaveLength(3);
+    expect([0, 1, 2].map((i) => [bodyOf(i).metadata.schritt, bodyOf(i).metadata.offen])).toEqual([
+      [2, ['plz', 'startDate']], [2, ['startDate']], [0, ['startDate']],
+    ]);
+  });
+
+  it('zur_pflegesituation: je Quelle einmal', () => {
+    reportLeadEvent('tok-m', 'zur_pflegesituation', { quelle: 'kasten', vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'zur_pflegesituation', { quelle: 'kasten', vor_speichern: true }, false);
+    reportLeadEvent('tok-m', 'zur_pflegesituation', { quelle: 'warum', vor_speichern: true }, false);
+    expect(calls()).toHaveLength(2);
+    expect([0, 1].map((i) => bodyOf(i).metadata.quelle)).toEqual(['kasten', 'warum']);
+  });
+
   it('Vorschau-Token sendet nichts', () => {
     reportLeadEvent('preview-token', 'profil_geoeffnet', { caregiver_id: 1, quelle: 'karte', vor_speichern: true }, false);
     reportLeadEvent('preview-token', 'kalender_geoeffnet', undefined, false);

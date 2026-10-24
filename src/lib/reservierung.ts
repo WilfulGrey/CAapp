@@ -4,7 +4,7 @@
 // Kunde hat auf DIESE Bewerbung schon reagiert, und nie auf Grund still erfasster (`seeded`)
 // Ereignisse.
 //
-// Je Bewerbung (Registry #126, 16.10.2026): Anker ist der Eingang mit derselben `application_id`;
+// Je Bewerbung (Registry #136, 16.10.2026): Anker ist der Eingang mit derselben `application_id`;
 // eine Reaktion zählt, wenn sie dieselbe `application_id` trägt oder zum Paar (Job, Pflegekraft)
 // gehört und NACH diesem Eingang liegt. Vorher galt alles je Paar: eine neu eingestellte
 // Bewerbung derselben Kraft erbte den Eingang der alten (Frist zu früh) und deren Absage (keine
@@ -19,7 +19,7 @@ import type { FetchedLeadEvent } from './leadEvents';
 /** Muss zu AUTO_REJECT_AFTER_HOURS in supabase/functions/detect-caregiver-events passen. */
 export const RESERVIERUNG_STUNDEN = 72;
 
-/** Übergang Registry #126, muss zu JE_BEWERBUNG_AB in detect-caregiver-events passen: Bewerbungen
+/** Übergang Registry #136, muss zu JE_BEWERBUNG_AB in detect-caregiver-events passen: Bewerbungen
  *  mit eigenem Eingang davor rechnen wie der Server weiter je Paar. */
 export const JE_BEWERBUNG_AB = '2026-10-13T00:00:00Z';
 
@@ -37,7 +37,7 @@ export function reserviertBis(
     jobOfferId: number | undefined | null;
     /** `leads.mamamia_job_offer_id`: Ereignisse ohne Job gehören wie im Server zu ihm. */
     standardJobId?: number | null;
-    /** mamamia application_id der Bewerbung (Registry #126). Ohne: Regel je Paar wie bisher. */
+    /** mamamia application_id der Bewerbung (Registry #136). Ohne: Regel je Paar wie bisher. */
     applicationId?: number | string | null;
   },
   jetzt: number = Date.now(),

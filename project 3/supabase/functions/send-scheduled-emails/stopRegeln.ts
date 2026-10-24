@@ -157,7 +157,7 @@ export function sucheStandStopp(o: {
   return null;
 }
 
-// ── Reaktion je Bewerbung (Registry #126) ─────────────────────────────────
+// ── Reaktion je Bewerbung (Registry #136) ─────────────────────────────────
 //
 // Bis 16.10.2026 hieß „der Kunde hat reagiert": irgendein Zu- oder Absage-Ereignis zu dieser
 // PFLEGEKRAFT. Bewirbt sich dieselbe Kraft nach einer Absage neu (neue `application_id`,

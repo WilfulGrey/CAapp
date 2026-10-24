@@ -14,7 +14,8 @@ const Fill: FC<{ children: ReactNode }> = ({ children }) => <>{children}</>;
 
 export interface VertragsDaten {
   datum: string;
-  ag: { name: string; strasse: string; plz: string; ort: string; email: string; telefon: string };
+  // anrede/vorname/nachname: nur für den Sync nach Mamamia (Registry #131), der Vertrag zeigt `name`.
+  ag: { name: string; strasse: string; plz: string; ort: string; email: string; telefon: string; anrede?: string; vorname?: string; nachname?: string };
   le: { name: string; strasse: string; plz: string; ort: string } | null; // null = identisch mit AG
   vertragsbeginn: string;   // Anreisedatum
   voraussAbreise: string;   // geplante Rotations-Abreise (informativ)

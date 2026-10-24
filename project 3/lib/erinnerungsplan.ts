@@ -29,7 +29,7 @@ export function reservierungsEnde(eingaengeMs: number[]): Date | null {
   return new Date(Math.floor((Math.min(...gueltig) + RESERVIERUNG_STUNDEN * STUNDE) / STUNDE) * STUNDE);
 }
 
-// ── Je Bewerbung statt je Pflegekraft (Registry #126, 16.10.2026) ──────────
+// ── Je Bewerbung statt je Pflegekraft (Registry #136, 16.10.2026) ──────────
 // Bewirbt sich dieselbe Pflegekraft nach einer Absage neu (neue application_id), sah die Planung
 // die noch offenen Zeilen der ALTEN Bewerbung als „schon geplant“ und plante nichts, und das Ende
 // der Reservierung kam aus dem Eingang der alten Bewerbung (Kundin 52dc3e9d, App 14746).
@@ -61,7 +61,7 @@ export function eingaengeDerBewerbung(
 }
 
 /** Sind für diese Bewerbung schon Erinnerungen offen? Mit `applicationId` zählen nur offene
- *  Zeilen genau dieser Bewerbung — Zeilen ohne application_id stammen von vor #126 und damit von
+ *  Zeilen genau dieser Bewerbung — Zeilen ohne application_id stammen von vor #136 und damit von
  *  einer früheren Bewerbung (detect meldet jeden Eingang nur einmal je application_id). Ohne
  *  `applicationId` wie bisher jede offene Zeile der Pflegekraft. */
 export function erinnerungenSchonOffen(

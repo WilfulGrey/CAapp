@@ -158,6 +158,7 @@ export type ProxyAction =
   | 'searchLocations'
   | 'getInviteRateState'
   | 'listLeadJobs'
+  | 'getCustomerKontakte'
   // writes
   | 'updateCustomer'
   | 'updateJobDescription'

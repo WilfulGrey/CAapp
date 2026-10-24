@@ -1,7 +1,9 @@
 // React hooks for mamamia-proxy actions.
 // Generic `useMamamiaQuery` — explicit per-action hooks below.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import type { Nurse } from '../../types';
+import { mapCaregiverToNurse } from './mappers';
 import {
   callMamamia,
   type ProxyAction,
@@ -9,6 +11,7 @@ import {
 } from './client';
 import type {
   MamamiaCustomer,
+  MamamiaKontakte,
   MamamiaJobOffer,
   MamamiaApplication,
   MamamiaMatching,
@@ -96,7 +99,19 @@ export function useCustomer(enabled = true) {
     {},
     enabled,
   );
-  return { ...state, data: state.data?.Customer ?? null };
+  // fertig: Antwort oder Fehler da (auch `Customer: null`) — Registry #131.
+  return { ...state, data: state.data?.Customer ?? null, fertig: state.data !== null || state.error !== null };
+}
+
+/** Registry #130: Personen der letzten Annahme für die Vorbelegung des
+ *  Vertragsformulars. Fehler sind egal — dann bleibt die bisherige Vorbelegung. */
+export function useCustomerKontakte(enabled = true) {
+  const state = useMamamiaQuery<{ Customer: MamamiaKontakte | null }>(
+    'getCustomerKontakte',
+    {},
+    enabled,
+  );
+  return { ...state, data: state.data?.Customer ?? null, fertig: state.data !== null || state.error !== null };
 }
 
 export function useApplications(opts: { limit?: number; page?: number } = {}, enabled = true) {
@@ -320,3 +335,26 @@ export function useInviteRateState(enabled = true) {
 }
 
 export { MamamiaError };
+
+// Karten (Registry #127): Einsätze aus dem SCHON geladenen vollen Profil
+// (CaregiverDeparturesWithPagination, Registry #126) — dieselbe Zahl wie im
+// Profil-Fenster. Kein eigener Abruf: es zählt nur, was prefetchCaregivers
+// oder das Profil-Fenster in den Cache gelegt hat; sonst bleibt die Zahl der
+// Liste (hp_total_jobs). Fehler der Departures-Abfrage ⇒ ebenfalls die Liste.
+export function useEinsatzStand(nurse: Nurse): Nurse {
+  const id = nurse.caregiverId;
+  const sub = useCallback(
+    (cb: () => void) => (id == null ? () => {} : subscribeCaregiver(id, cb)),
+    [id],
+  );
+  const voll = useSyncExternalStore(sub, () => (id == null ? undefined : getCached(id)));
+  return useMemo(() => {
+    if (!voll?.einsaetze) return nurse;
+    const jetzt = new Date();
+    const { history, onOtherJob } = mapCaregiverToNurse(voll, {
+      nowIso: jetzt.toISOString(),
+      nowYear: jetzt.getFullYear(),
+    });
+    return { ...nurse, history, onOtherJob };
+  }, [nurse, voll]);
+}
