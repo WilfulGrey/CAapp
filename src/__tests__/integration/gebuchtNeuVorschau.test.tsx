@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
-// Gebucht-Seite neu (PROTOTYP 15.10.2026): Die neue Seite erscheint NUR in ?preview=gebucht. Die Adresse wird beim Laden
-// des Moduls gelesen, darum steht sie VOR dem Import (vi.hoisted). Fantasie-Nummer statt der echten Notfallnummer.
+// Gebucht-Seite neu, Vorschau ?preview=gebucht (echte Kunden: gebuchtEcht.test.tsx). Die Adresse wird beim Laden des
+// Moduls gelesen, darum steht sie VOR dem Import (vi.hoisted). Fantasie-Nummer statt der echten Notfallnummer; die RPC
+// notfall_telefon darf in der Vorschau nie laufen (Registry #139).
 import { beforeAll, describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -8,6 +9,11 @@ import { server } from '../../../test/mocks/server';
 import { http, HttpResponse } from 'msw';
 
 vi.hoisted(() => { window.history.replaceState({}, '', '/?preview=gebucht&zustand=im-einsatz&notfall=%2B48%20123%20456%20789'); });
+const { notfallRpc } = vi.hoisted(() => ({ notfallRpc: vi.fn(async () => '+48 999 999 999') }));
+vi.mock('../../lib/supabase', async () => ({
+  ...(await vi.importActual<typeof import('../../lib/supabase')>('../../lib/supabase')),
+  fetchNotfallTelefon: notfallRpc,
+}));
 
 import CustomerPortalPage from '../../pages/CustomerPortalPage';
 
@@ -47,9 +53,10 @@ describe('?preview=gebucht zeigt die neue Gebucht-Seite', () => {
     const blatt = await screen.findByText('Ihre Beraterin');
     const huelle = blatt.closest('.pointer-events-auto') as HTMLElement;
     const anruf = within(huelle).getByRole('link', { name: 'Primundus-Notfallnummer anrufen: +48 123 456 789' });
-    // Notfallfeld unter der Kopfzeile mit dem X (das X bleibt oben).
-    expect(blatt.compareDocumentPosition(anruf) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Notfallfeld unter der Kopfzeile mit dem X (das X bleibt oben), VOR „Ihre Beraterin" (Martin 24.10.: Notfall zuerst).
+    expect(anruf.compareDocumentPosition(blatt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(huelle).getByText('täglich 8–20 Uhr')).toBeTruthy();
     expect(within(huelle).getByText('Bekannt aus')).toBeTruthy();
+    expect(notfallRpc).not.toHaveBeenCalled();
   }, 20_000);
 });

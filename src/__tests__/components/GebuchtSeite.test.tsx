@@ -538,21 +538,33 @@ describe('nur Belegtes', () => {
 
 describe('Quelltext-Wächter', () => {
   const seite = readFileSync('src/pages/CustomerPortalPage.tsx', 'utf8');
-  it('neue Seite nur im Vorschau-Zweig ?preview=gebucht; echte Kunden behalten BookedScreen', () => {
+  it('Vorschau-Daten nur im Vorschau-Zweig; echte Kunden über gebuchtDatenAusPortal, Rückweg BookedScreen (Registry #139)', () => {
     expect(seite).toMatch(/const GEBUCHT_NEU_VORSCHAU = VORSCHAU_SUCHE !== null && !vorschauAlteSeite\(VORSCHAU_SUCHE\);/);
     expect(seite).toMatch(/const VORSCHAU_SUCHE = IS_PREVIEW_GEBUCHT && typeof window !== 'undefined' \? window\.location\.search : null;/);
     expect(seite.match(/gebuchtVorschau\(/g) ?? []).toHaveLength(1);
     expect(seite).toMatch(/const gebuchtNeu = GEBUCHT_NEU_VORSCHAU && acceptedApp && VORSCHAU_SUCHE !== null\s*\?\s*gebuchtVorschau\(/);
-    expect(seite.match(/<GebuchtSeite\b/g) ?? []).toHaveLength(1);
+    // Echter Zweig: nie in den Vorschau-Modi, nur mit Token und hinter dem Rückweg-Schalter.
+    expect(seite).toMatch(/const GEBUCHT_SEITE_NEU = true;/);
+    expect(seite).toMatch(/const gebuchtEcht = GEBUCHT_SEITE_NEU && !IS_PREVIEW_ANY && !!acceptedApp && !!lead\?\.token;/);
+    expect(seite.match(/gebuchtDatenAusPortal\(/g) ?? []).toHaveLength(1);
+    expect(seite.match(/<GebuchtSeite\b/g) ?? []).toHaveLength(2);
     expect(seite).toMatch(/\{acceptedApp && gebuchtNeu \? \(\s*<div className="bg-pm-paper">\s*<GebuchtSeite/);
+    expect(seite).toMatch(/\) : acceptedApp && gebuchtEcht \? \(\s*gebuchtSeiteEcht \? \(\s*<div className="bg-pm-paper">\s*<GebuchtSeite/);
     expect(seite.match(/<BookedScreen\b/g) ?? []).toHaveLength(1);
+  });
+  it('Notfallnummer echter Kunden nur aus der RPC, nie in den Vorschau-Modi, nie im Log', () => {
+    expect(seite.match(/fetchNotfallTelefon\(/g) ?? []).toHaveLength(1);
+    // Der Abruf steht im Effekt, der nur bei gebuchtEcht läuft (gebuchtEcht enthält !IS_PREVIEW_ANY).
+    expect(seite).toMatch(/if \(!gebuchtEcht \|\| !lead\?\.token\) return;[\s\S]{0,600}fetchNotfallTelefon\(lead\.token\)/);
+    expect(seite).not.toMatch(/console\.\w+\([^)]*notfall/i);
   });
   it('die Vorschau-Daten (gebuchtVorschau.ts) importiert nur die Portal-Seite', () => {
     const quelle = readFileSync('src/components/portal/GebuchtSeite.tsx', 'utf8');
     expect(quelle).not.toMatch(/gebuchtVorschau/);
   });
   it('Hilfe-Blatt: Notfallfeld am berechneten Zustand, nicht am Vorschau-Etikett', () => {
-    expect(seite).toMatch(/vorKontakt=\{gebuchtNeu && notfallImHilfeBlatt\(gebuchtNeu\.daten\)/);
+    expect(seite).toMatch(/vorKontakt=\{gebuchtDaten && notfallImHilfeBlatt\(gebuchtDaten\)/);
+    expect(seite).toMatch(/const gebuchtDaten = gebuchtNeu\?\.daten \?\? gebuchtSeiteEcht;/);
     expect(seite).not.toMatch(/gebuchtNeu\.zustand !== 'beendet'/);
   });
 });

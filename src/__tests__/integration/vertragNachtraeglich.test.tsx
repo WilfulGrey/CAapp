@@ -2,9 +2,9 @@
 // Vertrag nachträglich abschließen (Martin, 2026-07-15): Die Agentur hat die
 // Bewerbung im SA-Portal akzeptiert → mamamia setzt final_confirmation am Job,
 // es gibt KEINE lead_application_acceptances-Zeile und die Bewerbung ist aus
-// listApplications verschwunden. Das Portal zeigt den BookedScreen über die
-// fc-Synthese (PR #378) — aber ohne Vertrag. Dieser Test fährt den Nachhol-Pfad:
-//   BookedScreen-Button → AngebotPruefenModal NUR Schritt 2 (contractOnly) →
+// listApplications verschwunden. Das Portal zeigt die Gebucht-Seite (seit Registry #139, vorher BookedScreen) über
+// die fc-Synthese (PR #378) — aber ohne Vertrag. Dieser Test fährt den Nachhol-Pfad:
+//   Knopf „Vertrag jetzt abschließen" → AngebotPruefenModal NUR Schritt 2 (contractOnly) →
 //   Unterschrift → Bridge-POST (Upsert inkl. contract_snapshot, application_id =
 //   numerische fc-Referenz) + Team-Mail-Resend (team_only_resend, weil die
 //   route.ts-Dedupe die Team-Mail sonst verschluckt) → Vertrag sofort im Kasten.
@@ -34,6 +34,7 @@ vi.mock('../../lib/supabase', async () => {
       }
       return { lead: null, error: 'Token nicht gefunden' };
     }),
+    fetchNotfallTelefon: vi.fn(async () => null),
   };
 });
 
@@ -82,7 +83,7 @@ const confirmedCustomer = {
 };
 
 describe('Vertrag nachträglich abschließen (agentur-seitige Annahme)', () => {
-  it('BookedScreen-Button → contractOnly-Modal (nur Schritt 2) → Upsert-POST + Team-Resend + Vertrag sichtbar', async () => {
+  it('Gebucht-Seite: Knopf → contractOnly-Modal (nur Schritt 2) → Upsert-POST + Team-Resend + Vertrag sichtbar', async () => {
     const bridgeCalls: { token?: string; event?: string; metadata?: Record<string, unknown> }[] = [];
     server.use(
       bridgeHandler((body) => {
@@ -103,10 +104,10 @@ describe('Vertrag nachträglich abschließen (agentur-seitige Annahme)', () => {
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
 
-    // BookedScreen rendert über die fc-Synthese; der Vertrag-Milestone ist
-    // ein aktiver Schritt (Hinweis + Button) statt „wird vorbereitet".
-    await screen.findByText(/Pflegekraft gebucht!/i, {}, { timeout: 5000 });
-    expect(await screen.findByText(/Bitte schließen Sie noch Ihren Betreuungsvertrag ab\./)).toBeTruthy();
+    // Gebucht-Seite über die fc-Synthese; der Vertrag ist der offene Schritt (Zustand VO) mit Knopf.
+    await screen.findByRole('heading', { level: 1, name: 'Ihr Einsatz' }, { timeout: 6000 });
+    expect(document.querySelector('[data-gebucht-seite]')?.getAttribute('data-zustand')).toBe('VO');
+    expect(screen.getByText('Vertrag unterschreiben')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: /Vertrag jetzt abschließen/ }));
 
     // Modal öffnet DIREKT auf den Angaben (Schritt 2) — kein Angebots-
@@ -167,10 +168,12 @@ describe('Vertrag nachträglich abschließen (agentur-seitige Annahme)', () => {
     expect((resendCall.metadata as Record<string, unknown>).team_only_resend).toBe(true);
     expect((resendCall.metadata as Record<string, any>).application_id).toBe(FC_ID);
 
-    // signedForm gesetzt → Vertrag erscheint sofort als unterschrieben
-    // (PDF-Link-Variante, lead.id + token vorhanden); Button verschwindet.
-    await waitFor(() => expect(screen.getByText(/✓ Unterschrieben/)).toBeTruthy(), { timeout: 3000 });
+    // signedForm gesetzt → Vertrag erscheint sofort als unterschrieben, PDF genau dieser Buchung (fc-Referenz);
+    // Knopf verschwindet.
+    await waitFor(() => expect(screen.getByText('Vertrag unterschrieben')).toBeTruthy(), { timeout: 3000 });
     expect(screen.queryByRole('button', { name: /Vertrag jetzt abschließen/ })).toBeNull();
+    const pdf = screen.getByRole('link', { name: /Vertrag als PDF/ }) as HTMLAnchorElement;
+    expect(new URL(pdf.href).searchParams.get('application_id')).toBe(String(FC_ID));
   }, 20000);
 
   it('Regression: Portal-Annahme mit persistiertem contract_snapshot → kein Nachhol-Button', async () => {
@@ -208,10 +211,12 @@ describe('Vertrag nachträglich abschließen (agentur-seitige Annahme)', () => {
     setLocation(`?token=${TEST_LEAD_TOKEN}`);
     render(<CustomerPortalPage />);
 
-    await screen.findByText(/Pflegekraft gebucht!/i, {}, { timeout: 5000 });
-    // Vertrag liegt vor → „✓ Unterschrieben", niemals der Nachhol-Button.
-    await waitFor(() => expect(screen.getByText(/✓ Unterschrieben/)).toBeTruthy(), { timeout: 3000 });
+    await screen.findByRole('heading', { level: 1, name: 'Ihr Einsatz' }, { timeout: 6000 });
+    // Vertrag liegt vor → „Vertrag unterschrieben" mit Datum und PDF dieser Annahme, niemals der Nachhol-Knopf.
+    await waitFor(() => expect(screen.getByText('Vertrag unterschrieben')).toBeTruthy(), { timeout: 3000 });
     expect(screen.queryByRole('button', { name: /Vertrag jetzt abschließen/ })).toBeNull();
-    expect(screen.queryByText(/Bitte schließen Sie noch Ihren Betreuungsvertrag ab/)).toBeNull();
+    expect(screen.queryByText('Vertrag unterschreiben')).toBeNull();
+    const pdf = screen.getByRole('link', { name: /Vertrag als PDF/ }) as HTMLAnchorElement;
+    expect(new URL(pdf.href).searchParams.get('application_id')).toBe('333');
   }, 20000);
 });

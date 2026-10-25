@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * GET /api/contract-pdf/[leadId]?token=…&application_id=… (Registry #138): die Gebucht-Seite verlinkt je Einsatz genau
+ * GET /api/contract-pdf/[leadId]?token=…&application_id=… (Registry #139): die Gebucht-Seite verlinkt je Einsatz genau
  * den Vertrag dieser Bewerbung. Gehört die Bewerbung nicht zum Lead, gibt es 404 — nie den Vertrag eines anderen
  * Einsatzes. Ohne Parameter bleibt es bei der neuesten Zeile. Geprüft am echten Handler mit Supabase-Attrappe, die
  * jede Filterkette mitschreibt.
@@ -75,7 +75,7 @@ const abrufen = async (suche: string) =>
 
 beforeEach(() => { filter = []; });
 
-describe('contract-pdf mit application_id (Registry #138)', () => {
+describe('contract-pdf mit application_id (Registry #139)', () => {
   it('Bewerbung des Leads ⇒ PDF genau dieser Zeile (Filter auf lead_id UND application_id)', async () => {
     const a = await abrufen('token=tok&application_id=14728');
     expect(a.status).toBe(200);

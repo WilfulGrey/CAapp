@@ -1,4 +1,4 @@
-// Gebucht-Seite neu (PROTOTYP 15.10.2026, nur Vorschau): alle sichtbaren Texte an EINER Stelle.
+// Gebucht-Seite neu (15.10.2026; seit Registry #139 auch für echte Kunden): alle sichtbaren Texte an EINER Stelle.
 //
 // Endwortlaut: seo-reports/analysen/gebucht-seite-2026-10-15/texte_final.md, Nachtrag 3 (15.10. spät, „Karte B mit
 // Schritten", N3.1–N3.12). Martin zum Bild aufgaben_390.png (Zustand AD): „finde ich super" — dessen Texte sind

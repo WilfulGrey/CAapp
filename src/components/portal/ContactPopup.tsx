@@ -12,7 +12,7 @@ const MEDIA_LOGOS = [
 ];
 
 /**
- * Hilfe-Blatt. PROTOTYP Gebucht-Seite neu (nur Vorschau): `vorKontakt` setzt einen Block VOR Martas Tageskontakt (das
+ * Hilfe-Blatt. Gebucht-Seite (Vorschau und echte Kunden, Registry #139): `vorKontakt` setzt einen Block VOR Martas Tageskontakt (das
  * Notfallfeld; Martin 24.10.: „wichtiger als der andere Kontakt"). Das X bleibt oben rechts (Gegenprüfung 15.10.), die
  * Zeile „Ihre Beraterin" rückt dann unter das Notfallfeld direkt über Marta. `zeiten` ersetzt „Mo–So, 8–20 Uhr"
  * (Entscheidung 10). Ohne beide Props: unverändert. „Bekannt aus" und die Kacheln bleiben immer.

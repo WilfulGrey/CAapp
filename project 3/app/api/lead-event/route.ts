@@ -836,7 +836,7 @@ const GET_PUBLIC_EVENT_TYPES = new Set([
   'application_received',
   'application_accepted_internal',
   'application_rejected',
-  // Registry #138: Anreisedaten für die Gebucht-Seite — NUR die Felder der Anreise-Mail (oeffentlicheMetadata), nie die
+  // Registry #139: Anreisedaten für die Gebucht-Seite — NUR die Felder der Anreise-Mail (oeffentlicheMetadata), nie die
   // Notiz der Agentur, Foto-URL oder Schlüssel.
   'caregiver_arrival_scheduled',
 ]);

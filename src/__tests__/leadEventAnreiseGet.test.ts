@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * GET /api/lead-event gibt Anreise-Ereignisse an das Portal (Gebucht-Seite, Registry #138) — aber NUR die Felder der
+ * GET /api/lead-event gibt Anreise-Ereignisse an das Portal (Gebucht-Seite, Registry #139) — aber NUR die Felder der
  * Anreise-Mail. Die Notiz der Agentur (`hinweis`), Foto-URL, Name, `confirmation_id` und `arrival_key` gehen nie an den
  * Browser. Geprüft am echten Handler (`project 3/app/api/lead-event/route.ts`) mit einer Supabase-Attrappe; die Pakete
  * des Kostenrechners installiert die Test-Umgebung nicht — darum werden `next/server` und die `@/lib`-Module ersetzt
@@ -81,7 +81,7 @@ const abrufen = async (suche: string) =>
     headers: new Headers(),
   }));
 
-describe('lead-event GET: Anreise-Ereignisse nur mit den Feldern der Anreise-Mail (Registry #138)', () => {
+describe('lead-event GET: Anreise-Ereignisse nur mit den Feldern der Anreise-Mail (Registry #139)', () => {
   it('caregiver_arrival_scheduled ist abrufbar; Notiz, Foto, Name, Schlüssel bleiben auf dem Server', async () => {
     const antwort = await abrufen('token=tok-1&types=caregiver_arrival_scheduled');
     expect(antwort.status).toBe(200);

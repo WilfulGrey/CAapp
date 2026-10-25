@@ -1,4 +1,6 @@
-// Kontaktbereich im Gebucht-Bildschirm. PROTOTYP 14.10.2026: nicht freigegeben, nicht live.
+// Kontaktbereich im Gebucht-Bildschirm. Die Varianten 1–3 (PROTOTYP 14.10.2026) gibt es nur noch in der Vorschau
+// `&seite=alt`; der Abschnitt der neuen Gebucht-Seite (unten, KONTAKT_TITEL/GebuchtKontaktKarte) sehen seit Registry #139
+// auch echte gebuchte Kunden.
 //
 // Martin 14.10.2026: „Ich brauche bei einer akzeptierten Buchung einen Bereich oben mit einem Kontakt, eine Notruf-Rufnummer
 // … Marta Kapcio oder Kollegen und diese Telefonnummer bitte melden, wenn es in dringenden Notfällen außerhalb auch der
@@ -219,7 +221,7 @@ export function GebuchtKontakt({ variante, notfallTelefon, className = 'mt-8' }:
   );
 }
 
-// ─── Gebucht-Seite neu (PROTOTYP 15.10.2026, nur Vorschau) ─────────────────────
+// ─── Gebucht-Seite neu (15.10.2026; seit Registry #139 auch für echte Kunden) ─────
 // Spezifikation gebucht-seite-2026-10-15, Abschnitt 6.5: Kontakt als eigener Abschnitt mit Überschrift (Martin: „Ihr Kontakt
 // zur Agentur … schöner"). Martin 24.10.: „Die Notfallnummer ist mir nicht prominent genug. Die ist wichtiger als der andere
 // Kontakt." Deshalb steht das Notfallfeld OBEN in der Karte, die Nummer selbst ist ein großer Anruf-Knopf, Martas

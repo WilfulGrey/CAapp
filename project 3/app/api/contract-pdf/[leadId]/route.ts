@@ -37,7 +37,7 @@ export async function OPTIONS() {
 // Liefert das unterschriebene Vertrags-PDF (application/pdf) für den Lead.
 // 404 wenn keine Acceptance-Row existiert (= noch nicht gebucht) oder die
 // Acceptance-Row keinen contract_snapshot hat (= alte Buchung vor B3).
-// `application_id` (Registry #138, Gebucht-Seite je Einsatz): genau der Vertrag
+// `application_id` (Registry #139, Gebucht-Seite je Einsatz): genau der Vertrag
 // dieser Bewerbung; gehört sie nicht zu diesem Lead ⇒ 404. Ohne Parameter wie
 // bisher die neueste Zeile.
 async function handleGet(

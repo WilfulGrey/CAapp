@@ -1,4 +1,5 @@
-// Gebucht-Seite neu — PROTOTYP 15.10.2026, NUR in der Vorschau ?preview=gebucht. Echte Kunden sehen weiter BookedScreen.
+// Gebucht-Seite neu (15.10.2026). Echte gebuchte Kunden sehen sie seit Registry #139 (Daten: lib/gebuchtDaten.ts, Rückweg
+// GEBUCHT_SEITE_NEU in CustomerPortalPage); die Vorschau ?preview=gebucht zeigt alle Zustände.
 //
 // Martin 15.10.2026 abends: „ich finde B glaube ich besser, aber die einzelnen dinge könnten mehr als aufgaben dargestellt
 // werden - passe an aber nur einen vollständigen screen statt alles so komplex" und „oben einfach den einsatz zeigen von

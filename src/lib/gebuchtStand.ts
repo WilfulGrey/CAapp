@@ -1,4 +1,4 @@
-// Gebucht-Seite neu (PROTOTYP 15.10.2026, nur Vorschau ?preview=gebucht): Zustandslogik als reine Funktionen.
+// Gebucht-Seite neu (15.10.2026; seit Registry #139 auch für echte Kunden): Zustandslogik als reine Funktionen.
 //
 // Grundlage: seo-reports/analysen/gebucht-seite-2026-10-15/spezifikation.md, Abschnitte 5 und 7, und texte_final.md,
 // Nachtrag 3 (Karte B mit Schritten, Martin 15.10. abends: „finde ich super"). Drei unabhängige Merkmale bestimmen die
