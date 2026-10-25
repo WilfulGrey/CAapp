@@ -20,6 +20,11 @@ describe('Anonyme Wizard-Zähler', () => {
     // Kontakt-Schritt (Registry #121): erstes Antippen, Knopf bei fehlenden Angaben
     expect(pruefeZaehler({ ereignis: 'feld_angetippt', variante: 'alt', quelle: 'google' })).toEqual({ ereignis: 'feld_angetippt', variante: 'alt', quelle: 'google' });
     expect(pruefeZaehler({ ereignis: 'knopf_unvollstaendig', variante: 'alt' })).toEqual({ ereignis: 'knopf_unvollstaendig', variante: 'alt', quelle: 'sonst' });
+    // Feldzähler (Registry #138): je Feld „fehlt“/„ungültig“, Absenden nach Hinweis
+    for (const ereignis of ['name_fehlt', 'email_fehlt', 'email_ungueltig', 'telefon_fehlt', 'telefon_ungueltig', 'abgeschickt_nach_hinweis']) {
+      expect(pruefeZaehler({ ereignis, variante: 'alt', quelle: 'google' })).toEqual({ ereignis, variante: 'alt', quelle: 'google' });
+    }
+    expect(pruefeZaehler({ ereignis: 'name_ungueltig', variante: 'alt' })).toBeNull();
     expect(pruefeZaehler({ ereignis: 'kontakt_email', variante: 'neu' })).toBeNull();
     expect(pruefeZaehler({ ereignis: 'garantie_geoeffnet', variante: 'vorschau', quelle: 'google' })).toEqual({ ereignis: 'garantie_geoeffnet', variante: 'vorschau', quelle: 'google' });
     expect(pruefeZaehler({ ereignis: 'garantie_weiter', variante: 'alt', quelle: 'sonst' })).toEqual({ ereignis: 'garantie_weiter', variante: 'alt', quelle: 'sonst' });

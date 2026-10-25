@@ -164,6 +164,9 @@ Wizard-Events:
   wie in der Leiste am Kartenfuß (Martin 10.10.) und der Datenschutz-Satz; die Leiste lässt den
   Punkt weg, solange dieser Absendeblock steht (`kontaktAbsendeblock`). Anonyme Zähler neu, je Seitenaufruf einmal: `feld_angetippt` (erster
   Fokus auf Name/E-Mail/Telefon) und `knopf_unvollstaendig` (Tipp, solange etwas fehlt).
+  Feldzähler (Registry #138, 24.10.2026): beim Tipp mit unvollständigen Angaben je betroffenem Feld `name_fehlt`,
+  `email_fehlt`, `email_ungueltig`, `telefon_fehlt`, `telefon_ungueltig`, dazu `abgeschickt_nach_hinweis` beim Absenden
+  nach einem Hinweis; je Seitenaufruf einmal, nie ein Feldinhalt.
   Gemessen vorher (09.10.): Knopf auf dem iPhone SE (553 px sichtbar) bei 619–675 px.
 - **Ad-Parameter:** `gclid`/`wbraid`/`gbraid`/`utm_term`/`utm_content` aus
   der Landing-URL landen per best-effort Update auf `analytics_sessions`
