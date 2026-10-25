@@ -32,11 +32,14 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders });
 }
 
-// GET /api/contract-pdf/[leadId]?token=<magic-link-token>
+// GET /api/contract-pdf/[leadId]?token=<magic-link-token>[&application_id=<id>]
 //
 // Liefert das unterschriebene Vertrags-PDF (application/pdf) für den Lead.
 // 404 wenn keine Acceptance-Row existiert (= noch nicht gebucht) oder die
 // Acceptance-Row keinen contract_snapshot hat (= alte Buchung vor B3).
+// `application_id` (Registry #138, Gebucht-Seite je Einsatz): genau der Vertrag
+// dieser Bewerbung; gehört sie nicht zu diesem Lead ⇒ 404. Ohne Parameter wie
+// bisher die neueste Zeile.
 async function handleGet(
   request: NextRequest,
   { params }: { params: { leadId: string } },
@@ -56,6 +59,13 @@ async function handleGet(
     if (!token) {
       return NextResponse.json(
         { error: 'token required' },
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    const appParam = request.nextUrl.searchParams.get('application_id');
+    if (appParam !== null && !/^\d{1,12}$/.test(appParam)) {
+      return NextResponse.json(
+        { error: 'invalid application_id' },
         { status: 400, headers: corsHeaders },
       );
     }
@@ -89,11 +99,14 @@ async function handleGet(
     // Neueste Acceptance-Row holen. Pro Lead sollte es genau eine geben
     // (Kunde akzeptiert eine Bewerbung); ORDER BY signed_at DESC als
     // Safety, falls historisch zwei Acceptances drin sind.
-    const { data: acceptance, error: accErr } = await supabase
+    const abfrage = supabase
       .from('lead_application_acceptances')
       .select('application_id, contract_snapshot, signatur, signed_at')
-      .eq('lead_id', leadId)
-      .order('signed_at', { ascending: false, nullsFirst: false })
+      .eq('lead_id', leadId);
+    const { data: acceptance, error: accErr } = await (appParam !== null
+      ? abfrage.eq('application_id', Number(appParam))
+      : abfrage.order('signed_at', { ascending: false, nullsFirst: false })
+    )
       .limit(1)
       .maybeSingle();
 
