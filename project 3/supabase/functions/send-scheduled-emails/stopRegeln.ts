@@ -157,21 +157,64 @@ export function sucheStandStopp(o: {
   return null;
 }
 
-/** Aktive Reservierung: eine echte Bewerbung der letzten 72 h, auf die der Kunde noch nicht
- *  reagiert hat (weder zu- noch abgesagt). Ereignisse wie aus lead_events. */
-export function reservierungAktiv(
-  ereignisse: { event_type: string; created_at: string; metadata?: Record<string, unknown> | null }[],
-  jetzt: Date,
+// ── Reaktion je Bewerbung (Registry #136) ─────────────────────────────────
+//
+// Bis 16.10.2026 hieß „der Kunde hat reagiert": irgendein Zu- oder Absage-Ereignis zu dieser
+// PFLEGEKRAFT. Bewirbt sich dieselbe Kraft nach einer Absage neu (neue `application_id`,
+// Registry #35: neue Bewerbung = neue Mail), galt die alte Absage auch für die neue Bewerbung —
+// ihre Erinnerungen fielen als `customer_reacted` weg (Kundin 52dc3e9d, App 14728 abgesagt am
+// 14.10., App 14746 am 15.10. ohne eine einzige Erinnerung).
+//
+// Regel jetzt: Eine Reaktion zählt für eine Bewerbung nur, wenn sie dieselbe `application_id`
+// trägt oder zeitlich NACH dem Eingang dieser Bewerbung liegt (Annahmen des Annahme-Detektors
+// tragen keine `application_id`, nur den Job). Kennt die Zeile ihre Bewerbung nicht (Altzeilen
+// ohne `application_id`), bleibt es bei der alten Regel je Pflegekraft. Ist der Eingang der
+// Bewerbung nicht zu finden, ebenfalls — im Zweifel keine Mail (Muster `hasReactionForCaregiver`).
+
+export type LeadEreignis = { event_type: string; created_at: string; metadata?: Record<string, unknown> | null };
+
+const REAKTION_AUF_BEWERBUNG: ReadonlySet<string> = new Set(["application_accepted_internal", "application_rejected"]);
+
+function idText(v: unknown): string {
+  return v == null ? "" : String(v);
+}
+
+/** Frühester echter (nicht `seeded`) Eingang einer Bewerbung, `null` ohne Treffer. */
+export function eingangDerBewerbung(ereignisse: LeadEreignis[], applicationId: number | string): number | null {
+  const app = idText(applicationId);
+  if (!app) return null;
+  const ms = ereignisse
+    .filter((e) => e.event_type === "application_received" && e.metadata?.seeded !== true && idText(e.metadata?.application_id) === app)
+    .map((e) => Date.parse(e.created_at))
+    .filter((t) => Number.isFinite(t));
+  return ms.length ? Math.min(...ms) : null;
+}
+
+/** Hat der Kunde auf DIESE Bewerbung reagiert (zu- oder abgesagt)? Ereignisse wie aus
+ *  lead_events, alle Pflegekräfte gemischt. Ohne `applicationId`: alte Regel je Pflegekraft. */
+export function reaktionAufBewerbung(
+  ereignisse: LeadEreignis[],
+  bewerbung: { caregiverId: number | string; applicationId?: number | string | null },
 ): boolean {
-  const beantwortet = new Set(
-    ereignisse
-      .filter((e) => e.event_type === "application_accepted_internal" || e.event_type === "application_rejected")
-      .map((e) => String(e.metadata?.caregiver_id ?? "")),
-  );
+  const cg = idText(bewerbung.caregiverId);
+  const reaktionen = ereignisse.filter((e) => REAKTION_AUF_BEWERBUNG.has(e.event_type) && idText(e.metadata?.caregiver_id) === cg);
+  if (reaktionen.length === 0) return false;
+  const app = idText(bewerbung.applicationId);
+  if (!app) return true;
+  const eingang = eingangDerBewerbung(ereignisse, app);
+  if (eingang == null) return true;
+  return reaktionen.some((r) => idText(r.metadata?.application_id) === app || Date.parse(r.created_at) > eingang);
+}
+
+/** Aktive Reservierung: eine echte Bewerbung der letzten 72 h, auf die der Kunde noch nicht
+ *  reagiert hat (weder zu- noch abgesagt) — je Bewerbung, siehe `reaktionAufBewerbung`.
+ *  Ereignisse wie aus lead_events. */
+export function reservierungAktiv(ereignisse: LeadEreignis[], jetzt: Date): boolean {
   return ereignisse.some((e) => {
     if (e.event_type !== "application_received" || e.metadata?.seeded === true) return false;
-    const cg = String(e.metadata?.caregiver_id ?? "");
-    if (!cg || beantwortet.has(cg)) return false;
+    const cg = idText(e.metadata?.caregiver_id);
+    if (!cg) return false;
+    if (reaktionAufBewerbung(ereignisse, { caregiverId: cg, applicationId: (e.metadata?.application_id ?? null) as number | string | null })) return false;
     const t = Date.parse(e.created_at);
     return Number.isFinite(t) && jetzt.getTime() - t < RESERVIERUNG_STUNDEN * STUNDE;
   });

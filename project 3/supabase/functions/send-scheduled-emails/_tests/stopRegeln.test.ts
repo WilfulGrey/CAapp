@@ -1,10 +1,13 @@
 // Stopp- und Zeitregeln der Kundenmails (26.09.2026) — siehe stopRegeln.ts.
 import { assert, assertEquals } from "@std/assert";
 import {
+  eingangDerBewerbung,
   erinnerungStopp,
   erinnerungStufe,
   genitiv,
+  type LeadEreignis,
   neuePflegekraefteEntscheidung,
+  reaktionAufBewerbung,
   reservierungAktiv,
   reservierungsEnde,
   reserviertBisAus,
@@ -107,4 +110,69 @@ Deno.test("Stand nach 2 Tagen entfällt mit Bewerbung oder neuem Interesse", () 
   assertEquals(sucheStandStopp({ ...basis, bewerbungDa: true }), "bewerbung_da");
   assertEquals(sucheStandStopp({ ...basis, interesseSeitAnlage: true }), "interesse_da");
   assertEquals(sucheStandStopp({ ...basis, beauftragt: true }), "betreuung_beauftragt");
+});
+
+// ── Registry #136: Reaktion je Bewerbung ──────────────────────────────────
+
+// PROD-Verlauf Kundin 52dc3e9d, Pflegekraft 15184 (Job 38118), wörtlich aus lead_events:
+// Absage aus dem Portal mit application_id als TEXT und ohne Job, Eingänge mit Zahl und Job.
+const FALL_52DC: LeadEreignis[] = [
+  { event_type: "application_received", created_at: "2026-10-14T14:17:00.779Z", metadata: { caregiver_id: 15184, application_id: 14728, mamamia_job_offer_id: 38118 } },
+  { event_type: "application_rejected", created_at: "2026-10-14T14:33:37.332Z", metadata: { caregiver_id: 15184, application_id: "14728" } },
+  { event_type: "application_received", created_at: "2026-10-15T09:18:15.916Z", metadata: { caregiver_id: 15184, application_id: 14746, mamamia_job_offer_id: 38118 } },
+];
+
+Deno.test("Reaktion je Bewerbung: Absage der alten Bewerbung gilt nicht für die neue (Fall 52dc3e9d)", () => {
+  assertEquals(reaktionAufBewerbung(FALL_52DC, { caregiverId: 15184, applicationId: 14746 }), false);
+  assertEquals(reaktionAufBewerbung(FALL_52DC, { caregiverId: "15184", applicationId: "14746" }), false);
+  // Die alte Bewerbung selbst ist beantwortet.
+  assertEquals(reaktionAufBewerbung(FALL_52DC, { caregiverId: 15184, applicationId: 14728 }), true);
+  // Altzeile ohne application_id: wie bisher je Pflegekraft.
+  assertEquals(reaktionAufBewerbung(FALL_52DC, { caregiverId: 15184 }), true);
+  assertEquals(reaktionAufBewerbung(FALL_52DC, { caregiverId: 15184, applicationId: null }), true);
+});
+
+Deno.test("Reaktion je Bewerbung: Absage der NEUEN Bewerbung zählt (gleiche id oder später)", () => {
+  const mitAbsage = [...FALL_52DC, { event_type: "application_rejected", created_at: "2026-10-16T08:00:00Z", metadata: { caregiver_id: 15184, application_id: "14746" } }];
+  assertEquals(reaktionAufBewerbung(mitAbsage, { caregiverId: 15184, applicationId: 14746 }), true);
+  // Annahme des Annahme-Detektors (ohne application_id) NACH dem Eingang zählt …
+  const annahme = (zeit: string): LeadEreignis => ({ event_type: "application_accepted_internal", created_at: zeit, metadata: { caregiver_id: 15184, mamamia_job_offer_id: 38118 } });
+  assertEquals(reaktionAufBewerbung([...FALL_52DC, annahme("2026-10-15T12:00:00Z")], { caregiverId: 15184, applicationId: 14746 }), true);
+  // … VOR dem Eingang nicht.
+  assertEquals(reaktionAufBewerbung([...FALL_52DC, annahme("2026-10-15T09:00:00Z")], { caregiverId: 15184, applicationId: 14746 }), false);
+  // Gleiche application_id zählt auch mit schiefem Zeitstempel.
+  const schief: LeadEreignis = { event_type: "application_rejected", created_at: "2026-10-15T09:18:00Z", metadata: { caregiver_id: 15184, application_id: 14746 } };
+  assertEquals(reaktionAufBewerbung([...FALL_52DC, schief], { caregiverId: 15184, applicationId: 14746 }), true);
+});
+
+Deno.test("Reaktion je Bewerbung: andere Pflegekräfte zählen nie, ohne Reaktion nie", () => {
+  const fremd: LeadEreignis = { event_type: "application_rejected", created_at: "2026-10-16T08:00:00Z", metadata: { caregiver_id: 32527, application_id: 14789 } };
+  assertEquals(reaktionAufBewerbung([...FALL_52DC.filter((e) => e.event_type === "application_received"), fremd], { caregiverId: 15184, applicationId: 14746 }), false);
+  assertEquals(reaktionAufBewerbung([], { caregiverId: 15184, applicationId: 14746 }), false);
+  assertEquals(reaktionAufBewerbung([], { caregiverId: 15184 }), false);
+});
+
+Deno.test("Reaktion je Bewerbung: Eingang unauffindbar ⇒ wie bisher (im Zweifel keine Mail)", () => {
+  // Zeile kennt 99999, aber kein application_received dazu (nur ein still erfasstes zählt nicht).
+  const ohneEingang: LeadEreignis[] = [
+    { event_type: "application_received", created_at: "2026-10-15T09:18:15Z", metadata: { caregiver_id: 15184, application_id: 99999, seeded: true } },
+    { event_type: "application_rejected", created_at: "2026-10-14T14:33:37Z", metadata: { caregiver_id: 15184, application_id: "14728" } },
+  ];
+  assertEquals(eingangDerBewerbung(ohneEingang, 99999), null);
+  assertEquals(reaktionAufBewerbung(ohneEingang, { caregiverId: 15184, applicationId: 99999 }), true);
+  assertEquals(eingangDerBewerbung(FALL_52DC, 14746), Date.parse("2026-10-15T09:18:15.916Z"));
+});
+
+Deno.test("Aktive Reservierung je Bewerbung: neue Bewerbung nach Absage ist reserviert", () => {
+  const jetzt = new Date("2026-10-16T10:00:00Z");
+  // Neue Bewerbung 14746 (vor 25 h) ist offen, obwohl die Kraft für 14728 abgesagt wurde.
+  assert(reservierungAktiv(FALL_52DC, jetzt));
+  // Nach der Absage auch der neuen: nichts mehr reserviert.
+  assert(!reservierungAktiv([...FALL_52DC, { event_type: "application_rejected", created_at: "2026-10-16T09:00:00Z", metadata: { caregiver_id: 15184, application_id: 14746 } }], jetzt));
+  // Eingänge ohne application_id (vor Registry #35): wie bisher je Pflegekraft.
+  const alt: LeadEreignis[] = [
+    { event_type: "application_received", created_at: "2026-10-15T09:18:15Z", metadata: { caregiver_id: 15184 } },
+    { event_type: "application_rejected", created_at: "2026-10-14T14:33:37Z", metadata: { caregiver_id: 15184 } },
+  ];
+  assert(!reservierungAktiv(alt, jetzt));
 });

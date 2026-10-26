@@ -194,6 +194,8 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
   // Ref daneben, damit die Zähler-Effekte lesen können, ohne neu zu feuern.
   const [kontaktVar, setKontaktVar] = useState<KontaktVariante>('alt');
   const kontaktVarRef = useRef<KontaktVariante>('alt');
+  // Registry #138: Hat dieser Seitenaufruf schon einen Hinweis am Kontakt-Schritt gesehen?
+  const hinweisGezeigtRef = useRef(false);
   const [stufe, setStufe] = useState<KontaktStufe>('name');
   const [stufenFehler, setStufenFehler] = useState('');
   // Nach dem E-Mail-Schritt existiert der Lead; Token und Portal-Link für
@@ -649,6 +651,13 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
   const kontaktUnvollstaendig = () => {
     zaehle('knopf_unvollstaendig', zaehlVariante());
     const fehler = kontaktFehlerAlt();
+    // Registry #138: jedes betroffene Feld zählen, nicht nur das erste; nie den Inhalt.
+    hinweisGezeigtRef.current = true;
+    if (!formData.name.trim()) zaehle('name_fehlt', zaehlVariante());
+    if (!formData.email.trim()) zaehle('email_fehlt', zaehlVariante());
+    else if (fehler.email) zaehle('email_ungueltig', zaehlVariante());
+    if (!(formData.phone ?? '').trim()) zaehle('telefon_fehlt', zaehlVariante());
+    else if (fehler.phone) zaehle('telefon_ungueltig', zaehlVariante());
     const erstes = (['name', 'email', 'phone'] as const).find((k) => fehler[k]);
     if (!erstes) return;
     setErrors((alt) => ({ ...alt, [erstes]: fehler[erstes] }));
@@ -782,6 +791,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
   const meldeErfolg = (data: { leadId: string; portalUrl: string }, kalkulation: { bruttopreis?: number }, onDone?: () => void) => {
     trackFormSubmit();
     zaehle('abgeschickt', zaehlVariante());
+    if (hinweisGezeigtRef.current) zaehle('abgeschickt_nach_hinweis', zaehlVariante());
     // step_complete(contact_form) + Conversion in EINEM Beacon — überlebt
     // den Redirect garantiert (Bug #33). Ersetzt die früheren racy
     // supabase-js-Inserts (analytics.trackConversion + step_complete aus

@@ -36,6 +36,54 @@ import { ladeSterneStand } from "@/lib/sterne-zeile-laden";
 // dynamischen Seiten gilt.
 export const dynamic = 'force-dynamic';
 
+// Weihnachtsband unter der Kopfzeile bis einschließlich 26.12.2026 (Ende 27.12. 00:00 Uhr Berlin = 26.12. 23:00 UTC).
+const WEIHNACHTEN_BIS = Date.UTC(2026, 11, 26, 23);
+function weihnachtsStoererAn(): boolean {
+  return Date.now() < WEIHNACHTEN_BIS;
+}
+// Goldpunkte an den Rändern des Bandes, nur am Computer
+const WEIHNACHTS_PUNKTE: { l: string; t: string; g: number; hell?: boolean }[] = [
+  { l: '2%', t: '30%', g: 3 }, { l: '6%', t: '72%', g: 2, hell: true }, { l: '10%', t: '24%', g: 2.5 }, { l: '15%', t: '62%', g: 2, hell: true },
+  { l: '85%', t: '28%', g: 2.5 }, { l: '89%', t: '70%', g: 2, hell: true }, { l: '93%', t: '34%', g: 3 }, { l: '97%', t: '66%', g: 2 },
+];
+function WeihnachtsStern() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[13px] w-[13px] flex-none max-[374px]:hidden fill-[#D4A843] drop-shadow-[0_0_4px_rgba(212,168,67,0.6)] md:h-4 md:w-4">
+      <path d="M12 1.5l1.9 7.1L21 10.5l-7.1 1.9L12 19.5l-1.9-7.1L3 10.5l7.1-1.9z" />
+    </svg>
+  );
+}
+
+// Text seit dem Abend des 24.10. (Martin nach OpenAI-Prüfung, „gesichert“ klang nach interner Planung): am Handy
+// „Betreuung über Weihnachten garantiert“, ab 768 px zusätzlich „, auch kurzfristig“. foto = Lage auf dem Hero-Foto
+// (< 1024 px), sonst unter der Kopfzeile (ab 1024 px). Endet am 26.12. um 24 Uhr (Berlin), die Seite rendert dynamisch.
+function WeihnachtsBand({ foto = false }: { foto?: boolean }) {
+  if (!weihnachtsStoererAn()) return null;
+  return (
+    <aside
+      aria-label="Weihnachten"
+      className={`${foto ? 'absolute inset-x-0 top-0 z-10 border-b lg:hidden' : 'relative hidden border-y lg:block'} overflow-hidden border-[#D4A843]/60 bg-gradient-to-r from-[#123222] via-[#2A5C3F] to-[#123222] text-white`}
+    >
+      {WEIHNACHTS_PUNKTE.map((p) => (
+        <span
+          key={p.l + p.t}
+          aria-hidden="true"
+          className={`absolute hidden rounded-full md:block ${p.hell ? 'bg-white/70' : 'bg-[#D4A843]'}`}
+          style={{ left: p.l, top: p.t, width: p.g, height: p.g }}
+        />
+      ))}
+      <p className="relative mx-auto flex max-w-[1256px] items-center justify-center gap-2 px-3 py-2.5 min-[375px]:px-3.5 md:gap-3.5 md:px-5 md:py-3">
+        <WeihnachtsStern />
+        <span className="whitespace-nowrap text-[14px] font-semibold leading-tight max-[374px]:text-[13px] min-[390px]:text-[14.5px] md:text-[16.5px]">
+          Betreuung über <strong className="font-extrabold text-[#D4A843]">Weihnachten</strong> garantiert
+          <span className="hidden md:inline">, auch kurzfristig</span>
+        </span>
+        <WeihnachtsStern />
+      </p>
+    </aside>
+  );
+}
+
 export default async function HomePage() {
   const bewertung = await ladeSterneStand();
   return (
@@ -47,6 +95,10 @@ export default async function HomePage() {
         dangerouslySetInnerHTML={{ __html: jsonLdString(homePageGraph()) }}
       />
       <Header />
+      {/* Weihnachtsband (Martin 24.10.2026, Entwurf A „Nur Band, überall“) — dasselbe Band wie auf primundus.de
+          (components/layout/WeihnachtsBand.tsx dort). Am Computer (ab 1024 px) unter der Kopfzeile; darunter liegt es
+          deckend auf der Oberkante des Fotos (Martin: „Ja, am Handy aufs Foto“), damit nichts nach unten rutscht. */}
+      <WeihnachtsBand />
 
       {/* Hero Section - Split Layout on Desktop */}
       {/* FESTER Abstand statt vertikaler Zentrierung (Martin 16.08.: "oben
@@ -100,6 +152,7 @@ export default async function HomePage() {
         <div className="mx-auto grid w-full max-w-[1256px] items-center lg:grid-cols-[46fr_54fr] lg:gap-12 lg:px-5 xl:gap-16">
 
           <div className="relative aspect-[1100/941] w-full overflow-hidden bg-[#F8F7F5] lg:order-2 lg:rounded-2xl">
+            <WeihnachtsBand foto />
             <Image
               src="/images/PM-Header-Shooting_hero-v3.webp"
               alt="Betreuungskraft und Seniorin zu Hause im Wohnzimmer"
