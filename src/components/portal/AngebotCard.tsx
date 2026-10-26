@@ -566,8 +566,10 @@ export const AngebotCard: FC<{
   // (GPT-5-Prüfung 24.09.). Tippen springt zum Feld.
   const navHinweis = (() => {
     if (!fehlerZeigen) return null;
-    // Suchfehler beim Einsatzort sperrt nicht, soll aber gesehen werden.
-    if (offen.length === 0) return einsatzortFehler;
+    // Suchfehler beim Einsatzort sperrt nicht, soll aber gesehen werden — nur
+    // auf „Einsatzort & Start“ (step 2), wo das Feld steht. Sonst stand auf
+    // „Zur Person“ nach einem Fehlversuch „5-stellige Postleitzahl“ (Registry #140).
+    if (offen.length === 0) return step === 2 ? einsatzortFehler : null;
     if (offen.length === 1 && offen[0] === 'plz' && einsatzortFehler) return einsatzortFehler;
     // Beim Ehepaar heißt Person 1 auch so — sonst stünde „Geschlecht,
     // Geschlecht (Person 2)" im Hinweis.

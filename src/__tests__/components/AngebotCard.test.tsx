@@ -118,6 +118,47 @@ describe('AngebotCard – Pflichtfelder', () => {
   });
 });
 
+describe('AngebotCard – PLZ-Hinweis nur auf „Einsatzort & Start“ (Registry #140)', () => {
+  const PLZ_HINWEIS = 'Bitte geben Sie eine 5-stellige Postleitzahl ein.';
+
+  it('Seite 1 und 2 zeigen über dem Knopf keinen PLZ-Hinweis, Seite 3 weiterhin', async () => {
+    // Alles da außer Geschlecht (Seite 1), Heben (Seite 2) und Einsatzort (Seite 3).
+    entwurf({
+      _isDraft: true, anzahl: '1',
+      mobilitaet: 'Rollatorfähig', demenz: 'Nein', nacht: 'Nein',
+      wohnungstyp: 'Einfamilienhaus', urbanisierung: 'Großstadt', startDate: '2099-12-01',
+    });
+    const { container } = render(<AngebotCard lead={lead} />);
+
+    // Seite 1: „Weiter“ mit Lücke setzt die Fehleranzeige.
+    await weiter();
+    schritt(1);
+    expect(screen.getByRole('button', { name: 'Geschlecht fehlt' })).toBeInTheDocument();
+    // Lücke gefüllt: Seite 1 ist vollständig, das PLZ-Feld steht erst auf Seite 3.
+    await userEvent.click(screen.getByRole('button', { name: 'Weiblich' }));
+    expect(screen.queryByText('Geschlecht fehlt')).toBeNull();
+    expect(screen.queryByText(PLZ_HINWEIS)).toBeNull();
+
+    // Seite 2: dasselbe Muster.
+    await weiter();
+    schritt(2);
+    await weiter();
+    expect(screen.getByRole('button', { name: 'Heben erforderlich fehlt' })).toBeInTheDocument();
+    await userEvent.click(within(container.querySelector('[data-field="heben"]') as HTMLElement).getByRole('button', { name: 'Nein' }));
+    expect(screen.queryByText('Heben erforderlich fehlt')).toBeNull();
+    expect(screen.queryByText(PLZ_HINWEIS)).toBeNull();
+
+    // Seite 3 ohne PLZ: Hinweis über dem Knopf und am Feld wie bisher.
+    await weiter();
+    schritt(3);
+    expect(screen.queryByText(PLZ_HINWEIS)).toBeNull();
+    await weiter();
+    schritt(3);
+    expect(screen.getByRole('button', { name: PLZ_HINWEIS })).toBeInTheDocument();
+    expect(screen.getAllByText(PLZ_HINWEIS)).toHaveLength(2);
+  });
+});
+
 describe('AngebotCard – Startdatum beim Ändern', () => {
   // Wie auf einem anderen Gerät: kein lokaler Startdatum-Wert.
   const OHNE_START = { ...VOLL, startDate: '' };
