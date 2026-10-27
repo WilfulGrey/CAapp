@@ -12,6 +12,10 @@
 //     https://<project>.supabase.co/functions/v1/daily-analytics-report
 //
 // Optionaler Body { "daysAgo": 2 } um einen älteren Tag zu reporten.
+//
+// Nur Kosten je Kampagne nachtragen (Registry #142), ohne Bericht und ohne Mail:
+//   Body { "nurKampagnenKosten": { "von": "2026-09-01", "bis": "2026-10-27" } }
+//   (+ "dryRun": true ⇒ nur zählen, nichts schreiben). Nur mit service_role-Bearer.
 
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import nodemailer from "npm:nodemailer@6.9.10";
@@ -24,9 +28,13 @@ import {
   fetchLeadCohorts,
   fetchBesucherKohorten,
   fetchAdsSpend,
+  fetchAdsKostenKampagne,
+  KAMPAGNEN_FENSTER_TAGE,
+  pruefeNachtrag,
   fetchPeriodStats,
   fetchTotalLeads, fetchMailHealth, fetchBuchungHealth, fetchUploadHealth } from "./queries.ts";
 import { buildReportEmail } from "./template.ts";
+import { isServiceRoleBearer } from "../_shared/serviceRoleAuth.ts";
 
 // Vergleichs-Periode für den Daily Report. 7 Tage liefert einen stabilen
 // Schnitt, der Wochenend-Effekt rausgemittelt + die Top-Tag-Spalte zeigt
@@ -106,9 +114,12 @@ Deno.serve(async (req: Request) => {
   // dryRun: baut die Mail, sendet aber NICHT — für Vorschau/Verifikation
   // nach Deploys, ohne die Empfänger mit Test-Mails zu fluten.
   let dryRun = false;
+  // nurKampagnenKosten: { von, bis } — nur Google-Kosten je Kampagne nachtragen.
+  let nachtrag: { von?: unknown; bis?: unknown } | null = null;
   try {
     if (req.method === "POST") {
       const body = await req.json().catch(() => ({}));
+      if (body?.nurKampagnenKosten && typeof body.nurKampagnenKosten === "object") nachtrag = body.nurKampagnenKosten;
       if (typeof body?.daysAgo === "number" && body.daysAgo > 0) {
         daysAgo = Math.floor(body.daysAgo);
       }
@@ -128,11 +139,37 @@ Deno.serve(async (req: Request) => {
   }
   const supabase = createClient(supabaseUrl, serviceKey);
 
+  /* Nachtragen der Kosten je Kampagne: eine GAQL-Abfrage über den Zeitraum, ein Upsert.
+     Kein Bericht, keine Mail, kein ads_kosten_tag. Nur server-zu-server (service_role). */
+  if (nachtrag) {
+    const json = (status: number, body: unknown) =>
+      new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+    if (!isServiceRoleBearer(req.headers.get("authorization"), serviceKey)) return json(401, { error: "unauthorized" });
+    const zeitraum = pruefeNachtrag(nachtrag.von, nachtrag.bis, berlinDayRange(0).iso);
+    if (!zeitraum.ok) return json(400, { error: zeitraum.fehler });
+    const zeilen = await fetchAdsKostenKampagne(supabase, zeitraum.von, zeitraum.bis, 60_000);
+    if (!zeilen) return json(502, { error: "Google-Kosten je Kampagne nicht abrufbar (Log: fetchAdsKostenKampagne)" });
+    const zusammenfassung = {
+      von: zeitraum.von, bis: zeitraum.bis, zeilen: zeilen.length,
+      tage: new Set(zeilen.map((z) => z.tag)).size,
+      summe: Math.round(zeilen.reduce((s, z) => s + z.kosten_netto, 0) * 100) / 100,
+    };
+    if (dryRun) return json(200, { ok: true, dryRun: true, ...zusammenfassung });
+    if (zeilen.length > 0) {
+      const jetzt = new Date().toISOString();
+      const { error } = await supabase
+        .from("ads_kosten_kampagne_tag")
+        .upsert(zeilen.map((z) => ({ ...z, aktualisiert_at: jetzt })), { onConflict: "tag,kampagne_id" });
+      if (error) return json(500, { error: `ads_kosten_kampagne_tag: ${error.message}` });
+    }
+    return json(200, { ok: true, ...zusammenfassung });
+  }
+
   try {
     const yesterday = berlinDayRange(daysAgo);
 
     const CHART_DAYS_BACK = 14;
-    const [yesterdayStats, periodStats, prevPeriodStats, totalLeads, booked, mailHealth, agentNotes, adsSpend, leadKohorten, besucherKohorten, buchungHealth, uploadHealth] = await Promise.all([
+    const [yesterdayStats, periodStats, prevPeriodStats, totalLeads, booked, mailHealth, agentNotes, adsSpend, leadKohorten, besucherKohorten, buchungHealth, uploadHealth, kampagnenKosten] = await Promise.all([
       fetchDailyStats(supabase, yesterday.start, yesterday.end),
       fetchPeriodStats(supabase, PERIOD_DAYS_BACK),
       // Die 7 Tage VOR der Vergleichsperiode — Basis für den Trend-Pfeil.
@@ -171,6 +208,11 @@ Deno.serve(async (req: Request) => {
         letzterUpload: null,
         error: e instanceof Error ? e.message : String(e),
       })),
+      /* Kosten je Kampagne für die Admin-Seite „Trichter“ (Registry #142): gestern und die
+         zwei Tage davor (fehlt ein Lauf, holt der nächste nach; Google korrigiert spät).
+         Fängt Fehler selbst ab (null, mit Timeout); `.catch` nur als zweites Netz. */
+      fetchAdsKostenKampagne(supabase, berlinDayRange(daysAgo + KAMPAGNEN_FENSTER_TAGE - 1).iso, yesterday.iso)
+        .catch(() => null),
     ]);
 
     const smtp = await getSmtpConfig(supabase);
@@ -204,6 +246,18 @@ Deno.serve(async (req: Request) => {
         .from("ads_kosten_tag")
         .upsert({ tag: yesterday.iso, kosten_netto: adsSpend.yesterday, aktualisiert_at: new Date().toISOString() }, { onConflict: "tag" });
       if (error) console.log("ads_kosten_tag konnte nicht geschrieben werden:", error.message);
+    }
+    /* Dazu je Kampagne (Registry #142) — gleiche Regel: auch im dryRun, Fehler nur ins Log. */
+    if (kampagnenKosten && kampagnenKosten.length > 0) {
+      try {
+        const jetzt = new Date().toISOString();
+        const { error } = await supabase
+          .from("ads_kosten_kampagne_tag")
+          .upsert(kampagnenKosten.map((z) => ({ ...z, aktualisiert_at: jetzt })), { onConflict: "tag,kampagne_id" });
+        if (error) console.log("ads_kosten_kampagne_tag konnte nicht geschrieben werden:", error.message);
+      } catch (e) {
+        console.log("ads_kosten_kampagne_tag konnte nicht geschrieben werden:", e instanceof Error ? e.message : String(e));
+      }
     }
 
     if (dryRun) {

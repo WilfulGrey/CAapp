@@ -47,9 +47,11 @@ export async function getGoogleAdsSecrets(supabase: RpcClient): Promise<GoogleAd
   return s;
 }
 
-export async function fetchAdsAccessToken(s: GoogleAdsSecrets): Promise<string> {
+/** `signal` optional (z. B. AbortSignal.timeout), damit ein hängendes Google den Aufrufer nicht festhält. */
+export async function fetchAdsAccessToken(s: GoogleAdsSecrets, signal?: AbortSignal): Promise<string> {
   const resp = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
+    signal,
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       client_id: s.clientId,
@@ -71,11 +73,13 @@ export async function adsSearch(
   accessToken: string,
   s: GoogleAdsSecrets,
   query: string,
+  signal?: AbortSignal,
 ): Promise<Array<Record<string, unknown>>> {
   const resp = await fetch(
     `https://googleads.googleapis.com/v23/customers/${ADS_CUSTOMER_ID}/googleAds:search`,
     {
       method: "POST",
+      signal,
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "developer-token": s.developerToken,
