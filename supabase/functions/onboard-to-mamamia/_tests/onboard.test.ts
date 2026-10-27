@@ -66,9 +66,13 @@ interface FakeSupabase {
   updateLead(id: string, patch: Partial<Lead>): void;
   fetchLeadJob(jobId: string, leadId: string): Promise<{ mamamia_job_offer_id: number } | null>;
   fetchNewestPlannedJob(leadId: string): Promise<{ mamamia_job_offer_id: number } | null>;
+  fetchCurrentBookedJob(leadId: string, heute: string): Promise<{ mamamia_job_offer_id: number } | null>;
 }
 
-interface FakeLeadJob { id: string; lead_id: string; mamamia_job_offer_id: number; status?: string; }
+interface FakeLeadJob {
+  id: string; lead_id: string; mamamia_job_offer_id: number; status?: string;
+  anreise?: string | null; abreise?: string | null;
+}
 
 function makeFakeSupabase(
   initialLeads: Lead[] = [],
@@ -110,6 +114,14 @@ function makeFakeSupabase(
         .filter((x) => x.lead_id === leadId && x.status === "geplant")
         .sort((a, b) => b.mamamia_job_offer_id - a.mamamia_job_offer_id);
       return Promise.resolve(planned[0] ? { mamamia_job_offer_id: planned[0].mamamia_job_offer_id } : null);
+    },
+    // Laufender/nächster gebuchter Job (Registry #140) — spiegelt die reale Query
+    // `.eq("status","gebucht").or("abreise.is.null,abreise.gte.<heute>").order("anreise", asc, nulls last)`.
+    fetchCurrentBookedJob(leadId, heute) {
+      const booked = leadJobs
+        .filter((x) => x.lead_id === leadId && x.status === "gebucht" && (!x.abreise || x.abreise >= heute))
+        .sort((a, b) => (a.anreise ?? "9999") < (b.anreise ?? "9999") ? -1 : 1);
+      return Promise.resolve(booked[0] ? { mamamia_job_offer_id: booked[0].mamamia_job_offer_id } : null);
     },
   };
 }
@@ -423,10 +435,10 @@ Deno.test("onboardLead: NO job_id + kein geplanter Job → lead's default job (S
 
 Deno.test("onboardLead: NO job_id → AKTIVER Job = neuester 'geplant' (Opcja B, Dachs 8899)", async () => {
   _resetAgencyTokenCache();
-  // Alter gebuchter Job (Default des Leads) + neuer geplanter Folge-Job:
+  // Alter, schon vorbeier gebuchter Job (Default des Leads) + neuer geplanter Folge-Job:
   // Einstieg ohne Deeplink landet auf dem NEUEN Job mit seinen Bewerbungen.
   const supa = makeFakeSupabase([makeLead({ ...ONBOARDED })], [
-    { id: "job-a", lead_id: "lead-x", mamamia_job_offer_id: 16225, status: "gebucht" },
+    { id: "job-a", lead_id: "lead-x", mamamia_job_offer_id: 16225, status: "gebucht", anreise: "2026-01-10", abreise: "2026-03-01" },
     { id: "job-b", lead_id: "lead-x", mamamia_job_offer_id: 99999, status: "geplant" },
   ]);
   const result = await onboardLead({
@@ -459,6 +471,81 @@ Deno.test("onboardLead: explizites job_id hat Vorrang vor der Aktiv-Job-Wahl", a
   });
   // ?job=<alter Einsatz> aus der Übersicht → genau der, kein Auto-Umschwenk.
   assertEquals(result.job_offer_id, 16225);
+});
+
+// ─── Registry #140: laufender oder nächster gebuchter Einsatz zuerst ───
+// NOW = 2026-04-23T10:00Z ⇒ Berliner Tag 2026-04-23.
+
+Deno.test("onboardLead #140: laufender gebuchter Job schlägt den geplanten Folgeeinsatz", async () => {
+  _resetAgencyTokenCache();
+  const supa = makeFakeSupabase([makeLead({ ...ONBOARDED })], [
+    { id: "job-a", lead_id: "lead-x", mamamia_job_offer_id: 16225, status: "abgeschlossen", anreise: "2026-02-01", abreise: "2026-04-10" },
+    { id: "job-b", lead_id: "lead-x", mamamia_job_offer_id: 20001, status: "gebucht", anreise: "2026-04-10", abreise: "2026-05-20" },
+    { id: "job-c", lead_id: "lead-x", mamamia_job_offer_id: 20002, status: "geplant", anreise: "2026-05-20" },
+  ]);
+  const result = await onboardLead({
+    leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: NO_MAMAMIA, now: NOW,
+  });
+  assertEquals(result.job_offer_id, 20001);
+});
+
+Deno.test("onboardLead #140: Default-Job vorbei, kein geplanter → laufender gebuchter statt Default (prod 6c971801)", async () => {
+  _resetAgencyTokenCache();
+  const supa = makeFakeSupabase([makeLead({ ...ONBOARDED })], [
+    { id: "job-a", lead_id: "lead-x", mamamia_job_offer_id: 16225, status: "abgeschlossen", anreise: "2026-03-01", abreise: "2026-04-22" },
+    { id: "job-b", lead_id: "lead-x", mamamia_job_offer_id: 20001, status: "gebucht", anreise: "2026-04-22", abreise: "2026-05-10" },
+    { id: "job-c", lead_id: "lead-x", mamamia_job_offer_id: 20003, status: "gebucht", anreise: "2026-05-10", abreise: "2026-06-20" },
+  ]);
+  const result = await onboardLead({
+    leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: NO_MAMAMIA, now: NOW,
+  });
+  // Zwei gebuchte, beide nicht vorbei → der früher beginnende (der laufende).
+  assertEquals(result.job_offer_id, 20001);
+});
+
+Deno.test("onboardLead #140: nur ein kommender gebuchter Job + geplanter → der gebuchte", async () => {
+  _resetAgencyTokenCache();
+  const supa = makeFakeSupabase([makeLead({ ...ONBOARDED })], [
+    { id: "job-b", lead_id: "lead-x", mamamia_job_offer_id: 20001, status: "gebucht", anreise: "2026-05-02", abreise: "2026-06-20" },
+    { id: "job-c", lead_id: "lead-x", mamamia_job_offer_id: 20002, status: "geplant", anreise: "2026-06-20" },
+  ]);
+  const result = await onboardLead({
+    leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: NO_MAMAMIA, now: NOW,
+  });
+  assertEquals(result.job_offer_id, 20001);
+});
+
+Deno.test("onboardLead #140: Abreise zählt nach Berliner Kalendertag (23:30 UTC = schon der nächste Tag)", async () => {
+  _resetAgencyTokenCache();
+  const jobs = [
+    { id: "job-b", lead_id: "lead-x", mamamia_job_offer_id: 20001, status: "gebucht", anreise: "2026-04-01", abreise: "2026-04-22" },
+    { id: "job-c", lead_id: "lead-x", mamamia_job_offer_id: 20002, status: "geplant", anreise: "2026-04-25" },
+  ];
+  // 2026-04-22T21:30Z = 23:30 Berlin am 22. ⇒ Abreisetag, der gebuchte läuft noch.
+  const amAbreisetag = await onboardLead({
+    leadToken: "valid-token", secrets: SECRETS, supabase: makeFakeSupabase([makeLead({ ...ONBOARDED })], jobs),
+    fetchFn: NO_MAMAMIA, now: () => new Date("2026-04-22T21:30:00.000Z"),
+  });
+  assertEquals(amAbreisetag.job_offer_id, 20001);
+  // 2026-04-22T22:30Z = 00:30 Berlin am 23. ⇒ vorbei, der geplante übernimmt.
+  _resetAgencyTokenCache();
+  const danach = await onboardLead({
+    leadToken: "valid-token", secrets: SECRETS, supabase: makeFakeSupabase([makeLead({ ...ONBOARDED })], jobs),
+    fetchFn: NO_MAMAMIA, now: () => new Date("2026-04-22T22:30:00.000Z"),
+  });
+  assertEquals(danach.job_offer_id, 20002);
+});
+
+Deno.test("onboardLead #140: fetchCurrentBookedJob-Fehler → geplanter Job (Portal-Eintritt bricht nie)", async () => {
+  _resetAgencyTokenCache();
+  const base = makeFakeSupabase([makeLead({ ...ONBOARDED })], [
+    { id: "job-c", lead_id: "lead-x", mamamia_job_offer_id: 20002, status: "geplant" },
+  ]);
+  const supa = { ...base, fetchCurrentBookedJob: () => Promise.reject(new Error("db down")) };
+  const result = await onboardLead({
+    leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: NO_MAMAMIA, now: NOW,
+  });
+  assertEquals(result.job_offer_id, 20002);
 });
 
 Deno.test("onboardLead: fetchNewestPlannedJob-Fehler → Default-Job (Portal-Eintritt bricht nie)", async () => {
