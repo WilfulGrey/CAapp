@@ -150,12 +150,13 @@ export function berlinTagBeginn(tag: string): Date {
 
 const ms = (iso: string | null | undefined) => (iso ? new Date(iso).getTime() : NaN);
 
-/** Letzter Tag, dessen Anfragen alle mindestens REIFE_STUNDEN alt sind. */
+/**
+ * Letzter Tag, dessen Anfragen alle mindestens REIFE_STUNDEN alt sind: der Tag vor dem
+ * Berliner Tag der Grenze (jetzt − 72 h). Der Tag der Grenze selbst hat immer noch
+ * Anfragen nach ihr — auch um Mitternacht, dann beginnt er genau an der Grenze.
+ */
 export function reifBis(jetzt: Date): string {
-  const grenze = new Date(jetzt.getTime() - REIFE_STUNDEN * 3600_000);
-  const tag = berlinTag(grenze);
-  // Endet der Tag der Grenze schon vor ihr? Nur bei exakt Mitternacht.
-  return berlinTagBeginn(tagPlus(tag, 1)).getTime() <= grenze.getTime() ? tag : tagPlus(tag, -1);
+  return tagPlus(berlinTag(new Date(jetzt.getTime() - REIFE_STUNDEN * 3600_000)), -1);
 }
 
 // ─── Zeitraum ─────────────────────────────────────────────────────────────
@@ -267,9 +268,9 @@ const kennung = (s: string | null | undefined) => {
  * Website → sonstige Kennung → direkt.
  *
  * Google: Kampagne aus `utm_campaign` (= Kampagnen-ID). Der Referenz-Export nahm sie aus
- * `click_view`; das gibt es serverseitig nicht. Abweichung: Die UTM-Werte stehen erst seit
- * 09.09.2026 am Lead (Migration 20260909110000) — ältere Google-Anfragen landen in
- * „Google ohne Zuordnung".
+ * `click_view`; das gibt es serverseitig nicht. Abweichung: Die Kampagne steht erst ab dem
+ * 07.09.2026 am Lead (Migration 20260909110000), lückenlos erst ab dem 11.09. (letzte Google-
+ * Anfrage ohne Kampagne: 10.09., 16:12) — ältere landen in „Google ohne Zuordnung".
  */
 export function kanalJeAnfrage(l: TLead, ereignisse: TEreignis[]): { kanal: Kanal; herkunft: string } {
   const quelle = String(l.source ?? '');
@@ -441,10 +442,15 @@ export function anfrageZeilen(input: {
   return { zeilen, tests };
 }
 
-/** Keyword aus utm_term: das gebuchte Keyword. Sieht es nach Kontaktdaten aus, bleibt es leer. */
+/**
+ * Keyword aus utm_term: das gebuchte Keyword. utm_term ist ein Adressparameter und kann frei
+ * gesetzt werden — deshalb nur Buchstaben, Ziffern, Leerzeichen, „+“, „-“ und „.“, höchstens
+ * 6 Wörter, und nichts, was nach Kontaktdaten aussieht. Sonst bleibt das Feld leer.
+ */
 export function keywordBereinigen(roh: string | null | undefined): string {
   const t = String(roh ?? '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 80);
   if (!t || t.includes('@') || /\d{6,}/.test(t.replace(/\s/g, ''))) return '';
+  if (!/^[\p{L}\p{N} +.-]+$/u.test(t) || t.split(' ').length > 6) return '';
   return t;
 }
 
@@ -529,17 +535,36 @@ export type Stufen = {
 };
 
 export type KanalSumme = Stufen & {
-  kanal: Kanal | 'Zusammen';
+  kanal: Kanal | 'Google gesamt' | 'Zusammen';
   /** Kosten netto in Euro; null = nicht bekannt (keine Kosten oder Kosten fehlen für Tage). */
   kosten: number | null;
   kostenArt: 'google' | 'einkauf' | null;
+  /** null bei unbekannten Kosten, ohne Profil (dann bei Kosten > 0 Farbe „rot“) oder bei `jeProfilOffen`. */
   jeProfil: number | null;
   jeProfilSelbst: number | null;
   farbe: 'gruen' | 'gelb' | 'rot' | null;
   farbeSelbst: 'gruen' | 'gelb' | 'rot' | null;
+  /**
+   * Kosten je Profil nicht belastbar: Im Zeitraum gibt es Google-Anfragen ohne Kampagne.
+   * Ihre Kosten stecken in High Intent / PM, ihre Profile nicht — der Nenner wäre zu klein.
+   */
+  jeProfilOffen: boolean;
 };
 
-export type TagZeile = Stufen & { tag: string; kanal: Kanal; kosten: number | null; reif: boolean };
+export type TagZeile = Stufen & { tag: string; kanal: Kanal; kosten: number | null; jeProfilOffen: boolean; reif: boolean };
+
+type Farbe = KanalSumme['farbe'];
+
+/**
+ * Kosten je Profil mit Farbe. Kosten > 0 ohne ein einziges Profil ist der schlechteste Fall
+ * und darf nicht wie „keine Kosten“ aussehen: Wert null, Farbe rot.
+ */
+function jeProfilMitFarbe(kosten: number | null, profile: number, offen: boolean): { wert: number | null; farbe: Farbe } {
+  if (offen || kosten === null) return { wert: null, farbe: null };
+  if (profile === 0) return { wert: null, farbe: kosten > 0 ? 'rot' : null };
+  const wert = rund(kosten / profile);
+  return { wert, farbe: zielFarbe(wert) };
+}
 
 const leer = (): Stufen => ({
   anfragen: 0, davonDoppelt: 0, ohneDoppelte: 0, portalGeoeffnet: 0, bogenGemessen: 0, bogenImBild: 0,
@@ -568,23 +593,36 @@ export const stueckpreis = (portal: string | null) => (portal && portal in PORTA
 
 export type Trichter = {
   kanaele: KanalSumme[];
+  /**
+   * Alle Google-Kanäle zusammen (auch „ohne Zuordnung“). Nur, wenn es mehr als einen
+   * Google-Kanal gibt oder Anfragen ohne Kampagne — dann ist das die belastbare Zahl je Profil.
+   */
+  googleGesamt: KanalSumme | null;
   zusammen: KanalSumme;
   tage: TagZeile[];
   /** Portale ohne Stückpreis (mit 0 € gerechnet). */
   ohnePreis: string[];
   google: { tageskosten: number; kampagnenkosten: number | null };
+  /** Google-Anfragen ohne Kampagne (utm_campaign fehlt; vor dem 11.09.2026). */
+  ohneZuordnung: number;
 };
 
 /**
  * Summen je Kanal über die Zeilen (Kohorte nach Anfragetag) und Kosten über die Tage
  * `tage`. Google-Kanäle bekommen Kosten nur, wenn für KEINEN Tag des Zeitraums Kampagnen-
- * Kosten fehlen — Teilsummen würden die Kosten je Profil zu gut aussehen lassen.
+ * Kosten fehlen — Teilsummen würden die Kosten je Profil zu gut aussehen lassen. Aus dem
+ * gleichen Grund kein Wert je Profil für einzelne Kampagnen, solange es Google-Anfragen ohne
+ * Kampagne gibt: deren Kosten stecken in den Kampagnen, deren Profile nicht (Nenner zu klein).
  */
 export function trichterSummen(zeilen: AnfrageZeile[], lage: KostenLage, tage: string[]): Trichter {
   const tagSet = new Set(tage);
   const rel = zeilen.filter((z) => tagSet.has(z.tag));
   const fehlend = lage.fehlendeTage.filter((t) => tagSet.has(t));
   const googleVollstaendig = lage.tabelleDa && fehlend.length === 0;
+  const ohneZuordnungZeilen = rel.filter((z) => z.kanal === 'Google ohne Zuordnung');
+  const tageOhneZuordnung = new Set(ohneZuordnungZeilen.map((z) => z.tag));
+  const kampagnenNennerOffen = ohneZuordnungZeilen.length > 0;
+  const istKampagne = (k: Kanal) => k === 'High Intent' || k === 'PM' || k === 'Google sonstige';
   const ohnePreis = new Set<string>();
 
   const jeKanal = new Map<Kanal, Stufen & { einkauf: number }>();
@@ -619,56 +657,83 @@ export function trichterSummen(zeilen: AnfrageZeile[], lage: KostenLage, tage: s
   const googleKosten = (kanal: Kanal, nurTage: string[]) =>
     nurTage.reduce((s, t) => s + (lage.jeTag.get(t)?.[kanal] ?? 0), 0);
 
+  const summeMitKosten = (
+    kanal: KanalSumme['kanal'], s: Stufen, kosten: number | null, kostenArt: KanalSumme['kostenArt'], offen: boolean,
+  ): KanalSumme => {
+    const gesamt = jeProfilMitFarbe(kosten, s.profileGesamt, offen);
+    const selbst = jeProfilMitFarbe(kosten, s.profilSelbst, offen);
+    return {
+      ...s, kanal, kosten, kostenArt,
+      jeProfil: gesamt.wert, jeProfilSelbst: selbst.wert, farbe: gesamt.farbe, farbeSelbst: selbst.farbe,
+      jeProfilOffen: offen,
+    };
+  };
+
   const mitKosten = (kanal: Kanal, s: Stufen & { einkauf: number }): KanalSumme => {
     let kosten: number | null = null;
     let kostenArt: KanalSumme['kostenArt'] = null;
     if (kanal === 'eingekauft') { kosten = rund(s.einkauf); kostenArt = 'einkauf'; }
-    else if (kanal === 'High Intent' || kanal === 'PM' || kanal === 'Google sonstige') {
+    else if (istKampagne(kanal)) {
       kostenArt = 'google';
       kosten = googleVollstaendig ? rund(googleKosten(kanal, tage)) : null;
     }
     const { einkauf: _e, ...stufen } = s;
-    return {
-      ...stufen, kanal, kosten, kostenArt,
-      jeProfil: teile(kosten, s.profileGesamt), jeProfilSelbst: teile(kosten, s.profilSelbst),
-      farbe: zielFarbe(teile(kosten, s.profileGesamt)), farbeSelbst: zielFarbe(teile(kosten, s.profilSelbst)),
-    };
+    return summeMitKosten(kanal, stufen, kosten, kostenArt, istKampagne(kanal) && kampagnenNennerOffen);
   };
 
   const kanaele = KANAELE.filter((k) => jeKanal.has(k)).map((k) => mitKosten(k, jeKanal.get(k)!));
-
-  const summe = leer();
-  rel.forEach((z) => zaehle(summe, z));
-  const bekannt = kanaele.filter((k) => k.kosten !== null);
-  const kostenZusammen = kanaele.some((k) => k.kostenArt === 'google' && k.kosten === null)
-    ? null : rund(bekannt.reduce((s, k) => s + (k.kosten ?? 0), 0));
-  const zusammen: KanalSumme = {
-    ...summe, kanal: 'Zusammen', kosten: kostenZusammen, kostenArt: null,
-    jeProfil: teile(kostenZusammen, summe.profileGesamt), jeProfilSelbst: teile(kostenZusammen, summe.profilSelbst),
-    farbe: zielFarbe(teile(kostenZusammen, summe.profileGesamt)), farbeSelbst: zielFarbe(teile(kostenZusammen, summe.profilSelbst)),
-  };
-
-  const tageZeilen: TagZeile[] = Array.from(jeTagKanal.values()).map((t) => {
-    const { einkauf, tag, kanal, ...stufen } = t;
-    let kosten: number | null = null;
-    if (kanal === 'eingekauft') kosten = rund(einkauf);
-    else if (GOOGLE_KANAELE.includes(kanal) && kanal !== 'Google ohne Zuordnung' && lage.jeTag.has(tag)) {
-      kosten = rund(lage.jeTag.get(tag)?.[kanal] ?? 0);
-    }
-    return { ...stufen, tag, kanal, kosten, reif: false };
-  }).sort((a, b) => a.tag.localeCompare(b.tag) || KANAELE.indexOf(a.kanal) - KANAELE.indexOf(b.kanal));
 
   const tageskosten = rund(tage.reduce((s, t) => s + (lage.googleTag.get(t) ?? 0), 0));
   const kampagnenkosten = googleVollstaendig
     ? rund(tage.reduce((s, t) => s + Object.values(lage.jeTag.get(t) ?? {}).reduce((a, b) => a + (b ?? 0), 0), 0))
     : null;
 
-  return { kanaele, zusammen, tage: tageZeilen, ohnePreis: Array.from(ohnePreis), google: { tageskosten, kampagnenkosten } };
+  /* Google gesamt: alle vier Google-Kanäle, Kosten = alle Kampagnen. Zähler und Nenner sind
+     hier vollständig, auch wenn Anfragen keine Kampagne tragen. */
+  const googleZeilen = kanaele.filter((k) => GOOGLE_KANAELE.includes(k.kanal as Kanal));
+  let googleGesamt: KanalSumme | null = null;
+  if (googleZeilen.length > 1 || kampagnenNennerOffen) {
+    const s = leer();
+    rel.filter((z) => GOOGLE_KANAELE.includes(z.kanal)).forEach((z) => zaehle(s, z));
+    googleGesamt = summeMitKosten('Google gesamt', s, kampagnenkosten, 'google', false);
+  }
+
+  /* Zusammen: alle Kosten durch alle Profile, auch die der Kanäle ohne Kosten (Website,
+     direkt, KI). Deshalb ohne Farbe — der Wert steht nicht gegen den Zielkorridor, solange
+     Martin nicht festgelegt hat, worauf sich „60–80 € je Profil“ bezieht. Fehlen Google-Kosten
+     und gibt es Google-Anfragen, bleibt auch „Zusammen“ leer (sonst nur der Einkauf). */
+  const summe = leer();
+  rel.forEach((z) => zaehle(summe, z));
+  const bekannt = kanaele.filter((k) => k.kosten !== null);
+  const googleFehlt = kanaele.some((k) => k.kostenArt === 'google' && k.kosten === null)
+    || (!googleVollstaendig && rel.some((z) => GOOGLE_KANAELE.includes(z.kanal)));
+  const kostenZusammen = googleFehlt ? null : rund(bekannt.reduce((s, k) => s + (k.kosten ?? 0), 0));
+  const zusammen: KanalSumme = {
+    ...summeMitKosten('Zusammen', summe, kostenZusammen, null, false),
+    farbe: null, farbeSelbst: null,
+  };
+
+  const tageZeilen: TagZeile[] = Array.from(jeTagKanal.values()).map((t) => {
+    const { einkauf, tag, kanal, ...stufen } = t;
+    let kosten: number | null = null;
+    if (kanal === 'eingekauft') kosten = rund(einkauf);
+    else if (istKampagne(kanal) && lage.jeTag.has(tag)) {
+      kosten = rund(lage.jeTag.get(tag)?.[kanal] ?? 0);
+    }
+    return { ...stufen, tag, kanal, kosten, jeProfilOffen: istKampagne(kanal) && tageOhneZuordnung.has(tag), reif: false };
+  }).sort((a, b) => a.tag.localeCompare(b.tag) || KANAELE.indexOf(a.kanal) - KANAELE.indexOf(b.kanal));
+
+  return {
+    kanaele, googleGesamt, zusammen, tage: tageZeilen, ohnePreis: Array.from(ohnePreis),
+    google: { tageskosten, kampagnenkosten }, ohneZuordnung: ohneZuordnungZeilen.length,
+  };
 }
 
 /** Hinweise in Klartext für die Seite. */
 export function hinweise(input: {
   lage: KostenLage; von: string; bis: string; heute: string; reifBis: string; trichter: Trichter;
+  /** Für den Morgen-Hinweis (Kosten von gestern kommen erst mit dem Morgenbericht). */
+  jetzt?: Date;
 }): string[] {
   const h: string[] = [];
   const { lage, trichter } = input;
@@ -678,6 +743,11 @@ export function hinweise(input: {
   } else if (lage.fehlendeTage.length > 0) {
     const f = lage.fehlendeTage;
     h.push(`Kosten je Kampagne fehlen für ${f.length} ${f.length === 1 ? 'Tag' : 'Tage'} (${tag(f[0])}${f.length > 1 ? `–${tag(f[f.length - 1])}` : ''}). Google-Kosten je Kanal bleiben deshalb leer.`);
+    const gestern = tagPlus(input.heute, -1);
+    const stunde = input.jetzt ? Number(berlinZeit(input.jetzt.toISOString()).slice(11, 13)) : NaN;
+    if (f.length === 1 && f[0] === gestern && stunde < 9) {
+      h.push('Die Kosten von gestern schreibt der Morgenbericht gegen 06:00 Uhr. Wer die Zahlen vorher braucht, wählt den Zeitraum bis vorgestern.');
+    }
   }
   if (lage.fehlendeTageGesamt.length > 0) {
     h.push(`Google-Tageskosten fehlen für ${lage.fehlendeTageGesamt.length} Tage — die Gegenprobe ist unvollständig.`);
@@ -692,7 +762,10 @@ export function hinweise(input: {
     h.push(`Anfragen ab ${tag(ab)} sind jünger als ${REIFE_STUNDEN} Stunden: Profile und vor allem Buchungen kommen dort noch dazu.`);
   }
   if (input.von < berlinTag(MESS_AB_BOGEN)) h.push('„Bogen im Bild" wird erst seit 22.10.2026, 15:29 Uhr gemessen; die Quote bezieht sich nur auf Anfragen ab dann.');
-  if (input.von < '2026-09-10') h.push('Google-Anfragen vor dem 10.09.2026 tragen keine Kampagne (UTM-Werte erst seitdem am Lead) und stehen unter „Google ohne Zuordnung".');
+  if (trichter.ohneZuordnung > 0) {
+    const n = trichter.ohneZuordnung;
+    h.push(`${n} Google-${n === 1 ? 'Anfrage trägt' : 'Anfragen tragen'} keine Kampagne (erst ab 11.09.2026 trägt jede Google-Anfrage ihre Kampagne) und ${n === 1 ? 'steht' : 'stehen'} unter „Google ohne Zuordnung“. Ihre Kosten stecken in High Intent und PM, ihre Profile nicht. € je Profil je Kampagne bleibt deshalb leer; belastbar ist „Google gesamt“.`);
+  }
   if (trichter.ohnePreis.length > 0) h.push(`Ohne hinterlegten Einkaufspreis und daher mit 0 € gerechnet: ${trichter.ohnePreis.join(', ')}.`);
   return h;
 }
@@ -751,8 +824,16 @@ export function tageCsv(tage: TagZeile[]): string {
   return csv(TAGE_SPALTEN, tage.map((t) => [
     t.tag, t.kanal, t.anfragen, t.davonDoppelt, t.portalGeoeffnet,
     t.bogenGemessen > 0 ? t.bogenImBild : 'nicht gemessen', t.bogenBegonnen, t.profilSelbst, t.teamIndiz,
-    t.profileGesamt, t.mitEinladung, t.mitBewerbung, t.buchungen, komma(t.kosten), komma(teile(t.kosten, t.profileGesamt)), t.reif,
+    t.profileGesamt, t.mitEinladung, t.mitBewerbung, t.buchungen, komma(t.kosten), kostenJeProfilFeld(t), t.reif,
   ]));
+}
+
+/** Kosten je Profil eines Tages: Betrag, „kein Profil“ (Kosten ohne Profil) oder „nicht belastbar“. */
+function kostenJeProfilFeld(t: TagZeile): string {
+  if (t.kosten === null) return '';
+  if (t.jeProfilOffen) return 'nicht belastbar';
+  if (t.profileGesamt === 0) return t.kosten > 0 ? 'kein Profil' : '';
+  return komma(teile(t.kosten, t.profileGesamt));
 }
 
 // ─── Laden ────────────────────────────────────────────────────────────────

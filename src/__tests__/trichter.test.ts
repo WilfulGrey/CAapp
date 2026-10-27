@@ -173,6 +173,9 @@ describe('Reife', () => {
     expect(zeilen.find((z) => z.leadId === jung.id)!.reif).toBe(false);
     // 27.10. 12:00 UTC − 72 h = 24.10. 12:00 UTC ⇒ der 24.10. ist noch nicht ganz reif
     expect(reifBis(JETZT)).toBe('2026-10-23');
+    // Grenze genau um Berliner Mitternacht (27.10. 22:00 UTC − 72 h = 24.10. 22:00 UTC = 25.10. 00:00 Sommerzeit): der 24.10. ist ganz reif.
+    expect(reifBis(new Date('2026-10-27T22:00:00Z'))).toBe('2026-10-24');
+    expect(reifBis(new Date('2026-10-27T21:59:00Z'))).toBe('2026-10-23');
     const tage = mitReife([{ tag: '2026-10-23' }, { tag: '2026-10-24' }] as never, reifBis(JETZT));
     expect(tage.map((t) => t.reif)).toEqual([true, false]);
   });
@@ -241,6 +244,76 @@ describe('Kosten je Profil', () => {
     expect(t.kanaele.find((k) => k.kanal === 'eingekauft')!.kosten).toBe(37); // Einkauf bleibt
   });
 
+  it('Kosten ohne ein einziges Profil: Wert leer, Farbe rot (nicht „keine Kosten“); Tage-CSV „kein Profil“', () => {
+    const lage = kostenLage({
+      kampagne: [kampagne('2026-10-23', HI, 70), kampagne('2026-10-24', HI, 80), kampagne('2026-10-24', PM, 30)],
+      gesamt: [{ tag: '2026-10-23', kosten_netto: 70 }, { tag: '2026-10-24', kosten_netto: 110 }],
+      von: zweiTage[0], bis: zweiTage[1], heute: '2026-10-27',
+    });
+    const t = trichterSummen(daten(), lage, zweiTage);
+    expect(t.kanaele.find((k) => k.kanal === 'PM')).toMatchObject({ kosten: 30, jeProfil: null, farbe: 'rot', jeProfilSelbst: null, farbeSelbst: 'rot', jeProfilOffen: false });
+    expect(tageCsv(t.tage)).toContain('2026-10-24;PM;0;0;0;nicht gemessen;0;0;0;0;0;0;0;30,00;kein Profil;nein');
+    // „Zusammen“ steht ohne Farbe: es teilt auch durch die Profile der Kanäle ohne Kosten.
+    expect(t.zusammen).toMatchObject({ farbe: null, farbeSelbst: null });
+    expect(t.zusammen.jeProfil).not.toBeNull();
+  });
+
+  it('Google-Anfrage ohne Kampagne: kein Wert je Profil je Kampagne, belastbar nur „Google gesamt“, Hinweis', () => {
+    const lage = kostenLage({
+      kampagne: [kampagne('2026-10-23', HI, 70), kampagne('2026-10-24', HI, 80), kampagne('2026-10-24', PM, 30)],
+      gesamt: [{ tag: '2026-10-23', kosten_netto: 70 }, { tag: '2026-10-24', kosten_netto: 110 }],
+      von: zweiTage[0], bis: zweiTage[1], heute: '2026-10-27',
+    });
+    const ohne = lead({ gclid: 'ohne-utm', created_at: '2026-10-24T10:00:00Z' });
+    const zeilen = daten().concat(zeilenFuer([ohne], [ev(ohne, 'patient_data_saved')]).zeilen);
+    const t = trichterSummen(zeilen, lage, zweiTage);
+    expect(t.ohneZuordnung).toBe(1);
+    const hi = t.kanaele.find((k) => k.kanal === 'High Intent')!;
+    expect(hi).toMatchObject({ kosten: 150, jeProfil: null, farbe: null, jeProfilSelbst: null, jeProfilOffen: true });
+    expect(t.kanaele.find((k) => k.kanal === 'PM')).toMatchObject({ jeProfilOffen: true, farbe: null });
+    expect(t.kanaele.find((k) => k.kanal === 'Google ohne Zuordnung')).toMatchObject({ anfragen: 1, kosten: null, profilSelbst: 1 });
+    expect(t.kanaele.find((k) => k.kanal === 'eingekauft')).toMatchObject({ jeProfilOffen: false, jeProfil: 37 });
+    // 180 € alle Kampagnen ÷ 3 Google-Profile (2 High Intent + 1 ohne Zuordnung)
+    expect(t.googleGesamt).toMatchObject({ kanal: 'Google gesamt', anfragen: 3, profileGesamt: 3, kosten: 180, jeProfil: 60, farbe: 'gruen', jeProfilOffen: false });
+    const tagCsv = tageCsv(t.tage);
+    expect(tagCsv).toContain('2026-10-24;High Intent;1;0;0;0;0;0;1;1;1;0;0;80,00;nicht belastbar;nein');
+    expect(tagCsv).toContain('2026-10-23;High Intent;1;0;0;0;0;1;0;1;0;0;0;70,00;70,00;nein'); // Tag ohne „ohne Zuordnung“
+    const h = hinweise({ lage, von: zweiTage[0], bis: zweiTage[1], heute: '2026-10-27', reifBis: '2026-10-23', trichter: t }).join(' ');
+    expect(h).toContain('1 Google-Anfrage trägt keine Kampagne');
+    expect(h).toContain('Google gesamt');
+    // Ohne die Anfrage ohne Kampagne: Werte je Kampagne wieder da, kein Hinweis.
+    const ohneHinweis = hinweise({ lage, von: zweiTage[0], bis: zweiTage[1], heute: '2026-10-27', reifBis: '2026-10-23', trichter: trichterSummen(daten(), lage, zweiTage) });
+    expect(ohneHinweis.join(' ')).not.toContain('keine Kampagne');
+  });
+
+  it('nur ein Google-Kanal und alle Anfragen mit Kampagne: keine Zeile „Google gesamt“', () => {
+    const lage = kostenLage({ kampagne: [kampagne('2026-10-23', HI, 70)], gesamt: [{ tag: '2026-10-23', kosten_netto: 70 }], von: '2026-10-23', bis: '2026-10-23', heute: '2026-10-27' });
+    const a = lead({ gclid: 'x', utm_campaign: HI });
+    expect(trichterSummen(zeilenFuer([a]).zeilen, lage, ['2026-10-23']).googleGesamt).toBeNull();
+  });
+
+  it('ohne Kampagnen-Tabelle und nur Google-Anfragen ohne Kampagne: „Zusammen“ ohne Kosten statt nur Einkauf', () => {
+    const lage = kostenLage({ kampagne: null, gesamt: [], von: '2026-10-23', bis: '2026-10-23', heute: '2026-10-27' });
+    const g = lead({ gclid: 'ohne' });
+    const e = lead({ source: 'portal:pflegehilfe.org' });
+    const t = trichterSummen(zeilenFuer([g, e]).zeilen, lage, ['2026-10-23']);
+    expect(t.kanaele.find((k) => k.kanal === 'eingekauft')!.kosten).toBe(37);
+    expect(t.zusammen.kosten).toBeNull();
+  });
+
+  it('morgens vor dem Morgenbericht: Hinweis, warum gestern fehlt', () => {
+    const lage = kostenLage({
+      kampagne: [kampagne('2026-10-25', HI, 70)], gesamt: [{ tag: '2026-10-25', kosten_netto: 70 }],
+      von: '2026-10-25', bis: '2026-10-27', heute: '2026-10-27',
+    });
+    expect(lage.fehlendeTage).toEqual(['2026-10-26']);
+    const t = trichterSummen([], lage, ['2026-10-25', '2026-10-26', '2026-10-27']);
+    const frueh = hinweise({ lage, von: '2026-10-25', bis: '2026-10-27', heute: '2026-10-27', reifBis: '2026-10-23', trichter: t, jetzt: new Date('2026-10-27T05:30:00Z') });
+    expect(frueh.join(' ')).toContain('Morgenbericht gegen 06:00');
+    const spaet = hinweise({ lage, von: '2026-10-25', bis: '2026-10-27', heute: '2026-10-27', reifBis: '2026-10-23', trichter: t, jetzt: new Date('2026-10-27T12:00:00Z') });
+    expect(spaet.join(' ')).not.toContain('Morgenbericht gegen 06:00');
+  });
+
   it('Zielkorridor: bis 80 € grün, bis 100 € gelb, darüber rot', () => {
     expect(zielFarbe(60)).toBe('gruen');
     expect(zielFarbe(80)).toBe('gruen');
@@ -282,10 +355,15 @@ describe('Pseudonym und CSV', () => {
     expect(erste.anfrage_id).toBe(pseudonym(l.id, 'geheim'));
   });
 
-  it('Keyword mit Kontaktdaten-Anschein bleibt leer', () => {
+  it('Keyword mit Kontaktdaten-Anschein oder Fremdtext bleibt leer', () => {
     expect(keywordBereinigen('Pflege Kosten')).toBe('pflege kosten');
+    expect(keywordBereinigen('pflegekräfte für zuhause kosten')).toBe('pflegekräfte für zuhause kosten');
+    expect(keywordBereinigen('+24 stunden pflege')).toBe('+24 stunden pflege');
     expect(keywordBereinigen('oma@web.de')).toBe('');
     expect(keywordBereinigen('0171 1234567')).toBe('');
+    expect(keywordBereinigen('Erika Mustermann, Hauptstr. 5')).toBe(''); // Komma: kein Keyword
+    expect(keywordBereinigen('mein name ist erika mustermann aus köln')).toBe(''); // mehr als 6 Wörter
+    expect(keywordBereinigen('=HYPERLINK("x")')).toBe('');
   });
 
   it('Tage-CSV mit Kosten in deutscher Schreibweise und Reife', () => {

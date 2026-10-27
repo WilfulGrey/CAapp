@@ -40,8 +40,11 @@ async function begrenzt<T>(aufgaben: (() => Promise<T>)[], parallel: number): Pr
 }
 
 export async function GET(request: NextRequest) {
+  /* Ohne ADMIN_PASSWORD kein Zugang (kein Ersatzpasswort im Code; die middleware sperrt
+     /api/admin/* in dem Fall ohnehin). PR #809 stellt die Prüfung für alle Routen um. */
+  const passwort = process.env.ADMIN_PASSWORD;
   const cookie = request.cookies.get('admin_auth')?.value ?? '';
-  if (cookie !== (process.env.ADMIN_PASSWORD || 'primundus2026')) {
+  if (!passwort || cookie !== passwort) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
@@ -140,13 +143,14 @@ export async function GET(request: NextRequest) {
       kostenJeKampagne: lage.tabelleDa,
       tests,
       kanaele: ergebnis.kanaele,
+      googleGesamt: ergebnis.googleGesamt,
       zusammen: ergebnis.zusammen,
       google: ergebnis.google,
-      reif: reifeSumme ? { kanaele: reifeSumme.kanaele, zusammen: reifeSumme.zusammen } : null,
+      reif: reifeSumme ? { kanaele: reifeSumme.kanaele, googleGesamt: reifeSumme.googleGesamt, zusammen: reifeSumme.zusammen } : null,
       tage,
       hinweise: [
         ...(zeitraum.wert.hinweis ? [zeitraum.wert.hinweis] : []),
-        ...hinweise({ lage, von, bis, heute, reifBis: reif, trichter: ergebnis }),
+        ...hinweise({ lage, von, bis, heute, reifBis: reif, trichter: ergebnis, jetzt }),
       ],
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {

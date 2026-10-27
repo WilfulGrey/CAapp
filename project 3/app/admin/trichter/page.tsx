@@ -19,14 +19,17 @@ type Antwort = {
   kostenJeKampagne: boolean;
   tests: number;
   kanaele: KanalSumme[];
+  googleGesamt: KanalSumme | null;
   zusammen: KanalSumme;
   google: { tageskosten: number; kampagnenkosten: number | null };
-  reif: { kanaele: KanalSumme[]; zusammen: KanalSumme } | null;
+  reif: { kanaele: KanalSumme[]; googleGesamt: KanalSumme | null; zusammen: KanalSumme } | null;
   tage: TagZeile[];
   hinweise: string[];
 };
 
 const START_MESSUNG = '2026-09-01';
+/** Ab diesem Tag trägt jede Google-Anfrage ihre Kampagne (letzte ohne: 10.09., 16:12). */
+const START_KAMPAGNE = '2026-09-11';
 
 const ZEITRAEUME = [
   { key: '7', label: '7 Tage' },
@@ -34,6 +37,7 @@ const ZEITRAEUME = [
   { key: '30', label: '30 Tage' },
   { key: '90', label: '90 Tage' },
   { key: 'sept', label: 'Seit 01.09.' },
+  { key: 'kampagne', label: 'Seit 11.09.' },
   { key: 'frei', label: 'Frei' },
 ];
 
@@ -49,6 +53,9 @@ function tagMinus(heute: string, n: number) {
   return d.toISOString().slice(0, 10);
 }
 const heuteBerlin = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
+
+/** Google-Kanäle (für die Stelle von „Google gesamt“ in der Tabelle). */
+const GOOGLE: string[] = ['High Intent', 'PM', 'Google sonstige', 'Google ohne Zuordnung'];
 
 const FARBE: Record<string, string> = {
   gruen: 'bg-emerald-50 text-emerald-800',
@@ -89,7 +96,8 @@ export default function TrichterPage() {
     setAuswahl(key);
     if (key === 'frei') return;
     const h = heuteBerlin();
-    setZeitraum(key === 'sept' ? { von: START_MESSUNG, bis: h } : { von: tagMinus(h, Number(key) - 1), bis: h });
+    if (key === 'sept' || key === 'kampagne') setZeitraum({ von: key === 'sept' ? START_MESSUNG : START_KAMPAGNE, bis: h });
+    else setZeitraum({ von: tagMinus(h, Number(key) - 1), bis: h });
   };
 
   useEffect(() => {
@@ -107,7 +115,22 @@ export default function TrichterPage() {
     return () => { abgebrochen = true; };
   }, [zeitraum]);
 
-  const sicht = nurReif && daten?.reif ? daten.reif : daten ? { kanaele: daten.kanaele, zusammen: daten.zusammen } : null;
+  const sicht = nurReif && daten?.reif ? daten.reif
+    : daten ? { kanaele: daten.kanaele, googleGesamt: daten.googleGesamt, zusammen: daten.zusammen } : null;
+
+  /* Zeilen der Kanal-Tabelle: „Google gesamt“ direkt hinter dem letzten Google-Kanal. */
+  const kanalZeilen = ((): KanalSumme[] => {
+    if (!sicht) return [];
+    const liste: KanalSumme[] = [];
+    const istGoogle = (k: KanalSumme) => GOOGLE.includes(k.kanal);
+    sicht.kanaele.forEach((k, i) => {
+      liste.push(k);
+      const naechste = sicht.kanaele[i + 1];
+      if (sicht.googleGesamt && istGoogle(k) && (!naechste || !istGoogle(naechste))) liste.push(sicht.googleGesamt);
+    });
+    if (sicht.googleGesamt && !liste.includes(sicht.googleGesamt)) liste.unshift(sicht.googleGesamt);
+    return liste.concat([sicht.zusammen]);
+  })();
 
   /* Tagestabelle: Zeilen = Tage (neueste oben), Spalten = Kanäle mit Daten. */
   const tagTabelle = useMemo(() => {
@@ -124,8 +147,10 @@ export default function TrichterPage() {
     return { kanaele, tagListe, jeTag };
   }, [daten, nurReif]);
 
+  /* Mit „Nur reife Tage“ endet auch die Datei am letzten reifen Tag. */
+  const csvNurReif = nurReif && !!daten?.reif;
   const csvLink = (teil: 'anfragen' | 'tage') =>
-    `/api/admin/trichter?von=${daten?.von ?? zeitraum.von}&bis=${daten?.bis ?? zeitraum.bis}&format=csv&teil=${teil}`;
+    `/api/admin/trichter?von=${daten?.von ?? zeitraum.von}&bis=${csvNurReif && daten ? daten.reifBis : daten?.bis ?? zeitraum.bis}&format=csv&teil=${teil}`;
 
   const zelle = (k: KanalSumme, key: keyof KanalSumme) => {
     const wert = Number(k[key] ?? 0);
@@ -144,12 +169,25 @@ export default function TrichterPage() {
     );
   };
 
-  const jeProfil = (wert: number | null, farbe: string | null) => (
-    <span className={`inline-block rounded px-1.5 py-0.5 font-semibold ${farbe ? FARBE[farbe] : 'text-gray-400'}`}>{euro(wert)}</span>
-  );
+  /* Kosten je Profil: leer ohne Kosten, „—“ wenn der Nenner unvollständig ist, rot „kein
+     Profil“ bei Kosten ohne Profil, sonst der Betrag gegen den Zielkorridor. */
+  const jeProfil = (k: KanalSumme, wert: number | null, farbe: string | null) => {
+    if (k.kosten === null) return <span className="text-gray-400">—</span>;
+    if (k.jeProfilOffen) {
+      return <span className="cursor-help text-gray-400" title="Nicht belastbar: Google-Anfragen ohne Kampagne im Zeitraum, siehe Google gesamt">—</span>;
+    }
+    if (wert === null) {
+      return k.kosten > 0
+        ? <span className={`inline-block whitespace-nowrap rounded px-1.5 py-0.5 font-semibold ${FARBE.rot}`}>kein Profil</span>
+        : <span className="text-gray-400">—</span>;
+    }
+    return (
+      <span className={`inline-block whitespace-nowrap rounded px-1.5 py-0.5 font-semibold ${farbe ? FARBE[farbe] : 'text-gray-700'}`}>{euro(wert)}</span>
+    );
+  };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+    <div className="py-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#3D2B1F]">Trichter</h1>
@@ -237,35 +275,48 @@ export default function TrichterPage() {
                 <span className={`rounded px-1 ${FARBE.gruen}`}>grün</span>, bis {daten.ziel.gelbBis} €{' '}
                 <span className={`rounded px-1 ${FARBE.gelb}`}>gelb</span>, darüber{' '}
                 <span className={`rounded px-1 ${FARBE.rot}`}>rot</span>. Google-Kosten je Kampagne, eingekaufte Anfragen zum Stückpreis.
+                „Zusammen“ teilt alle Kosten durch alle Profile, auch die der Kanäle ohne Kosten, und steht deshalb ohne Farbe.
               </p>
             </CardHeader>
-            <CardContent className="overflow-x-auto">
-              <table className="w-full min-w-[1000px] text-sm">
+            <CardContent className="overflow-x-auto px-0">
+              <table className="w-full min-w-[1040px] text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wider text-gray-500">
-                    <th className="sticky left-0 z-10 bg-white py-2 pr-3">Kanal</th>
-                    <th className="py-2 px-1.5 text-right">Anfragen</th>
-                    {STUFEN.map((s) => (
-                      <th key={String(s.key)} title={s.titel} className="cursor-help py-2 px-1.5 text-right">{s.kopf}</th>
+                    <th className="sticky left-0 z-10 bg-white py-2 pl-6 pr-3">Kanal</th>
+                    <th className="py-2 px-1 text-right">Anfragen</th>
+                    <th className="py-2 px-1 text-right">Kosten</th>
+                    <th className="py-2 px-1 text-right" title="Kosten ÷ Profile gesamt">€ je Profil</th>
+                    <th className="border-r border-gray-200 py-2 px-1 text-right" title="Kosten ÷ Profile, die der Kunde selbst gespeichert hat">€ je Profil selbst</th>
+                    {STUFEN.map((s, i) => (
+                      <th key={String(s.key)} title={s.titel}
+                        className={`cursor-help py-2 text-right ${i === STUFEN.length - 1 ? 'pl-1 pr-6' : 'px-1'}`}>{s.kopf}</th>
                     ))}
-                    <th className="py-2 px-1.5 text-right">Kosten</th>
-                    <th className="py-2 px-1.5 text-right" title="Kosten ÷ Profile gesamt">€ je Profil</th>
-                    <th className="py-2 pl-1.5 text-right" title="Kosten ÷ Profile, die der Kunde selbst gespeichert hat">€ je Profil selbst</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sicht.kanaele.concat([sicht.zusammen]).map((k) => (
-                    <tr key={k.kanal} className={`align-top tabular-nums ${k.kanal === 'Zusammen' ? 'border-t-2 border-gray-300 font-semibold' : 'border-b border-gray-100'}`}>
-                      <td className="sticky left-0 z-10 whitespace-nowrap bg-white py-2.5 pr-3 font-medium text-[#3D2B1F]">{k.kanal}</td>
-                      <td className="py-2.5 px-1.5 text-right font-semibold">{k.anfragen}</td>
-                      {STUFEN.map((s) => (
-                        <td key={String(s.key)} className="py-2.5 px-1.5 text-right">{zelle(k, s.key)}</td>
-                      ))}
-                      <td className="py-2.5 px-1.5 text-right">{euro(k.kosten)}</td>
-                      <td className="py-2.5 px-1.5 text-right">{k.kosten === null ? <span className="text-gray-400">—</span> : jeProfil(k.jeProfil, k.farbe)}</td>
-                      <td className="py-2.5 pl-1.5 text-right">{k.kosten === null ? <span className="text-gray-400">—</span> : jeProfil(k.jeProfilSelbst, k.farbeSelbst)}</td>
-                    </tr>
-                  ))}
+                  {kanalZeilen.map((k) => {
+                    const summenZeile = k.kanal === 'Zusammen' || k.kanal === 'Google gesamt';
+                    const zeilenFarbe = k.kanal === 'Google gesamt' ? 'bg-gray-50' : 'bg-white';
+                    return (
+                      <tr key={k.kanal} className={`align-top tabular-nums ${k.kanal === 'Zusammen' ? 'border-t-2 border-gray-300 font-semibold' : 'border-b border-gray-100'} ${k.kanal === 'Google gesamt' ? 'bg-gray-50' : ''}`}>
+                        <td className={`sticky left-0 z-10 whitespace-nowrap py-2.5 pl-6 pr-3 font-medium text-[#3D2B1F] ${zeilenFarbe}`}>
+                          {k.kanal}
+                          {summenZeile && (
+                            <span className="block max-w-[11rem] whitespace-normal text-[11px] font-normal leading-tight text-gray-500">
+                              {k.kanal === 'Zusammen' ? 'inkl. Kanäle ohne Kosten' : 'alle Google-Kanäle'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-1 text-right font-semibold">{k.anfragen}</td>
+                        <td className="whitespace-nowrap py-2.5 px-1 text-right">{euro(k.kosten)}</td>
+                        <td className="py-2.5 px-1 text-right">{jeProfil(k, k.jeProfil, k.farbe)}</td>
+                        <td className="border-r border-gray-200 py-2.5 px-1 text-right">{jeProfil(k, k.jeProfilSelbst, k.farbeSelbst)}</td>
+                        {STUFEN.map((s, i) => (
+                          <td key={String(s.key)} className={`py-2.5 text-right ${i === STUFEN.length - 1 ? 'pl-1 pr-6' : 'px-1'}`}>{zelle(k, s.key)}</td>
+                        ))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </CardContent>
@@ -278,13 +329,13 @@ export default function TrichterPage() {
                 Je Kanal: Anfragen → Profile gesamt, darunter die Kosten des Tages. Grau: jünger als 72 Stunden, da kommen noch Profile und Buchungen dazu.
               </p>
             </CardHeader>
-            <CardContent className="overflow-x-auto">
+            <CardContent className="overflow-x-auto px-0">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wider text-gray-500">
-                    <th className="sticky left-0 bg-white py-2 pr-3">Tag</th>
+                    <th className="sticky left-0 bg-white py-2 pl-6 pr-3">Tag</th>
                     {tagTabelle.kanaele.map((k) => <th key={k} className="whitespace-nowrap py-2 px-2 text-right">{k}</th>)}
-                    <th className="py-2 pl-2 text-right">Zusammen</th>
+                    <th className="py-2 pl-2 pr-6 text-right">Zusammen</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -296,7 +347,7 @@ export default function TrichterPage() {
                     const p = zeilen.reduce((s, z) => s + z.profileGesamt, 0);
                     return (
                       <tr key={tag} className={`border-b border-gray-100 tabular-nums ${reif ? '' : 'text-gray-400'}`}>
-                        <td className="sticky left-0 whitespace-nowrap bg-white py-1.5 pr-3">{kurz(tag)}</td>
+                        <td className="sticky left-0 whitespace-nowrap bg-white py-1.5 pl-6 pr-3">{kurz(tag)}</td>
                         {tagTabelle.kanaele.map((k) => {
                           const z = m.get(k);
                           return (
@@ -310,7 +361,7 @@ export default function TrichterPage() {
                             </td>
                           );
                         })}
-                        <td className="whitespace-nowrap py-1.5 pl-2 text-right font-medium">{a} → {p}</td>
+                        <td className="whitespace-nowrap py-1.5 pl-2 pr-6 text-right font-medium">{a} → {p}</td>
                       </tr>
                     );
                   })}
@@ -322,11 +373,11 @@ export default function TrichterPage() {
           <div className="flex flex-wrap gap-3">
             <a href={csvLink('anfragen')} download
               className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-[#3D2B1F] hover:bg-gray-50">
-              <Download className="h-4 w-4" /> Anfragen als CSV (anonym)
+              <Download className="h-4 w-4" /> Anfragen als CSV (anonym){csvNurReif ? ', nur reife Tage' : ''}
             </a>
             <a href={csvLink('tage')} download
               className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-[#3D2B1F] hover:bg-gray-50">
-              <Download className="h-4 w-4" /> Tage als CSV
+              <Download className="h-4 w-4" /> Tage als CSV{csvNurReif ? ' (nur reife Tage)' : ''}
             </a>
           </div>
           <p className="text-xs text-gray-500">

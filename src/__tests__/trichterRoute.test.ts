@@ -80,6 +80,13 @@ describe('/api/admin/trichter', () => {
     expect((await abrufen('', 'falsch')).status).toBe(401);
   });
 
+  it('ohne ADMIN_PASSWORD kein Zugang, auch nicht mit dem früheren Ersatzpasswort', async () => {
+    delete process.env.ADMIN_PASSWORD;
+    expect((await abrufen('', 'primundus2026')).status).toBe(401);
+    expect((await abrufen('', '')).status).toBe(401);
+    expect(abgefragt).toEqual([]);
+  });
+
   it('JSON: fehlende Kampagnen-Tabelle ⇒ Hinweis, High Intent ohne Kosten, kein Fehler, keine Kontaktdaten', async () => {
     const a = await abrufen('', 'pw-test');
     expect(a.status).toBe(200);
