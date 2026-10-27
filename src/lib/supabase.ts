@@ -98,6 +98,20 @@ export async function fetchLeadByToken(token: string): Promise<{
   return { lead: data as Lead, error: null };
 }
 
+// ─── Primundus-Notfallnummer (Gebucht-Seite, Registry #139) ───────────────────
+// Die Nummer steht nie im Code (Repo und Bundle sind öffentlich). Die Funktion notfall_telefon
+// (Migration 20261024150000) gibt sie nur bei gültigem Token UND Buchung zurück, sonst null. Fehler ⇒ null:
+// dann fehlt das Notfallfeld, der Tageskontakt bleibt. Den Wert nie loggen.
+export async function fetchNotfallTelefon(token: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.rpc('notfall_telefon', { p_token: token });
+    if (error || typeof data !== 'string' || !data.trim()) return null;
+    return data.trim();
+  } catch {
+    return null;
+  }
+}
+
 // ─── Persist a decline (or undo) for a caregiver via the
 //     set_declined_caregiver RPC (token-authenticated, SECURITY DEFINER).
 //     Returns null on success, error message on failure. Caller is

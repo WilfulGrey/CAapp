@@ -252,7 +252,19 @@ export async function fetchLeadEvents(
   token: string | null | undefined,
   eventTypes?: LeadEvent[] | string[],
 ): Promise<FetchedLeadEvent[]> {
-  if (!token || token === 'preview-token') return [];
+  return (await fetchLeadEventsOderNull(token, eventTypes)) ?? [];
+}
+
+/**
+ * Wie fetchLeadEvents, aber null, wenn die Brücke nicht geantwortet hat (Netz, HTTP-Fehler, kaputtes JSON). Die
+ * Gebucht-Seite braucht den Unterschied: Die Wartezeile „… sehen Sie hier, sobald …" steht nur nach einer echten
+ * Antwort (Spezifikation 7, Regel 4).
+ */
+export async function fetchLeadEventsOderNull(
+  token: string | null | undefined,
+  eventTypes?: LeadEvent[] | string[],
+): Promise<FetchedLeadEvent[] | null> {
+  if (!token || token === 'preview-token') return null;
   const params = new URLSearchParams({ token });
   if (eventTypes && eventTypes.length > 0) params.set('types', eventTypes.join(','));
   try {
@@ -260,11 +272,11 @@ export async function fetchLeadEvents(
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });
-    if (!res.ok) return [];
-    const json = await res.json().catch(() => ({ events: [] }));
-    return Array.isArray(json?.events) ? (json.events as FetchedLeadEvent[]) : [];
+    if (!res.ok) return null;
+    const json = await res.json().catch(() => null);
+    return Array.isArray(json?.events) ? (json.events as FetchedLeadEvent[]) : null;
   } catch {
-    return [];
+    return null;
   }
 }
 

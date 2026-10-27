@@ -57,14 +57,56 @@ export const MonatsAufstellung: FC<{ offer: OfferDetails; title?: string; abschn
         ))}
       </div>
       <p className="text-[12px] text-gray-400 mt-2.5 leading-relaxed">
-        An- und Abreisetage werden mit vollem Tagessatz berechnet.
-        {zuschlag.hasSummer && (
-          <> Im Juli und August fällt ein Sommerzuschlag von 6,67 €/Tag (200 €/Monat) an.</>
-        )}
-        {zuschlag.relevantHolidayNames.length > 0 && (
-          <> An {zuschlag.relevantHolidayNames.join(', ')} wird der doppelte Tagessatz berechnet.</>
-        )}
+        {aufstellungHinweis(zuschlag)}
       </p>
     </div>
   );
 };
+
+/** Fußnote der Aufstellung — EIN Wortlaut für den Dialog „Angebot prüfen" und die Gebucht-Seite (live, unverändert). */
+export function aufstellungHinweis(zuschlag: { hasSummer: boolean; relevantHolidayNames: string[] }): string {
+  return [
+    'An- und Abreisetage werden mit vollem Tagessatz berechnet.',
+    zuschlag.hasSummer ? 'Im Juli und August fällt ein Sommerzuschlag von 6,67 €/Tag (200 €/Monat) an.' : null,
+    zuschlag.relevantHolidayNames.length > 0 ? `An ${zuschlag.relevantHolidayNames.join(', ')} wird der doppelte Tagessatz berechnet.` : null,
+  ].filter(Boolean).join(' ');
+}
+
+/**
+ * Gebucht-Seite neu (PROTOTYP 15.10.2026, nur Vorschau): die Monatszeilen in pm-Tokens, aufgeklappt IN der Einsatz-Karte.
+ * Rechnet mit den Daten, die die Karte zeigt (nicht mit den Vertragsdaten); die Zeilen „Anreise"/„Abreise" entfallen, weil
+ * die Karte sie direkt darüber nennt. Wortlaut wie oben (live). `grundlage` = erste Zeile über den Monaten (T3b), sie sagt,
+ * womit gerechnet ist; ohne Monatszeilen entfällt sie mit.
+ */
+export function MonatsZeilen({ anreise, abreise, tagessatz, anreisekosten = 125, abreisekosten = 125, grundlage }: {
+  /** „19.10.2026" */
+  anreise: string;
+  abreise: string;
+  tagessatz: number;
+  anreisekosten?: number;
+  abreisekosten?: number;
+  grundlage?: string;
+}) {
+  const summary = buildMonthlyBreakdown(anreise, abreise, tagessatz, anreisekosten, abreisekosten, tagessatz);
+  const zuschlag = computeZuschlagRelevance(anreise, abreise);
+  if (summary.length === 0) return null;
+  return (
+    <div data-baustein="monatszeilen">
+      {grundlage && <p className="mb-2.5 text-pretty text-[13px] leading-[1.45] text-pm-muted" data-zeile="kosten-grundlage">{grundlage}</p>}
+      <div className="rounded-[16px] bg-pm-paper px-4 py-3.5 space-y-3">
+        {summary.map((m) => (
+          <div key={m.monat}>
+            <div className="flex items-baseline justify-between gap-4">
+              <span className="text-[15px] text-pm-muted">{m.monat}</span>
+              <span className="text-[15px] font-semibold tabular-nums text-pm-ink whitespace-nowrap">{m.betrag.toLocaleString('de-DE')}&nbsp;€</span>
+            </div>
+            {m.details.map((d) => (
+              <p key={d} className="mt-0.5 text-right text-[13px] leading-snug text-pm-muted">{d}</p>
+            ))}
+          </div>
+        ))}
+      </div>
+      <p className="mt-2.5 text-pretty text-[13px] leading-[1.45] text-pm-muted">{aufstellungHinweis(zuschlag)}</p>
+    </div>
+  );
+}

@@ -4,6 +4,7 @@ import { Nurse } from '../types';
 import { displayName, initials } from '../components/portal/shared';
 import {
   fetchLeadByToken,
+  fetchNotfallTelefon,
   Lead,
   cap,
   formatEuro,
@@ -15,7 +16,7 @@ import { fruehereBuchung, vertragVorbelegung } from '../lib/vertragVorbelegung';
 import { rankComparator } from '../lib/mamamia/matchingsRanking';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { isAboutDeStale, regenerateGermanDescription } from '../lib/mamamia/caregiverAbout';
-import { feedbackInRuhezeit, reportLeadEvent, fetchLeadEvents, KOSTENRECHNER_URL } from '../lib/leadEvents';
+import { feedbackInRuhezeit, reportLeadEvent, fetchLeadEvents, fetchLeadEventsOderNull, KOSTENRECHNER_URL } from '../lib/leadEvents';
 import type { CaregiverSnapshot, EinladenQuelle, FormularQuelle, LeadEventMetadata, Messpunkt, ProfilQuelle } from '../lib/leadEvents';
 import { identifyClarity } from '../lib/clarity';
 import { portalToken } from '../lib/portalToken';
@@ -49,6 +50,12 @@ import {
   type PatientForm,
 } from '../components/portal/shared';
 import { BookedScreen } from '../components/portal/BookedScreen';
+import { kontaktPositionAusUrl, kontaktVarianteAusUrl, martaUntenAusUrl, notfallAusVorschauUrl, NotfallFeld } from '../components/portal/GebuchtKontakt';
+import { GebuchtSeite, notfallImHilfeBlatt } from '../components/portal/GebuchtSeite';
+import { gebuchtVorschau, vorschauAlteSeite } from '../components/portal/gebuchtVorschau';
+import { berlinTag } from '../lib/gebuchtStand';
+import { gebuchtDatenAusPortal } from '../lib/gebuchtDaten';
+import { ERREICHBAR } from '../lib/kontakt';
 import { VertragSignieren } from '../components/portal/VertragSignieren';
 import { AngebotCard } from '../components/portal/AngebotCard';
 import { AppCard } from '../components/portal/AppCard';
@@ -141,6 +148,33 @@ const IS_PREVIEW_WARTET = PREVIEW_PARAM === 'wartet';
 const IS_PREVIEW_LEER =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('leer') === '1';
 const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIEW_GEBUCHT || IS_PREVIEW_CHAT || IS_PREVIEW_PATIENT || IS_PREVIEW_WARTET;
+
+// PROTOTYP 14.10.2026 — Kontaktbereich im ALTEN Gebucht-Bildschirm (BookedScreen + GebuchtKontakt). NUR in der Vorschau
+// ?preview=gebucht&seite=alt, außerhalb AUS (undefined). Echte Kunden bekommen die Nummer seit Registry #139 auf der neuen
+// GebuchtSeite (RPC notfall_telefon); BookedScreen (Rückweg GEBUCHT_SEITE_NEU = false) bleibt ohne Bereich. Schalter:
+//   &kontakt=1|2|3          Variante (ohne Parameter: Empfehlung V1); &kontakt=aus = ohne Bereich (Vergleich mit heute)
+//   &unten=marta|siegel     Seitenende: Marta-Kasten wie heute | nur Siegel und Sterne (Entscheidung 4)
+//   &kontaktpos=oben|unten  Bereich unter der Einleitung (Standard) | unter „Als Nächstes"
+//   &notfall=…              Notfallnummer zur Laufzeit (nie im Code); ohne Parameter der Platzhalter
+//   &vertrag=offen          Zustand „Vertrag offen" (Pflegekraft gebucht, Vertrag noch nicht unterschrieben)
+const VORSCHAU_SUCHE = IS_PREVIEW_GEBUCHT && typeof window !== 'undefined' ? window.location.search : null;
+const GEBUCHT_KONTAKT = VORSCHAU_SUCHE !== null && new URLSearchParams(VORSCHAU_SUCHE).get('kontakt') !== 'aus'
+  ? {
+      variante: kontaktVarianteAusUrl(VORSCHAU_SUCHE),
+      notfallTelefon: notfallAusVorschauUrl(VORSCHAU_SUCHE),
+      martaUnten: martaUntenAusUrl(VORSCHAU_SUCHE),
+      position: kontaktPositionAusUrl(VORSCHAU_SUCHE),
+    }
+  : undefined;
+// Neue Gebucht-Seite (GebuchtSeite, Spezifikation gebucht-seite-2026-10-15). Vorschau ?preview=gebucht mit Zuständen und
+// Schaltern aus components/portal/gebuchtVorschau.ts (&zustand=…, &folge=…, &notfall=… usw.); `&seite=alt` zeigt dort die
+// alte Seite (BookedScreen) samt den Schaltern oben.
+const GEBUCHT_NEU_VORSCHAU = VORSCHAU_SUCHE !== null && !vorschauAlteSeite(VORSCHAU_SUCHE);
+// Registry #139: Echte gebuchte Kunden sehen die neue Gebucht-Seite (Martin 24.10.2026: „Passt so"), Daten aus
+// lib/gebuchtDaten.ts. Rückweg ohne Revert: false ⇒ wieder BookedScreen.
+const GEBUCHT_SEITE_NEU = true;
+/** Vorschau-Zustand „Vertrag offen" (sonst sperrt die Vorschau ihn: PREVIEW_SIGNED_FORM gilt als unterschrieben). */
+const IS_PREVIEW_GEBUCHT_VERTRAG_OFFEN = VORSCHAU_SUCHE !== null && new URLSearchParams(VORSCHAU_SUCHE).get('vertrag') === 'offen';
 
 // Sub-Nav-Zeile mit Job-Kontext (Status-Badge + Zeitraum links) +
 // "Alle Einsätze →" rechts, wenn der Kunde aus der Multi-Job-Übersicht
@@ -569,7 +603,7 @@ const CustomerPortalPage: FC = () => {
   // Unterschriebener Vertrag (Daten + getippte Signatur) aus dem Annahme-Flow.
   // Erlaubt die read-only Präsentation des fertigen Vertrags im gebuchten Portal.
   const [signedForm, setSignedForm] = useState<ContractFormData | null>(
-    IS_PREVIEW_GEBUCHT ? PREVIEW_SIGNED_FORM : null,
+    IS_PREVIEW_GEBUCHT && !IS_PREVIEW_GEBUCHT_VERTRAG_OFFEN ? PREVIEW_SIGNED_FORM : null,
   );
   const [showSignedContract, setShowSignedContract] = useState(false);
   // „Vertrag nachträglich abschließen" (Martin, 2026-07-15): App, für die das
@@ -850,7 +884,7 @@ const CustomerPortalPage: FC = () => {
   // Nebeneffekt erwünscht: listLeadJobs synct best-effort aus Mamamia →
   // der lead_jobs-Spiegel (Basis der Aktiv-Job-Wahl beim Onboard) ist
   // nach jedem Portal-Besuch frisch.
-  const { data: leadJobs } = useLeadJobs(mmReady);
+  const { data: leadJobs, error: leadJobsError } = useLeadJobs(mmReady);
   const hasMultipleJobs = (leadJobs?.length ?? 0) > 1;
 
   // Gebucht-Ableitung aus dem Mamamia-Stand (Fix 2026-07-15):
@@ -1362,6 +1396,22 @@ const CustomerPortalPage: FC = () => {
   // Button). Frühere `declinedMatches`-Liste + MatchCardDone-Pfad
   // entfallen — Status kommt aus dem derived `nurseStatusById`.
   const acceptedApp = applications.find((a) => a.status === 'accepted') ?? null;
+
+  // Registry #139: Gebucht-Seite für echte Kunden. Anreise-Ereignisse der Brücke (null = keine Antwort, Spez. 7 Regel 4;
+  // nach 4 s ohne Antwort gilt null, eine späte Antwort zählt trotzdem) und die Notfallnummer aus notfall_telefon (nur bei
+  // Buchung, sonst null). undefined = noch nicht gefragt. Nie in den Vorschau-Modi — dort kommt alles aus gebuchtVorschau.ts.
+  const gebuchtEcht = GEBUCHT_SEITE_NEU && !IS_PREVIEW_ANY && !!acceptedApp && !!lead?.token;
+  const [gebuchtEreignisse, setGebuchtEreignisse] = useState<FetchedLeadEvent[] | null | undefined>(undefined);
+  const [notfallTelefon, setNotfallTelefon] = useState<string | null>(null);
+  useEffect(() => {
+    if (!gebuchtEcht || !lead?.token) return;
+    let aktiv = true;
+    const frist = setTimeout(() => { if (aktiv) setGebuchtEreignisse((v) => (v === undefined ? null : v)); }, 4000);
+    fetchLeadEventsOderNull(lead.token, ['caregiver_arrival_scheduled'])
+      .then((ev) => { if (aktiv) setGebuchtEreignisse(ev); });
+    fetchNotfallTelefon(lead.token).then((n) => { if (aktiv) setNotfallTelefon(n); });
+    return () => { aktiv = false; clearTimeout(frist); };
+  }, [gebuchtEcht, lead?.token]);
   const hasPending = pendingApps.length > 0;
   const matchesUnlocked = !hasPending;
   // Kompakt-Einstieg (KompaktEinstieg.tsx): nur VOR dem ersten Absenden der Pflegesituation, ohne
@@ -3633,6 +3683,70 @@ const CustomerPortalPage: FC = () => {
     );
   })();
 
+  // Vorschau der Gebucht-Seite (?preview=gebucht): Eingaben nur hier, alle Daten relativ zu heute (gebuchtVorschau.ts).
+  // Echte Kunden: gebuchtSeiteEcht (lib/gebuchtDaten.ts).
+  const gebuchtNeu = GEBUCHT_NEU_VORSCHAU && acceptedApp && VORSCHAU_SUCHE !== null
+    ? gebuchtVorschau({
+        search: VORSCHAU_SUCHE,
+        heute: berlinTag(),
+        nurse: acceptedApp.nurse,
+        kopf: {
+          name: lead ? customerSalutation(lead) : 'Herr Mustermann',
+          kuerzel: lead && (lead.vorname || lead.nachname)
+            ? initials([lead.vorname, lead.nachname].filter(Boolean).join(' ').trim()).toUpperCase().slice(0, 2)
+            : null,
+        },
+      })
+    : null;
+
+  // vertragSigned aus zwei Quellen ableiten:
+  //   1) signedForm — frisch im Annahme-Flow gesetzt (in-memory, lebt nur bis Page-Reload)
+  //   2) acceptedApplications.rows[].contract_snapshot — vom Server persistiert. Nach Reload ist signedForm null, die
+  //      Acceptance-Row aber noch in der DB. Wenn contract_snapshot existiert, hat der Kunde signiert (Stufe-B-Update
+  //      schreibt signatur + contract_snapshot zusammen).
+  // Sonst zeigte BookedScreen "Vertrag · Folgt" obwohl die Mail-PDF längst raus ist — Michael-Dachs-Reproducer 12.06.
+  const hasPersistedContract = (acceptedApplications?.rows ?? []).some((r) => !!r.contract_snapshot);
+  const vertragSigned = !!signedForm?.signatur || hasPersistedContract;
+  // Vertrag nachträglich abschließen (Martin, 2026-07-15): Fehlt der unterschriebene Vertrag (Annahme kam agentur-seitig
+  // → synthetische fc-App ohne signedForm/contract_snapshot), wird der Vertrag zum aktiven Schritt. Nur mit belastbarer
+  // numerischer Bridge-Referenz (fail-soft) + echtem Lead-Token; nie im Preview, nie für beendete Einsätze, nie wenn der
+  // Vertrag schon vorliegt.
+  const contractAppId = acceptedApp ? acceptanceApplicationId(acceptedApp.id) : null;
+  const canCompleteContract =
+    !!acceptedApp
+    && !vertragSigned
+    && !IS_EINSATZ_BEENDET
+    && !IS_PREVIEW_ANY
+    && !!lead?.token
+    && contractAppId !== null;
+
+  // Registry #139: Daten der Gebucht-Seite für echte Kunden — erst wenn Annahmen, Einsätze und die Brücke da sind.
+  const gebuchtSeiteEcht = gebuchtEcht && acceptedApp && lead && annahmenBekannt
+    && (leadJobs !== null || !!leadJobsError) && gebuchtEreignisse !== undefined
+    ? gebuchtDatenAusPortal({
+        heute: berlinTag(),
+        kopf: {
+          name: customerSalutation(lead),
+          kuerzel: lead.vorname || lead.nachname
+            ? initials([lead.vorname, lead.nachname].filter(Boolean).join(' ').trim()).toUpperCase().slice(0, 2)
+            : null,
+        },
+        lead: { id: lead.id, token: lead.token ?? null, email: lead.email ?? null, vermittler: lead.vermittler ?? null },
+        app: acceptedApp,
+        signiertInDieserSitzung: !!signedForm?.signatur,
+        annahmen: acceptedApplications?.rows ?? null,
+        kannVertragNachholen: canCompleteContract,
+        jobs: leadJobs,
+        jobOfferId: mmJobOffer?.id ?? session?.job_offer_id ?? null,
+        jobOffer: mmJobOffer ? { arrival_at: mmJobOffer.arrival_at, departure_at: mmJobOffer.departure_at } : null,
+        ereignisse: gebuchtEreignisse,
+        notfallTelefon,
+        kostenrechnerUrl: KOSTENRECHNER_URL,
+      })
+    : null;
+  /** Daten der Gebucht-Seite, die gerade zu sehen ist (Vorschau oder echt) — fürs Hilfe-Blatt und das Profil. */
+  const gebuchtDaten = gebuchtNeu?.daten ?? gebuchtSeiteEcht;
+
   return (
     <>
     <div className="min-h-screen bg-gray-100 font-pm md:flex md:items-start md:justify-center md:py-10">
@@ -3725,36 +3839,42 @@ const CustomerPortalPage: FC = () => {
         )}
       </nav>
 
-      {acceptedApp ? (
-        (() => {
-          // vertragSigned aus zwei Quellen ableiten:
-          //   1) signedForm — frisch im Annahme-Flow gesetzt (in-memory, lebt
-          //      nur bis Page-Reload)
-          //   2) acceptedApplications.rows[].contract_snapshot — vom Server
-          //      persistiert. Nach Reload ist signedForm null, die Acceptance-
-          //      Row aber noch in der DB. Wenn contract_snapshot existiert,
-          //      hat der Kunde signiert (Stufe-B-Update schreibt signatur +
-          //      contract_snapshot zusammen).
-          // Sonst zeigte BookedScreen "Vertrag · Folgt" obwohl die Mail-PDF
-          // längst raus ist — Michael-Dachs-Reproducer 12.06.
-          const hasPersistedContract = (acceptedApplications?.rows ?? []).some(
-            (r) => !!r.contract_snapshot,
-          );
-          const vertragSigned = !!signedForm?.signatur || hasPersistedContract;
-          // Vertrag nachträglich abschließen (Martin, 2026-07-15): Fehlt der
-          // unterschriebene Vertrag (Annahme kam agentur-seitig → synthetische
-          // fc-App ohne signedForm/contract_snapshot), wird der Vertrag-
-          // Milestone zum aktiven Schritt. Nur mit belastbarer numerischer
-          // Bridge-Referenz (fail-soft) + echtem Lead-Token; nie im Preview,
-          // nie für beendete Einsätze, nie wenn der Vertrag schon vorliegt.
-          const contractAppId = acceptanceApplicationId(acceptedApp.id);
-          const canCompleteContract =
-            !vertragSigned
-            && !IS_EINSATZ_BEENDET
-            && !IS_PREVIEW_ANY
-            && !!lead?.token
-            && contractAppId !== null;
-          return (
+      {acceptedApp && gebuchtNeu ? (
+        <div className="bg-pm-paper">
+          <GebuchtSeite
+            daten={gebuchtNeu.daten}
+            kontaktTitel={gebuchtNeu.kontaktTitel}
+            seitenende={gebuchtNeu.seitenende}
+            sterne={sterne}
+            onPflegekraft={() => { profilQuelleRef.current = 'gebucht'; setSelectedNurse(acceptedApp.nurse); }}
+            // Vorschau: kein Lead, kein Server — die Knöpfe zeigen nur, wohin sie führen würden.
+            onVertragAbschliessen={() => showToast('Vorschau: Hier öffnet sich der Vertrag („Ihre Angaben" → „Unterschrift").')}
+            onEinsatz={() => showToast('Vorschau: Hier öffnet sich dieser Einsatz.')}
+          />
+        </div>
+      ) : acceptedApp && gebuchtEcht ? (
+        gebuchtSeiteEcht ? (
+          <div className="bg-pm-paper">
+            <GebuchtSeite
+              daten={gebuchtSeiteEcht}
+              kontaktTitel="a"
+              seitenende="b"
+              sterne={sterne}
+              onPflegekraft={() => { profilQuelleRef.current = 'gebucht'; setSelectedNurse(acceptedApp.nurse); }}
+              // Vertrag nachholen nur unter derselben Bedingung wie bisher (kein toter Knopf).
+              onVertragAbschliessen={canCompleteContract ? () => setContractApp(acceptedApp) : undefined}
+              // Rückfall ohne PDF-Link: der in dieser Sitzung unterschriebene Vertrag im Portal.
+              onVertragAnsehen={signedForm?.signatur ? () => setShowSignedContract(true) : undefined}
+              einsatzHref={(jobId) => `/?${new URLSearchParams({ token: lead?.token ?? '', job: jobId }).toString()}`}
+            />
+          </div>
+        ) : (
+          // Bis Annahmen, Einsätze und die Brücke da sind (höchstens 4 s): kein Zwischenstand, der gleich wieder kippt.
+          <div className="flex justify-center bg-pm-paper py-16" aria-busy="true">
+            <div className="w-10 h-10 border-2 border-[#8B7355] border-t-transparent rounded-full animate-spin" />
+          </div>
+        )
+      ) : acceptedApp ? (
             <div className="bg-pm-paper">
             <BookedScreen
               kopf={{
@@ -3764,11 +3884,15 @@ const CustomerPortalPage: FC = () => {
                   : null,
               }}
               sterne={sterne}
+              kontakt={GEBUCHT_KONTAKT}
               app={acceptedApp}
               onNurseClick={(n) => { profilQuelleRef.current = 'gebucht'; setSelectedNurse(n); }}
               vertragSigned={vertragSigned}
               onSignContract={
-                canCompleteContract ? () => setContractApp(acceptedApp) : undefined
+                canCompleteContract
+                  ? () => setContractApp(acceptedApp)
+                  // Vorschau „Vertrag offen": Knopf sichtbar, schließt aber nichts ab (kein Lead, kein Server).
+                  : IS_PREVIEW_GEBUCHT_VERTRAG_OFFEN ? () => showToast('Vorschau: Hier wird kein Vertrag abgeschlossen.') : undefined
               }
               // leadId + Token aktivieren den eingebetteten PDF-Viewer im
               // Vertrag-Milestone (Mustervertrag-Look via /api/contract-pdf).
@@ -3786,8 +3910,6 @@ const CustomerPortalPage: FC = () => {
               einsatzBeendet={IS_EINSATZ_BEENDET}
             />
             </div>
-          );
-        })()
       ) : rueckbau ? (
         // Rückbau Registry #122: vor dem ersten Speichern die Seite aus Stand 75b8df8 (EinstiegVorSpeichern.tsx), Kopf und
         // Häufige Fragen wie heute (Martin 10.10.); Initialen wie im Kopf des Kompakt-Einstiegs.
@@ -4648,6 +4770,8 @@ const CustomerPortalPage: FC = () => {
           app={nurseModalApp ?? undefined}
           // Gebucht oder Vertrag offen: nur das Profil, kein „Einladen" (Review 25.09.).
           nurProfil={!!acceptedApp || !!contractApp}
+          // Gebucht-Seite (Vorschau und echt, Spezifikation 6.11): ohne „sofort verfügbar“.
+          ohneVerfuegbarkeit={!!gebuchtDaten}
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onChat={CHAT_ENABLED && nurseModalApp ? () => { const n = enrichedSelectedNurse; setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setChatNurse(n); } : undefined}
@@ -4763,7 +4887,16 @@ const CustomerPortalPage: FC = () => {
       )}
 
       {/* Contact Popup */}
-      {showContactPopup && <ContactPopup onClose={() => setShowContactPopup(false)} />}
+      {showContactPopup && (
+        <ContactPopup
+          onClose={() => setShowContactPopup(false)}
+          // Gebucht-Seite (Vorschau und echt, Registry #139): Notfallfeld vor Martas Tageskontakt (Martin 24.10.), solange
+          // der berechnete Zustand nicht „beendet" ist (Spezifikation 6.10, Entscheidung 3), „täglich 8–20 Uhr" statt
+          // „Mo–So, 8–20 Uhr" (Entscheidung 10). Dieselbe Nummer wie auf der Seite.
+          vorKontakt={gebuchtDaten && notfallImHilfeBlatt(gebuchtDaten) ? <NotfallFeld nummer={gebuchtDaten.notfallTelefon} /> : undefined}
+          zeiten={gebuchtDaten ? ERREICHBAR : undefined}
+        />
+      )}
 
 
       {/* Decline Confirm Modal */}

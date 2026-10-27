@@ -41,6 +41,8 @@ vi.mock('../../lib/supabase', async () => {
       }
       return { lead: null, error: 'Token nicht gefunden' };
     }),
+    // RPC notfall_telefon (Registry #139): supabase-js läuft nicht durch MSW — darum hier ersetzt, nie ins Netz.
+    fetchNotfallTelefon: vi.fn(async () => null),
   };
 });
 
@@ -74,7 +76,7 @@ function setLocation(search: string) {
 describe('Portal integration: golden paths', () => {
   // ─── Path 1: Happy (accept application) ─────────────────────────────────
 
-  it('happy path: token → review → accept → bridge POST + BookedScreen', async () => {
+  it('happy path: token → review → accept → bridge POST + Gebucht-Seite', async () => {
     // MVP flow: acceptance does NOT call Mamamia STORE_CONFIRMATION; it
     // POSTs to the kostenrechner bridge with event=application_accepted_internal.
     // Bridge writes lead_application_acceptances + fires team mail.
@@ -133,11 +135,10 @@ describe('Portal integration: golden paths', () => {
     await user.click(screen.getByText(/Ich stimme ausdrücklich zu/));
     await user.click(screen.getByRole('button', { name: /Vertrag jetzt unterschreiben/i }));
 
-    // BookedScreen rendered (copy includes "Pflegekraft gebucht!" substring)
-    await waitFor(
-      () => expect(screen.getByText(/Pflegekraft gebucht!/i)).toBeInTheDocument(),
-      { timeout: 3000 },
-    );
+    // Gebucht-Seite (Registry #139) statt BookedScreen; der Vertrag dieser Sitzung gilt sofort als unterschrieben.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Ihr Einsatz' }, { timeout: 6000 })).toBeInTheDocument();
+    expect(screen.queryByText(/Pflegekraft gebucht!/i)).toBeNull();
+    expect(screen.getByText('Vertrag unterschrieben')).toBeInTheDocument();
     // Bridge called with event=application_accepted_internal + contract data
     await waitFor(() => expect(bridgePayload).not.toBeNull(), { timeout: 1000 });
     expect(bridgePayload!.event).toBe('application_accepted_internal');
@@ -401,7 +402,7 @@ describe('Portal integration: golden paths', () => {
     mo.observe(document.body, { subtree: true, childList: true });
     setLocation(`?token=${TEST_LEAD_TOKEN}&view=application`);
     render(<CustomerPortalPage />);
-    await screen.findByText(/Pflegekraft gebucht!/i, {}, { timeout: 5000 });
+    await screen.findByRole('heading', { level: 1, name: 'Ihr Einsatz' }, { timeout: 6000 });
     await new Promise((r) => setTimeout(r, 400));
     mo.disconnect();
     expect(titel.some((t) => t.includes('Sie haben eine aktive Bewerbung'))).toBe(false);

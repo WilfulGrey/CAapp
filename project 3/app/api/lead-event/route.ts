@@ -20,6 +20,7 @@ import { createHash } from 'crypto';
 import { kundenEmpfaenger } from '@/lib/empfaenger';
 import { holeBewertungsStand } from '@/lib/bewertungen-stand';
 import { MESSPUNKTE } from '@/lib/messpunkte';
+import { oeffentlicheMetadata } from '@/lib/oeffentliche-ereignisse';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
 // kostenrechner lead so the Nachfass emails can branch. Token-authenticated —
@@ -835,6 +836,9 @@ const GET_PUBLIC_EVENT_TYPES = new Set([
   'application_received',
   'application_accepted_internal',
   'application_rejected',
+  // Registry #139: Anreisedaten für die Gebucht-Seite — NUR die Felder der Anreise-Mail (oeffentlicheMetadata), nie die
+  // Notiz der Agentur, Foto-URL oder Schlüssel.
+  'caregiver_arrival_scheduled',
 ]);
 
 async function handleGet(request: NextRequest) {
@@ -873,7 +877,8 @@ async function handleGet(request: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
     }
-    return NextResponse.json({ events: events ?? [] }, { headers: corsHeaders });
+    const oeffentlich = (events ?? []).map((e) => ({ ...e, metadata: oeffentlicheMetadata(e.event_type, e.metadata) }));
+    return NextResponse.json({ events: oeffentlich }, { headers: corsHeaders });
   } catch (e) {
     console.error('lead-event GET error:', e instanceof Error ? e.message : String(e));
     return NextResponse.json({ error: 'failed' }, { status: 500, headers: corsHeaders });

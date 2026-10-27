@@ -5,6 +5,8 @@ const TON = {
   offen: 'bg-pm-coral-tint text-pm-coral-ink',
   fertig: 'bg-pm-mint text-pm-green-deep',
   warnung: 'bg-pm-amber-tint text-pm-amber-ink',
+  // Abgeschlossener Stand ohne Signalfarbe (Gebucht-Seite „Beendet", texte_final Nachtrag 3, N3.3): weiß mit Rand.
+  neutral: 'bg-white text-pm-taupe-ink ring-1 ring-inset ring-pm-chip',
 } as const;
 
 export function StatusBadge({ ton, children }: { ton: keyof typeof TON; children: ReactNode }) {

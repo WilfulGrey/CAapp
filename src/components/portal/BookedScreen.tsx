@@ -6,6 +6,7 @@ import type { SterneStand } from '../../lib/sterne';
 import { PflegekraftProfil } from './PflegekraftProfil';
 import { MonatsAufstellung } from './MonatsAufstellung';
 import { MartaBox } from './MartaBox';
+import { GebuchtKontakt, type KontaktPosition, type KontaktVariante, type MartaUnten } from './GebuchtKontakt';
 import { AngebotPerson } from './KompaktEinstieg';
 import { Button } from '../ui/Button';
 import { KOSTENRECHNER_URL } from '../../lib/leadEvents';
@@ -42,8 +43,19 @@ export const BookedScreen: FC<{
   kopf?: { name: string | null; kuerzel: string | null };
   /** Fassung 34: Marta am Ende, mit Siegel und Sternen (wie nach dem Absenden). `undefined` = kein Kasten. */
   sterne?: SterneStand | null;
-}> = ({ app, onNurseClick, onSignContract, vertragSigned, leadId, leadToken, onShowContract, einsatzBeendet, kopf, sterne }) => {
+  /**
+   * PROTOTYP 14.10.2026 (Martin: „bei einer akzeptierten Buchung einen Bereich oben … Marta Kapcio oder Kollegen und diese
+   * Telefonnummer"): Kontaktbereich. `undefined` = kein Bereich (Stand heute, und außerhalb der Vorschau).
+   * `notfallTelefon` null/leer/ungültig ⇒ ohne Notfallblock. `martaUnten` = was am Seitenende steht (Entscheidung 4).
+   * `position` (Standard „oben" = direkt unter der Einleitung; „unten" = unter „Als Nächstes", damit bei offenem Vertrag
+   * der Vertragsknopf weiter oben bleibt — Vorschlag zur Wahl, Vorschau `&kontaktpos=unten`).
+   * Beim beendeten Einsatz entfällt der Bereich: Es läuft keine Betreuung mehr; die normale Erreichbarkeit steht weiter im
+   * Marta-Kasten am Ende.
+   */
+  kontakt?: { variante: KontaktVariante; notfallTelefon: string | null; martaUnten: MartaUnten; position?: KontaktPosition };
+}> = ({ app, onNurseClick, onSignContract, vertragSigned, leadId, leadToken, onShowContract, einsatzBeendet, kopf, sterne, kontakt }) => {
   const { nurse, offer } = app;
+  const kontaktBereich = kontakt && !einsatzBeendet ? kontakt : null;
 
   const milestones = einsatzBeendet
     ? [
@@ -94,6 +106,10 @@ export const BookedScreen: FC<{
                 : 'Wir bereiten Ihre Vertragsdokumente vor. Marta\u00a0Kapcio oder ein Kollege meldet sich in Kürze persönlich bei Ihnen.'}
         </p>
       </div>
+
+      {kontaktBereich && kontaktBereich.position !== 'unten' && (
+        <GebuchtKontakt variante={kontaktBereich.variante} notfallTelefon={kontaktBereich.notfallTelefon} />
+      )}
 
       {/* Ihre Pflegekraft: dasselbe geschlossene Profil wie überall (Martin 27.09.2026, „V"). */}
       <div className="mt-8">
@@ -212,9 +228,13 @@ export const BookedScreen: FC<{
         </ol>
       </section>
 
+      {kontaktBereich && kontaktBereich.position === 'unten' && (
+        <GebuchtKontakt variante={kontaktBereich.variante} notfallTelefon={kontaktBereich.notfallTelefon} className="mt-10" />
+      )}
+
       {sterne !== undefined && (
         <div className="mt-10">
-          <MartaBox sterne={sterne} />
+          <MartaBox sterne={sterne} nurVertrauen={kontaktBereich?.martaUnten === 'siegel'} />
         </div>
       )}
     </div>
