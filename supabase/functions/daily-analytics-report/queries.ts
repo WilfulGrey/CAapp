@@ -897,7 +897,13 @@ export async function fetchAdsSpend(
 // Für die Admin-Seite „Trichter“: Kosten je Profil je Kanal (High Intent, PM)
 // brauchen die Kosten JE KAMPAGNE, ads_kosten_tag hat nur die Tagessumme.
 // Gleicher Zugang, gleiche Fail-soft-Regel wie fetchAdsSpend: null bei jedem
-// Fehler, die Mail geht trotzdem raus.
+// Fehler, die Mail geht trotzdem raus. Anders als fetchAdsSpend mit Timeout:
+// hängt Google, darf Promise.all der Morgen-Mail nicht bis zum Laufzeitlimit warten.
+//
+// Fenster: der Morgenlauf holt die letzten 3 Tage (vorvorgestern bis gestern) und
+// schreibt alle drei neu — fällt ein Lauf aus, holt der nächste den Tag nach, und
+// Google korrigiert Kosten noch Tage später (ungültige Klicks). Nachtragen über einen
+// längeren Zeitraum: Body { nurKampagnenKosten: { von, bis } } (index.ts).
 
 export interface KampagnenKostenZeile {
   tag: string;            // YYYY-MM-DD (Konto-Zeitzone = Berlin)
@@ -909,37 +915,69 @@ export interface KampagnenKostenZeile {
 }
 
 const TAG_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
+const gueltigerTag = (t: string) =>
+  TAG_FORMAT.test(t) && new Date(`${t}T00:00:00Z`).toISOString().slice(0, 10) === t;
 
-/** GAQL für einen Tag: nur Kampagnen mit Einblendungen (ohne Einblendung keine Kosten). */
-export function kampagnenKostenAbfrage(tag: string): string {
-  if (!TAG_FORMAT.test(tag)) throw new Error(`ungültiger Tag: ${tag}`);
-  return "SELECT campaign.id, campaign.name, metrics.cost_micros, metrics.clicks, metrics.impressions " +
-    `FROM campaign WHERE segments.date = '${tag}' AND metrics.impressions > 0`;
+/** Tage, die der Morgenlauf je Kampagne neu schreibt (gestern und die zwei davor). */
+export const KAMPAGNEN_FENSTER_TAGE = 3;
+/** Höchstens so viele Tage auf einmal nachtragen. */
+export const KAMPAGNEN_NACHTRAG_MAX_TAGE = 120;
+/** Timeout je Google-Aufruf (Token, Search). */
+export const KAMPAGNEN_TIMEOUT_MS = 15_000;
+
+/** GAQL für einen Zeitraum: je Tag und Kampagne, nur mit Einblendungen (ohne Einblendung keine Kosten). */
+export function kampagnenKostenAbfrage(von: string, bis: string): string {
+  if (!gueltigerTag(von) || !gueltigerTag(bis) || von > bis) throw new Error(`ungültiger Zeitraum: ${von}–${bis}`);
+  return "SELECT segments.date, campaign.id, campaign.name, metrics.cost_micros, metrics.clicks, metrics.impressions " +
+    `FROM campaign WHERE segments.date BETWEEN '${von}' AND '${bis}' AND metrics.impressions > 0`;
 }
 
-/** Antwortzeilen der Ads-API → eine Zeile je Kampagne (summiert, falls Google mehrere liefert). Pure. */
-export function kampagnenKosten(rows: Array<Record<string, unknown>>, tag: string): KampagnenKostenZeile[] {
-  const jeId = new Map<string, KampagnenKostenZeile>();
+/**
+ * Zeitraum für das Nachtragen prüfen: gültige Tage, von ≤ bis, bis vor heute (heute ist
+ * noch nicht fertig), höchstens KAMPAGNEN_NACHTRAG_MAX_TAGE Tage. Pure.
+ */
+export function pruefeNachtrag(von: unknown, bis: unknown, heute: string):
+  { ok: true; von: string; bis: string } | { ok: false; fehler: string } {
+  if (typeof von !== "string" || typeof bis !== "string" || !gueltigerTag(von) || !gueltigerTag(bis)) {
+    return { ok: false, fehler: "von/bis als JJJJ-MM-TT angeben" };
+  }
+  if (von > bis) return { ok: false, fehler: "von liegt nach bis" };
+  if (bis >= heute) return { ok: false, fehler: "bis muss vor heute liegen" };
+  const tage = (Date.parse(`${bis}T00:00:00Z`) - Date.parse(`${von}T00:00:00Z`)) / 86_400_000 + 1;
+  if (tage > KAMPAGNEN_NACHTRAG_MAX_TAGE) return { ok: false, fehler: `höchstens ${KAMPAGNEN_NACHTRAG_MAX_TAGE} Tage auf einmal` };
+  return { ok: true, von, bis };
+}
+
+/** Antwortzeilen der Ads-API → eine Zeile je Tag und Kampagne (summiert, falls Google mehrere liefert). Pure. */
+export function kampagnenKosten(rows: Array<Record<string, unknown>>): KampagnenKostenZeile[] {
+  const jeSchluessel = new Map<string, KampagnenKostenZeile>();
   for (const r of rows) {
     // deno-lint-ignore no-explicit-any
     const c = (r as any)?.campaign ?? {};
     // deno-lint-ignore no-explicit-any
     const m = (r as any)?.metrics ?? {};
+    // deno-lint-ignore no-explicit-any
+    const tag = String((r as any)?.segments?.date ?? "");
     const id = String(c.id ?? "").trim();
-    if (!/^\d+$/.test(id)) continue;
-    const z = jeId.get(id) ?? { tag, kampagne_id: id, kampagne_name: null, kosten_netto: 0, klicks: 0, impressionen: 0 };
+    if (!/^\d+$/.test(id) || !gueltigerTag(tag)) continue;
+    const schluessel = `${tag}|${id}`;
+    const z = jeSchluessel.get(schluessel) ?? { tag, kampagne_id: id, kampagne_name: null, kosten_netto: 0, klicks: 0, impressionen: 0 };
     if (typeof c.name === "string" && c.name.trim()) z.kampagne_name = c.name.trim();
     z.kosten_netto += Number(m.costMicros ?? 0) / 1e6;
     z.klicks += Number(m.clicks ?? 0) || 0;
     z.impressionen += Number(m.impressions ?? 0) || 0;
-    jeId.set(id, z);
+    jeSchluessel.set(schluessel, z);
   }
-  return Array.from(jeId.values()).map((z) => ({ ...z, kosten_netto: Math.round(z.kosten_netto * 100) / 100 }));
+  return Array.from(jeSchluessel.values())
+    .map((z) => ({ ...z, kosten_netto: Math.round(z.kosten_netto * 100) / 100 }))
+    .sort((a, b) => a.tag.localeCompare(b.tag) || a.kampagne_id.localeCompare(b.kampagne_id));
 }
 
 export async function fetchAdsKostenKampagne(
   supabase: SupabaseClient,
-  tag: string,
+  von: string,
+  bis: string,
+  timeoutMs = KAMPAGNEN_TIMEOUT_MS,
 ): Promise<KampagnenKostenZeile[] | null> {
   try {
     const secrets = await getGoogleAdsSecrets(supabase);
@@ -947,8 +985,9 @@ export async function fetchAdsKostenKampagne(
       console.log("fetchAdsKostenKampagne: keine Google-Secrets (Staging?) — Kosten je Kampagne entfallen");
       return null;
     }
-    const token = await fetchAdsAccessToken(secrets);
-    return kampagnenKosten(await adsSearch(token, secrets, kampagnenKostenAbfrage(tag)), tag);
+    const abfrage = kampagnenKostenAbfrage(von, bis);
+    const token = await fetchAdsAccessToken(secrets, AbortSignal.timeout(timeoutMs));
+    return kampagnenKosten(await adsSearch(token, secrets, abfrage, AbortSignal.timeout(timeoutMs)));
   } catch (e) {
     console.error("fetchAdsKostenKampagne:", e instanceof Error ? e.message : String(e));
     return null;
