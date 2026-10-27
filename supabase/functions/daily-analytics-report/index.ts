@@ -24,6 +24,7 @@ import {
   fetchLeadCohorts,
   fetchBesucherKohorten,
   fetchAdsSpend,
+  fetchAdsKostenKampagne,
   fetchPeriodStats,
   fetchTotalLeads, fetchMailHealth, fetchBuchungHealth, fetchUploadHealth } from "./queries.ts";
 import { buildReportEmail } from "./template.ts";
@@ -132,7 +133,7 @@ Deno.serve(async (req: Request) => {
     const yesterday = berlinDayRange(daysAgo);
 
     const CHART_DAYS_BACK = 14;
-    const [yesterdayStats, periodStats, prevPeriodStats, totalLeads, booked, mailHealth, agentNotes, adsSpend, leadKohorten, besucherKohorten, buchungHealth, uploadHealth] = await Promise.all([
+    const [yesterdayStats, periodStats, prevPeriodStats, totalLeads, booked, mailHealth, agentNotes, adsSpend, leadKohorten, besucherKohorten, buchungHealth, uploadHealth, kampagnenKosten] = await Promise.all([
       fetchDailyStats(supabase, yesterday.start, yesterday.end),
       fetchPeriodStats(supabase, PERIOD_DAYS_BACK),
       // Die 7 Tage VOR der Vergleichsperiode — Basis für den Trend-Pfeil.
@@ -171,6 +172,9 @@ Deno.serve(async (req: Request) => {
         letzterUpload: null,
         error: e instanceof Error ? e.message : String(e),
       })),
+      /* Kosten je Kampagne für die Admin-Seite „Trichter“ (Registry #142).
+         Fängt Fehler selbst ab (null); `.catch` nur als zweites Netz. */
+      fetchAdsKostenKampagne(supabase, yesterday.iso).catch(() => null),
     ]);
 
     const smtp = await getSmtpConfig(supabase);
@@ -204,6 +208,18 @@ Deno.serve(async (req: Request) => {
         .from("ads_kosten_tag")
         .upsert({ tag: yesterday.iso, kosten_netto: adsSpend.yesterday, aktualisiert_at: new Date().toISOString() }, { onConflict: "tag" });
       if (error) console.log("ads_kosten_tag konnte nicht geschrieben werden:", error.message);
+    }
+    /* Dazu je Kampagne (Registry #142) — gleiche Regel: auch im dryRun, Fehler nur ins Log. */
+    if (kampagnenKosten && kampagnenKosten.length > 0) {
+      try {
+        const jetzt = new Date().toISOString();
+        const { error } = await supabase
+          .from("ads_kosten_kampagne_tag")
+          .upsert(kampagnenKosten.map((z) => ({ ...z, aktualisiert_at: jetzt })), { onConflict: "tag,kampagne_id" });
+        if (error) console.log("ads_kosten_kampagne_tag konnte nicht geschrieben werden:", error.message);
+      } catch (e) {
+        console.log("ads_kosten_kampagne_tag konnte nicht geschrieben werden:", e instanceof Error ? e.message : String(e));
+      }
     }
 
     if (dryRun) {

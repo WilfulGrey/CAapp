@@ -893,6 +893,68 @@ export async function fetchAdsSpend(
   }
 }
 
+// ─── Google-Ads-Kosten je Kampagne (Registry #142, 27.10.2026) ─────────────
+// Für die Admin-Seite „Trichter“: Kosten je Profil je Kanal (High Intent, PM)
+// brauchen die Kosten JE KAMPAGNE, ads_kosten_tag hat nur die Tagessumme.
+// Gleicher Zugang, gleiche Fail-soft-Regel wie fetchAdsSpend: null bei jedem
+// Fehler, die Mail geht trotzdem raus.
+
+export interface KampagnenKostenZeile {
+  tag: string;            // YYYY-MM-DD (Konto-Zeitzone = Berlin)
+  kampagne_id: string;
+  kampagne_name: string | null;
+  kosten_netto: number;   // EUR, 2 Nachkommastellen
+  klicks: number;
+  impressionen: number;
+}
+
+const TAG_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
+
+/** GAQL für einen Tag: nur Kampagnen mit Einblendungen (ohne Einblendung keine Kosten). */
+export function kampagnenKostenAbfrage(tag: string): string {
+  if (!TAG_FORMAT.test(tag)) throw new Error(`ungültiger Tag: ${tag}`);
+  return "SELECT campaign.id, campaign.name, metrics.cost_micros, metrics.clicks, metrics.impressions " +
+    `FROM campaign WHERE segments.date = '${tag}' AND metrics.impressions > 0`;
+}
+
+/** Antwortzeilen der Ads-API → eine Zeile je Kampagne (summiert, falls Google mehrere liefert). Pure. */
+export function kampagnenKosten(rows: Array<Record<string, unknown>>, tag: string): KampagnenKostenZeile[] {
+  const jeId = new Map<string, KampagnenKostenZeile>();
+  for (const r of rows) {
+    // deno-lint-ignore no-explicit-any
+    const c = (r as any)?.campaign ?? {};
+    // deno-lint-ignore no-explicit-any
+    const m = (r as any)?.metrics ?? {};
+    const id = String(c.id ?? "").trim();
+    if (!/^\d+$/.test(id)) continue;
+    const z = jeId.get(id) ?? { tag, kampagne_id: id, kampagne_name: null, kosten_netto: 0, klicks: 0, impressionen: 0 };
+    if (typeof c.name === "string" && c.name.trim()) z.kampagne_name = c.name.trim();
+    z.kosten_netto += Number(m.costMicros ?? 0) / 1e6;
+    z.klicks += Number(m.clicks ?? 0) || 0;
+    z.impressionen += Number(m.impressions ?? 0) || 0;
+    jeId.set(id, z);
+  }
+  return Array.from(jeId.values()).map((z) => ({ ...z, kosten_netto: Math.round(z.kosten_netto * 100) / 100 }));
+}
+
+export async function fetchAdsKostenKampagne(
+  supabase: SupabaseClient,
+  tag: string,
+): Promise<KampagnenKostenZeile[] | null> {
+  try {
+    const secrets = await getGoogleAdsSecrets(supabase);
+    if (!secrets) {
+      console.log("fetchAdsKostenKampagne: keine Google-Secrets (Staging?) — Kosten je Kampagne entfallen");
+      return null;
+    }
+    const token = await fetchAdsAccessToken(secrets);
+    return kampagnenKosten(await adsSearch(token, secrets, kampagnenKostenAbfrage(tag)), tag);
+  } catch (e) {
+    console.error("fetchAdsKostenKampagne:", e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
+
 /* ── Lead-Kohorten je Tag ──────────────────────────────────────────────
    Für das gestapelte Balkendiagramm (Martin 28.08.): „von DEN Leads dieses
    Tages haben so viele später ein Patientenprofil gefüllt".
