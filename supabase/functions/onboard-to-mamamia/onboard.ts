@@ -41,6 +41,14 @@ export interface SupabaseLike {
   fetchNewestPlannedJob?(
     leadId: string,
   ): Promise<{ mamamia_job_offer_id: number } | null>;
+  // Registry #140 (Martin 27.10.2026: „laufender Einsatz zuerst“): der gebuchte
+  // Job des Leads, der heute läuft oder als nächster beginnt — `gebucht`,
+  // Abreise fehlt oder ≥ `heute` (Berliner Kalendertag), früheste Anreise.
+  // Hat Vorrang vor fetchNewestPlannedJob. Optional wie die anderen.
+  fetchCurrentBookedJob?(
+    leadId: string,
+    heute: string,
+  ): Promise<{ mamamia_job_offer_id: number } | null>;
   // Registry #54 — atomowy claim: JEDEN UPDATE `... where id=$1 and
   // mamamia_customer_id is null and (mamamia_onboarding_started_at is null or
   // < staleBefore)`. true = ten wołający tworzy klienta; false = ktoś inny
@@ -272,20 +280,42 @@ async function pushCustomerToken(args: {
 // lead_jobs row IF it belongs to the lead (ownership via leadId); an
 // unknown/foreign job_id falls back to the default (safe — never cross-lead;
 // robust — stale deep-links don't break the portal).
+// Kalendertag in Berlin als YYYY-MM-DD — so vergleicht lead_jobs.abreise (date).
+function berlinTag(d: Date): string {
+  return d.toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
+}
+
 async function resolveScopedJobOfferId(
   supabase: SupabaseLike,
   leadId: string,
   defaultJobOfferId: number,
   jobId: string | undefined,
+  heute: string,
 ): Promise<number> {
-  // Opcja B (Dachs 8899, 2026-07-22): Einstieg OHNE expliziten ?job= landet
-  // auf dem AKTIVEN Job = neuester 'geplant' aus lead_jobs. Kunden mit einem
-  // einzigen Job verhalten sich identisch (ihr Job ist der neueste geplant;
-  // nach der Buchung gibt es keinen geplanten → Default). Multi-Job-Kunden
-  // sehen den neuen Einsatz mit seinen Bewerbungen statt des alten gebuchten
-  // (der über ?view=jobs / ?job= weiterhin erreichbar ist). Fail-soft: jeder
-  // Fehler ⇒ bisheriger Default — der Portal-Eintritt darf NIE brechen.
+  // Einstieg OHNE expliziten ?job=, Reihenfolge seit Registry #140:
+  // 1. laufender oder nächster GEBUCHTER Job — wer betreut wird, sieht seinen
+  //    Einsatz mit Anreise und Notfallnummer (Gebucht-Seite, #139). Vorher
+  //    landeten Gebuchte auf der Suche nach dem Folgeeinsatz oder auf ihrem
+  //    ersten, schon beendeten Job (prod 27.10.: 15 von 22). Die Suche
+  //    erreichen sie über den Schritt „Folgeeinsatz“ der Seite.
+  // 2. Opcja B (Dachs 8899, 2026-07-22): neuester 'geplant' aus lead_jobs —
+  //    noch nicht gebuchte Kunden sehen den neuen Einsatz mit seinen
+  //    Bewerbungen (der alte bleibt über ?view=jobs / ?job= erreichbar).
+  // 3. Default-Job des Leads.
+  // Fail-soft: jeder Fehler ⇒ nächste Stufe — der Portal-Eintritt darf NIE brechen.
   if (!jobId) {
+    if (supabase.fetchCurrentBookedJob) {
+      try {
+        const booked = await supabase.fetchCurrentBookedJob(leadId, heute);
+        if (booked && Number.isInteger(booked.mamamia_job_offer_id)) {
+          return booked.mamamia_job_offer_id;
+        }
+      } catch (e) {
+        console.warn(
+          `[onboard] fetchCurrentBookedJob failed for lead ${leadId}: ${(e as Error).message} — trying planned job`,
+        );
+      }
+    }
     if (!supabase.fetchNewestPlannedJob) return defaultJobOfferId;
     try {
       const planned = await supabase.fetchNewestPlannedJob(leadId);
@@ -360,7 +390,7 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
     return {
       customer_id: lead.mamamia_customer_id,
       job_offer_id: await resolveScopedJobOfferId(
-        supabase, lead.id, lead.mamamia_job_offer_id, jobId,
+        supabase, lead.id, lead.mamamia_job_offer_id, jobId, berlinTag(now()),
       ),
       lead_id: lead.id,
       email: lead.email,
@@ -382,7 +412,7 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
       return {
         customer_id: done.mamamia_customer_id,
         job_offer_id: await resolveScopedJobOfferId(
-          supabase, done.id, done.mamamia_job_offer_id, jobId,
+          supabase, done.id, done.mamamia_job_offer_id, jobId, berlinTag(now()),
         ),
         lead_id: done.id,
         email: done.email,
@@ -520,7 +550,7 @@ async function createCustomerAndJob(args: {
   return {
     customer_id: mamamiaCustomerId,
     job_offer_id: await resolveScopedJobOfferId(
-      supabase, lead.id, mamamiaJobOfferId, jobId,
+      supabase, lead.id, mamamiaJobOfferId, jobId, berlinTag(now()),
     ),
     lead_id: lead.id,
     email: lead.email,

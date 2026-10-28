@@ -682,10 +682,19 @@ poniżej lecą TYLKO przy pierwszym wejściu klienta.**
 `lead.mamamia_job_offer_id`:
 1. jawny deeplink `?job=<lead_jobs.id>` (przegląd `?view=jobs`) → ten job
    (ownership-check po lead_id; obcy/nieznany → fallback niżej) — Variant A;
-2. bez deeplinka → **AKTYWNY job = najnowszy `status='geplant'` z `lead_jobs`**
-   (Opcja B, Dachs 8899 2026-07-22 — klient z gebuchtym starym jobem ma lądować
-   na nowym einsatzu z jego Bewerbungami, nie na BookedScreen starej PK);
-3. brak geplant / błąd lookupu → `lead.mamamia_job_offer_id` (fail-soft,
+2. bez deeplinka, **najpierw** (Registry #140, Martin 2026-10-27: „laufender
+   Einsatz zuerst") → **gebuchter job, który dziś trwa albo zaczyna się jako
+   następny** z `lead_jobs`: `status='gebucht'`, `abreise` puste albo ≥ dziś
+   (dzień kalendarzowy w Europe/Berlin), najwcześniejsza `anreise`
+   (`fetchCurrentBookedJob`). Klient pod opieką widzi swój einsatz z przyjazdem
+   i numerem awaryjnym (strona „gebucht", #139); poszukiwanie kolejnego
+   einsatzu ma pod krokiem „Folgeeinsatz" tej strony. Powód: na prodzie
+   27.10.2026 15 z 22 zabookowanych klientów lądowało na poszukiwaniu albo na
+   pierwszym, już zakończonym jobie;
+3. brak trwającego/następnego gebucht → **najnowszy `status='geplant'` z
+   `lead_jobs`** (Opcja B, Dachs 8899 2026-07-22 — klient bez bookingu widzi
+   nowy einsatz z jego Bewerbungami, nie stary job);
+4. brak obu / błąd lookupu → `lead.mamamia_job_offer_id` (fail-soft,
    Portal-Eintritt nigdy nie pęka). Front dodatkowo: `pickFinalConfirmedJob`
    jest STRICT per job sesji (fc innego joba nie kaperuje aktywnego), a link
    „Alle meine Einsätze" renderuje się też bez `?job=`, gdy lead ma >1 job.
@@ -695,8 +704,8 @@ poniżej lecą TYLKO przy pierwszym wejściu klienta.**
 (`appendJobParam` w `project 3/lib/portal-url.ts` + lookup `lead_jobs` po
 `metadata.mamamia_job_offer_id`), remindery przez `send-scheduled-emails`
 (kopia helpera w `followupJobs.ts` — edge fn nie może importować z `lib/`).
-Fail-soft: brak wiersza w mirrorze ⇒ plain link ⇒ i tak ląduje na najnowszym
-geplant (punkt 2 wyżej). Metafora Michała: token = klucz do mieszkania,
+Fail-soft: brak wiersza w mirrorze ⇒ plain link ⇒ i tak ląduje na trwającym
+gebucht albo najnowszym geplant (punkty 2–3 wyżej). Metafora Michała: token = klucz do mieszkania,
 `?job=` = pokój.
 
 #### ③ LoginAgency (auth do mamamii, BEZ tokena)

@@ -315,6 +315,22 @@ function makeRealSupabase(url: string, serviceKey: string): SupabaseLike {
       if (error) throw new Error(`supabase fetchNewestPlannedJob: ${error.message}`);
       return data;
     },
+    async fetchCurrentBookedJob(leadId: string, heute: string) {
+      // Registry #140: gebuchter Job, der heute läuft oder als nächster
+      // beginnt (Abreise fehlt oder ≥ heute, früheste Anreise zuerst).
+      // Keiner → null → Caller probiert den geplanten Job.
+      const { data, error } = await client
+        .from("lead_jobs")
+        .select("mamamia_job_offer_id")
+        .eq("lead_id", leadId)
+        .eq("status", "gebucht")
+        .or(`abreise.is.null,abreise.gte.${heute}`)
+        .order("anreise", { ascending: true, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw new Error(`supabase fetchCurrentBookedJob: ${error.message}`);
+      return data;
+    },
   };
 }
 
