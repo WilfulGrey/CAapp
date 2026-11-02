@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { istAdmin } from '@/lib/admin-sitzung';
 import { ADMIN_SPALTEN, MAX_ADMIN_LISTE, pruefeManuell } from '@/lib/bewertungen-admin';
 import { fehlerText, supabaseDienst } from '@/lib/bewertungen-server';
 
@@ -9,18 +10,14 @@ import { fehlerText, supabaseDienst } from '@/lib/bewertungen-server';
  *        sofort veröffentlicht, ohne E-Mail, es gehen keine Mails raus.
  *
  * Schutz wie die übrigen Admin-Routen: middleware.ts lässt /api/admin nur mit
- * gültigem admin_auth-Cookie durch, hier wird es zusätzlich geprüft.
+ * gültiger Admin-Sitzung durch, hier wird sie zusätzlich geprüft.
  * Service-Key, weil die Tabelle RLS ohne Policy hat.
  */
 
 export const dynamic = 'force-dynamic';
 
-function angemeldet(request: NextRequest): boolean {
-  return (request.cookies.get('admin_auth')?.value ?? '') === (process.env.ADMIN_PASSWORD || 'primundus2026');
-}
-
 export async function GET(request: NextRequest) {
-  if (!angemeldet(request)) return NextResponse.json({ fehler: 'Nicht angemeldet.' }, { status: 401 });
+  if (!(await istAdmin(request))) return NextResponse.json({ fehler: 'Nicht angemeldet.' }, { status: 401 });
   try {
     const { data, error } = await supabaseDienst()
       .from('bewertungen')
@@ -36,7 +33,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!angemeldet(request)) return NextResponse.json({ fehler: 'Nicht angemeldet.' }, { status: 401 });
+  if (!(await istAdmin(request))) return NextResponse.json({ fehler: 'Nicht angemeldet.' }, { status: 401 });
   let body: unknown;
   try {
     body = await request.json();

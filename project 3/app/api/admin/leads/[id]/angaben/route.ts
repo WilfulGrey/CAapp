@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { istAdmin } from '@/lib/admin-sitzung';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { berechnePreis, type FormularDaten, type Kalkulation } from '@/lib/calculation';
 import { diffAngaben, mamamiaFelder, type Aenderung } from '@/lib/angaben-diff';
@@ -37,9 +38,7 @@ type LeadRow = {
 
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  const cookie = request.cookies.get('admin_auth')?.value ?? '';
-  const erwartet = process.env.ADMIN_PASSWORD || 'primundus2026';
-  if (cookie !== erwartet) {
+  if (!(await istAdmin(request))) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 

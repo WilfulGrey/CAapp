@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { istAdmin } from '@/lib/admin-sitzung';
 import { createClient } from '@supabase/supabase-js';
 import { pruefeMonatsEingabe } from '@/lib/wachstum';
 
@@ -12,8 +13,7 @@ import { pruefeMonatsEingabe } from '@/lib/wachstum';
  * Admin-Cookie — die Middleware sperrt /api/admin/* ohnehin.
  */
 export async function PUT(request: NextRequest) {
-  const cookie = request.cookies.get('admin_auth')?.value ?? '';
-  if (cookie !== (process.env.ADMIN_PASSWORD || 'primundus2026')) {
+  if (!(await istAdmin(request))) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
