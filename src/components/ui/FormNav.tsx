@@ -80,7 +80,7 @@ export function FormNav({
             Zurück
           </Button>
         )}
-        <Button onClick={onWeiter} laedt={laedt} ladeText={ladeText} breit className={stand75b8df8 ? undefined : `px-2 whitespace-nowrap${ruhig ? ' !font-semibold' : ''}`}>
+        <Button data-mess="weiter" onClick={onWeiter} laedt={laedt} ladeText={ladeText} breit className={stand75b8df8 ? undefined : `px-2 whitespace-nowrap${ruhig ? ' !font-semibold' : ''}`}>
           {weiterText}
         </Button>
       </div>

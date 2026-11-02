@@ -14,6 +14,7 @@ import { EYEBROW } from '../ui/SectionHeader';
 import { DateField, kalenderTag, localTodayIso } from './DateField';
 import { callMamamia } from '../../lib/mamamia/client';
 import { reportLeadEvent } from '../../lib/leadEvents';
+import { neuBelegteFelder } from '../../lib/messWerte';
 import type { LeadEventMetadata } from '../../lib/leadEvents';
 import type { PatientForm } from './shared';
 import { STEP_LABELS, einsatzortHinweis } from './shared';
@@ -94,7 +95,8 @@ export const AngebotCard: FC<{
    *  (Registry #132): erstes Feld im Bild, Feld auf Seite 1 oder 3 angetippt, „Weiter“ mit offenen Pflichtfeldern.
    *  Das Portal meldet sie nur für echte Leads; ohne Rückruf passiert nichts. */
   onMesspunkt?: (
-    punkt: 'kalender_geoeffnet' | 'kalender_zu_ohne_datum' | 'formular_sichtbar' | 'feld_beruehrt' | 'weiter_blockiert',
+    punkt: 'kalender_geoeffnet' | 'kalender_zu_ohne_datum' | 'formular_sichtbar' | 'feld_beruehrt' | 'weiter_blockiert'
+      | 'weiter_getippt' | 'knopf_im_bild' | 'feld_gewaehlt' | 'hinweis_im_bild' | 'speichern_gestartet' | 'speichern_antwort',
     metadata?: LeadEventMetadata,
   ) => void;
 }> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet, gewaehlterStart, schonAbgesendet, onImBlick, eingebettet = false, stand75b8df8 = false, onMesspunkt }) => {
@@ -108,6 +110,7 @@ export const AngebotCard: FC<{
   // aus `missingFields`.
   const [fehlerZeigen, setFehlerZeigen] = useState(false);
   const [step, setStep] = useState(0);
+  const speicherVersuch = useRef(0);
   const [priceInfo, setPriceInfo] = useState<string|null>(null);
 
   // ─── localStorage key per lead/token ────────────────────────────────────────
@@ -646,6 +649,16 @@ export const AngebotCard: FC<{
 
   const zurueck = () => { setFehlerZeigen(false); setStep(s => s - 1); scrollToFormTop(); };
 
+  // Kernmessung (Registry #144): Sieht der Kunde nach einem gestoppten „Weiter“ das rote Feld?
+  const pruefeHinweisImBild = (schritt: number) => {
+    window.setTimeout(() => {
+      const feld = patientFormRef.current?.querySelector('[data-invalid="1"]');
+      const r = feld?.getBoundingClientRect();
+      const im_bild = !!r && r.top + r.height / 2 >= 0 && r.top + r.height / 2 <= window.innerHeight;
+      onMesspunkt?.('hinweis_im_bild', { schritt, im_bild });
+    }, 1000);
+  };
+
   const weiter = () => {
     if (missingFields(step).length === 0) {
       setFehlerZeigen(false);
@@ -657,6 +670,7 @@ export const AngebotCard: FC<{
     onMesspunkt?.('weiter_blockiert', { schritt: step, offen: missingFields(step), vor_speichern: !nurAenderung });
     setFehlerZeigen(true);
     zumErstenFehler();
+    pruefeHinweisImBild(step);
   };
 
   const speichern = async () => {
@@ -672,8 +686,16 @@ export const AngebotCard: FC<{
       setFehlerZeigen(true);
       setStep(ersterOffener);
       zumErstenFehler();
+      pruefeHinweisImBild(ersterOffener);
       return;
     }
+    const versuch = ++speicherVersuch.current;
+    const speicherStart = Date.now();
+    onMesspunkt?.('speichern_gestartet', { versuch, vor_speichern: !nurAenderung });
+    const speicherAntwort = (ergebnis: NonNullable<LeadEventMetadata['ergebnis']>, fehler_art?: LeadEventMetadata['fehler_art']) =>
+      onMesspunkt?.('speichern_antwort', {
+        versuch, ergebnis, ...(fehler_art ? { fehler_art } : {}), dauer_ms: Date.now() - speicherStart, vor_speichern: !nurAenderung,
+      });
     // Hier stand bis Registry #65 ein `_isDraft:false` VOR dem
     // Speichern — nach einem abgelehnten Save las der Reload
     // „Vollständig", obwohl in Mamamia nichts steht. Ersatzlos
@@ -694,6 +716,7 @@ export const AngebotCard: FC<{
       setIsSaving(true);
       try {
         await onSaveToMamamia(patient);
+        speicherAntwort('ok');
         setSaved(true);
         setPatientOpen(false);
         onPatientSaved?.(true);
@@ -704,6 +727,8 @@ export const AngebotCard: FC<{
         // customer can retry without re-entering data.
         setPatientOpen(true);
         const m = err instanceof Error ? err.message : '';
+        if (m.startsWith('EINSATZORT')) speicherAntwort('einsatzort');
+        else speicherAntwort('fehler', /401|unauthor|unauthenticated|token/i.test(m) ? 'zugang' : /network|fetch|load failed|timeout|abort/i.test(m) ? 'netz' : 'sonst');
         if (!m.startsWith('EINSATZORT')) {
           console.error('UpdateCustomer failed:', err);
         } else {
@@ -724,6 +749,7 @@ export const AngebotCard: FC<{
     } else {
       // Mamamia disabled (e.g. local dev) — fall back to
       // the old immediate-collapse path.
+      speicherAntwort('ohne_verbindung');
       setSaved(true);
       setPatientOpen(false);
       onPatientSaved?.(true);
@@ -791,6 +817,18 @@ export const AngebotCard: FC<{
   // Listener stabil; die Sitzungs-Dedupe macht `reportLeadEvent`.
   const messStand = useRef({ step, vorSpeichern: !nurAenderung, melden: onMesspunkt });
   messStand.current = { step, vorSpeichern: !nurAenderung, melden: onMesspunkt };
+  // Kernmessung (Registry #144, Beschreibung unten): „Weiter“/„Speichern“ zur Hälfte im Bild.
+  useEffect(() => {
+    const knopf = patientFormRef.current?.querySelector('[data-mess="weiter"]');
+    if (!knopf || !patientOpen || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(entries => {
+      if (!entries.some(e => e.isIntersecting)) return;
+      const { step: s, vorSpeichern, melden } = messStand.current;
+      melden?.('knopf_im_bild', { schritt: s, vor_speichern: vorSpeichern });
+    }, { threshold: 0.5 });
+    io.observe(knopf);
+    return () => io.disconnect();
+  }, [patientOpen, step]);
   const sichtbarGemeldet = useRef(false);
   useEffect(() => {
     const el = patientFormRef.current;
@@ -824,8 +862,35 @@ export const AngebotCard: FC<{
     };
   }, []);
 
+  // ── Kernmessung (Registry #144, für Kunden unsichtbar) ────────────────────────────────────
+  // Zeigt, ob Kunden nicht tippen oder etwas bricht: Knopf im Bild, Tipp auf den Knopf (pointerup, also auch ein Tipp, der
+  // keinen Klick auslöst; Wischen endet in pointercancel), Feld wirklich gewählt. Nur Schlüssel und Zähler.
+  const tippZaehler = useRef<Record<number, number>>({});
+  useEffect(() => {
+    const el = patientFormRef.current;
+    if (!el) return;
+    const getippt = (e: Event) => {
+      if (!(e.target as Element | null)?.closest?.('[data-mess="weiter"]')) return;
+      const { step: s, vorSpeichern, melden } = messStand.current;
+      const tipp = (tippZaehler.current[s] ?? 0) + 1;
+      tippZaehler.current[s] = tipp;
+      if (tipp <= 5) melden?.('weiter_getippt', { schritt: s, tipp, vor_speichern: vorSpeichern });
+    };
+    el.addEventListener('pointerup', getippt, true);
+    return () => el.removeEventListener('pointerup', getippt, true);
+  }, []);
+  // Nur Änderungen des Kunden: Vorbelegung und Nachladen aus mamamia laufen ohne userDirty.
+  const letzterPatient = useRef(patient);
+  useEffect(() => {
+    const vorher = letzterPatient.current;
+    letzterPatient.current = patient;
+    if (!userDirty.current) return;
+    const { step: s, vorSpeichern, melden } = messStand.current;
+    neuBelegteFelder(vorher, patient).forEach(feld => melden?.('feld_gewaehlt', { schritt: s, feld, vor_speichern: vorSpeichern }));
+  }, [patient]);
+
   return (
-    <div ref={patientFormRef} id="pflegesituation-formular" className="scroll-mt-16">
+    <div ref={patientFormRef} id="pflegesituation-formular" data-schritt={step} className="scroll-mt-16">
       {patientOpen && (
         <Rahmen className={eingebettet ? 'pt-4' : 'px-5 pt-5'}>
           <ProgressSteps

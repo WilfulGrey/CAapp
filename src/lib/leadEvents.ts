@@ -7,6 +7,8 @@
 // portal_opened / patient_data_saved; caregiver_invited is intentionally NOT
 // deduped on the server so each invite produces one team mail.
 
+import type { GeraetKlasse } from './messWerte';
+
 export const KOSTENRECHNER_URL =
   import.meta.env.VITE_KOSTENRECHNER_URL || 'https://kostenrechner.primundus.de';
 
@@ -42,6 +44,17 @@ export const MESSPUNKTE = [
   'feld_beruehrt',            // ein Feld auf Seite 1 oder 3 angetippt oder fokussiert {schritt, feld, vor_speichern}
   'weiter_blockiert',         // „Weiter“/„Speichern“ getippt, Pflichtangaben fehlen {schritt, offen, vor_speichern}
   'zur_pflegesituation',      // Knopf oder Link ins Formular getippt {quelle, vor_speichern}
+  // Kernmessung (Registry #144, Martin 02.11.): zeigt, ob Kunden nicht tippen oder etwas bricht.
+  'weiter_getippt',           // Tipp auf „Weiter“/„Speichern“, vor jeder Prüfung {schritt, tipp, vor_speichern}
+  'knopf_im_bild',            // „Weiter“/„Speichern“ zur Hälfte im Bild {schritt, vor_speichern}
+  'feld_gewaehlt',            // Feld durch den Kunden von leer auf belegt {schritt, feld, vor_speichern}
+  'hinweis_im_bild',          // nach gestopptem „Weiter“: erstes rotes Feld im Bild? {schritt, im_bild}
+  'speichern_gestartet',      // Speichern beginnt {versuch, vor_speichern}
+  'speichern_antwort',        // Ergebnis des Speicherns {versuch, ergebnis, fehler_art, dauer_ms, vor_speichern}
+  'portal_verlassen',         // Seite versteckt oder verlassen {art, sekunden, schritt, formular_offen, vor_speichern}
+  'portal_fehler',            // JS-Fehler {art, name, text} (ohne Werte, fehlerKurz)
+  'portal_ladefehler',        // Laden gescheitert {quelle}
+  'pflegekraefte_geladen',    // erste Liste {anzahl, dauer_ms, vor_speichern}
 ] as const;
 export type Messpunkt = typeof MESSPUNKTE[number];
 
@@ -141,6 +154,24 @@ export interface LeadEventMetadata {
   schritt?: number;
   feld?: string;
   offen?: string[];
+  // Kernmessung (Registry #144): nur Klassen, Zähler und Schlüssel, nie ein eingegebener Wert.
+  geraet?: GeraetKlasse['geraet'];
+  browser?: GeraetKlasse['browser'];
+  in_app?: boolean;
+  hoehe?: GeraetKlasse['hoehe'];
+  tipp?: number;
+  im_bild?: boolean;
+  versuch?: number;
+  ergebnis?: 'ok' | 'fehler' | 'einsatzort' | 'ohne_verbindung';
+  fehler_art?: 'zugang' | 'netz' | 'sonst';
+  dauer_ms?: number;
+  art?: 'versteckt' | 'verlassen' | 'js' | 'promise';
+  sekunden?: number;
+  formular_offen?: boolean;
+  name?: string;
+  text?: string;
+  quelle_laden?: 'lead' | 'sitzung' | 'abgelaufen' | 'kunde' | 'pflegekraefte';
+  anzahl?: number;
 }
 
 // Session-level dedupe so a re-render or repeated save doesn't spam the
@@ -199,6 +230,16 @@ function dedupeKey(token: string, event: LeadEvent, metadata?: LeadEventMetadata
   if (event === 'zur_pflegesituation') {
     return `${token}:${event}:${metadata?.quelle ?? ''}`;
   }
+  // Kernmessung (Registry #144): je Tipp, je Schritt, je Feld, je Speicherversuch; Verlassen je Stand, damit Rückkehr
+  // und erneutes Verlassen sichtbar bleiben; Fehler je Art und Text, Ladefehler je Quelle.
+  if (event === 'weiter_getippt') return `${token}:${event}:${metadata?.schritt ?? ''}:${metadata?.tipp ?? ''}`;
+  if (event === 'knopf_im_bild') return `${token}:${event}:${metadata?.schritt ?? ''}`;
+  if (event === 'feld_gewaehlt') return `${token}:${event}:${metadata?.feld ?? ''}`;
+  if (event === 'hinweis_im_bild') return `${token}:${event}:${metadata?.schritt ?? ''}:${metadata?.im_bild ? 1 : 0}`;
+  if (event === 'speichern_gestartet' || event === 'speichern_antwort') return `${token}:${event}:${metadata?.versuch ?? ''}`;
+  if (event === 'portal_verlassen') return `${token}:${event}:${metadata?.art ?? ''}:${metadata?.schritt ?? ''}:${metadata?.formular_offen ? 1 : 0}`;
+  if (event === 'portal_fehler') return `${token}:${event}:${metadata?.art ?? ''}:${metadata?.name ?? ''}:${metadata?.text ?? ''}`;
+  if (event === 'portal_ladefehler') return `${token}:${event}:${metadata?.quelle_laden ?? ''}`;
   return `${token}:${event}`;
 }
 
@@ -230,6 +271,8 @@ export function reportLeadEvent(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    // Beim Verlassen bricht der Browser normale Anfragen ab.
+    ...(event === 'portal_verlassen' ? { keepalive: true } : {}),
   }).catch(() => {
     // Fire-and-forget. On failure, drop the dedupe key so a later attempt
     // can retry (e.g. patient_data_saved fires again on the next save).
