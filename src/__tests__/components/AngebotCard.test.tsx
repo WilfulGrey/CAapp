@@ -460,3 +460,116 @@ describe('AngebotCard – Feld-Messung', () => {
     expect(meldungen(onMesspunkt, 'feld_beruehrt')[0]?.[1]).toMatchObject({ vor_speichern: false });
   });
 });
+
+// Kernmessung (Registry #144): zeigt, ob Kunden nicht tippen oder etwas bricht. Nur Schlüssel und Zähler.
+describe('AngebotCard – Kernmessung', () => {
+  const meldungen = (m: ReturnType<typeof vi.fn>, punkt: string) => m.mock.calls.filter(([p]) => p === punkt).map(([, d]) => d);
+  const knopf = () => screen.getByRole('button', { name: /^Weiter/ });
+
+  it('Tipp auf „Weiter“ wird vor der Prüfung gemeldet und je Schritt gezählt', async () => {
+    const onMesspunkt = vi.fn();
+    render(<AngebotCard lead={lead} onMesspunkt={onMesspunkt} />);
+    await userEvent.click(knopf());
+    await userEvent.click(knopf());
+    expect(meldungen(onMesspunkt, 'weiter_getippt')).toEqual([
+      { schritt: 0, tipp: 1, vor_speichern: true },
+      { schritt: 0, tipp: 2, vor_speichern: true },
+    ]);
+    const reihenfolge = onMesspunkt.mock.calls.map(([p]) => p);
+    expect(reihenfolge.indexOf('weiter_getippt')).toBeLessThan(reihenfolge.indexOf('weiter_blockiert'));
+  });
+
+  it('ein Tipp, der keinen Klick auslöst, zählt trotzdem; Wischen (pointercancel) nicht', () => {
+    const onMesspunkt = vi.fn();
+    render(<AngebotCard lead={lead} onMesspunkt={onMesspunkt} />);
+    knopf().dispatchEvent(new Event('pointercancel', { bubbles: true }));
+    expect(meldungen(onMesspunkt, 'weiter_getippt')).toEqual([]);
+    knopf().dispatchEvent(new Event('pointerup', { bubbles: true }));
+    expect(meldungen(onMesspunkt, 'weiter_getippt')).toEqual([{ schritt: 0, tipp: 1, vor_speichern: true }]);
+    expect(meldungen(onMesspunkt, 'weiter_blockiert')).toEqual([]);
+  });
+
+  it('Knopf zur Hälfte im Bild → „knopf_im_bild“ mit dem Schritt', () => {
+    const beobachter: Array<{ cb: (e: Array<{ isIntersecting: boolean }>) => void; ziel?: Element }> = [];
+    const vorher = (window as unknown as { IntersectionObserver?: unknown }).IntersectionObserver;
+    (window as unknown as { IntersectionObserver: unknown }).IntersectionObserver = class {
+      eintrag: { cb: (e: Array<{ isIntersecting: boolean }>) => void; ziel?: Element };
+      constructor(cb: (e: Array<{ isIntersecting: boolean }>) => void) { this.eintrag = { cb }; beobachter.push(this.eintrag); }
+      observe(el: Element) { this.eintrag.ziel = el; }
+      disconnect() {}
+      unobserve() {}
+    };
+    try {
+      const onMesspunkt = vi.fn();
+      render(<AngebotCard lead={lead} onMesspunkt={onMesspunkt} />);
+      const aufKnopf = beobachter.find((b) => b.ziel?.getAttribute('data-mess') === 'weiter');
+      expect(aufKnopf).toBeTruthy();
+      aufKnopf!.cb([{ isIntersecting: false }]);
+      expect(meldungen(onMesspunkt, 'knopf_im_bild')).toEqual([]);
+      aufKnopf!.cb([{ isIntersecting: true }]);
+      expect(meldungen(onMesspunkt, 'knopf_im_bild')).toEqual([{ schritt: 0, vor_speichern: true }]);
+    } finally {
+      (window as unknown as { IntersectionObserver: unknown }).IntersectionObserver = vorher;
+    }
+  });
+
+  it('echte Feldwahl → „feld_gewaehlt“; die Vorbelegung zählt nicht', async () => {
+    const onMesspunkt = vi.fn();
+    render(<AngebotCard lead={lead} onMesspunkt={onMesspunkt} />);
+    expect(meldungen(onMesspunkt, 'feld_gewaehlt')).toEqual([]);
+    await userEvent.click(screen.getByRole('button', { name: 'Weiblich' }));
+    expect(meldungen(onMesspunkt, 'feld_gewaehlt')).toEqual([{ schritt: 0, feld: 'geschlecht', vor_speichern: true }]);
+  });
+
+  it('kein Messpunkt enthält einen eingegebenen Wert', async () => {
+    const onMesspunkt = vi.fn();
+    render(<AngebotCard lead={lead} onMesspunkt={onMesspunkt} />);
+    const geburtsjahr = document.querySelector('[data-field="geburtsjahr"] input') as HTMLInputElement;
+    await userEvent.type(geburtsjahr, '1944');
+    await userEvent.click(screen.getByRole('button', { name: 'Weiblich' }));
+    await userEvent.click(knopf());
+    const alles = JSON.stringify(onMesspunkt.mock.calls);
+    expect(meldungen(onMesspunkt, 'feld_gewaehlt').map((d) => (d as { feld: string }).feld)).toContain('geburtsjahr');
+    for (const wert of ['1944', 'Weiblich']) expect(alles).not.toContain(wert);
+  });
+
+  it('Speichern: gestartet und Antwort ok mit Dauer', async () => {
+    entwurf(VOLL);
+    const onMesspunkt = vi.fn();
+    render(<AngebotCard lead={lead} mamamiaEnabled onSaveToMamamia={vi.fn(async () => {})} onMesspunkt={onMesspunkt} />);
+    for (let i = 0; i < 3; i++) await weiter();
+    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen erhalten' }));
+    await waitFor(() => expect(meldungen(onMesspunkt, 'speichern_antwort')).toHaveLength(1));
+    expect(meldungen(onMesspunkt, 'speichern_gestartet')).toEqual([{ versuch: 1, vor_speichern: true }]);
+    expect(meldungen(onMesspunkt, 'speichern_antwort')[0]).toMatchObject({ versuch: 1, ergebnis: 'ok', vor_speichern: true });
+    expect((meldungen(onMesspunkt, 'speichern_antwort')[0] as { dauer_ms: number }).dauer_ms).toBeGreaterThanOrEqual(0);
+  });
+
+  it.each([
+    ['Request failed 401', 'fehler', 'zugang'],
+    ['Failed to fetch', 'fehler', 'netz'],
+    ['Geburtsjahr 1944 ungültig', 'fehler', 'sonst'],
+    ['EINSATZORT:80331', 'einsatzort', undefined],
+  ])('Speichern scheitert mit „%s“ → %s, Fehlertext geht nicht mit', async (text, ergebnis, fehler_art) => {
+    entwurf(VOLL);
+    const onMesspunkt = vi.fn();
+    const onSave = vi.fn(async () => { throw new Error(text); });
+    render(<AngebotCard lead={lead} mamamiaEnabled onSaveToMamamia={onSave} onMesspunkt={onMesspunkt} />);
+    for (let i = 0; i < 3; i++) await weiter();
+    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen erhalten' }));
+    await waitFor(() => expect(meldungen(onMesspunkt, 'speichern_antwort')).toHaveLength(1));
+    const antwort = meldungen(onMesspunkt, 'speichern_antwort')[0] as Record<string, unknown>;
+    expect(antwort.ergebnis).toBe(ergebnis);
+    expect(antwort.fehler_art).toBe(fehler_art);
+    expect(JSON.stringify(antwort)).not.toMatch(/1944|80331/);
+  });
+
+  it('Speichern ohne Verbindung zu mamamia wird sichtbar', async () => {
+    entwurf(VOLL);
+    const onMesspunkt = vi.fn();
+    render(<AngebotCard lead={lead} onMesspunkt={onMesspunkt} />);
+    for (let i = 0; i < 3; i++) await weiter();
+    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen erhalten' }));
+    expect(meldungen(onMesspunkt, 'speichern_antwort')[0]).toMatchObject({ ergebnis: 'ohne_verbindung' });
+  });
+});

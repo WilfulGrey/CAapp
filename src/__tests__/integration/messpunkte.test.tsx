@@ -42,7 +42,11 @@ beforeAll(() => {
 });
 
 type Meldung = { token?: string; event?: string; metadata?: Record<string, unknown>; notify?: boolean };
-const ERLAUBTE_FELDER = ['caregiver_id', 'quelle', 'vor_speichern', 'frage', 'schritt', 'feld', 'offen'];
+const ERLAUBTE_FELDER = [
+  'caregiver_id', 'quelle', 'vor_speichern', 'frage', 'schritt', 'feld', 'offen',
+  // Kernmessung (Registry #144): nur Klassen, Zähler und Schlüssel.
+  'tipp', 'im_bild', 'versuch', 'ergebnis', 'fehler_art', 'dauer_ms', 'art', 'sekunden', 'formular_offen', 'name', 'text', 'quelle_laden', 'anzahl',
+];
 // Lesende Aufrufe der Seite (Ereignisse für die Karten, Sterne) — hier ohne Inhalt.
 const lesen = [
   http.get('https://kostenrechner.primundus.de/api/lead-event', () => HttpResponse.json({ events: [] })),

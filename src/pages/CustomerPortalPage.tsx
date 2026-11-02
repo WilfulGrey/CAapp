@@ -20,6 +20,7 @@ import { feedbackInRuhezeit, reportLeadEvent, fetchLeadEvents, fetchLeadEventsOd
 import type { CaregiverSnapshot, EinladenQuelle, FormularQuelle, LeadEventMetadata, Messpunkt, ProfilQuelle } from '../lib/leadEvents';
 import { identifyClarity } from '../lib/clarity';
 import { portalToken } from '../lib/portalToken';
+import { fehlerKurz, geraetKlasse } from '../lib/messWerte';
 import {
   useRejectApplication,
   useStoreConfirmation,
@@ -539,6 +540,7 @@ const CustomerPortalPage: FC = () => {
     fetchLeadByToken(token).then(({ lead: l, error }) => {
       if (error || !l) {
         setLeadError('Ihr Angebot konnte nicht geladen werden. Bitte öffnen Sie den Link aus Ihrer E-Mail erneut.');
+        reportLeadEvent(token, 'portal_ladefehler', { quelle_laden: 'lead' }, false);
       } else {
         setLead(l);
         // Im selben Render wie der Lead: kein einziges Bild im Ausgangszustand
@@ -560,6 +562,7 @@ const CustomerPortalPage: FC = () => {
         reportLeadEvent(l.token, 'portal_reopened', {
           ...(mailSource ? { mail_source: mailSource } : {}),
           ...(referrerHost ? { referrer: referrerHost } : {}),
+          ...geraetKlasse(navigator.userAgent, window.innerHeight, navigator.maxTouchPoints > 1),
         });
         // Stitch this portal session to the customer's earlier
         // kostenrechner session in Clarity. The kalkulation page does the
@@ -772,6 +775,48 @@ const CustomerPortalPage: FC = () => {
     if (IS_PREVIEW_ANY) return;
     reportLeadEvent(lead?.token, punkt, metadata, false);
   };
+  // Kernmessung (Registry #144): JS-Fehler und Verlassen der Seite, unabhängig davon, ob der Lead schon geladen ist. Der
+  // Stand des Bogens kommt aus dem DOM, weil der Bogen nicht in jeder Ansicht eingehängt ist.
+  const vorSpeichernRef = useRef(vorSpeichern);
+  vorSpeichernRef.current = vorSpeichern;
+  useEffect(() => {
+    if (IS_PREVIEW_ANY) return;
+    const token = portalToken();
+    if (!token) return;
+    const fehler = (art: 'js' | 'promise', name: unknown, text: unknown) => {
+      if (/ResizeObserver loop/.test(String(text))) return; // harmlos, Browser-Eigenheit
+      reportLeadEvent(token, 'portal_fehler', { art, name: fehlerKurz(name || 'Error'), text: fehlerKurz(text) }, false);
+    };
+    const beiFehler = (e: ErrorEvent) => fehler('js', e.error?.name, e.message);
+    const beiAblehnung = (e: PromiseRejectionEvent) => {
+      // Die Nachricht trägt den Antworttext des Servers: nur die Klasse melden.
+      if (e.reason instanceof MamamiaError) fehler('promise', 'MamamiaError', e.reason.status === 401 ? 'zugang' : e.reason.status >= 500 ? 'server' : 'anfrage');
+      else fehler('promise', e.reason?.name, e.reason?.message ?? e.reason);
+    };
+    const verlassen = (art: 'versteckt' | 'verlassen') => {
+      const bogen = document.getElementById('pflegesituation-formular');
+      const schritt = bogen?.dataset.schritt;
+      reportLeadEvent(token, 'portal_verlassen', {
+        art,
+        sekunden: Math.round(performance.now() / 1000),
+        ...(schritt != null ? { schritt: Number(schritt) } : {}),
+        formular_offen: !!bogen?.querySelector('[data-field]'),
+        vor_speichern: vorSpeichernRef.current,
+      }, false);
+    };
+    const beiSichtwechsel = () => { if (document.visibilityState === 'hidden') verlassen('versteckt'); };
+    const beiPagehide = () => verlassen('verlassen');
+    window.addEventListener('error', beiFehler);
+    window.addEventListener('unhandledrejection', beiAblehnung);
+    document.addEventListener('visibilitychange', beiSichtwechsel);
+    window.addEventListener('pagehide', beiPagehide);
+    return () => {
+      window.removeEventListener('error', beiFehler);
+      window.removeEventListener('unhandledrejection', beiAblehnung);
+      document.removeEventListener('visibilitychange', beiSichtwechsel);
+      window.removeEventListener('pagehide', beiPagehide);
+    };
+  }, []);
   // Woher das nächste Profil geöffnet wird, wo der Zustand es nicht verrät (Liste im Kompakt-Einstieg, Mail-Link `cg=`,
   // „Bereits bearbeitet", gebucht). Sonst folgt die Quelle aus dem Zustand, den derselbe Klick setzt.
   const profilQuelleRef = useRef<ProfilQuelle | null>(null);
@@ -822,6 +867,29 @@ const CustomerPortalPage: FC = () => {
   // invited matchings explicitly puts them back into the list with full
   // caregiver data so the modal click and badge both work.
   const { data: mmInvitedMatchings } = useMatchings({ limit: 100, filters: { is_request: true } }, mmReady);
+  // Kernmessung (Registry #144): wann die erste Liste da ist und wie lang sie ist, oder dass das Laden scheiterte.
+  // Dauer ab Seitenstart, weil der Kunde genau so lange wartet.
+  const listeGemeldet = useRef(false);
+  useEffect(() => {
+    if (listeGemeldet.current || !mmMatchings?.data) return;
+    listeGemeldet.current = true;
+    messen('pflegekraefte_geladen', { anzahl: mmMatchings.data.length, dauer_ms: Math.round(performance.now()), vor_speichern: vorSpeichern });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mmMatchings]);
+  useEffect(() => {
+    if (mmMatchingsError && !mmMatchings?.data) messen('portal_ladefehler', { quelle_laden: 'pflegekraefte' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mmMatchingsError]);
+  // „Verbindung fehlgeschlagen“ und abgelaufener Link sind Vollbilder: Der Kunde kommt nicht zum Bogen.
+  useEffect(() => {
+    if (mmExpired) messen('portal_ladefehler', { quelle_laden: 'abgelaufen' });
+    else if (mmError) messen('portal_ladefehler', { quelle_laden: 'sitzung' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mmError, mmExpired, lead?.token]);
+  useEffect(() => {
+    if (mmCustomerError && !mmCustomer) messen('portal_ladefehler', { quelle_laden: 'kunde' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mmCustomerError]);
   // Set of caregiver IDs already invited (Request rows in Mamamia). Used
   // below to seed nurseStatuses with 'invited' so the badge survives F5.
   const { data: invitedCaregiverIds, loading: invitedLoading, error: invitedError, refetch: refetchInvited } = useInvitedCaregivers(mmReady);

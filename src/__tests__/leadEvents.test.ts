@@ -232,4 +232,25 @@ describe('Messpunkte (Registry #123)', () => {
     reportLeadEvent('preview-token', 'kalender_geoeffnet', undefined, false);
     expect(calls()).toHaveLength(0);
   });
+
+  it('Kernmessung: je Tipp, Feld und Speicherversuch eine Meldung, gleiche nur einmal', () => {
+    for (const tipp of [1, 2, 2]) reportLeadEvent('tok-k', 'weiter_getippt', { schritt: 0, tipp }, false);
+    for (const feld of ['geschlecht', 'pflegegrad', 'geschlecht']) reportLeadEvent('tok-k', 'feld_gewaehlt', { schritt: 0, feld }, false);
+    for (const versuch of [1, 2, 2]) reportLeadEvent('tok-k', 'speichern_antwort', { versuch, ergebnis: 'fehler' }, false);
+    expect(calls()).toHaveLength(6);
+  });
+
+  it('portal_verlassen überlebt das Schließen der Seite (keepalive), andere Meldungen nicht nötig', () => {
+    reportLeadEvent('tok-v', 'portal_verlassen', { art: 'verlassen', schritt: 0, formular_offen: true }, false);
+    reportLeadEvent('tok-v', 'knopf_im_bild', { schritt: 0 }, false);
+    expect((calls()[0][1] as RequestInit).keepalive).toBe(true);
+    expect((calls()[1][1] as RequestInit).keepalive).toBeUndefined();
+  });
+
+  it('portal_verlassen meldet Rückkehr und erneutes Verlassen auf einem anderen Stand neu', () => {
+    reportLeadEvent('tok-w', 'portal_verlassen', { art: 'versteckt', schritt: 0, formular_offen: true }, false);
+    reportLeadEvent('tok-w', 'portal_verlassen', { art: 'versteckt', schritt: 0, formular_offen: true }, false);
+    reportLeadEvent('tok-w', 'portal_verlassen', { art: 'versteckt', schritt: 1, formular_offen: true }, false);
+    expect(calls()).toHaveLength(2);
+  });
 });

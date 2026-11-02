@@ -273,6 +273,9 @@ export async function fetchDailyStats(
   const { data: leadEvents, error: leErr } = await supabase
     .from("lead_events")
     .select("event_type, lead_id")
+    // Nur die unten ausgewerteten Typen: Die Messpunkte des Portals (Registry #144) füllen die Tabelle, und PostgREST
+    // schneidet still bei 1.000 Zeilen ab. Ohne Filter fehlten dann zufällig Profile und Buchungen im Bericht.
+    .in("event_type", ["patient_data_saved", "caregiver_invited", "caregiver_interest_shown", "application_received", "application_accepted_internal"])
     .gte("created_at", start)
     .lt("created_at", end);
   if (leErr) throw new Error(`lead_events: ${leErr.message}`);

@@ -23,6 +23,18 @@
 //   feld_beruehrt           { schritt, feld, vor_speichern }   Feld auf Seite 1 oder 3 angetippt; `feld` = data-field-Schlüssel
 //   weiter_blockiert        { schritt, offen, vor_speichern }  „Weiter“/„Speichern“ mit offenen Pflichtfeldern (Schlüssel)
 //   zur_pflegesituation     { quelle: kasten|warum|karte|schritte|frage|mail|stand, vor_speichern }  Knopf ins Formular
+// Kernmessung (Registry #144, Martin 02.11.2026): zeigt, ob Kunden nicht tippen oder etwas bricht. Nur Klassen und Schlüssel.
+//   weiter_getippt          { schritt, tipp, vor_speichern }   Tipp auf „Weiter“/„Speichern“, vor jeder Prüfung; tipp = 1…5 je Schritt
+//   knopf_im_bild           { schritt, vor_speichern }         „Weiter“/„Speichern“ zur Hälfte im Bild
+//   feld_gewaehlt           { schritt, feld, vor_speichern }   Feld wechselt durch den Kunden von leer auf belegt; `feld` = Schlüssel
+//   hinweis_im_bild         { schritt, im_bild }               nach gestopptem „Weiter“: erstes rotes Feld 1 Sek. später zur Hälfte im Bild?
+//   speichern_gestartet     { versuch, vor_speichern }         Pflichtangaben vollständig, Speichern beginnt
+//   speichern_antwort       { versuch, ergebnis, fehler_art?, dauer_ms, vor_speichern }  ok|fehler|einsatzort|ohne_verbindung
+//   portal_verlassen        { art, sekunden, schritt, formular_offen, vor_speichern }    art: versteckt|verlassen
+//   portal_fehler           { art, name, text }                JS-Fehler; text ohne Adressen, Zahlen, Zitate (fehlerKurz)
+//   portal_ladefehler       { quelle_laden }                   lead|sitzung|abgelaufen|kunde|pflegekraefte
+//   pflegekraefte_geladen   { anzahl, dauer_ms, vor_speichern } erste Liste, dauer_ms ab Seitenstart
+// `portal_reopened` trägt zusätzlich geraet, browser, in_app, hoehe (Klassen, src/lib/messWerte.ts).
 // `vor_speichern` = die Pflegesituation wurde noch nie gespeichert (Portal: !patientSaved && !schonAbgesendet).
 export const MESSPUNKTE = [
   'profil_geoeffnet',
@@ -37,6 +49,16 @@ export const MESSPUNKTE = [
   'feld_beruehrt',
   'weiter_blockiert',
   'zur_pflegesituation',
+  'weiter_getippt',
+  'knopf_im_bild',
+  'feld_gewaehlt',
+  'hinweis_im_bild',
+  'speichern_gestartet',
+  'speichern_antwort',
+  'portal_verlassen',
+  'portal_fehler',
+  'portal_ladefehler',
+  'pflegekraefte_geladen',
 ] as const;
 
 export type Messpunkt = typeof MESSPUNKTE[number];
