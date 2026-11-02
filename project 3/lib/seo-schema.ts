@@ -90,7 +90,7 @@ export function organizationGraph() {
         '@type': 'WebSite',
         '@id': WEBSITE_ID,
         url: `${SITE_URL}/`,
-        name: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
+        name: '24-Stunden-Pflege: Kostenrechner & Pflegekräfte | PRIMUNDUS',
         inLanguage: 'de',
         publisher: { '@id': ORGANIZATION_ID },
       },
