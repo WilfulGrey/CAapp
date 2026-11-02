@@ -70,9 +70,10 @@ export function CareServicesSection() {
                 </p>
               </div>
 
-              {/* Block 2: Services Grid (2x3) */}
+              {/* Block 2: Services Grid (2x3). Von 768 bis 1023 px einspaltig: In der halben
+                  Spalte passt „Medikamentenerinnerung“ nicht, die Seite lief bis 869 px seitlich über. */}
               <div className="mb-10 md:mb-12">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-4">
                   {services.map((service, index) => (
                     <div key={index} className="flex items-center gap-3">
                       <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-[#A89279] to-[#8B7355] flex items-center justify-center shadow-sm">
