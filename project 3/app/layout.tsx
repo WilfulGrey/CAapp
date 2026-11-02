@@ -54,8 +54,8 @@ export const metadata: Metadata = {
     ...(IST_PROD ? {} : { interactiveWidget: 'resizes-content' as const }),
   },
   metadataBase: new URL(SEITE),
-  title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
-  description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× in Folge ausgezeichneten Testsieger mit Bestpreisgarantie.',
+  title: '24-Stunden-Pflege: Kostenrechner & Pflegekräfte | PRIMUNDUS',
+  description: 'Sehen Sie in 2 Minuten, was 24-Stunden-Pflege kostet und welche Pflegekräfte verfügbar sind. Vom 6× in Folge ausgezeichneten Testsieger mit Bestpreisgarantie.',
   alternates: {
     canonical: '/',
   },
@@ -64,8 +64,8 @@ export const metadata: Metadata = {
     locale: 'de_DE',
     url: '/',
     siteName: 'PRIMUNDUS',
-    title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
-    description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× in Folge ausgezeichneten Testsieger mit Bestpreisgarantie.',
+    title: '24-Stunden-Pflege: Kostenrechner & Pflegekräfte | PRIMUNDUS',
+    description: 'Sehen Sie in 2 Minuten, was 24-Stunden-Pflege kostet und welche Pflegekräfte verfügbar sind. Vom 6× in Folge ausgezeichneten Testsieger mit Bestpreisgarantie.',
     images: [
       {
         url: '/images/primundus_logo_header.webp',
@@ -74,8 +74,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
-    description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× in Folge ausgezeichneten Testsieger mit Bestpreisgarantie.',
+    title: '24-Stunden-Pflege: Kostenrechner & Pflegekräfte | PRIMUNDUS',
+    description: 'Sehen Sie in 2 Minuten, was 24-Stunden-Pflege kostet und welche Pflegekräfte verfügbar sind. Vom 6× in Folge ausgezeichneten Testsieger mit Bestpreisgarantie.',
     images: [
       {
         url: '/images/primundus_logo_header.webp',

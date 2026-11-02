@@ -225,8 +225,16 @@ export default async function HomePage() {
                       wo sie ein Argument stuetzt, nicht in die Ueberschrift. */}
                   24-Stunden-Pflege vom Testsieger
                 </span>
-                <span className="block text-[33px] font-bold leading-[1.1] sm:text-[40px] lg:text-[44px] xl:text-[50px]">
-                  Ihre Eltern müssen nicht ins Heim.
+                {/* Wortlaut von Martin (31.10.2026, „der Text darunter bleibt“).
+                    Zeilenausgleich: „Passende Pflegekräfte“ ist bei 33 px 355 px
+                    breit und passte unter 396 px Breite nicht in eine Zeile; die
+                    H1 wurde dreizeilig und schob den Knopf 37 px tiefer. Die
+                    Schrift folgt deshalb am Handy der Textspalte (Breite − 40 px),
+                    ab 402 px bleibt es bei 33 px. Am Computer dasselbe: Bei 44 und
+                    50 px brach sie in „Passende / Pflegekräfte sofort / finden.“;
+                    die Spalte ist ab 1024 px 430 px und ab 1280 px 530 px breit. */}
+                <span className="block text-[length:min(33px,calc((100vw-40px)*0.0911))] font-bold leading-[1.1] sm:text-[40px] lg:text-[39px] xl:text-[48px]">
+                  Passende Pflegekräfte sofort finden.
                 </span>
               </h1>
 
