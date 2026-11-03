@@ -8,6 +8,8 @@
 // Wortlaut und Klassen 1:1 aus 75b8df8:src/components/portal/MatchCard.tsx; die damalige `DeutschZeile` (später aus
 // SprachBalken.tsx entfernt) steht unten in dieser Datei. Nach dem Speichern gilt weiter `MatchCard` („V“, Registry #98).
 // Rückweg/Bereinigung: Datei löschen, sobald der Rückbau entschieden ist (s. CLAUDE.md Registry #122).
+// Registry #145 (03.11.2026): Dieselbe Karte trägt jetzt auch den Einstieg „Pflegekräfte zuerst“ — mit `einladenAktiv`
+// ist „Einladen“ Koralle ohne Schloss, mit `vorgemerkt` steht „Vorgemerkt ✓“. Ohne die Schalter unverändert (`?einstieg=alt`).
 import { useState } from 'react';
 import type { FC } from 'react';
 import { Check, ChevronDown, Heart, Lock, Sparkles, UserPlus, X } from 'lucide-react';
@@ -54,7 +56,13 @@ export const MatchCardVorSpeichern: FC<{
   /** Tipp auf die Stufen-Plakette: Profil mit geöffneter Erklärung (07.09.,
    *  Clarity: Kunden tippten Stammkraft/Bewährt und nichts passierte). */
   onStufeClick?: () => void;
-}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin, isRecommended, globalInviteLocked, profilFehlt, onStufeClick }) => {
+  /** Registry #145 (Martin 03.11.2026, Pflegekräfte zuerst): „Einladen" auch vor dem Speichern als aktiver Knopf wie
+   *  nach dem Speichern (Koralle, ohne Schloss). Der Tipp geht weiter nur an `onInvite`; das Portal öffnet dort das
+   *  Fenster „{Name} einladen" und merkt die Pflegekraft vor. Ohne den Schalter (Rückweg `?einstieg=alt`) wie bisher. */
+  einladenAktiv?: boolean;
+  /** Registry #145: schon vorgemerkt → „Vorgemerkt ✓" statt „Einladen"; bleibt tippbar und öffnet das Fenster erneut. */
+  vorgemerkt?: boolean;
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin, isRecommended, globalInviteLocked, profilFehlt, onStufeClick, einladenAktiv = false, vorgemerkt = false }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
@@ -225,16 +233,25 @@ export const MatchCardVorSpeichern: FC<{
             </svg>
             Bitte warten…
           </button>
+        ) : profilFehlt && einladenAktiv && vorgemerkt ? (
+          // Registry #145: vorgemerkt, wird nach dem Speichern eingeladen. Tippbar wie „Einladen" (öffnet das Fenster).
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); handleInvite(); }}
+            className="min-h-[44px] inline-flex items-center px-[18px] rounded-full text-[15px] font-bold whitespace-nowrap transition-colors active:scale-[0.98] bg-pm-mint border border-[#CFE8D8] text-pm-green-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-taupe"
+          >
+            Vorgemerkt ✓
+          </button>
         ) : (
           <button
             onClick={e => { e.stopPropagation(); handleInvite(); }}
             className={`min-h-[44px] inline-flex items-center gap-1.5 px-[18px] rounded-full text-[15px] font-bold whitespace-nowrap transition-colors active:scale-[0.98] ${
-              profilFehlt
+              profilFehlt && !einladenAktiv
                 ? 'bg-white border-[1.5px] border-[#CDBFA8] text-pm-taupe-ink hover:border-pm-taupe'
                 : 'bg-pm-coral text-white hover:bg-pm-coral-deep'
             }`}
           >
-            {profilFehlt ? <Lock className="w-4 h-4" aria-hidden="true" /> : <UserPlus className="w-4 h-4" aria-hidden="true" />}
+            {profilFehlt && !einladenAktiv ? <Lock className="w-4 h-4" aria-hidden="true" /> : <UserPlus className="w-4 h-4" aria-hidden="true" />}
             Einladen
           </button>
         )}

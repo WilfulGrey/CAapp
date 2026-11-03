@@ -227,6 +227,19 @@ describe('Messpunkte (Registry #123)', () => {
     expect([0, 1].map((i) => bodyOf(i).metadata.quelle)).toEqual(['kasten', 'warum']);
   });
 
+  it('Pflegekräfte zuerst (Registry #145): einladung_vorgemerkt je Pflegekraft einmal, einladung_nach_speichern einmal je Sitzung', () => {
+    reportLeadEvent('tok-v', 'einladung_vorgemerkt', { caregiver_id: 50003 }, false);
+    reportLeadEvent('tok-v', 'einladung_vorgemerkt', { caregiver_id: 50003 }, false);
+    reportLeadEvent('tok-v', 'einladung_vorgemerkt', { caregiver_id: 50002 }, false);
+    reportLeadEvent('tok-v', 'einladung_nach_speichern', { anzahl: 2, ok: 2 }, false);
+    reportLeadEvent('tok-v', 'einladung_nach_speichern', { anzahl: 2, ok: 2 }, false);
+    reportLeadEvent('tok-v', 'zur_pflegesituation', { quelle: 'einladen_fenster', vor_speichern: true }, false);
+    expect(calls()).toHaveLength(4);
+    expect([0, 1, 2, 3].map((i) => bodyOf(i).event)).toEqual(['einladung_vorgemerkt', 'einladung_vorgemerkt', 'einladung_nach_speichern', 'zur_pflegesituation']);
+    expect(bodyOf(2).metadata).toEqual({ anzahl: 2, ok: 2 });
+    for (const i of [0, 1, 2, 3]) expect(bodyOf(i).notify).toBe(false);
+  });
+
   it('Vorschau-Token sendet nichts', () => {
     reportLeadEvent('preview-token', 'profil_geoeffnet', { caregiver_id: 1, quelle: 'karte', vor_speichern: true }, false);
     reportLeadEvent('preview-token', 'kalender_geoeffnet', undefined, false);

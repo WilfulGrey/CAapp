@@ -73,6 +73,8 @@ import { MatchCard } from '../components/portal/MatchCard';
 // Rückbau Registry #122: vor dem ersten Speichern wieder der Einstieg aus Stand 75b8df8 (Kostenkarte, Kasten
 // „Noch 2 Minuten“, Karten mit „Einladen“ + Schloss, offenes Formular mit „Speichern“); Kopf und Häufige Fragen wie heute.
 import { EinstiegVorSpeichern, WarumSheetVorSpeichern } from '../components/portal/EinstiegVorSpeichern';
+import { EinladenSheetVorSpeichern, EinstiegPflegekraefteZuerst, type VorgemerkteKraft } from '../components/portal/EinstiegPflegekraefteZuerst';
+import { eingeladenHinweis, ladeVormerkungen, speichereVormerkungen } from '../lib/vormerkungen';
 import { MatchCardVorSpeichern } from '../components/portal/MatchCardVorSpeichern';
 import { MatchCardDone } from '../components/portal/MatchCardDone';
 import { InterestCard, type InterestActionStatus } from '../components/portal/InterestCard';
@@ -543,6 +545,8 @@ const CustomerPortalPage: FC = () => {
         reportLeadEvent(token, 'portal_ladefehler', { quelle_laden: 'lead' }, false);
       } else {
         setLead(l);
+        // Registry #145: vorgemerkte Pflegekräfte dieses Tokens (übersteht ein Neuladen).
+        setVorgemerkt(ladeVormerkungen(l.token));
         // Im selben Render wie der Lead: kein einziges Bild im Ausgangszustand
         // für Kunden, die schon abgesendet haben (siehe `schonAbgesendet`).
         if (l.patient_form_at) setPatientSaved(true);
@@ -721,6 +725,24 @@ const CustomerPortalPage: FC = () => {
   const [einstiegKompakt] = useState(() => {
     try { return new URLSearchParams(window.location.search).get('einstieg') === 'kompakt'; } catch { return false; }
   });
+  // Registry #145: `?einstieg=alt` zeigt vor dem Speichern die bisherige Seite (EinstiegVorSpeichern, Stand 75b8df8) statt
+  // „Pflegekräfte zuerst“ — Rückweg und Vorher-Vergleich, kein Kunde bekommt den Schalter. Einmal beim Laden gelesen.
+  const [einstiegAlt] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('einstieg') === 'alt'; } catch { return false; }
+  });
+  // Registry #145 (Martin 03.11.2026, „Pflegekräfte zuerst“): Vor dem Speichern merkt „Einladen“ die Pflegekraft vor und
+  // öffnet das Fenster „{Name} einladen“; nach dem ersten erfolgreichen Speichern werden alle Vorgemerkten über den
+  // bisherigen Einladen-Weg eingeladen. Gemerkt werden nur caregiver_ids, je Token im localStorage (lib/vormerkungen.ts).
+  // Gespeicherte Vormerkungen werden im selben Render wie der Lead gelesen (beim Laden des Leads, in der Vorschau sofort),
+  // sonst stünde auf einer vorgemerkten Karte nach dem Neuladen kurz „Einladen“.
+  const [vorgemerkt, setVorgemerkt] = useState<number[]>(() => (IS_PREVIEW_ANY ? ladeVormerkungen(PREVIEW_LEAD.token) : []));
+  const [einladenFenster, setEinladenFenster] = useState<{ caregiverId: number; name: string } | null>(null);
+  // Gesetzt, sobald das ERSTE Speichern bei mamamia durch ist (onSaveToMamamia); der Effekt unten lädt dann ein.
+  const [einladenNachSpeichern, setEinladenNachSpeichern] = useState(false);
+  const vormerkungenSetzen = (ids: number[]) => {
+    setVorgemerkt(ids);
+    speichereVormerkungen(lead?.token, ids);
+  };
   const sterne = useSterneStand();
   // Manual override for the "Ihr Angebot" expand/collapse. null = follow
   // the auto rule below (expanded only in initial state). Toggling sets
@@ -1490,6 +1512,9 @@ const CustomerPortalPage: FC = () => {
   // Kompakt-Einstiegs. Seit #748 speicherten Google-Kunden in Stunde 1 nur noch 2 von 48 (vorher 42 von 151).
   // Alles nach dem ersten Speichern bleibt wie bisher. Zurück zum Kompakt-Einstieg: hier `false` (oder `?einstieg=kompakt`).
   const rueckbau = kompakt && !einstiegKompakt;
+  // Registry #145 (Martin 03.11.2026): In genau diesem Zustand die Seite „Pflegekräfte zuerst“ (EinstiegPflegekraefteZuerst)
+  // statt des Stands 75b8df8; `?einstieg=alt` zeigt den bisherigen Stand unverändert.
+  const pflegekraefteZuerst = rueckbau && !einstiegAlt;
   // Fassung 31 (Martin 06.10.: „alle 4 ja, aber die anderen screens will ich vorher absegnen"): die Ansicht NACH dem Absenden
   // im Aufbau von Fassung 30 — Kopf wie dort, „So geht es weiter" mit Stand, Pflegekräfte zum Einladen, Angebot und
   // Pflegesituation zugeklappt. Vorerst nur mit `?look=angebot`; ohne Schalter bleibt die heutige Ansicht.
@@ -2128,13 +2153,29 @@ const CustomerPortalPage: FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead, mmCustomer, mmReady, hasPending, schonAbgesendet, sucheLaeuft, pendingApps.length, listeLaedt]);
 
+  // Registry #145: Pflegekraft vormerken (je Token im localStorage) und das Fenster „{Name} einladen" öffnen. Erneutes
+  // Tippen öffnet nur das Fenster. Messpunkt `einladung_vorgemerkt` einmal je Pflegekraft, ohne Namen.
+  const einladungVormerken = (caregiverId: number, nurse: Nurse) => {
+    setEinladenFenster({ caregiverId, name: displayName(nurse.name) });
+    if (vorgemerkt.includes(caregiverId)) return;
+    vormerkungenSetzen([...vorgemerkt, caregiverId]);
+    messen('einladung_vorgemerkt', { caregiver_id: caregiverId });
+  };
+
   const canInviteNurse = (_idx: number): boolean => {
     // Strict gate: no invitations until patient profile is complete.
     // Without it, the caregiver can't prepare a meaningful application
     // and we get back-and-forth queries that frustrate both sides.
+    if (!patientSaved && pflegekraefteZuerst) {
+      // Registry #145: „Einladen" vor dem Speichern merkt die Pflegekraft vor und öffnet „{Name} einladen" mit dem Knopf
+      // zum Formular. Eingeladen wird erst nach dem ersten erfolgreichen Speichern (Effekt `einladenNachSpeichern`).
+      const m = effectiveMatched[_idx];
+      if (m) einladungVormerken(m.caregiverId, m.nurse);
+      return false;
+    }
     if (!patientSaved && rueckbau) {
-      // Rückbau Registry #122 (Stand 75b8df8): „Einladen" mit Schloss öffnet „Warum erst die Pflegesituation?" mit dem
-      // Knopf zum Formular (Teil 3 des Redesigns, Martin 24.09.).
+      // Rückbau Registry #122 (Stand 75b8df8, heute nur noch `?einstieg=alt`): „Einladen" mit Schloss öffnet „Warum erst
+      // die Pflegesituation?" mit dem Knopf zum Formular (Teil 3 des Redesigns, Martin 24.09.).
       setWarumOffen(true);
       return false;
     }
@@ -2171,8 +2212,13 @@ const CustomerPortalPage: FC = () => {
     return true;
   };
 
-  const confirmInviteNurse = async (idx: number, name: string): Promise<void> => {
-    const match = effectiveMatched[idx];
+  const confirmInviteNurse = (idx: number, name: string): Promise<void> =>
+    einladenPflegekraft(effectiveMatched[idx], name);
+
+  // Der Einladen-Weg für Karte und Profil — und seit Registry #145 auch für das automatische Einladen der Vorgemerkten nach
+  // dem ersten Speichern (keine neue API, dieselben Wiederholungen, Fehlermeldungen und Messungen). `ohneHinweis`: kein
+  // „✓ … wurde eingeladen!" je Einladung, der automatische Weg meldet am Ende gesammelt.
+  const einladenPflegekraft = async (match: { caregiverId: number; nurse: Nurse } | undefined, name: string, ohneHinweis = false): Promise<void> => {
     if (!mmReady || typeof match?.caregiverId !== 'number') {
       showToast('Einladung derzeit nicht möglich. Bitte später erneut versuchen.');
       throw new Error('not-ready');
@@ -2226,7 +2272,7 @@ const CustomerPortalPage: FC = () => {
         });
         refetchInvited();
         refetchInviteRate();
-        showToast(`✓ ${name} wurde eingeladen!`);
+        if (!ohneHinweis) showToast(`✓ ${name} wurde eingeladen!`);
         return;
       } catch (err) {
         lastErr = err as Error;
@@ -2394,6 +2440,56 @@ const CustomerPortalPage: FC = () => {
       setInviteInFlight(false);
     }
   };
+
+  // ── Registry #145: die Vorgemerkten nach dem ersten Speichern einladen ────────────────────────────────────────────────
+  // Ausgelöst von onSaveToMamamia (erstes Speichern bei mamamia ok), ausgeführt, sobald die Seite als gespeichert gilt.
+  // Nacheinander über den bisherigen Einladen-Weg (einladenPflegekraft): dieselben Wiederholungen bei mamamias kurzer
+  // Sperre direkt nach dem Speichern (cat=authorization, bis 3 × 5 s), dieselbe Grenze 5 je Stunde (Fenster
+  // InviteRateLimitModal, danach kein weiterer Versuch), bei Fehlern die bisher übliche Meldung — die Karte bleibt
+  // einladbar. Eingeladen wird nur, wer noch in der Liste steht und offen ist (nicht abgelehnt, nicht schon eingeladen).
+  // Am Ende „{Name} ist eingeladen." bzw. „… sind eingeladen.", aber nur ohne Fehlschlag (sonst bleibt die Fehlermeldung
+  // stehen). Die Vormerkungen sind danach gelöscht. Vorschau: nur der Zustand, nichts geht an mamamia.
+  useEffect(() => {
+    if (!einladenNachSpeichern || !patientSaved) return;
+    setEinladenNachSpeichern(false);
+    const ids = vorgemerkt;
+    vormerkungenSetzen([]);
+    if (ids.length === 0) return;
+    const kandidaten = ids
+      .map((id) => effectiveMatched.find((m) => m.caregiverId === id))
+      .filter((m): m is { caregiverId: number; nurse: Nurse } => !!m && nurseStatusById.get(m.caregiverId) === 'pending');
+    void (async () => {
+      const eingeladen: string[] = [];
+      let fehler = false;
+      for (const m of kandidaten) {
+        const name = displayName(m.nurse.name);
+        if (IS_PREVIEW_ANY) {
+          setStatusOverrides((prev) => new Map(prev).set(m.caregiverId, 'invited'));
+          eingeladen.push(name);
+          continue;
+        }
+        try {
+          await einladenPflegekraft(m, name, true);
+          eingeladen.push(name);
+        } catch (err) {
+          fehler = true;
+          // Grenze erreicht: weitere Versuche scheitern genauso (das Fenster mit der Wartezeit ist schon offen).
+          if (err instanceof MamamiaError && err.rateLimitPayload) break;
+        }
+      }
+      messen('einladung_nach_speichern', { anzahl: kandidaten.length, ok: eingeladen.length });
+      if (eingeladen.length > 0 && !fehler) showToast(eingeladenHinweis(eingeladen));
+    })();
+    // Nur beim Übergang „erstes Speichern ok → gespeichert"; Liste, Status und Vormerkungen gelten aus genau diesem Render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [einladenNachSpeichern, patientSaved]);
+  // Vormerkungen von einem früheren Besuch, wenn die Pflegesituation inzwischen anderswo gespeichert wurde (anderes Gerät,
+  // Team): Es gibt kein „erstes Speichern" mehr, das sie auslöst — also verwerfen statt liegen lassen.
+  useEffect(() => {
+    if (!schonAbgesendet || abgesendetInSitzung || einladenNachSpeichern || vorgemerkt.length === 0) return;
+    vormerkungenSetzen([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schonAbgesendet, abgesendetInSitzung, einladenNachSpeichern, vorgemerkt.length]);
 
   // Interest-side dismiss handler. Local-only — writes a row to
   // lead_dismissed_caregivers so the next portal refresh / refetch
@@ -2846,6 +2942,9 @@ const CustomerPortalPage: FC = () => {
           schonAbgesendet={schonAbgesendet}
           onAbgesendet={(nurAenderung) => {
             setAbgesendetInSitzung(true);
+            // Registry #145, nur Vorschau (dort speichert der Bogen ohne mamamia, onSaveToMamamia läuft nicht): das
+            // Einladen der Vorgemerkten nach dem ersten Speichern zeigen.
+            if (IS_PREVIEW_ANY && !nurAenderung) setEinladenNachSpeichern(true);
             // Angaben geändert (nicht die erste Anfrage): bestätigen und zuklappen.
             if (!nurAenderung) return;
             showToast('✓ Ihre Angaben sind gespeichert.', 5000);
@@ -3034,6 +3133,8 @@ const CustomerPortalPage: FC = () => {
               'patient_data_saved',
               Object.keys(leadEventMeta).length > 0 ? leadEventMeta : undefined,
             );
+            // Registry #145: erstes Speichern ok → die vorgemerkten Pflegekräfte einladen, sobald die Seite umschaltet.
+            if (vorSpeichern) setEinladenNachSpeichern(true);
             // Patient form save flippa customer na active + dorzuca pełne
             // patient/wish dane. Mamamia matching engine re-scoreuje całą
             // listę z nowymi inputami — początkowo zwrócone caregivers
@@ -3652,9 +3753,11 @@ const CustomerPortalPage: FC = () => {
       const sc = nurseBadgeScore(nurse.history?.assignments);
       if (sc > recBest) { recBest = sc; recIdx = idx; }
     });
-    return visibleNurses.map(({ nurse, i, status }, idx) => (
+    return visibleNurses.map(({ nurse, i, status, caregiverId }, idx) => (
       <MatchCardVorSpeichern
         profilFehlt={!patientSaved}
+        einladenAktiv={pflegekraefteZuerst}
+        vorgemerkt={pflegekraefteZuerst && vorgemerkt.includes(caregiverId)}
         key={`m-${i}`}
         nurse={nurse}
         status={status}
@@ -3668,6 +3771,13 @@ const CustomerPortalPage: FC = () => {
       />
     ));
   })();
+
+  // Registry #145: die Vorgemerkten für die Zeile über dem Formular — nur, wer in der Liste steht und noch offen ist.
+  const vorgemerkteKraefte: VorgemerkteKraft[] = !pflegekraefteZuerst ? [] : vorgemerkt.flatMap((id) => {
+    const m = effectiveMatched.find((x) => x.caregiverId === id);
+    if (!m || nurseStatusById.get(id) !== 'pending') return [];
+    return [{ caregiverId: id, name: displayName(m.nurse.name), image: m.nurse.image, color: m.nurse.color, initialen: initials(m.nurse.name) }];
+  });
 
   // ── SECTION: Bereits bearbeitet ──
   // Immer unten sichtbar wenn doneApps ODER bearbeitete Matchings
@@ -3978,9 +4088,33 @@ const CustomerPortalPage: FC = () => {
               einsatzBeendet={IS_EINSATZ_BEENDET}
             />
             </div>
+      ) : pflegekraefteZuerst ? (
+        // Registry #145 (Martin 03.11.2026): vor dem ersten Speichern „Pflegekräfte zuerst" — Preis oben, sofort die
+        // Pflegekräfte, dann die Pflegesituation (EinstiegPflegekraefteZuerst.tsx). Rückweg `?einstieg=alt`.
+        <EinstiegPflegekraefteZuerst
+          anrede={lead ? customerSalutation(lead) : 'Herr Mustermann'}
+          kuerzel={lead && (lead.vorname || lead.nachname)
+            ? initials([lead.vorname, lead.nachname].filter(Boolean).join(' ').trim()).toUpperCase().slice(0, 2)
+            : null}
+          lead={lead}
+          onBestpreis={() => setBestpreisOffen(true)}
+          heimEigenanteil={HEIM_EIGENANTEIL}
+          heimQuelle={HEIM_QUELLE}
+          laedt={listeLaedt}
+          karten={kartenVorSpeichern}
+          gehalteneEinladungen={pflegekraftAuswahl.heldInvites}
+          vorschlaegeVorhanden={pflegekraftAuswahl.allVisible.length > 0}
+          bereitsBearbeitet={bereitsBearbeitet}
+          formular={patientFormular(false, true)}
+          sterne={sterne}
+          vorgemerkte={vorgemerkteKraefte}
+          onKostenAufgeklappt={() => messen('kosten_aufgeklappt')}
+          onFaqGeoeffnet={messeFrage}
+        />
       ) : rueckbau ? (
         // Rückbau Registry #122: vor dem ersten Speichern die Seite aus Stand 75b8df8 (EinstiegVorSpeichern.tsx), Kopf und
-        // Häufige Fragen wie heute (Martin 10.10.); Initialen wie im Kopf des Kompakt-Einstiegs.
+        // Häufige Fragen wie heute (Martin 10.10.); Initialen wie im Kopf des Kompakt-Einstiegs. Seit Registry #145 nur
+        // noch mit `?einstieg=alt`.
         <EinstiegVorSpeichern
           anrede={lead ? customerSalutation(lead) : 'Herr Mustermann'}
           kuerzel={lead && (lead.vorname || lead.nachname)
@@ -4761,6 +4895,13 @@ const CustomerPortalPage: FC = () => {
       <BestpreisSheet offen={bestpreisOffen} onClose={() => setBestpreisOffen(false)} />
       {/* Rückbau Registry #122: „Warum erst die Pflegesituation?" nur vor dem ersten Speichern (Stand 75b8df8). */}
       <WarumSheetVorSpeichern offen={rueckbau && warumOffen} onClose={() => setWarumOffen(false)} onVervollstaendigen={zurPflegesituationAus('warum')} />
+      {/* Registry #145: „{Name} einladen" nach dem Tipp auf „Einladen" vor dem ersten Speichern (Pflegekräfte zuerst). */}
+      <EinladenSheetVorSpeichern
+        offen={pflegekraefteZuerst && !!einladenFenster}
+        name={einladenFenster?.name ?? ''}
+        onClose={() => setEinladenFenster(null)}
+        onVervollstaendigen={zurPflegesituationAus('einladen_fenster')}
+      />
 
       {/* ── Rückmeldung zum Angebot (schwebend, unten rechts), zurück seit Registry #102 ────────────
            Als Kasten im Fluss saß sie ~3000 px weit unten und wurde kaum gesehen (Martin, 12.08.).

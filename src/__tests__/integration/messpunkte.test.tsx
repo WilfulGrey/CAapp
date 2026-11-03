@@ -46,6 +46,8 @@ const ERLAUBTE_FELDER = [
   'caregiver_id', 'quelle', 'vor_speichern', 'frage', 'schritt', 'feld', 'offen',
   // Kernmessung (Registry #144): nur Klassen, Zähler und Schlüssel.
   'tipp', 'im_bild', 'versuch', 'ergebnis', 'fehler_art', 'dauer_ms', 'art', 'sekunden', 'formular_offen', 'name', 'text', 'quelle_laden', 'anzahl',
+  // Pflegekräfte zuerst (Registry #145): Zahl der angekommenen Einladungen.
+  'ok',
 ];
 // Lesende Aufrufe der Seite (Ereignisse für die Karten, Sterne) — hier ohne Inhalt.
 const lesen = [
@@ -53,7 +55,8 @@ const lesen = [
   http.get('https://primundus.de/api/bewertungen-stand', () => HttpResponse.json({ schnitt: '4,9', wert: 4.9, anzahl: 126 })),
 ];
 
-describe('Messpunkte vor dem ersten Speichern (Rückbau, Registry #122/#123)', () => {
+// Seit Registry #145 steht der Stand 75b8df8 nur noch hinter `?einstieg=alt` (Rückweg); die Messpunkte dort bleiben.
+describe('Messpunkte vor dem ersten Speichern (Rückbau, Registry #122/#123, ?einstieg=alt)', () => {
   it('Einladen mit Schloss, Warum, Bestpreis, Kosten, Frage und Profil — je eine stille Meldung ohne Personendaten', async () => {
     const meldungen: Meldung[] = [];
     server.use(
@@ -61,7 +64,7 @@ describe('Messpunkte vor dem ersten Speichern (Rückbau, Registry #122/#123)', (
       ...lesen,
       ...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }),
     );
-    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=alt`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await screen.findByText('Noch 2 Minuten bis zu Ihren Bewerbungen', {}, { timeout: 5000 });
@@ -114,7 +117,7 @@ describe('Messpunkte vor dem ersten Speichern (Rückbau, Registry #122/#123)', (
       ...lesen,
       ...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }),
     );
-    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=alt`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await screen.findByText('Noch 2 Minuten bis zu Ihren Bewerbungen', {}, { timeout: 5000 });
