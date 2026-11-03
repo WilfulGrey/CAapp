@@ -442,10 +442,12 @@ describe('Portal integration: golden paths', () => {
 
   // ─── Startseiten-Punkte + Sprunglink goto=anfragen (Martin 26.09.) ───────
 
-  it('vor dem Speichern (Rückbau Registry #122): Kostenkarte mit den vier Haken aus Stand 75b8df8, nicht den Startseiten-Punkten', async () => {
+  // Seit Registry #145 steht der Stand 75b8df8 hinter `?einstieg=alt`; die vier Punkte der neuen Kostenkarte (2×2) prüft
+  // integration/pflegekraefteZuerst.test.tsx.
+  it('vor dem Speichern (Rückbau Registry #122, ?einstieg=alt): Kostenkarte mit den vier Haken aus Stand 75b8df8, nicht den Startseiten-Punkten', async () => {
     server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
     localStorage.removeItem(`patient_${TEST_LEAD_TOKEN}`);
-    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    setLocation(`?token=${TEST_LEAD_TOKEN}&einstieg=alt`);
     render(<CustomerPortalPage />);
     expect(await screen.findByText('Erst auswählen, dann buchen', {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText('Täglich kündbar')).toBeInTheDocument();
@@ -681,13 +683,14 @@ describe('Einstieg vor dem ersten Speichern wie Stand 75b8df8 (Rückbau Registry
   const text = (el: Element) => (el.textContent ?? '').replace(/ /g, ' ');
   const gescrollt = () => (Element.prototype.scrollIntoView as unknown as { mock: { contexts: Element[] } }).mock.contexts.map((e) => e.id);
 
-  it('Kopf wie heute (Sterne ohne Link), Kostenkarte, „Passende Pflegekräfte“ mit dem Kasten „Noch 2 Minuten bis zu Ihren Bewerbungen“, Karten mit „Einladen“ + Schloss, offenes Formular, „So geht es weiter“ und Marta wie damals, Häufige Fragen wie heute', async () => {
+  // Seit Registry #145 nur noch hinter `?einstieg=alt` (Rückweg und Vorher-Vergleich).
+  it('?einstieg=alt: Kopf wie heute (Sterne ohne Link), Kostenkarte, „Passende Pflegekräfte“ mit dem Kasten „Noch 2 Minuten bis zu Ihren Bewerbungen“, Karten mit „Einladen“ + Schloss, offenes Formular, „So geht es weiter“ und Marta wie damals, Häufige Fragen wie heute', async () => {
     server.use(
       ...ohneBewerbung(),
       http.get('https://primundus.de/api/bewertungen-stand', () => HttpResponse.json({ schnitt: '4,9', wert: 4.9, anzahl: 126 })),
     );
     localStorage.removeItem(`patient_${TEST_LEAD_TOKEN}`);
-    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    setLocation(`?token=${TEST_LEAD_TOKEN}&einstieg=alt`);
     render(<CustomerPortalPage />);
     // Kopf wie im Kompakt-Einstieg: Initialen, „Guten Tag, …“, „Ihr persönlicher Bereich“, Titel, Sternezeile.
     const h1 = await screen.findByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' }, { timeout: 5000 });
@@ -823,12 +826,12 @@ describe('Einstieg vor dem ersten Speichern wie Stand 75b8df8 (Rückbau Registry
     expect(screen.queryAllByRole('button', { name: 'Einladen' }).some((b) => b.querySelector('svg.lucide-lock'))).toBe(false);
   }, 20_000);
 
-  it('„Einladen“ mit Schloss, „Warum? Mehr“ und „Einladen“ im Profil öffnen „Warum erst die Pflegesituation?“ — keine Einladung; der Knopf darin springt zum Formular', async () => {
+  it('?einstieg=alt: „Einladen“ mit Schloss, „Warum? Mehr“ und „Einladen“ im Profil öffnen „Warum erst die Pflegesituation?“ — keine Einladung; der Knopf darin springt zum Formular', async () => {
     (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
     let einladungen = 0;
     server.use(...ohneBewerbung({ inviteCaregiver: () => { einladungen += 1; return { SendInvitationCaregiver: true }; } }));
     localStorage.removeItem(`patient_${TEST_LEAD_TOKEN}`);
-    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    setLocation(`?token=${TEST_LEAD_TOKEN}&einstieg=alt`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
 

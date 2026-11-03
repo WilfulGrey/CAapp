@@ -38,14 +38,15 @@ describe('Messpunkte in der Vorschau (?preview=patient)', () => {
     );
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
-    await screen.findByText('Noch 2 Minuten bis zu Ihren Bewerbungen', {}, { timeout: 5000 });
+    // Seit Registry #145 „Pflegekräfte zuerst“: Einladen merkt vor und öffnet „{Name} einladen“ — auch das ohne Meldung.
+    await screen.findByText('Laden Sie ein, wer Ihnen gefällt. Dafür beschreiben Sie kurz die Pflegesituation.', {}, { timeout: 5000 });
 
     await user.click(screen.getByRole('button', { name: /^Bestpreisgarantie/ }));
     await user.click(within(await screen.findByRole('dialog')).getAllByRole('button', { name: 'Schließen' })[0]);
     await user.click(screen.getByRole('button', { name: 'Alle Kosten im Überblick' }));
     await user.click(screen.getByRole('button', { name: 'Was brauche ich zu Hause?' }));
     await user.click(screen.getAllByRole('button', { name: 'Einladen' })[0]);
-    await user.click(within(await screen.findByRole('dialog', { name: 'Warum erst die Pflegesituation?' })).getAllByRole('button', { name: 'Schließen' })[0]);
+    await user.click(within(await screen.findByRole('dialog', { name: /einladen$/ })).getByRole('button', { name: 'Später' }));
     await user.click(screen.getByText('Anna N.'));
 
     await new Promise((r) => setTimeout(r, 50));

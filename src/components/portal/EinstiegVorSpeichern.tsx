@@ -24,6 +24,9 @@
 // mamamia, Telefon- und Startdatum-Logik (#91/#92), Ladezustand bis zur Einladungs-Zählung (#749). Alles NACH dem ersten
 // Speichern bleibt wie heute im Trunk.
 //
+// Seit Registry #145 (03.11.2026) ist die Seite vor dem Speichern „Pflegekräfte zuerst“ (EinstiegPflegekraefteZuerst.tsx);
+// diese Seite steht nur noch hinter `?einstieg=alt` (Rückweg, Vorher-Bilder) und bleibt dafür unverändert. Kopf, „So geht
+// es weiter“ und das Warum-Fenster nutzt die neue Seite bzw. `?einstieg=alt` weiter von hier.
 // Rückweg: `?einstieg=kompakt` zeigt den Kompakt-Einstieg (#780) zum Vergleich; dauerhaft zurück = `rueckbau` in
 // CustomerPortalPage auf false. Bereinigung nach der Entscheidung: diese Datei, MatchCardVorSpeichern.tsx und die Props
 // `stand75b8df8` (AngebotCard, FormNav) entfernen.

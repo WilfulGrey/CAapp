@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { useState } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Button } from '../../components/ui/Button';
@@ -67,6 +68,32 @@ describe('Sheet', () => {
   it('rendert nichts, wenn es geschlossen ist', () => {
     render(<Sheet offen={false} titel="X" onClose={() => {}}><p>Inhalt</p></Sheet>);
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  // Registry #145: Chrome/Edge brachen am Computer (Handyrahmen mit eigenem Scroll-Behälter) das weiche Scrollen zur
+  // Pflegesituation ab, weil der Fokus beim Schließen den Karten-Knopf wieder ins Bild holte. Fokus zurück ja, Scrollen nein.
+  it('gibt den Fokus beim Schließen an den auslösenden Knopf zurück, ohne zu scrollen', async () => {
+    function MitKnopf() {
+      const [offen, setOffen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOffen(true)}>Einladen</button>
+          <Sheet offen={offen} titel="Emilia W. einladen" onClose={() => setOffen(false)}><p>Inhalt</p></Sheet>
+        </>
+      );
+    }
+    render(<MitKnopf />);
+    const ausloeser = screen.getByRole('button', { name: 'Einladen' });
+    await userEvent.click(ausloeser);
+    expect(screen.getByRole('dialog', { name: 'Emilia W. einladen' })).toBeInTheDocument();
+    const fokus = vi.spyOn(HTMLElement.prototype, 'focus');
+    await userEvent.click(screen.getByRole('button', { name: 'Schließen' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(ausloeser);
+    const zurueck = fokus.mock.calls.filter((_, i) => fokus.mock.contexts[i] === ausloeser);
+    expect(zurueck.length).toBeGreaterThan(0);
+    expect(zurueck[zurueck.length - 1]).toEqual([{ preventScroll: true }]);
+    fokus.mockRestore();
   });
 });
 
