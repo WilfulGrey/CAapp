@@ -238,7 +238,7 @@ export const MatchCardVorSpeichern: FC<{
           <button
             type="button"
             onClick={e => { e.stopPropagation(); handleInvite(); }}
-            className="min-h-[44px] inline-flex items-center px-[18px] rounded-full text-[15px] font-bold whitespace-nowrap transition-colors active:scale-[0.98] bg-pm-mint border border-[#CFE8D8] text-pm-green-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-taupe"
+            className="min-h-[44px] inline-flex items-center px-[18px] rounded-full text-[15px] font-bold whitespace-nowrap transition-colors active:scale-[0.98] bg-pm-mint border border-pm-green/15 text-pm-green-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-taupe"
           >
             Vorgemerkt ✓
           </button>

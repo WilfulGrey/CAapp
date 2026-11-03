@@ -7,6 +7,10 @@
 //   - nach dem ersten erfolgreichen Speichern automatisch eingeladen (bisheriger Weg inviteCaregiver), Hinweis, Vormerkungen weg
 //   - automatisch: 6 stille Versuche bei mamamias Sperre nach dem Speichern (von Hand weiter 3), einladenWiederholung.ts
 //   - Messpunkte einladung_vorgemerkt / einladung_nach_speichern; Rückweg ?einstieg=alt
+//   Nachbesserung 2 (03.11.2026): Martins Satz „Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten.“ im Fenster und
+//   in der Zeile der Pflegesituation; Etikett „6× Testsieger DIE WELT“ unter dem Siegel; der Dank nach dem Speichern bleibt
+//   stehen, der Hinweis folgt danach (Toast role="status"); Namen mit geschütztem Leerzeichen; höchstens so viele
+//   Vormerkungen wie Einladungen frei sind, abgelehnte/ausgeblendete verlieren sie; Vormerkungen nur im Modus.
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -32,6 +36,12 @@ vi.mock('../../lib/supabase', async () => {
 vi.mock('../../lib/einladenWiederholung', async () => ({
   ...(await vi.importActual<typeof import('../../lib/einladenWiederholung')>('../../lib/einladenWiederholung')),
   EINLADEN_ABSTAND_MS: 5,
+}));
+// Der Dank nach dem ersten Speichern steht 2,5 s statt 7 s — lang genug, um zu sehen, dass der Hinweis des automatischen
+// Einladens ihn nicht ersetzt, kurz genug für die Tests.
+vi.mock('../../lib/toastWarteschlange', async () => ({
+  ...(await vi.importActual<typeof import('../../lib/toastWarteschlange')>('../../lib/toastWarteschlange')),
+  DANK_DAUER_MS: 2500,
 }));
 
 import CustomerPortalPage from '../../pages/CustomerPortalPage';
@@ -60,6 +70,11 @@ const lesen = [
   http.get('https://primundus.de/api/bewertungen-stand', () => HttpResponse.json({ schnitt: '4,9', wert: 4.9, anzahl: 126 })),
 ];
 const ZEILE = 'Laden Sie ein, wer Ihnen gefällt. Dafür beschreiben Sie kurz die Pflegesituation.';
+const SECHZIG = 'Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten.';
+const DANK = 'Vielen Dank! Passende Pflegekräfte können sich jetzt bei Ihnen bewerben.';
+const NBSP = '\u00A0';
+// Der Toast-Rahmen (role="status", aria-live="polite") steht immer im DOM; sein Text ist der gerade sichtbare Hinweis.
+const toastRahmen = () => document.querySelector('[data-toast]') as HTMLElement;
 const davor = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 const gescrollt = () => (Element.prototype.scrollIntoView as unknown as { mock: { contexts: Element[] } }).mock.contexts.map((e) => e.id);
 // Vollständiger Entwurf, damit „Weiter“ dreimal durchlässt und „Speichern“ speichert (wie „letzter Schritt“ in portal.test).
@@ -90,6 +105,17 @@ const einladenMitSperre = (sperre: number, zaehler: { versuche: number }) => htt
   return undefined;
 });
 type Meldung = { token?: string; event?: string; metadata?: Record<string, unknown>; notify?: boolean };
+// Grenze 5 je Stunde und Batch-Reveal (Pool = 5 − Einladungen der letzten 24 h): Stand der Einladungen wie vom Proxy.
+const einladungsStand = (used: number, used24h: number) => http.post('https://test.supabase.co/functions/v1/mamamia-proxy', async ({ request }) => {
+  const body = await request.clone().json() as { action?: string };
+  if (body.action !== 'getInviteRateState') return undefined;
+  return HttpResponse.json({ data: { used, used_24h: used24h, limit: 5, window_minutes: 60, oldest_at: null, retry_after_seconds: 0, blocked: used >= 5 } });
+});
+const speichernBisZumEnde = async (user: ReturnType<typeof userEvent.setup>) => {
+  for (let i = 0; i < 3; i++) await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
+  await user.click(await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 }));
+};
+const zeilenText = () => document.querySelector('[data-vormerk-zeile]')?.textContent ?? null;
 
 describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => {
   it('Reihenfolge: Kopf, Kostenkarte kompakt, sofort die Pflegekräfte ohne Kasten, Pflegesituation, So geht es weiter, Fragen, Marta', async () => {
@@ -99,11 +125,19 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
 
     const h1 = await screen.findByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' }, { timeout: 5000 });
     const karte = screen.getByText('Ihre Betreuungskosten').closest('.shadow-lift') as HTMLElement;
-    // Preis groß, Testsieger-Siegel klein daneben (ohne Zusatztext), Satz und Bestpreisgarantie wie bisher.
+    // Preis groß, Testsieger-Siegel klein daneben, darunter einzeilig das Etikett „6× Testsieger DIE WELT“ (Nachbesserung 2:
+    // genau dieser Wortlaut, „DIE WELT“ mit geschütztem Leerzeichen, kein weiterer Text), Satz und Bestpreisgarantie wie bisher.
     const preis = within(karte).getByText('2.800 €');
+    expect(preis.className).toContain('whitespace-nowrap');
     const siegel = within(karte).getByAltText('Testsieger Die Welt');
-    expect(siegel.parentElement).toBe(preis.parentElement);
+    const etikettSpalte = siegel.closest('[data-testsieger-etikett]') as HTMLElement;
+    expect(etikettSpalte.parentElement).toBe(preis.parentElement);
     expect(siegel.className).toContain('h-12');
+    const etikett = within(etikettSpalte).getByText('6× Testsieger DIE WELT');
+    expect(etikett.textContent).toBe(`6× Testsieger DIE${NBSP}WELT`);
+    expect(etikett.className).toContain('whitespace-nowrap');
+    expect(etikettSpalte.textContent).toBe(etikett.textContent);
+    expect(davor(siegel, etikett)).toBe(true);
     expect(within(karte).getByText('Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).')).toBeInTheDocument();
     expect(within(karte).getByRole('button', { name: /^Bestpreisgarantie/ })).toBeInTheDocument();
     // Die vier Punkte im Wortlaut, als 2×2.
@@ -119,11 +153,13 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
     // „Kosten erst …“, Heimvergleich und Testsieger-Zeile erst im Aufklapper, oben, vor der Aufstellung.
     expect(screen.queryByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeNull();
     expect(screen.queryByText(/^Zuhause statt Pflegeheim/)).toBeNull();
-    expect(within(karte).queryByText(/6× Testsieger/)).toBeNull();
+    // Zugeklappt nur das Etikett unter dem Siegel; die Testsieger-Zeile mit „20 Jahre Erfahrung“ steht im Aufklapper.
+    expect(within(karte).getAllByText(/6× Testsieger/)).toEqual([etikett]);
+    expect(within(karte).queryByText(/20 Jahre Erfahrung/)).toBeNull();
     await userEvent.click(within(karte).getByRole('button', { name: 'Alle Kosten im Überblick' }));
     const kostenErst = within(karte).getByText('Kosten erst, wenn die Pflegekraft da ist.');
     const heim = within(karte).getByText(/^Zuhause statt Pflegeheim/);
-    const testsieger = within(karte).getByText(/6× Testsieger/);
+    const testsieger = within(karte).getAllByText(/6× Testsieger/).filter((e) => e !== etikett)[0];
     const betreuung = within(karte).getAllByText('Betreuung')[0];
     expect(davor(kostenErst, heim) && davor(heim, testsieger) && davor(testsieger, betreuung)).toBe(true);
     expect(within(karte).getByText('Mustervertrag als PDF herunterladen')).toBeInTheDocument();
@@ -152,7 +188,8 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
     expect(within(kopf).getByText('Für Ihre Bewerbungen')).toBeInTheDocument();
     expect(within(kopf).getByRole('heading', { level: 2, name: 'Pflegesituation' })).toBeInTheDocument();
     expect(within(kopf).getByText('Unvollständig')).toBeInTheDocument();
-    expect(within(kopf).getByText('Danach können Sie Pflegekräfte einladen und bekommen Bewerbungen.')).toBeInTheDocument();
+    // Nachbesserung 2: Martins Satz wörtlich angehängt.
+    expect(within(kopf).getByText(`Danach können Sie Pflegekräfte einladen und bekommen Bewerbungen. ${SECHZIG}`)).toBeInTheDocument();
     expect(screen.queryByText('Damit sich Pflegekräfte bewerben können. Vieles ist schon ausgefüllt.')).toBeNull();
     const schritt = screen.getByText(/Schritt 1 von 4/);
     // Ohne Vormerkung keine Zeile über dem Formular.
@@ -188,7 +225,8 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
     expect(within(fenster).getByText('Pflegegrad, Mobilität und Demenz')).toBeInTheDocument();
     expect(within(fenster).getByText('Einsätze in der Nacht')).toBeInTheDocument();
     expect(within(fenster).getByText('Wohnort, Unterbringung und Startdatum')).toBeInTheDocument();
-    expect(within(fenster).getByText('Das dauert etwa 2 Minuten. Danach laden wir Emilia W. für Sie ein.')).toBeInTheDocument();
+    // Nachbesserung 2: zweiter Text mit Martins Satz wörtlich.
+    expect(within(fenster).getByText(`Das dauert etwa 2 Minuten. Danach laden wir Emilia W. für Sie ein. ${SECHZIG}`)).toBeInTheDocument();
     expect(within(fenster).getByRole('button', { name: 'Pflegesituation vervollständigen' })).toBeInTheDocument();
     // Vorgemerkt: Zustand, localStorage je Token, Karte und Zeile über dem Formular.
     expect(JSON.parse(localStorage.getItem(vormerkSchluessel('token-pz-fenster'))!)).toEqual([50003]);
@@ -198,6 +236,8 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
     expect(within(karteEmilia()).queryByRole('button', { name: 'Einladen' })).toBeNull();
     expect(screen.getByText('Nach dem Speichern laden wir Emilia W. für Sie ein.')).toBeInTheDocument();
     const zeile = document.querySelector('[data-vormerk-zeile]')!;
+    // Nachbesserung 2: der Name bricht nie mitten um (geschütztes Leerzeichen in „Emilia W.“).
+    expect(zeile.textContent).toBe(`Nach dem Speichern laden wir Emilia${NBSP}W. für Sie ein.`);
     expect(davor(document.getElementById('patientendaten')!, zeile)).toBe(true);
     expect(davor(zeile, screen.getByText(/Schritt 1 von 4/))).toBe(true);
 
@@ -213,6 +253,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
     await user.click(within(karteHelena).getByRole('button', { name: 'Einladen' }));
     await user.click(within(await screen.findByRole('dialog', { name: 'Helena K. einladen' })).getByRole('button', { name: 'Später' }));
     expect(screen.getByText('Nach dem Speichern laden wir Emilia W. und Helena K. für Sie ein.')).toBeInTheDocument();
+    expect(document.querySelector('[data-vormerk-zeile]')!.textContent).toBe(`Nach dem Speichern laden wir Emilia${NBSP}W. und Helena${NBSP}K. für Sie ein.`);
     expect(JSON.parse(localStorage.getItem(vormerkSchluessel('token-pz-fenster'))!)).toEqual([50003, 50002]);
 
     // Messpunkte: je Pflegekraft einmal vorgemerkt, still und ohne Namen; der Fenster-Knopf meldet seine Quelle.
@@ -284,7 +325,10 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
     for (let i = 0; i < 3; i++) await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
     await user.click(await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 }));
 
-    expect(await screen.findByText('Emilia W. und Helena K. sind eingeladen.', {}, { timeout: 8000 })).toBeInTheDocument();
+    const hinweis = await screen.findByText('Emilia W. und Helena K. sind eingeladen.', {}, { timeout: 8000 });
+    // Nachbesserung 2: Namen im Toast mit geschütztem Leerzeichen, der Toast im Rahmen role="status".
+    expect(hinweis.textContent).toBe(`Emilia${NBSP}W. und Helena${NBSP}K. sind eingeladen.`);
+    expect(toastRahmen().contains(hinweis)).toBe(true);
     expect(gespeichert).toBe(1);
     // Nacheinander, in der Reihenfolge des Vormerkens, je genau einmal.
     expect(eingeladen).toEqual([50003, 50002]);
@@ -427,4 +471,167 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
     expect(await screen.findByRole('dialog', { name: 'Warum erst die Pflegesituation?' })).toBeInTheDocument();
     expect(localStorage.getItem(vormerkSchluessel('token-pz-alt'))).toBeNull();
   }, 20_000);
+
+  // ── Nachbesserung 2 (03.11.2026) ────────────────────────────────────────────────────────────────────────────────────
+  it('Nachbesserung 2: der Dank nach dem Speichern bleibt stehen, „… sind eingeladen.“ kommt danach (Warteschlange); Toast mit role="status"', async () => {
+    const TOKEN = 'token-pz-dank';
+    localStorage.setItem(vormerkSchluessel(TOKEN), JSON.stringify([50003, 50002]));
+    const eingeladen: number[] = [];
+    server.use(nebenlaeufer, ...lesen, ...defaultHandlers({ proxy: {
+      ...ohneBewerbung, ...ort, listMatchings: zweiVorschlaege,
+      inviteCaregiver: (vars) => { eingeladen.push(vars.caregiver_id as number); return { StoreRequest: { id: 1 } }; },
+    } }));
+    vollerEntwurf(TOKEN);
+    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await screen.findByText('Nach dem Speichern laden wir Emilia W. und Helena K. für Sie ein.', {}, { timeout: 5000 });
+    // Der Rahmen steht schon leer da (aria-live braucht ein bestehendes Element), höflich, als Ganzes vorgelesen.
+    const rahmen = toastRahmen();
+    expect(rahmen.getAttribute('role')).toBe('status');
+    expect(rahmen.getAttribute('aria-live')).toBe('polite');
+    expect(rahmen.getAttribute('aria-atomic')).toBe('true');
+    expect(rahmen.textContent).toBe('');
+    await speichernBisZumEnde(user);
+    await waitFor(() => expect(toastRahmen().textContent).toBe(DANK), { timeout: 5000 });
+    // Beide Einladungen sind durch, während der Dank noch steht — bisher hätte der Hinweis ihn genau hier ersetzt.
+    await waitFor(() => expect(eingeladen).toEqual([50003, 50002]), { timeout: 5000 });
+    await new Promise((r) => setTimeout(r, 150));
+    expect(toastRahmen().textContent).toBe(DANK);
+    expect(screen.queryByText(/sind eingeladen\.$/)).toBeNull();
+    // Nach dem Dank der Hinweis, im selben Rahmen, Namen ohne Umbruch in der Mitte.
+    await waitFor(() => expect(toastRahmen().textContent).toBe(`Emilia${NBSP}W. und Helena${NBSP}K. sind eingeladen.`), { timeout: 5000 });
+    expect(toastRahmen()).toBe(rahmen);
+  }, 30_000);
+
+  it('Nachbesserung 2: Fehlschlag beim automatischen Einladen — die übliche Meldung erst nach dem Dank', async () => {
+    const TOKEN = 'token-pz-dank-fehler';
+    localStorage.setItem(vormerkSchluessel(TOKEN), JSON.stringify([50003]));
+    let versuche = 0;
+    server.use(
+      nebenlaeufer,
+      http.post('https://test.supabase.co/functions/v1/mamamia-proxy', async ({ request }) => {
+        const body = await request.clone().json() as { action?: string };
+        if (body.action === 'inviteCaregiver') { versuche += 1; return HttpResponse.json({ error: 'validation failed' }, { status: 400 }); }
+        return undefined;
+      }),
+      ...lesen,
+      ...defaultHandlers({ proxy: { ...ohneBewerbung, ...ort, listMatchings: zweiVorschlaege } }),
+    );
+    vollerEntwurf(TOKEN);
+    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await screen.findByText('Nach dem Speichern laden wir Emilia W. für Sie ein.', {}, { timeout: 5000 });
+    await speichernBisZumEnde(user);
+    await waitFor(() => expect(toastRahmen().textContent).toBe(DANK), { timeout: 5000 });
+    await waitFor(() => expect(versuche).toBe(1), { timeout: 5000 });
+    await new Promise((r) => setTimeout(r, 150));
+    expect(toastRahmen().textContent).toBe(DANK);
+    await waitFor(() => expect(toastRahmen().textContent).toBe('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.'), { timeout: 5000 });
+  }, 30_000);
+
+  it('Nachbesserung 2: eine abgelehnte Karte verliert ihre Vormerkung (Zeile und localStorage)', async () => {
+    const TOKEN = 'token-pz-ablehnen';
+    localStorage.setItem(vormerkSchluessel(TOKEN), JSON.stringify([50003, 50002]));
+    server.use(...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
+    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await screen.findByText('Nach dem Speichern laden wir Emilia W. und Helena K. für Sie ein.', {}, { timeout: 5000 });
+    // Helena K. im Profil ablehnen („Nein danke“).
+    await user.click(screen.getByText('Helena K.'));
+    await user.click(await screen.findByRole('button', { name: 'Nein danke' }, { timeout: 5000 }));
+    await waitFor(() => expect(zeilenText()).toBe(`Nach dem Speichern laden wir Emilia${NBSP}W. für Sie ein.`));
+    expect(JSON.parse(localStorage.getItem(vormerkSchluessel(TOKEN))!)).toEqual([50003]);
+  }, 20_000);
+
+  it('Nachbesserung 2: eine ausgeblendete Karte verliert ihre Vormerkung (Pool nach Einladungen der letzten 24 h nur 1)', async () => {
+    const TOKEN = 'token-pz-ausgeblendet';
+    localStorage.setItem(vormerkSchluessel(TOKEN), JSON.stringify([50003, 50002]));
+    server.use(einladungsStand(0, 4), ...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
+    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    render(<CustomerPortalPage />);
+    // Genau eine Karte zu sehen; nur sie steht in der Zeile und bleibt im localStorage.
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /^(Einladen|Vorgemerkt ✓)$/ })).toHaveLength(1), { timeout: 5000 });
+    const sichtbar = screen.queryByText('Emilia W.') ? { name: 'Emilia', id: 50003 } : { name: 'Helena', id: 50002 };
+    await waitFor(() => expect(JSON.parse(localStorage.getItem(vormerkSchluessel(TOKEN))!)).toEqual([sichtbar.id]));
+    expect(zeilenText()).toBe(`Nach dem Speichern laden wir ${sichtbar.name}${NBSP}${sichtbar.name === 'Emilia' ? 'W.' : 'K.'} für Sie ein.`);
+  }, 20_000);
+
+  it('Nachbesserung 2: die Zeile nennt nie mehr Namen, als eingeladen werden können (noch 1 von 5 frei) — und genau die werden eingeladen', async () => {
+    const TOKEN = 'token-pz-frei';
+    localStorage.setItem(vormerkSchluessel(TOKEN), JSON.stringify([50003, 50002]));
+    const eingeladen: number[] = [];
+    server.use(einladungsStand(4, 0), nebenlaeufer, ...lesen, ...defaultHandlers({ proxy: {
+      ...ohneBewerbung, ...ort, listMatchings: zweiVorschlaege,
+      inviteCaregiver: (vars) => { eingeladen.push(vars.caregiver_id as number); return { StoreRequest: { id: 1 } }; },
+    } }));
+    vollerEntwurf(TOKEN);
+    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await screen.findByText('Helena K.', {}, { timeout: 5000 });
+    // Beide Karten zu sehen, aber nur eine Einladung frei: Zeile und „Vorgemerkt ✓“ nur für Emilia W. (zuerst vorgemerkt).
+    await waitFor(() => expect(zeilenText()).toBe(`Nach dem Speichern laden wir Emilia${NBSP}W. für Sie ein.`));
+    const karteEmilia = screen.getByText('Emilia W.').closest('.rounded-card') as HTMLElement;
+    const karteHelena = screen.getByText('Helena K.').closest('.rounded-card') as HTMLElement;
+    expect(within(karteEmilia).getByRole('button', { name: 'Vorgemerkt ✓' })).toBeInTheDocument();
+    // Helena K.: „Einladen“ verspricht nichts mehr — das Fenster „Warum erst die Pflegesituation?“ (Wortlaut Stand 75b8df8).
+    await user.click(within(karteHelena).getByRole('button', { name: 'Einladen' }));
+    const warum = await screen.findByRole('dialog', { name: 'Warum erst die Pflegesituation?' });
+    expect(screen.queryByRole('dialog', { name: 'Helena K. einladen' })).toBeNull();
+    expect(JSON.parse(localStorage.getItem(vormerkSchluessel(TOKEN))!)).toEqual([50003, 50002]);
+    const schliessen = within(warum).getAllByRole('button', { name: 'Schließen' });
+    await user.click(schliessen[schliessen.length - 1]);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await speichernBisZumEnde(user);
+    await waitFor(() => expect(toastRahmen().textContent).toBe(`Emilia${NBSP}W. ist eingeladen.`), { timeout: 8000 });
+    expect(eingeladen).toEqual([50003]);
+  }, 30_000);
+
+  it('Nachbesserung 2: Vormerkungen nur im Modus „Pflegekräfte zuerst“ — ?einstieg=alt lädt sie nicht und lädt nach dem Speichern niemanden ein', async () => {
+    const TOKEN = 'token-pz-alt-speichern';
+    localStorage.setItem(vormerkSchluessel(TOKEN), JSON.stringify([50003]));
+    const eingeladen: number[] = [];
+    server.use(nebenlaeufer, ...lesen, ...defaultHandlers({ proxy: {
+      ...ohneBewerbung, ...ort, listMatchings: zweiVorschlaege,
+      inviteCaregiver: (vars) => { eingeladen.push(vars.caregiver_id as number); return { StoreRequest: { id: 1 } }; },
+    } }));
+    vollerEntwurf(TOKEN);
+    window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=alt`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await screen.findByText('Noch 2 Minuten bis zu Ihren Bewerbungen', {}, { timeout: 5000 });
+    expect(screen.queryByRole('button', { name: 'Vorgemerkt ✓' })).toBeNull();
+    expect(zeilenText()).toBeNull();
+    await speichernBisZumEnde(user);
+    await waitFor(() => expect(toastRahmen().textContent).toBe(DANK), { timeout: 5000 });
+    await new Promise((r) => setTimeout(r, 400));
+    expect(eingeladen).toEqual([]);
+    // Nicht angefasst: weder geladen noch gelöscht.
+    expect(JSON.parse(localStorage.getItem(vormerkSchluessel(TOKEN))!)).toEqual([50003]);
+  }, 30_000);
+
+  it('Nachbesserung 2: auch ?einstieg=kompakt lädt keine Vormerkungen und lädt nach dem Speichern niemanden ein', async () => {
+    const TOKEN = 'token-pz-kompakt-speichern';
+    localStorage.setItem(vormerkSchluessel(TOKEN), JSON.stringify([50003]));
+    const eingeladen: number[] = [];
+    server.use(nebenlaeufer, ...lesen, ...defaultHandlers({ proxy: {
+      ...ohneBewerbung, ...ort, listMatchings: zweiVorschlaege,
+      inviteCaregiver: (vars) => { eingeladen.push(vars.caregiver_id as number); return { StoreRequest: { id: 1 } }; },
+    } }));
+    vollerEntwurf(TOKEN);
+    window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=kompakt`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    const hinweis = await waitFor(() => { const h = document.getElementById('patientendaten'); if (!h) throw new Error('kein Hinweis'); return h; }, { timeout: 5000 });
+    await user.click(await within(hinweis).findByRole('button', { name: 'Jetzt vervollständigen' }, { timeout: 5000 }));
+    for (let i = 0; i < 3; i++) await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
+    await user.click(await screen.findByRole('button', { name: /^(Speichern|Bewerbungen erhalten)$/ }, { timeout: 5000 }));
+    await waitFor(() => expect(toastRahmen().textContent).toBe(DANK), { timeout: 5000 });
+    await new Promise((r) => setTimeout(r, 400));
+    expect(eingeladen).toEqual([]);
+    expect(JSON.parse(localStorage.getItem(vormerkSchluessel(TOKEN))!)).toEqual([50003]);
+  }, 30_000);
 });

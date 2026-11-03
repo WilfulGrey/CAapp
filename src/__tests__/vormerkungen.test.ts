@@ -1,7 +1,9 @@
 // Vorgemerkte Pflegekräfte vor dem ersten Speichern (Registry #145): nur caregiver_ids je Token, robust gegen Unlesbares,
 // und der Wortlaut der Namensliste („A und B“, „A, B und C“) für Zeile und Hinweis.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { eingeladenHinweis, ladeVormerkungen, namenListe, speichereVormerkungen, vormerkSchluessel } from '../lib/vormerkungen';
+import { einladbareVormerkungen, eingeladenHinweis, ladeVormerkungen, MAX_VORMERKUNGEN, nameGeschuetzt, namenListe, speichereVormerkungen, vormerkSchluessel } from '../lib/vormerkungen';
+
+const NBSP = '\u00A0';
 
 beforeEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
 
@@ -37,11 +39,37 @@ describe('Vormerkungen im localStorage (je Token)', () => {
 });
 
 describe('Namensliste und Hinweis nach dem Einladen', () => {
-  it('ein, zwei, drei Namen', () => {
-    expect(namenListe(['Emilia W.'])).toBe('Emilia W.');
-    expect(namenListe(['Emilia W.', 'Anna N.'])).toBe('Emilia W. und Anna N.');
-    expect(namenListe(['Emilia W.', 'Anna N.', 'Ewa L.'])).toBe('Emilia W., Anna N. und Ewa L.');
-    expect(eingeladenHinweis(['Emilia W.'])).toBe('Emilia W. ist eingeladen.');
-    expect(eingeladenHinweis(['Emilia W.', 'Anna N.'])).toBe('Emilia W. und Anna N. sind eingeladen.');
+  // Nachbesserung 2: das Leerzeichen IM Namen ist geschützt (U+00A0), damit „Anna N.“ nie mitten umbricht; zwischen den
+  // Namen („, “ und „ und “) bleiben normale Leerzeichen, dort darf die Zeile umbrechen.
+  it('ein, zwei, drei Namen — jeder Name mit geschütztem Leerzeichen', () => {
+    expect(nameGeschuetzt('Anna N.')).toBe(`Anna${NBSP}N.`);
+    expect(nameGeschuetzt('Anna Maria N.')).toBe(`Anna${NBSP}Maria${NBSP}N.`);
+    expect(namenListe([])).toBe('');
+    expect(namenListe(['Emilia W.'])).toBe(`Emilia${NBSP}W.`);
+    expect(namenListe(['Emilia W.', 'Anna N.'])).toBe(`Emilia${NBSP}W. und Anna${NBSP}N.`);
+    expect(namenListe(['Emilia W.', 'Anna N.', 'Ewa L.'])).toBe(`Emilia${NBSP}W., Anna${NBSP}N. und Ewa${NBSP}L.`);
+    expect(eingeladenHinweis(['Emilia W.'])).toBe(`Emilia${NBSP}W. ist eingeladen.`);
+    expect(eingeladenHinweis(['Emilia W.', 'Anna N.'])).toBe(`Emilia${NBSP}W. und Anna${NBSP}N. sind eingeladen.`);
+  });
+});
+
+describe('Höchstens 5 Vormerkungen, nur Einladbare (Nachbesserung 2)', () => {
+  it('Laden und Speichern kappen bei 5', () => {
+    expect(MAX_VORMERKUNGEN).toBe(5);
+    speichereVormerkungen('abc', [1, 2, 3, 4, 5, 6, 7]);
+    expect(localStorage.getItem('pm_vorgemerkt_abc')).toBe('[1,2,3,4,5]');
+    localStorage.setItem('pm_vorgemerkt_xyz', '[9,8,7,6,5,4]');
+    expect(ladeVormerkungen('xyz')).toEqual([9, 8, 7, 6, 5]);
+  });
+
+  it('nur offene, sichtbare Karten, in der Reihenfolge des Vormerkens, nie mehr als frei und als 5', () => {
+    // 3 ausgeblendet/abgelehnt (nicht unter den offenen Karten) fällt weg, die Reihenfolge bleibt.
+    expect(einladbareVormerkungen([4, 3, 1], [1, 2, 4], 5)).toEqual([4, 1]);
+    // Grenze 5 je Stunde: noch 1 frei → nur die zuerst Vorgemerkte; 0 frei → niemand.
+    expect(einladbareVormerkungen([4, 1], [1, 2, 4], 1)).toEqual([4]);
+    expect(einladbareVormerkungen([4, 1], [1, 2, 4], 0)).toEqual([]);
+    expect(einladbareVormerkungen([4, 1], [1, 2, 4], -2)).toEqual([]);
+    // Nie mehr als 5, auch wenn mehr frei wäre.
+    expect(einladbareVormerkungen([1, 2, 3, 4, 5, 6], [1, 2, 3, 4, 5, 6], 9)).toEqual([1, 2, 3, 4, 5]);
   });
 });

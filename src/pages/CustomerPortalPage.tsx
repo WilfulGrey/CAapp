@@ -75,7 +75,8 @@ import { MatchCard } from '../components/portal/MatchCard';
 // „Noch 2 Minuten“, Karten mit „Einladen“ + Schloss, offenes Formular mit „Speichern“); Kopf und Häufige Fragen wie heute.
 import { EinstiegVorSpeichern, WarumSheetVorSpeichern } from '../components/portal/EinstiegVorSpeichern';
 import { EinladenSheetVorSpeichern, EinstiegPflegekraefteZuerst, type VorgemerkteKraft } from '../components/portal/EinstiegPflegekraefteZuerst';
-import { eingeladenHinweis, ladeVormerkungen, speichereVormerkungen } from '../lib/vormerkungen';
+import { einladbareVormerkungen, eingeladenHinweis, ladeVormerkungen, MAX_VORMERKUNGEN, speichereVormerkungen } from '../lib/vormerkungen';
+import { DANK_DAUER_MS, useToastWarteschlange } from '../lib/toastWarteschlange';
 import { MatchCardVorSpeichern } from '../components/portal/MatchCardVorSpeichern';
 import { MatchCardDone } from '../components/portal/MatchCardDone';
 import { InterestCard, type InterestActionStatus } from '../components/portal/InterestCard';
@@ -546,8 +547,9 @@ const CustomerPortalPage: FC = () => {
         reportLeadEvent(token, 'portal_ladefehler', { quelle_laden: 'lead' }, false);
       } else {
         setLead(l);
-        // Registry #145: vorgemerkte Pflegekräfte dieses Tokens (übersteht ein Neuladen).
-        setVorgemerkt(ladeVormerkungen(l.token));
+        // Registry #145: vorgemerkte Pflegekräfte dieses Tokens (übersteht ein Neuladen) — nur im Modus „Pflegekräfte
+        // zuerst“, nicht bei `?einstieg=alt` / `?einstieg=kompakt` (Nachbesserung 2).
+        if (modusPflegekraefteZuerst) setVorgemerkt(ladeVormerkungen(l.token));
         // Im selben Render wie der Lead: kein einziges Bild im Ausgangszustand
         // für Kunden, die schon abgesendet haben (siehe `schonAbgesendet`).
         if (l.patient_form_at) setPatientSaved(true);
@@ -626,7 +628,9 @@ const CustomerPortalPage: FC = () => {
   const [showInfoPopup, setShowInfoPopup] = useState(false);
   const [showContactPopup, setShowContactPopup] = useState(false);
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
-  const [toast, setToast] = useState<string | null>(null);
+  // Toast mit Warteschlange (Registry #145, Nachbesserung 2): der Dank nach dem ersten Speichern wird vom Hinweis des
+  // automatischen Einladens nicht mehr ersetzt, der Hinweis folgt danach (lib/toastWarteschlange.ts).
+  const { toast, showToast } = useToastWarteschlange();
   // Patientendaten-Card im Preview-Modus normalerweise als „bereits gespeichert"
   // markieren (versteckt die Karte). Ausnahme: ?preview=patient zeigt die
   // Karte explizit — Profile-Card direkt geöffnet, damit man den Wizard
@@ -731,15 +735,21 @@ const CustomerPortalPage: FC = () => {
   const [einstiegAlt] = useState(() => {
     try { return new URLSearchParams(window.location.search).get('einstieg') === 'alt'; } catch { return false; }
   });
+  // Registry #145, Nachbesserung 2: Vormerkungen gibt es nur im Modus „Pflegekräfte zuerst“ (ohne `?einstieg=alt` und ohne
+  // `?einstieg=kompakt`) — nur dort werden sie geladen und nach dem ersten Speichern automatisch eingeladen.
+  const modusPflegekraefteZuerst = !einstiegAlt && !einstiegKompakt;
   // Registry #145 (Martin 03.11.2026, „Pflegekräfte zuerst“): Vor dem Speichern merkt „Einladen“ die Pflegekraft vor und
   // öffnet das Fenster „{Name} einladen“; nach dem ersten erfolgreichen Speichern werden alle Vorgemerkten über den
   // bisherigen Einladen-Weg eingeladen. Gemerkt werden nur caregiver_ids, je Token im localStorage (lib/vormerkungen.ts).
   // Gespeicherte Vormerkungen werden im selben Render wie der Lead gelesen (beim Laden des Leads, in der Vorschau sofort),
   // sonst stünde auf einer vorgemerkten Karte nach dem Neuladen kurz „Einladen“.
-  const [vorgemerkt, setVorgemerkt] = useState<number[]>(() => (IS_PREVIEW_ANY ? ladeVormerkungen(PREVIEW_LEAD.token) : []));
+  const [vorgemerkt, setVorgemerkt] = useState<number[]>(() => (IS_PREVIEW_ANY && modusPflegekraefteZuerst ? ladeVormerkungen(PREVIEW_LEAD.token) : []));
   const [einladenFenster, setEinladenFenster] = useState<{ caregiverId: number; name: string } | null>(null);
   // Gesetzt, sobald das ERSTE Speichern bei mamamia durch ist (onSaveToMamamia); der Effekt unten lädt dann ein.
   const [einladenNachSpeichern, setEinladenNachSpeichern] = useState(false);
+  // Nachbesserung 2: wer eingeladen wird, steht im Moment des Speicherns fest — genau die Namen der Zeile. Danach lädt
+  // mamamia die Liste neu (refetchMatchings, neue Reihenfolge); das darf die Auswahl nicht mehr verschieben.
+  const einladenListe = useRef<number[]>([]);
   const vormerkungenSetzen = (ids: number[]) => {
     setVorgemerkt(ids);
     speichereVormerkungen(lead?.token, ids);
@@ -1824,14 +1834,8 @@ const CustomerPortalPage: FC = () => {
     return true;
   });
 
-  // Nur der Timer des LETZTEN Toasts blendet aus: Vorher schloss der Timer
-  // eines älteren Toasts einen neueren zu früh (z. B. 7-s-Dank nach 4 s).
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showToast = (msg: string, durationMs = 4000) => {
-    setToast(msg);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), durationMs);
-  };
+  // showToast kommt aus useToastWarteschlange (oben): nur der Timer des LETZTEN Toasts blendet aus, und `hintenAn`-Toasts
+  // warten hinter dem geschützten Dank nach dem ersten Speichern.
 
   // Annahme-Pfad (seit 2026-07-15 automatisch — vorher MVP mit manueller
   // Nacharbeit): die Portal-Annahme führt BEIDES aus:
@@ -2156,11 +2160,23 @@ const CustomerPortalPage: FC = () => {
 
   // Registry #145: Pflegekraft vormerken (je Token im localStorage) und das Fenster „{Name} einladen" öffnen. Erneutes
   // Tippen öffnet nur das Fenster. Messpunkt `einladung_vorgemerkt` einmal je Pflegekraft, ohne Namen.
+  // Nachbesserung 2: höchstens so viele, wie eingeladen werden können (5, abzüglich der Einladungen dieser Stunde). Ist das
+  // voll, öffnet „Einladen" wie im Stand 75b8df8 „Warum erst die Pflegesituation?" (verspricht keine Einladung). Praktisch
+  // kommt das kaum vor: es stehen nie mehr als 5 offene Karten da, und abgelehnte/ausgeblendete verlieren ihre Vormerkung.
   const einladungVormerken = (caregiverId: number, nurse: Nurse) => {
+    // Schon unter denen, die eingeladen werden („Vorgemerkt ✓"): nur das Fenster.
+    if (vorgemerktEinladbar.includes(caregiverId)) {
+      setEinladenFenster({ caregiverId, name: displayName(nurse.name) });
+      return;
+    }
+    const bleiben = vorgemerkt.filter((id) => id !== caregiverId && offeneKartenIds.includes(id));
+    if (einladbareVormerkungen(bleiben, offeneKartenIds, freieEinladungen).length >= Math.min(MAX_VORMERKUNGEN, freieEinladungen)) {
+      setWarumOffen(true);
+      return;
+    }
     setEinladenFenster({ caregiverId, name: displayName(nurse.name) });
-    if (vorgemerkt.includes(caregiverId)) return;
-    vormerkungenSetzen([...vorgemerkt, caregiverId]);
-    messen('einladung_vorgemerkt', { caregiver_id: caregiverId });
+    vormerkungenSetzen([...bleiben, caregiverId]);
+    if (!vorgemerkt.includes(caregiverId)) messen('einladung_vorgemerkt', { caregiver_id: caregiverId });
   };
 
   const canInviteNurse = (_idx: number): boolean => {
@@ -2222,7 +2238,7 @@ const CustomerPortalPage: FC = () => {
   // mitten in mamamias Sperre nach dem Speichern startet (einladenWiederholung.ts).
   const einladenPflegekraft = async (match: { caregiverId: number; nurse: Nurse } | undefined, name: string, nachSpeichern = false): Promise<void> => {
     if (!mmReady || typeof match?.caregiverId !== 'number') {
-      showToast('Einladung derzeit nicht möglich. Bitte später erneut versuchen.');
+      showToast('Einladung derzeit nicht möglich. Bitte später erneut versuchen.', 4000, { hintenAn: nachSpeichern });
       throw new Error('not-ready');
     }
 
@@ -2325,7 +2341,8 @@ const CustomerPortalPage: FC = () => {
         prev.map((a) => a.nurse.name === nurseName ? { ...a, isInvited: false } : a)
       );
     }
-    showToast('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.');
+    // Automatisch nach dem Speichern (Registry #145): erst nach dem Dank zeigen, nicht an seiner Stelle.
+    showToast('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.', 4000, { hintenAn: nachSpeichern });
     throw lastErr ?? new Error('invite-failed');
     } finally {
       setInviteInFlight(false);
@@ -2446,6 +2463,76 @@ const CustomerPortalPage: FC = () => {
     }
   };
 
+  // Seit Registry #145 (Nachbesserung 2) hier oben, vor den frühen `return`s weiter unten: das Aufräumen der Vormerkungen
+  // ist ein Effekt und braucht die Auswahl in seinen Abhängigkeiten. Inhalt unverändert.
+  // Sichtbare Vorschläge (Batch-Reveal, Empfehlung zuerst) — EINMAL berechnet: für die Karten
+  // (abgesendet) und für die Zeilen des Kompakt-Einstiegs, damit beide dieselbe Auswahl zeigen.
+  const pflegekraftAuswahl = (() => {
+    // Interest-Pflegekräfte (sowohl invited als auch declined)
+    // werden NICHT in der Matching-Liste gerendert sondern unten
+    // in der "Bereits bearbeitet"-Sektion (User-Wunsch: gleiche
+    // Behandlung wie bei Bewerbungen). Filter: caregiverId raus
+    // wenn interestOriginIds das hat UND Status invited/declined.
+    const allVisible = effectiveMatched
+      .map((m, i) => ({ nurse: m.nurse, i, caregiverId: m.caregiverId, status: nurseStatusById.get(m.caregiverId) ?? 'pending' as NurseStatus, virtualDeclinedFromInterest: false as const }))
+      .filter(({ status, caregiverId }) => {
+        if (status === 'pending') return true;
+        // invited/declined ausschließen wenn aus Interest stammt
+        return !interestOriginIds.has(caregiverId);
+      });
+    // Order: pending (cap 5, oben) → invited → declined (ganz unten,
+    // ausgegraut mit "Abgelehnt"-Pill + Undo-Link). User-Wunsch:
+    // bearbeitete (normale) Pflegekräfte rutschen nach unten in der
+    // Matching-Liste. Interest-Aktionen leben in "Bereits bearbeitet"
+    // (siehe unten — InterestActionCards in der doneApps-Sektion).
+    // Oben NUR die frischen Vorschläge (max 3). Bereits bearbeitete
+    // Matchings (invited/declined) wandern in die gedämpfte
+    // "Bereits bearbeitet"-Sektion unten (MatchCardDone) — sonst
+    // wirken sie zu prominent / zu ähnlich wie die offenen Vorschläge.
+    type VisibleNurse = {
+      nurse: Nurse;
+      i: number;
+      caregiverId: number;
+      status: NurseStatus;
+      virtualDeclinedFromInterest: boolean;
+    };
+    // Batch-Reveal (User-Wunsch 25.06.): sichtbarer Pool = 5 −
+    // Einladungen der letzten 24h. Einladen hält den Slot 24h (die
+    // Pflegekraft wartet auf Antwort); nach 24h ohne Reaktion füllt sich
+    // der Pool wieder auf 5 + die "neue Pflegekräfte"-Mail geht raus.
+    // Ablehnen zählt NICHT mit (caregiver_invite_attempts erfasst nur
+    // echte Einladungen) → rückt sofort nach. used_24h aus getInviteRateState.
+    const unbestaetigt = [...einladungStand.current].filter(([id, stand]) =>
+      stand === inviteRate
+      && (statusOverrides.get(id) === 'invited' || interestStatusOverrides.get(id) === 'invited')).length;
+    const heldInvites = (inviteRate?.used_24h ?? 0) + unbestaetigt;
+    const visibleCount = Math.max(0, 5 - heldInvites);
+    const pendingNurses: VisibleNurse[] = allVisible.filter(({ status }) => status === 'pending').slice(0, visibleCount);
+    // Die Empfehlung (höchste Badge-Bewertung, Score = Erfahrungsjahre +
+    // Einsätze) nach ganz oben ziehen — die anderen behalten ihre
+    // Reihenfolge. So steht "Empfehlung des Beraters" immer zuoberst.
+    const badgeScore = (n: Nurse) => nurseBadgeScore(n.history?.assignments);
+    let bestIdx = -1;
+    let bestScore = -Infinity;
+    pendingNurses.forEach((p, idx) => {
+      const s = badgeScore(p.nurse);
+      if (s > bestScore) { bestScore = s; bestIdx = idx; }
+    });
+    const visibleNurses: VisibleNurse[] = bestIdx > 0
+      ? [pendingNurses[bestIdx], ...pendingNurses.filter((_, idx) => idx !== bestIdx)]
+      : pendingNurses;
+    return { allVisible, heldInvites, visibleNurses };
+  })();
+
+  // Registry #145, Nachbesserung 2: wer nach dem Speichern wirklich eingeladen wird — die Vorgemerkten, die als offene
+  // Karte zu sehen sind (nicht abgelehnt, nicht ausgeblendet), höchstens 5 und nie mehr, als in dieser Stunde noch frei ist
+  // (Grenze 5 je Stunde, useInviteRateState). Dieselbe Liste für Karte, Zeile und das Einladen nach dem Speichern.
+  const offeneKartenIds = pflegekraftAuswahl.visibleNurses.filter((v) => v.status === 'pending').map((v) => v.caregiverId);
+  const freieEinladungen = Math.max(0, (inviteRate?.limit ?? MAX_VORMERKUNGEN) - (inviteRate?.used ?? 0));
+  const vorgemerktEinladbar = modusPflegekraefteZuerst ? einladbareVormerkungen(vorgemerkt, offeneKartenIds, freieEinladungen) : [];
+  // `kartenGeladen`: echte Liste da (für „Runde 28“ unten und das Aufräumen der Vormerkungen).
+  const kartenGeladen = !listeLaedt && (IS_PREVIEW_ANY || (mmReady && !!mmMatchings?.data));
+
   // ── Registry #145: die Vorgemerkten nach dem ersten Speichern einladen ────────────────────────────────────────────────
   // Ausgelöst von onSaveToMamamia (erstes Speichern bei mamamia ok), ausgeführt, sobald die Seite als gespeichert gilt.
   // Nacheinander über den bisherigen Einladen-Weg (einladenPflegekraft): stille Wiederholungen bei mamamias kurzer
@@ -2455,12 +2542,16 @@ const CustomerPortalPage: FC = () => {
   // einladbar. Eingeladen wird nur, wer noch in der Liste steht und offen ist (nicht abgelehnt, nicht schon eingeladen).
   // Am Ende „{Name} ist eingeladen." bzw. „… sind eingeladen.", aber nur ohne Fehlschlag (sonst bleibt die Fehlermeldung
   // stehen). Die Vormerkungen sind danach gelöscht. Vorschau: nur der Zustand, nichts geht an mamamia.
+  // Nachbesserung 2: eingeladen werden genau die, die die Zeile beim Speichern nannte (`einladenListe` = damals
+  // `vorgemerktEinladbar`: offen und sichtbar, höchstens 5, nie mehr als frei); alle Hinweise dieses Wegs warten hinter
+  // dem Dank (`hintenAn`), nur im Modus „Pflegekräfte zuerst“.
   useEffect(() => {
     if (!einladenNachSpeichern || !patientSaved) return;
     setEinladenNachSpeichern(false);
-    const ids = vorgemerkt;
+    const ids = einladenListe.current;
+    einladenListe.current = [];
     vormerkungenSetzen([]);
-    if (ids.length === 0) return;
+    if (!modusPflegekraefteZuerst || ids.length === 0) return;
     const kandidaten = ids
       .map((id) => effectiveMatched.find((m) => m.caregiverId === id))
       .filter((m): m is { caregiverId: number; nurse: Nurse } => !!m && nurseStatusById.get(m.caregiverId) === 'pending');
@@ -2484,7 +2575,7 @@ const CustomerPortalPage: FC = () => {
         }
       }
       messen('einladung_nach_speichern', { anzahl: kandidaten.length, ok: eingeladen.length });
-      if (eingeladen.length > 0 && !fehler) showToast(eingeladenHinweis(eingeladen));
+      if (eingeladen.length > 0 && !fehler) showToast(eingeladenHinweis(eingeladen), 4000, { hintenAn: true });
     })();
     // Nur beim Übergang „erstes Speichern ok → gespeichert"; Liste, Status und Vormerkungen gelten aus genau diesem Render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2496,6 +2587,14 @@ const CustomerPortalPage: FC = () => {
     vormerkungenSetzen([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schonAbgesendet, abgesendetInSitzung, einladenNachSpeichern, vorgemerkt.length]);
+  // Nachbesserung 2: abgelehnte oder ausgeblendete Karten verlieren ihre Vormerkung auch im localStorage — nur vor dem
+  // Speichern und erst, wenn die Liste wirklich geladen ist (sonst wären während des Ladens alle „ausgeblendet").
+  useEffect(() => {
+    if (!pflegekraefteZuerst || patientSaved || !kartenGeladen || einladenNachSpeichern) return;
+    const bleiben = vorgemerkt.filter((id) => offeneKartenIds.includes(id));
+    if (bleiben.length !== vorgemerkt.length) vormerkungenSetzen(bleiben);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pflegekraefteZuerst, patientSaved, kartenGeladen, einladenNachSpeichern, vorgemerkt.join(','), offeneKartenIds.join(',')]);
 
   // Interest-side dismiss handler. Local-only — writes a row to
   // lead_dismissed_caregivers so the next portal refresh / refetch
@@ -2601,6 +2700,8 @@ const CustomerPortalPage: FC = () => {
       next.set(caregiverId, 'declined');
       return next;
     });
+    // Registry #145, Nachbesserung 2: eine abgelehnte Karte verliert ihre Vormerkung (auch nach „Rückgängig").
+    if (vorgemerkt.includes(caregiverId)) vormerkungenSetzen(vorgemerkt.filter((id) => id !== caregiverId));
     if (lead?.token) {
       setDeclinedCaregiver(lead.token, caregiverId, true).catch(err => {
         console.error('setDeclinedCaregiver failed:', err);
@@ -2933,7 +3034,8 @@ const CustomerPortalPage: FC = () => {
             if (!saved && schonAbgesendet) return;
             if (saved && !patientSaved) {
               // Hauptweg zuerst (Martin 24.09.): Bewerbungen, Einladen ist die Zugabe.
-              showToast('✓ Vielen Dank! Passende Pflegekräfte können sich jetzt bei Ihnen bewerben.', 7000);
+              // Geschützt (Registry #145, Nachbesserung 2): der Hinweis des automatischen Einladens wartet dahinter.
+              showToast('✓ Vielen Dank! Passende Pflegekräfte können sich jetzt bei Ihnen bewerben.', DANK_DAUER_MS, { geschuetzt: true });
               // Frisch gespeichert → Abschnitt klappt zu (Referenz-Zustand).
               // Ohne den Reset würde ein früher gesetzter manual-Wert den
               // Bogen offen halten, obwohl die Aufgabe erledigt ist.
@@ -2950,7 +3052,7 @@ const CustomerPortalPage: FC = () => {
             setAbgesendetInSitzung(true);
             // Registry #145, nur Vorschau (dort speichert der Bogen ohne mamamia, onSaveToMamamia läuft nicht): das
             // Einladen der Vorgemerkten nach dem ersten Speichern zeigen.
-            if (IS_PREVIEW_ANY && !nurAenderung) setEinladenNachSpeichern(true);
+            if (IS_PREVIEW_ANY && !nurAenderung && modusPflegekraefteZuerst) { einladenListe.current = vorgemerktEinladbar; setEinladenNachSpeichern(true); }
             // Angaben geändert (nicht die erste Anfrage): bestätigen und zuklappen.
             if (!nurAenderung) return;
             showToast('✓ Ihre Angaben sind gespeichert.', 5000);
@@ -3140,7 +3242,7 @@ const CustomerPortalPage: FC = () => {
               Object.keys(leadEventMeta).length > 0 ? leadEventMeta : undefined,
             );
             // Registry #145: erstes Speichern ok → die vorgemerkten Pflegekräfte einladen, sobald die Seite umschaltet.
-            if (vorSpeichern) setEinladenNachSpeichern(true);
+            if (vorSpeichern && modusPflegekraefteZuerst) { einladenListe.current = vorgemerktEinladbar; setEinladenNachSpeichern(true); }
             // Patient form save flippa customer na active + dorzuca pełne
             // patient/wish dane. Mamamia matching engine re-scoreuje całą
             // listę z nowymi inputami — początkowo zwrócone caregivers
@@ -3648,68 +3750,8 @@ const CustomerPortalPage: FC = () => {
         );
       })();
 
-  // Sichtbare Vorschläge (Batch-Reveal, Empfehlung zuerst) — EINMAL berechnet: für die Karten
-  // (abgesendet) und für die Zeilen des Kompakt-Einstiegs, damit beide dieselbe Auswahl zeigen.
-  const pflegekraftAuswahl = (() => {
-    // Interest-Pflegekräfte (sowohl invited als auch declined)
-    // werden NICHT in der Matching-Liste gerendert sondern unten
-    // in der "Bereits bearbeitet"-Sektion (User-Wunsch: gleiche
-    // Behandlung wie bei Bewerbungen). Filter: caregiverId raus
-    // wenn interestOriginIds das hat UND Status invited/declined.
-    const allVisible = effectiveMatched
-      .map((m, i) => ({ nurse: m.nurse, i, caregiverId: m.caregiverId, status: nurseStatusById.get(m.caregiverId) ?? 'pending' as NurseStatus, virtualDeclinedFromInterest: false as const }))
-      .filter(({ status, caregiverId }) => {
-        if (status === 'pending') return true;
-        // invited/declined ausschließen wenn aus Interest stammt
-        return !interestOriginIds.has(caregiverId);
-      });
-    // Order: pending (cap 5, oben) → invited → declined (ganz unten,
-    // ausgegraut mit "Abgelehnt"-Pill + Undo-Link). User-Wunsch:
-    // bearbeitete (normale) Pflegekräfte rutschen nach unten in der
-    // Matching-Liste. Interest-Aktionen leben in "Bereits bearbeitet"
-    // (siehe unten — InterestActionCards in der doneApps-Sektion).
-    // Oben NUR die frischen Vorschläge (max 3). Bereits bearbeitete
-    // Matchings (invited/declined) wandern in die gedämpfte
-    // "Bereits bearbeitet"-Sektion unten (MatchCardDone) — sonst
-    // wirken sie zu prominent / zu ähnlich wie die offenen Vorschläge.
-    type VisibleNurse = {
-      nurse: Nurse;
-      i: number;
-      caregiverId: number;
-      status: NurseStatus;
-      virtualDeclinedFromInterest: boolean;
-    };
-    // Batch-Reveal (User-Wunsch 25.06.): sichtbarer Pool = 5 −
-    // Einladungen der letzten 24h. Einladen hält den Slot 24h (die
-    // Pflegekraft wartet auf Antwort); nach 24h ohne Reaktion füllt sich
-    // der Pool wieder auf 5 + die "neue Pflegekräfte"-Mail geht raus.
-    // Ablehnen zählt NICHT mit (caregiver_invite_attempts erfasst nur
-    // echte Einladungen) → rückt sofort nach. used_24h aus getInviteRateState.
-    const unbestaetigt = [...einladungStand.current].filter(([id, stand]) =>
-      stand === inviteRate
-      && (statusOverrides.get(id) === 'invited' || interestStatusOverrides.get(id) === 'invited')).length;
-    const heldInvites = (inviteRate?.used_24h ?? 0) + unbestaetigt;
-    const visibleCount = Math.max(0, 5 - heldInvites);
-    const pendingNurses: VisibleNurse[] = allVisible.filter(({ status }) => status === 'pending').slice(0, visibleCount);
-    // Die Empfehlung (höchste Badge-Bewertung, Score = Erfahrungsjahre +
-    // Einsätze) nach ganz oben ziehen — die anderen behalten ihre
-    // Reihenfolge. So steht "Empfehlung des Beraters" immer zuoberst.
-    const badgeScore = (n: Nurse) => nurseBadgeScore(n.history?.assignments);
-    let bestIdx = -1;
-    let bestScore = -Infinity;
-    pendingNurses.forEach((p, idx) => {
-      const s = badgeScore(p.nurse);
-      if (s > bestScore) { bestScore = s; bestIdx = idx; }
-    });
-    const visibleNurses: VisibleNurse[] = bestIdx > 0
-      ? [pendingNurses[bestIdx], ...pendingNurses.filter((_, idx) => idx !== bestIdx)]
-      : pendingNurses;
-    return { allVisible, heldInvites, visibleNurses };
-  })();
-
   // Runde 28 (Look „angebot", Martin 06.10.: „Fokus auf die Pflegekräfte"): die Empfehlung steht direkt unter der Einleitung,
   // die übrigen Vorschläge unter „So geht es weiter". Dieselbe Karte wie im Portal (MatchCard „V"). `geladen`: echte Liste da.
-  const kartenGeladen = !listeLaedt && (IS_PREVIEW_ANY || (mmReady && !!mmMatchings?.data));
   const angebotKarten = (() => {
     const { visibleNurses } = pflegekraftAuswahl;
     let recIdx = -1;
@@ -3763,7 +3805,7 @@ const CustomerPortalPage: FC = () => {
       <MatchCardVorSpeichern
         profilFehlt={!patientSaved}
         einladenAktiv={pflegekraefteZuerst}
-        vorgemerkt={pflegekraefteZuerst && vorgemerkt.includes(caregiverId)}
+        vorgemerkt={pflegekraefteZuerst && vorgemerktEinladbar.includes(caregiverId)}
         key={`m-${i}`}
         nurse={nurse}
         status={status}
@@ -3778,10 +3820,11 @@ const CustomerPortalPage: FC = () => {
     ));
   })();
 
-  // Registry #145: die Vorgemerkten für die Zeile über dem Formular — nur, wer in der Liste steht und noch offen ist.
-  const vorgemerkteKraefte: VorgemerkteKraft[] = !pflegekraefteZuerst ? [] : vorgemerkt.flatMap((id) => {
+  // Registry #145: die Vorgemerkten für die Zeile über dem Formular — genau die, die nach dem Speichern eingeladen werden
+  // (`vorgemerktEinladbar`, Nachbesserung 2: nie mehr Namen, als eingeladen werden können).
+  const vorgemerkteKraefte: VorgemerkteKraft[] = !pflegekraefteZuerst ? [] : vorgemerktEinladbar.flatMap((id) => {
     const m = effectiveMatched.find((x) => x.caregiverId === id);
-    if (!m || nurseStatusById.get(id) !== 'pending') return [];
+    if (!m) return [];
     return [{ caregiverId: id, name: displayName(m.nurse.name), image: m.nurse.image, color: m.nurse.color, initialen: initials(m.nurse.name) }];
   });
 
@@ -3936,18 +3979,21 @@ const CustomerPortalPage: FC = () => {
     <div className="min-h-screen bg-gray-100 font-pm md:flex md:items-start md:justify-center md:py-10">
     <div className="min-h-screen md:min-h-0 bg-white w-full md:w-[390px] md:min-h-[844px] md:rounded-[48px] md:shadow-2xl md:overflow-hidden md:border-[8px] md:border-gray-800 md:ring-4 md:ring-gray-900/10 relative" style={{fontFamily: 'inherit'}}>
     <div id="portal-scroll-container" className="md:h-[844px] md:overflow-y-auto md:overflow-x-hidden">
-      {/* Toast */}
+      {/* Toast. Der Rahmen mit role="status" steht immer da (Registry #145, Nachbesserung 2): Bildschirmleser lesen jeden
+          neuen Hinweis höflich vor, ohne die laufende Ansage zu unterbrechen. */}
+      <div role="status" aria-live="polite" aria-atomic="true" data-toast>
       {toast && (
         <div
           className="fixed top-5 left-1/2 -translate-x-1/2 z-[60] max-w-[85vw] bg-white border border-[#E8D0EA] text-gray-800 px-4 py-3 rounded-2xl shadow-lg text-sm font-medium flex items-center gap-2.5"
           style={{ animation: 'slideDown 0.25s ease-out' }}
         >
-          <div className="w-5 h-5 rounded-full bg-[#9B1FA1] flex items-center justify-center flex-shrink-0">
+          <div className="w-5 h-5 rounded-full bg-[#9B1FA1] flex items-center justify-center flex-shrink-0" aria-hidden="true">
             <Check className="w-3 h-3 text-white" strokeWidth={3} />
           </div>
           <span className="leading-snug">{toast.replace(/^✓\s*/, '')}</span>
         </div>
       )}
+      </div>
 
       {/* Navbar */}
       <nav className="sticky top-0 z-40" style={{background:'white', boxShadow:'0 1px 0 #E9E9EB, 0 2px 8px rgba(0,0,0,0.06)'}}>

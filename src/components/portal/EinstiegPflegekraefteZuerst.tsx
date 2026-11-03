@@ -71,8 +71,14 @@ export function KostenkarteKompakt({ lead, onBestpreis, heimEigenanteil, heimQue
         {offerExpanded && (
           <>
             <div className="mt-1 flex items-center justify-between gap-3">
-              <p className="text-[46px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-pm-ink">{formatEuro(brutto)}</p>
-              <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-12 w-auto flex-none object-contain" />
+              {/* whitespace-nowrap: auf 375 px brach „€“ sonst neben dem Etikett in eine zweite Zeile (gemessen 03.11.). */}
+              <p className="whitespace-nowrap text-[46px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-pm-ink">{formatEuro(brutto)}</p>
+              {/* Nachbesserung 2 (Martin 03.11.): unter dem kleinen Siegel einzeilig das freigegebene Etikett, kein weiterer
+                  Text; „DIE WELT“ bricht nie um (geschütztes Leerzeichen, ganze Zeile ohne Umbruch). */}
+              <div className="flex flex-none flex-col items-center gap-1" data-testsieger-etikett>
+                <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-12 w-auto flex-none object-contain" />
+                <span className="whitespace-nowrap text-[11px] font-bold leading-none text-pm-ink">6× Testsieger DIE&nbsp;WELT</span>
+              </div>
             </div>
             <p className="text-[14.5px] mt-2 leading-[1.5] text-pm-muted">
               Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).
@@ -252,7 +258,8 @@ export function EinladenSheetVorSpeichern({ offen, name, onClose, onVervollstaen
         <Punkt>Einsätze in der Nacht</Punkt>
         <Punkt>Wohnort, Unterbringung und Startdatum</Punkt>
       </ul>
-      <p className="mt-2">Das dauert etwa 2 Minuten. Danach laden wir {name} für Sie ein.</p>
+      {/* Zweiter Satz: Martins Wortlaut (03.11.2026, Nachbesserung 2), Zeitangabe von ihm gesetzt. */}
+      <p className="mt-2">Das dauert etwa 2 Minuten. Danach laden wir {name} für Sie ein. Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten.</p>
     </Sheet>
   );
 }
@@ -330,10 +337,10 @@ export function EinstiegPflegekraefteZuerst({
         </div>
 
         {laedt && (
-          <div className="rounded-card px-5 py-8 border border-[#EFEBE4] bg-white text-center">
-            <div className="inline-block w-6 h-6 rounded-full border-2 animate-spin mb-3" style={{ borderColor: '#C4B49A', borderTopColor: 'transparent' }} />
-            <p className="text-[15px] font-semibold mb-1" style={{ color: '#18181B' }}>Wir laden Ihre Pflegekräfte …</p>
-            <p className="text-[14px] leading-relaxed" style={{ color: '#71717A' }}>Einen Moment bitte — gleich sehen Sie Ihre persönlichen Vorschläge.</p>
+          <div className="rounded-card px-5 py-8 border border-pm-line-soft bg-white text-center">
+            <div className="inline-block w-6 h-6 rounded-full border-2 border-pm-taupe-light/70 border-t-transparent animate-spin mb-3" />
+            <p className="text-[15px] font-semibold mb-1 text-pm-ink">Wir laden Ihre Pflegekräfte …</p>
+            <p className="text-[14px] leading-relaxed text-pm-muted">Einen Moment bitte — gleich sehen Sie Ihre persönlichen Vorschläge.</p>
           </div>
         )}
 
@@ -346,18 +353,18 @@ export function EinstiegPflegekraefteZuerst({
             )}
 
             {!hasAnyCard && gehalteneEinladungen > 0 && (
-              <div className="rounded-card px-5 py-5 border border-[#EFEBE4] bg-white text-center">
-                <p className="text-[15px] font-semibold mb-1" style={{color:'#18181B'}}>Ihre Auswahl ist eingeladen</p>
-                <p className="text-[14px] leading-relaxed" style={{color:'#71717A'}}>
+              <div className="rounded-card px-5 py-5 border border-pm-line-soft bg-white text-center">
+                <p className="text-[15px] font-semibold mb-1 text-pm-ink">Ihre Auswahl ist eingeladen</p>
+                <p className="text-[14px] leading-relaxed text-pm-muted">
                   Die Pflegekräfte melden sich meist innerhalb von 1&ndash;2 Tagen. Sobald Rückmeldungen da sind, sehen Sie sie hier &mdash; meldet sich niemand, schlagen wir Ihnen automatisch weitere Pflegekräfte vor.
                 </p>
               </div>
             )}
 
             {!hasAnyCard && gehalteneEinladungen === 0 && vorschlaegeVorhanden && (
-              <div className="rounded-card px-5 py-5 border border-[#EFEBE4] bg-white text-center">
-                <p className="text-[15px] font-semibold mb-1" style={{color:'#18181B'}}>Alle aktuellen Vorschläge bearbeitet</p>
-                <p className="text-[14px] leading-relaxed" style={{color:'#71717A'}}>
+              <div className="rounded-card px-5 py-5 border border-pm-line-soft bg-white text-center">
+                <p className="text-[15px] font-semibold mb-1 text-pm-ink">Alle aktuellen Vorschläge bearbeitet</p>
+                <p className="text-[14px] leading-relaxed text-pm-muted">
                   Sie haben alle passenden Pflegekräfte durchgesehen. Wir schlagen Ihnen in Kürze weitere vor &mdash; Sie hören von uns.
                 </p>
               </div>
@@ -377,7 +384,7 @@ export function EinstiegPflegekraefteZuerst({
                 eyebrow="Für Ihre Bewerbungen"
                 titel="Pflegesituation"
                 rechts={<StatusBadge ton="warnung">Unvollständig</StatusBadge>}
-                zeile="Danach können Sie Pflegekräfte einladen und bekommen Bewerbungen."
+                zeile="Danach können Sie Pflegekräfte einladen und bekommen Bewerbungen. Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten."
               />
             </div>
             <VormerkZeile kraefte={vorgemerkte} />
