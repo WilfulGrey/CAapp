@@ -20,6 +20,8 @@ import { ablaufVariante, KONTAKT_NACH_PREIS, KONTAKT_SEITE, WARTE_KURZ_ENDE_MS, 
 import { GARANTIE_OEFFNEN_EVENT } from "@/components/calculator/BestpreisSiegelLink";
 import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
+import { RECHNER_KOPF } from "@/lib/rechner-kopf";
+import { SoGehts } from "@/components/calculator/SoGehts";
 import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
 import { kontaktStandard, kontaktVariante, KNOPF_KONTAKT, STUFEN, STUFEN_FEHLER, type KontaktStufe, type KontaktVariante } from "@/lib/kontakt-stufen";
 
@@ -1379,8 +1381,12 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
               )}
             </>
           ) : (
-            <p className="text-center text-[15px] font-bold text-white">
-              In 2 Minuten zu Ihrem Preis
+            // Frage 1–8 (Martin 03.11.2026, Registry #146): dieselbe Aussage wie
+            // die H1 der Startseite, hier ohne Punkt. War „In 2 Minuten zu Ihrem Preis“.
+            // Der Text ist länger als der alte: Am Handy rückt er vom X weg (pr-8),
+            // sonst stieß er bei 360 px an die Glyphe (375 px: 6 px Luft, gemessen).
+            <p className={`text-center text-[15px] font-bold text-white ${fullscreen ? 'pr-8 sm:pr-0' : ''}`}>
+              {RECHNER_KOPF}
             </p>
           )}
         </div>
@@ -1503,6 +1509,9 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                   ))}
                 </div>
               )}
+              {/* „So geht's“ (Martin 03.11.2026, Registry #146): nur unter Frage 1,
+                  UNTER den Antworten, in jedem Modus. Die Aufwärmfrage bekommt ihn nicht. */}
+              {currentStep === 1 && warmupAudience && <SoGehts />}
 
               {/* Step 2 (was 3) — Haushalt */}
               {currentStep === 2 && (
@@ -2110,7 +2119,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
           </div>
           <div className="flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
-            <span className="text-[#3D3D3D] font-medium">DSGVO-Konform</span>
+            <span className="text-[#3D3D3D] font-medium">DSGVO-konform</span>
           </div>
           {/* Registry #121 (Martin 10.10.): Im Absendeblock steht der Satz schon
               unter den Sternen, dort nicht doppelt in der Karte. */}
