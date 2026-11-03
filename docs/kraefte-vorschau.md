@@ -155,7 +155,8 @@ Sofortangebot"; Knopf einzeilig „Sofortangebot & Pflegekräfte ansehen →"
 Gesamtstory mit Anzeigen, Page, Formular, Kundenportal"):** Ein Wort für das
 Ergebnis auf der ganzen Strecke: **„Preis"** (nicht „Kosten", nicht
 „Sofortangebot"). Landingpage-Knöpfe „Preis & Pflegekräfte ansehen",
-Kopfzeile „In 2 Minuten zu Ihrem Preis", Hero-Pill ohne Zahl („Passende
+Kopfzeile „In 2 Minuten zu Ihrem Preis" (seit 03.11.2026 „Passende
+Pflegekräfte sofort finden“, Registry #146), Hero-Pill ohne Zahl („Passende
 Pflegekräfte sofort verfügbar" — die tagesabhängige Zahl samt
 `counter-drift.ts` ist weg; sie lebt nur noch als Startwert der
 Warte-Animation). Warten: „Wir berechnen Ihren Preis und suchen passende
