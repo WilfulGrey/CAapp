@@ -70,9 +70,13 @@ export function KostenkarteKompakt({ lead, onBestpreis, heimEigenanteil, heimQue
 
         {offerExpanded && (
           <>
-            <div className="mt-1 flex items-center justify-between gap-3">
+            {/* Preis und Siegel+Etikett brauchen zusammen ca. 300 px (Preis 160 + Abstand 12 + Etikett 128), die Karte hat
+                innen auf 375 px 307 px, auf 360 px 292 px, auf 320 px 252 px (gemessen 03.11.). Darum unter 375 px Preis
+                40 px (ca. 139 px breit, passt auf 360 px in eine Zeile) und flex-wrap: Reicht die Breite trotzdem nicht
+                (320 px, z. B. iPhone mit Anzeigezoom), rutscht Siegel+Etikett unter den Preis, statt aus der Karte zu ragen. */}
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
               {/* whitespace-nowrap: auf 375 px brach „€“ sonst neben dem Etikett in eine zweite Zeile (gemessen 03.11.). */}
-              <p className="whitespace-nowrap text-[46px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-pm-ink">{formatEuro(brutto)}</p>
+              <p className="whitespace-nowrap text-[40px] min-[375px]:text-[46px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-pm-ink">{formatEuro(brutto)}</p>
               {/* Nachbesserung 2 (Martin 03.11.): unter dem kleinen Siegel einzeilig das freigegebene Etikett, kein weiterer
                   Text; „DIE WELT“ bricht nie um (geschütztes Leerzeichen, ganze Zeile ohne Umbruch). */}
               <div className="flex flex-none flex-col items-center gap-1" data-testsieger-etikett>

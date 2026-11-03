@@ -132,6 +132,11 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
     const siegel = within(karte).getByAltText('Testsieger Die Welt');
     const etikettSpalte = siegel.closest('[data-testsieger-etikett]') as HTMLElement;
     expect(etikettSpalte.parentElement).toBe(preis.parentElement);
+    // Gegenprüfung 03.11.: die Zeile darf nie breiter als die Karte werden (360 px ragte das Etikett in den Rand, 320 px
+    // aus der Karte). Unter 375 px Preis 40 px, notfalls rutscht Siegel+Etikett unter den Preis (Maße: portal_lage.json).
+    expect(preis.parentElement!.className).toContain('flex-wrap');
+    expect(preis.className).toContain('text-[40px]');
+    expect(preis.className).toContain('min-[375px]:text-[46px]');
     expect(siegel.className).toContain('h-12');
     const etikett = within(etikettSpalte).getByText('6× Testsieger DIE WELT');
     expect(etikett.textContent).toBe(`6× Testsieger DIE${NBSP}WELT`);
