@@ -151,10 +151,14 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
     // Nicht die Startseiten-Punkte.
     expect(screen.queryByText('Kein Vertrag vor Ihrer Auswahl')).toBeNull();
     expect(screen.queryByText('Täglich kündbar, taggenau abgerechnet')).toBeNull();
-    // Weiches Trennzeichen (U+00AD) in „Vermittlungsgebühr“, nur beim Umbruch sichtbar, zählt nicht zum Wortlaut.
-    expect([...punkte.querySelectorAll('li')].map((li) => li.textContent?.replace(/\u00AD/g, ''))).toEqual([
-      'Täglich kündbar', 'Tagesgenaue Abrechnung', 'Erst auswählen, dann buchen', 'Keine Vermittlungsgebühr',
+    // Weiche Trennzeichen (U+00AD), nur beim Umbruch sichtbar, zählen nicht zum Wortlaut. Martin 03.11.: Hemmungen nehmen,
+    // zum Profil animieren; „Erst auswählen, dann buchen“ und „Tagesgenaue Abrechnung“ sind raus.
+    expect([...punkte.querySelectorAll('li')].map((li) => li.textContent?.replace(/\u00AD/g, '').replace(/\u00A0/g, ' '))).toEqual([
+      'Einladen kostenlos und unverbindlich', 'Erste Rückmeldungen häufig in 60 Minuten', 'Täglich kündbar', 'Keine Vermittlungsgebühr',
     ]);
+    expect(punkte.textContent).toContain('60\u00A0Minuten');
+    expect(within(karte).queryByText('Erst auswählen, dann buchen')).toBeNull();
+    expect(within(karte).queryByText('Tagesgenaue Abrechnung')).toBeNull();
     // „Kosten erst …“, Heimvergleich und Testsieger-Zeile erst im Aufklapper, oben, vor der Aufstellung.
     expect(screen.queryByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeNull();
     expect(screen.queryByText(/^Zuhause statt Pflegeheim/)).toBeNull();

@@ -27,12 +27,26 @@ import { FaqListe } from './FaqListe';
 import { MartaBox } from './MartaBox';
 import { KopfVorSpeichern, SoGehtEsWeiterVorSpeichern } from './EinstiegVorSpeichern';
 
-// Die vier Punkte der Kostenkarte, Wortlaut wie bisher (EinstiegVorSpeichern).
-export const VIER_PUNKTE = ['Täglich kündbar', 'Tagesgenaue Abrechnung', 'Erst auswählen, dann buchen', 'Keine Vermittlungsgebühr'] as const;
+// Die vier Punkte der Kostenkarte (Martin 03.11.2026: „Es soll Hemmungen nehmen und zum Weitermachen animieren, um das
+// Profil auszufüllen“; Auswahl OpenAI-geprüft). Reihenfolge links oben → rechts unten. „Erste Rückmeldungen …“ ist Martins
+// Satz „Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten.“, gekürzt auf die Zeile; gesetzt, nicht nachprüfen.
+export const VIER_PUNKTE = ['Einladen kostenlos und unverbindlich', 'Erste Rückmeldungen häufig in 60 Minuten', 'Täglich kündbar', 'Keine Vermittlungsgebühr'] as const;
+
+// Weiche Trennzeichen (U+00AD) für Wörter, die breiter sein können als eine Spalte (sichtbar nur beim Umbruch).
+const TRENNSTELLEN: Record<string, string> = {
+  Vermittlungsgebühr: 'Vermittlungs\u00ADgebühr',
+  Rückmeldungen: 'Rück\u00ADmeldungen',
+  unverbindlich: 'unver\u00ADbindlich',
+};
+// „60 Minuten“ bricht nie zwischen Zahl und Einheit (geschütztes Leerzeichen; auf 375 px stand „60“ sonst allein).
+const mitTrennstellen = (text: string) => text
+  .replace(/Vermittlungsgebühr|Rückmeldungen|unverbindlich/g, (w) => TRENNSTELLEN[w])
+  .replace('60 Minuten', '60\u00A0Minuten');
 
 // ── Kostenkarte kompakt ──────────────────────────────────────────────────────────────────────────────────────────────────
-// Dieselbe Karte wie bisher (Klassen, Wortlaut, Chevron am Eyebrow klappt die ganze Karte), nur weniger hoch: Siegel klein
-// rechts neben dem Preis, die vier Punkte als 2×2, „Kosten erst …“, Heimvergleich und Testsieger-Zeile im Aufklapper oben.
+// Dieselbe Karte wie bisher (Klassen, Chevron am Eyebrow klappt die ganze Karte), nur weniger hoch und mit neuen Punkten:
+// Siegel klein rechts neben dem Preis, die vier Punkte als 2×2, „Kosten erst …“, Heimvergleich und Testsieger-Zeile im
+// Aufklapper oben (Heimvergleich bleibt dort, Martin 03.11.).
 export function KostenkarteKompakt({ lead, onBestpreis, heimEigenanteil, heimQuelle, onKostenAufgeklappt }: {
   lead: Lead | null;
   onBestpreis: () => void;
@@ -100,16 +114,16 @@ export function KostenkarteKompakt({ lead, onBestpreis, heimEigenanteil, heimQue
             </button>
 
             {/* 2×2 auch am Handy; lange Punkte brechen in ihrer Spalte um. „Vermittlungsgebühr“ ist breiter als eine
-                Spalte auf 375–390 px (ca. 128 px gegen 114–121 px) und ragte über den Kartenrand: weiches Trennzeichen
-                nur dort („Vermittlungs-/gebühr“, sichtbar nur beim Umbruch). Automatische Silbentrennung trennte auch
-                „Tagesgenaue Ab-/rechnung“, obwohl der Umbruch am Leerzeichen reicht. */}
+                Spalte auf 375–390 px (ca. 128 px gegen 114–121 px) und ragte über den Kartenrand: weiche Trennzeichen
+                nur an festen Stellen (TRENNSTELLEN, sichtbar nur beim Umbruch). Keine automatische Silbentrennung: Sie
+                trennte auch Wörter, bei denen der Umbruch am Leerzeichen reicht. */}
             <ul className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
               {VIER_PUNKTE.map((text) => (
                 <li key={text} className="flex items-start gap-2 text-[14.5px] leading-[1.35] text-pm-ink">
                   <span className="mt-[1px] w-[18px] h-[18px] rounded-[6px] bg-pm-shell text-pm-taupe flex items-center justify-center flex-none" aria-hidden="true">
                     <Check className="w-3 h-3" strokeWidth={3} />
                   </span>
-                  <span className="min-w-0">{text.replace('Vermittlungsgebühr', 'Vermittlungs\u00ADgebühr')}</span>
+                  <span className="min-w-0">{mitTrennstellen(text)}</span>
                 </li>
               ))}
             </ul>
