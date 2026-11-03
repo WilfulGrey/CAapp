@@ -5,8 +5,9 @@
 //   - „Einladen“ ohne Schloss, Tipp → Fenster „{Name} einladen“, Pflegekraft vorgemerkt (Zustand + localStorage je Token)
 //   - Zeile über dem Formular „Nach dem Speichern laden wir {Name} für Sie ein.“
 //   - nach dem ersten erfolgreichen Speichern automatisch eingeladen (bisheriger Weg inviteCaregiver), Hinweis, Vormerkungen weg
+//   - automatisch: 6 stille Versuche bei mamamias Sperre nach dem Speichern (von Hand weiter 3), einladenWiederholung.ts
 //   - Messpunkte einladung_vorgemerkt / einladung_nach_speichern; Rückweg ?einstieg=alt
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../../../test/mocks/server';
@@ -19,12 +20,19 @@ vi.mock('../../lib/supabase', async () => {
   return {
     ...actual,
     // Jeder Test mit eigenem Token: Der Sitzungs-Dedupe der Meldungen (leadEvents.ts) gilt je Token.
+    // „…-gespeichert“: Pflegesituation schon gespeichert (Proxy hat patient_form_at gesetzt) — die Seite nach dem Speichern.
     fetchLeadByToken: vi.fn(async (token: string) => token.startsWith('token-pz-')
-      ? { lead: { ...defaultLead, token } as unknown as import('../../lib/supabase').Lead, error: null }
+      ? { lead: { ...defaultLead, token, ...(token.endsWith('-gespeichert') ? { patient_form_at: '2026-11-03T08:00:00Z' } : {}) } as unknown as import('../../lib/supabase').Lead, error: null }
       : { lead: null, error: 'Token nicht gefunden' }),
     fetchNotfallTelefon: vi.fn(async () => null),
   };
 });
+
+// Wiederholungen bei mamamias Sperre nach dem Speichern: Anzahl echt (3 von Hand, 6 automatisch), Abstand 5 ms statt 5 s.
+vi.mock('../../lib/einladenWiederholung', async () => ({
+  ...(await vi.importActual<typeof import('../../lib/einladenWiederholung')>('../../lib/einladenWiederholung')),
+  EINLADEN_ABSTAND_MS: 5,
+}));
 
 import CustomerPortalPage from '../../pages/CustomerPortalPage';
 
@@ -72,6 +80,15 @@ const nebenlaeufer = http.post('https://test.supabase.co/functions/v1/mamamia-pr
   return undefined;
 });
 const ort = { searchLocations: () => ({ LocationsWithPagination: { data: [{ id: 4711, location: 'München', zip_code: '80331', country_code: 'DE' }] } }) };
+// mamamias kurze Sperre direkt nach dem Speichern (Registry #102): Proxy antwortet 502 mit category „authorization“.
+// Die ersten `sperre` Einladungen scheitern so, danach fällt die Anfrage zum Standard (Erfolg) durch.
+const einladenMitSperre = (sperre: number, zaehler: { versuche: number }) => http.post('https://test.supabase.co/functions/v1/mamamia-proxy', async ({ request }) => {
+  const body = await request.clone().json() as { action?: string };
+  if (body.action !== 'inviteCaregiver') return undefined;
+  zaehler.versuche += 1;
+  if (zaehler.versuche <= sperre) return HttpResponse.json({ error: 'panel StoreRequest: Unauthorized [http=200 cat=authorization]', category: 'authorization' }, { status: 502 });
+  return undefined;
+});
 type Meldung = { token?: string; event?: string; metadata?: Record<string, unknown>; notify?: boolean };
 
 describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => {
@@ -336,6 +353,64 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
       const k = screen.getByText('Emilia W.').closest('.rounded-card') as HTMLElement;
       expect(within(k).getByRole('button', { name: 'Einladen' })).toBeInTheDocument();
     });
+  }, 30_000);
+
+  it('automatisch nach dem Speichern: hält mamamias Sperre länger aus (6 Versuche statt 3) — 4 × abgelehnt, dann „{Name} ist eingeladen.“', async () => {
+    const TOKEN = 'token-pz-sperre';
+    localStorage.setItem(vormerkSchluessel(TOKEN), JSON.stringify([50003]));
+    const zaehler = { versuche: 0 };
+    const meldungen: Meldung[] = [];
+    server.use(
+      bridgeHandler((b) => { meldungen.push(b as Meldung); }),
+      nebenlaeufer,
+      einladenMitSperre(4, zaehler),
+      ...lesen,
+      ...defaultHandlers({ proxy: { ...ohneBewerbung, ...ort, listMatchings: zweiVorschlaege } }),
+    );
+    vollerEntwurf(TOKEN);
+    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await screen.findByText('Nach dem Speichern laden wir Emilia W. für Sie ein.', {}, { timeout: 5000 });
+    for (let i = 0; i < 3; i++) await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
+    await user.click(await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 }));
+    expect(await screen.findByText('Emilia W. ist eingeladen.', {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(zaehler.versuche).toBe(5);
+    expect(screen.queryByText('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.')).toBeNull();
+    await waitFor(() => expect(meldungen.find((m) => m.event === 'einladung_nach_speichern')?.metadata).toEqual({ anzahl: 1, ok: 1 }));
+  }, 30_000);
+
+  it('automatisch nach dem Speichern: nach 6 abgelehnten Versuchen nur die übliche Meldung, kein siebter', async () => {
+    const TOKEN = 'token-pz-sperre-dauer';
+    localStorage.setItem(vormerkSchluessel(TOKEN), JSON.stringify([50003]));
+    const zaehler = { versuche: 0 };
+    server.use(nebenlaeufer, einladenMitSperre(99, zaehler), ...lesen,
+      ...defaultHandlers({ proxy: { ...ohneBewerbung, ...ort, listMatchings: zweiVorschlaege } }));
+    vollerEntwurf(TOKEN);
+    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await screen.findByText('Nach dem Speichern laden wir Emilia W. für Sie ein.', {}, { timeout: 5000 });
+    for (let i = 0; i < 3; i++) await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
+    await user.click(await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 }));
+    expect(await screen.findByText('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.', {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(zaehler.versuche).toBe(6);
+    expect(screen.queryByText(/ist eingeladen\.$/)).toBeNull();
+  }, 30_000);
+
+  it('Knopf von Hand nach dem Speichern: weiter 3 Versuche bei der Sperre (unverändert)', async () => {
+    const TOKEN = 'token-pz-hand-gespeichert';
+    const zaehler = { versuche: 0 };
+    server.use(einladenMitSperre(99, zaehler), ...lesen,
+      ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
+    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await screen.findByText('Emilia W.', {}, { timeout: 5000 });
+    const k = screen.getByText('Emilia W.').closest('.rounded-card') as HTMLElement;
+    await user.click(within(k).getByRole('button', { name: 'Einladen' }));
+    expect(await screen.findByText('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.', {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(zaehler.versuche).toBe(3);
   }, 30_000);
 
   it('Rückweg ?einstieg=alt: die bisherige Seite unverändert (Kasten, Schloss, „Warum erst die Pflegesituation?“), nichts vorgemerkt', async () => {

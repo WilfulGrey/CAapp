@@ -35,7 +35,10 @@ export function Sheet({
     return () => {
       document.removeEventListener('keydown', taste);
       document.body.style.overflow = ueberlauf;
-      zuvor.current?.focus?.();
+      // Fokus zurück, aber OHNE Scrollen (Registry #145): Führt ein Knopf im Pop-up woandershin (weich zur Pflegesituation),
+      // holte focus() den alten Knopf zurück ins Bild — Chrome/Edge brechen damit am Computer (Handyrahmen mit eigenem
+      // Scroll-Behälter) das weiche Scrollen ab, die Seite blieb an der Karte stehen (gemessen 1.413 statt 96 px).
+      zuvor.current?.focus?.({ preventScroll: true });
     };
   }, [offen]);
 

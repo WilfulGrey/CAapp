@@ -20,6 +20,7 @@ import { feedbackInRuhezeit, reportLeadEvent, fetchLeadEvents, fetchLeadEventsOd
 import type { CaregiverSnapshot, EinladenQuelle, FormularQuelle, LeadEventMetadata, Messpunkt, ProfilQuelle } from '../lib/leadEvents';
 import { identifyClarity } from '../lib/clarity';
 import { portalToken } from '../lib/portalToken';
+import { EINLADEN_ABSTAND_MS, EINLADEN_VERSUCHE, EINLADEN_VERSUCHE_NACH_SPEICHERN } from '../lib/einladenWiederholung';
 import { fehlerKurz, geraetKlasse } from '../lib/messWerte';
 import {
   useRejectApplication,
@@ -2216,9 +2217,10 @@ const CustomerPortalPage: FC = () => {
     einladenPflegekraft(effectiveMatched[idx], name);
 
   // Der Einladen-Weg für Karte und Profil — und seit Registry #145 auch für das automatische Einladen der Vorgemerkten nach
-  // dem ersten Speichern (keine neue API, dieselben Wiederholungen, Fehlermeldungen und Messungen). `ohneHinweis`: kein
-  // „✓ … wurde eingeladen!" je Einladung, der automatische Weg meldet am Ende gesammelt.
-  const einladenPflegekraft = async (match: { caregiverId: number; nurse: Nurse } | undefined, name: string, ohneHinweis = false): Promise<void> => {
+  // dem ersten Speichern (keine neue API, dieselben Fehlermeldungen und Messungen). `nachSpeichern`: kein „✓ … wurde
+  // eingeladen!" je Einladung (der automatische Weg meldet am Ende gesammelt) und mehr stille Wiederholungen, weil er
+  // mitten in mamamias Sperre nach dem Speichern startet (einladenWiederholung.ts).
+  const einladenPflegekraft = async (match: { caregiverId: number; nurse: Nurse } | undefined, name: string, nachSpeichern = false): Promise<void> => {
     if (!mmReady || typeof match?.caregiverId !== 'number') {
       showToast('Einladung derzeit nicht möglich. Bitte später erneut versuchen.');
       throw new Error('not-ready');
@@ -2242,6 +2244,9 @@ const CustomerPortalPage: FC = () => {
     // 10s (3 attempts × 5s), only surface the toast if every retry fails.
     // 10s covers the worst-case warm-up (translator wipe + a just-opened job
     // needing 3-5s); longer just makes a genuine failure feel laggy.
+    // Ausnahme Registry #145: das automatische Einladen nach dem ersten Speichern
+    // startet schon ca. 1 s nach updateCustomer — dort 6 Versuche (bis 25 s),
+    // der Kunde wartet auf nichts (einladenWiederholung.ts).
     einladungStand.current.set(id, inviteRate);
     setStatusOverrides((prev) => {
       const next = new Map(prev);
@@ -2254,8 +2259,8 @@ const CustomerPortalPage: FC = () => {
       );
     }
 
-    const RETRY_DELAY_MS = 5000;
-    const MAX_ATTEMPTS = 3;
+    const RETRY_DELAY_MS = EINLADEN_ABSTAND_MS;
+    const MAX_ATTEMPTS = nachSpeichern ? EINLADEN_VERSUCHE_NACH_SPEICHERN : EINLADEN_VERSUCHE;
     let lastErr: Error | null = null;
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -2272,7 +2277,7 @@ const CustomerPortalPage: FC = () => {
         });
         refetchInvited();
         refetchInviteRate();
-        if (!ohneHinweis) showToast(`✓ ${name} wurde eingeladen!`);
+        if (!nachSpeichern) showToast(`✓ ${name} wurde eingeladen!`);
         return;
       } catch (err) {
         lastErr = err as Error;
@@ -2443,8 +2448,9 @@ const CustomerPortalPage: FC = () => {
 
   // ── Registry #145: die Vorgemerkten nach dem ersten Speichern einladen ────────────────────────────────────────────────
   // Ausgelöst von onSaveToMamamia (erstes Speichern bei mamamia ok), ausgeführt, sobald die Seite als gespeichert gilt.
-  // Nacheinander über den bisherigen Einladen-Weg (einladenPflegekraft): dieselben Wiederholungen bei mamamias kurzer
-  // Sperre direkt nach dem Speichern (cat=authorization, bis 3 × 5 s), dieselbe Grenze 5 je Stunde (Fenster
+  // Nacheinander über den bisherigen Einladen-Weg (einladenPflegekraft): stille Wiederholungen bei mamamias kurzer
+  // Sperre direkt nach dem Speichern (cat=authorization; hier 6 × im Abstand von 5 s statt 3 ×, weil der Weg ca. 1 s nach
+  // updateCustomer startet — einladenWiederholung.ts), dieselbe Grenze 5 je Stunde (Fenster
   // InviteRateLimitModal, danach kein weiterer Versuch), bei Fehlern die bisher übliche Meldung — die Karte bleibt
   // einladbar. Eingeladen wird nur, wer noch in der Liste steht und offen ist (nicht abgelehnt, nicht schon eingeladen).
   // Am Ende „{Name} ist eingeladen." bzw. „… sind eingeladen.", aber nur ohne Fehlschlag (sonst bleibt die Fehlermeldung
