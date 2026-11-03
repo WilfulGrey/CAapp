@@ -13,11 +13,15 @@
 /** Rote Kopfleiste des Fragebogens, Frage 1–8. War „In 2 Minuten zu Ihrem Preis“. */
 export const RECHNER_KOPF = 'Passende Pflegekräfte sofort finden';
 
-/** Ablauf in vier Schritten, nur unter den Antworten von Frage 1 („Wie viele Personen …“). */
+/**
+ * Ablauf in vier Schritten, nur unter den Antworten von Frage 1 („Wie viele Personen …“).
+ * Schritt 1 in Martins eigenem Wort „preisrelevante Fragen“ (Nachbesserung 03.11.2026),
+ * war „Ein paar Fragen zum Preis beantworten“.
+ */
 export const SO_GEHTS = {
   titel: "So geht's",
   schritte: [
-    'Ein paar Fragen zum Preis beantworten',
+    'Ein paar preisrelevante Fragen beantworten',
     'Kontaktdaten angeben',
     'Preis und passende Pflegekräfte sehen',
     'Pflegekräfte einladen: kurz die Pflegesituation beschreiben',

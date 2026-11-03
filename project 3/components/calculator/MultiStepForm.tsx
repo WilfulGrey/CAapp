@@ -2119,7 +2119,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
           </div>
           <div className="flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
-            <span className="text-[#3D3D3D] font-medium">DSGVO-Konform</span>
+            <span className="text-[#3D3D3D] font-medium">DSGVO-konform</span>
           </div>
           {/* Registry #121 (Martin 10.10.): Im Absendeblock steht der Satz schon
               unter den Sternen, dort nicht doppelt in der Karte. */}

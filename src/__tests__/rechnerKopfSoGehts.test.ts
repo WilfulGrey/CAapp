@@ -38,11 +38,18 @@ describe('Kopfleiste des Fragebogens (Registry #146)', () => {
   });
 });
 
+describe('Kartenfuß des Rechners (Nachbesserung 03.11.)', () => {
+  it('„DSGVO-konform“ klein, wie in TrustRow und im Kontaktschritt', () => {
+    expect(quelle).toContain('>DSGVO-konform</span>');
+    expect(quelle, 'Großes „Konform“ steht wieder im Rechner').not.toContain('DSGVO-Konform');
+  });
+});
+
 describe('„So geht\'s“ unter Frage 1 (Registry #146)', () => {
   it('Überschrift und vier Schritte wie vorgegeben', () => {
     expect(SO_GEHTS.titel).toBe("So geht's");
     expect([...SO_GEHTS.schritte]).toEqual([
-      'Ein paar Fragen zum Preis beantworten',
+      'Ein paar preisrelevante Fragen beantworten',
       'Kontaktdaten angeben',
       'Preis und passende Pflegekräfte sehen',
       'Pflegekräfte einladen: kurz die Pflegesituation beschreiben',
@@ -68,6 +75,20 @@ describe('„So geht\'s“ unter Frage 1 (Registry #146)', () => {
     expect(soGehts).toContain('SO_GEHTS.schritte.map');
     expect(soGehts).not.toMatch(/<button|onClick|shadow/);
     expect(soGehts).toContain('data-so-gehts');
+  });
+
+  it('Schritt 1 in Martins Wort „preisrelevante Fragen“ (Nachbesserung 03.11.)', () => {
+    expect(SO_GEHTS.schritte[0]).toBe('Ein paar preisrelevante Fragen beantworten');
+    expect(SO_GEHTS.schritte.join(' ')).not.toContain('Fragen zum Preis');
+  });
+
+  it('Ziffern lesbar (≥ 4,5:1 auf Weiß) und die Liste bleibt für Screenreader eine Liste', () => {
+    const ziffer = soGehts.match(/className="([^"]*rounded-full[^"]*)"/);
+    expect(ziffer, 'Ziffernkreis nicht gefunden').not.toBeNull();
+    // #5A5A5A = 6,9:1 auf Weiß; das frühere Braun #8B7355 hatte 4,49:1.
+    expect(ziffer![1]).toContain('text-[#5A5A5A]');
+    expect(ziffer![1]).not.toContain('text-[#8B7355]');
+    expect(soGehts).toMatch(/<ol role="list"/);
   });
 
   it('Zähler und Messung bleiben unverändert', () => {
