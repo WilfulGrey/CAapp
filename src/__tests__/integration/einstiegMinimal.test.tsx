@@ -16,7 +16,8 @@ import { server } from '../../../test/mocks/server';
 import { http, HttpResponse } from 'msw';
 import { defaultHandlers, defaultLead, sampleCaregiver, sampleMatching, bridgeHandler } from '../../../test/fixtures/mamamia-mocks';
 import { vormerkSchluessel } from '../../lib/vormerkungen';
-import { EinstiegMinimal, zeilenFakten } from '../../components/portal/EinstiegMinimal';
+import { EinstiegMinimal, angebotKurz, zeilenFakten } from '../../components/portal/EinstiegMinimal';
+import { angebotFuer } from '../../components/portal/KompaktEinstieg';
 import type { Nurse } from '../../types';
 
 vi.mock('../../lib/supabase', async () => {
@@ -105,9 +106,11 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(within(kopf).getByAltText('Testsieger Die Welt')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hilfe' })).toBeNull();
 
-    // Kompakte Angebotskarte: „Ihr Angebot“ + angebotFuer (ohne „·“), Preis, „/ Monat“, „Details ›“, drei Punkte.
+    // Kompakte Angebotskarte: „Ihr Angebot · eine Person, Pflegegrad 3“ (Mockup wörtlich), Preis, „/ Monat“, „Details ›“,
+    // drei Punkte.
     const karte = document.querySelector('[data-angebot-minimal]') as HTMLElement;
-    expect(within(karte).getByText('Ihr Angebot für eine Person mit Pflegegrad 3')).toBeInTheDocument();
+    expect(within(karte).getByText('Ihr Angebot · eine Person, Pflegegrad 3')).toBeInTheDocument();
+    expect(karte.textContent).not.toContain('Ihr Angebot für');
     expect(within(karte).getByText(/^2\.800 €/).textContent).toBe('2.800 € / Monat');
     expect(within(karte).getByRole('button', { name: 'Details ›' })).toBeInTheDocument();
     expect(within(karte).getByText('Täglich kündbar · Keine Vermittlungsgebühr · Bestpreisgarantie')).toBeInTheDocument();
@@ -321,18 +324,27 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
     const haupt = screen.getByRole('button', { name: HAUPTKNOPF });
     const knopf = screen.getByRole('button', { name: 'Rückruf vereinbaren' });
+    // Der Statusbereich steht schon vor dem Tipp leer im DOM (ein erst mit Text eingefügter Bereich wird von Screenreadern
+    // unzuverlässig angesagt).
+    const aktionen = document.querySelector('[data-aktionen-minimal]') as HTMLElement;
+    const danke = within(aktionen).getByRole('status');
+    expect(danke.textContent).toBe('');
 
-    // Während der Anfrage gesperrt, ein Doppeltipp sendet nicht zweimal; die Beschriftung bleibt.
+    // Während der Anfrage gesperrt (aria-disabled, nicht disabled: der Fokus bleibt auf dem Knopf), ein Doppeltipp sendet
+    // nicht zweimal; die Beschriftung bleibt.
     await user.click(knopf);
-    await waitFor(() => expect(knopf).toBeDisabled());
+    await waitFor(() => expect(knopf).toHaveAttribute('aria-disabled', 'true'));
+    expect(knopf).not.toBeDisabled();
     expect(knopf).toHaveAttribute('aria-busy', 'true');
+    expect(document.activeElement).toBe(knopf);
     expect(knopf.textContent).toBe('Rückruf vereinbaren');
     await user.click(knopf);
     freigeben();
 
-    const aktionen = document.querySelector('[data-aktionen-minimal]') as HTMLElement;
-    const danke = await within(aktionen).findByRole('status');
-    expect(danke.textContent).toBe('Danke, Marta ruft Sie an.');
+    // Derselbe Statusbereich bekommt den Dank; der Fokus geht auf den Dank an der Stelle des Knopfs (nicht auf die Seite).
+    await waitFor(() => expect(danke.textContent).toBe('Danke, Marta ruft Sie an.'));
+    expect(within(aktionen).getByRole('status')).toBe(danke);
+    expect(document.activeElement).toBe(within(danke).getByText('Danke, Marta ruft Sie an.'));
     expect(screen.queryByRole('button', { name: 'Rückruf vereinbaren' })).toBeNull();
     expect(bitten).toEqual([{ token: TOKEN, aktion: 'rueckruf', quelle: 'portal_einstieg' }]);
     // Hauptknopf und Nummer bleiben, in derselben Reihenfolge.
@@ -358,18 +370,23 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     render(<CustomerPortalPage />);
     await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
 
-    await user.click(screen.getByRole('button', { name: 'Rückruf vereinbaren' }));
+    const erster = screen.getByRole('button', { name: 'Rückruf vereinbaren' });
+    await user.click(erster);
     const aktionen = document.querySelector('[data-aktionen-minimal]') as HTMLElement;
     const fehler = await within(aktionen).findByRole('alert');
     expect(fehler.textContent).toBe('Das hat nicht geklappt');
     const knopf = screen.getByRole('button', { name: 'Rückruf vereinbaren' });
-    expect(knopf).toBeEnabled();
+    // Derselbe Knopf, wieder frei und weiter fokussiert (Tastatur kann sofort wiederholen).
+    expect(knopf).toBe(erster);
+    expect(knopf).not.toHaveAttribute('aria-disabled');
+    expect(document.activeElement).toBe(knopf);
     expect(davor(fehler, knopf)).toBe(true);
     expect(screen.queryByText('Danke, Marta ruft Sie an.')).toBeNull();
     expect(screen.getByText(/^oder anrufen, auch per/)).toBeInTheDocument();
 
     await user.click(knopf);
-    expect((await within(aktionen).findByRole('status')).textContent).toBe('Danke, Marta ruft Sie an.');
+    const status = within(aktionen).getByRole('status');
+    await waitFor(() => expect(status.textContent).toBe('Danke, Marta ruft Sie an.'));
     expect(anzahl).toBe(2);
   }, 20_000);
 
@@ -410,6 +427,31 @@ describe('zeilenFakten (Registry #147)', () => {
     expect(zeilenFakten(kraft(0, 'Gut'))).toEqual(['Deutsch Gut']);
     expect(zeilenFakten(kraft(4, '—'))).toEqual(['4 Jahre Erfahrung']);
     expect(zeilenFakten(kraft(0, ''))).toEqual([]);
+  });
+});
+
+describe('angebotKurz: Angebotszeile wie im Mockup (Registry #147)', () => {
+  it('„eine Person, Pflegegrad 3“ (Mockup), dieselben Wörter wie angebotFuer ohne „für“/„mit“; ohne Personenzahl null', () => {
+    expect(angebotKurz({ betreuung_fuer: '1-person', pflegegrad: 3 })).toBe('eine Person, Pflegegrad 3');
+    expect(angebotKurz({ betreuung_fuer: '1-person', pflegegrad: '3' })).toBe('eine Person, Pflegegrad 3');
+    expect(angebotKurz({ betreuung_fuer: 'ehepaar', pflegegrad: 4 })).toBe('zwei Personen, Pflegegrad 4');
+    expect(angebotKurz({ betreuung_fuer: '1-person', pflegegrad: 0 })).toBe('eine Person, ohne Pflegegrad');
+    expect(angebotKurz({ betreuung_fuer: '1-person' })).toBe('eine Person');
+    expect(angebotKurz({ pflegegrad: 3 })).toBeNull();
+    expect(angebotKurz(null)).toBeNull();
+  });
+  it('steht genau dann da, wenn auch angebotFuer etwas liefert (gleiche Angaben, kein zweiter Maßstab)', () => {
+    const faelle: (Record<string, unknown> | null)[] = [
+      null, {}, { pflegegrad: 2 }, { betreuung_fuer: 'egal', pflegegrad: 2 },
+      { betreuung_fuer: '1-person' }, { betreuung_fuer: '1-person', pflegegrad: 'x' },
+      { betreuung_fuer: 'ehepaar', pflegegrad: 0 }, { betreuung_fuer: 'ehepaar', pflegegrad: '5' },
+    ];
+    for (const fd of faelle) {
+      const lang = angebotFuer(fd);
+      const kurz = angebotKurz(fd);
+      expect(kurz === null).toBe(lang === null);
+      if (lang && kurz) expect(lang.replace(/^für /, '').replace(/ mit /, ', ').replace(/ ohne /, ', ohne ')).toBe(kurz);
+    }
   });
 });
 

@@ -27,7 +27,6 @@ import { formatEuro, type Lead } from '../../lib/supabase';
 import type { SterneStand } from '../../lib/sterne';
 import { ERREICHBAR, TELEFON, TELEFON_HREF, WHATSAPP_HREF } from '../../lib/kontakt';
 import { initials } from './shared';
-import { angebotFuer } from './KompaktEinstieg';
 import { SoGehtEsWeiterVorSpeichern } from './EinstiegVorSpeichern';
 import { AbschnittPflegesituation, KostenkarteKompakt, type VorgemerkteKraft } from './EinstiegPflegekraefteZuerst';
 import { FaqListe } from './FaqListe';
@@ -70,14 +69,29 @@ export function TestsiegerKopf() {
 }
 
 // ── Kompakte Angebotskarte ───────────────────────────────────────────────────────────────────────────────────────────────
-// „Ihr Angebot für eine Person mit Pflegegrad 3“ (angebotFuer, klein wie im Mockup; ohne Angaben nur „Ihr Angebot“), Preis,
-// „Details ›“, drei Punkte. Preis wie in der Kostenkarte darunter (`bruttopreis`, dort derselbe Ersatzwert).
+/** „eine Person, Pflegegrad 3“: die Angaben der Zeile über dem Preis in der Form des Mockups („Ihr Angebot · eine Person,
+ *  Pflegegrad 3“). Dieselben Angaben und Wörter wie `angebotFuer` (KompaktEinstieg, „für eine Person mit Pflegegrad 3“),
+ *  nur ohne „für“ und „mit“: „eine Person“ / „zwei Personen“, „Pflegegrad N“, Pflegegrad 0 „ohne Pflegegrad“. Ohne
+ *  Personenzahl `null` (wie `angebotFuer`; dann steht nur „Ihr Angebot“), ohne Pflegegrad nur die Personenzahl.
+ *  Der Satz „Ihr Angebot für …“ steht weder im Mockup noch sonst im Portal (Prüfung 07.11.). */
+export function angebotKurz(fd: Record<string, unknown> | null | undefined): string | null {
+  const wer = fd?.betreuung_fuer === '1-person' ? 'eine Person' : fd?.betreuung_fuer === 'ehepaar' ? 'zwei Personen' : null;
+  if (!wer) return null;
+  const pg = fd?.pflegegrad;
+  const grad = typeof pg === 'number' || (typeof pg === 'string' && /^\d$/.test(pg))
+    ? (Number(pg) === 0 ? 'ohne Pflegegrad' : `Pflegegrad ${pg}`)
+    : null;
+  return grad ? `${wer}, ${grad}` : wer;
+}
+
+// „Ihr Angebot · eine Person, Pflegegrad 3“ (Mockup wörtlich, klein; ohne Angaben nur „Ihr Angebot“), Preis, „Details ›“,
+// drei Punkte. Preis wie in der Kostenkarte darunter (`bruttopreis`, dort derselbe Ersatzwert).
 export function AngebotKarteMinimal({ lead, onDetails }: { lead: Lead | null; onDetails: () => void }) {
   const brutto = lead?.kalkulation?.bruttopreis ?? 3050;
-  const fuer = angebotFuer((lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined);
+  const angaben = angebotKurz((lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined);
   return (
     <div className="rounded-[16px] bg-pm-paper px-3 pb-2.5 pt-[11px]" data-angebot-minimal>
-      <p className="text-[13px] leading-[1.3] text-pm-muted">{fuer ? `Ihr Angebot ${fuer}` : 'Ihr Angebot'}</p>
+      <p className="text-[13px] leading-[1.3] text-pm-muted">{angaben ? `Ihr Angebot · ${angaben}` : 'Ihr Angebot'}</p>
       <div className="mt-px flex items-baseline justify-between gap-3">
         <p className="whitespace-nowrap text-[24px] font-bold leading-[1.15] tracking-[-0.01em] tabular-nums text-pm-ink">
           {formatEuro(brutto)} <span className="text-[14px] font-medium tracking-normal text-pm-muted">/ Monat</span>
@@ -96,7 +110,10 @@ export function AngebotKarteMinimal({ lead, onDetails }: { lead: Lead | null; on
 /** Teile von „7 Jahre Erfahrung · Deutsch Gut“ — wie `kraftZeile` im Kostenrechner (lib/kraefte-vorschau.ts), Reihenfolge
  *  wie im Mockup; fehlende Angaben entfallen. Die Deutsch-Stufe steht wie auf der Pflegekraft-Karte vor dem Speichern
  *  („Deutsch ●●○ Gut“, `DeutschZeile` in MatchCardVorSpeichern.tsx, 1:1 aus der Karte im Stand 75b8df8) und im Profil
- *  (CustomerNurseModal: „Deutsch“ … „Grund“): der Wert aus `nurse.language.level` unverändert (Grund / Mittel / Gut). */
+ *  (CustomerNurseModal: „Deutsch“ … „Grund“): der Wert aus `nurse.language.level` unverändert (Grund / Mittel / Gut).
+ *  Ohne Balken als „Deutsch Grund / Mittel / Gut“ steht derselbe Wortlaut schon in den Nachfassmails an Kunden
+ *  (project 3/supabase/functions/send-scheduled-emails/index.ts, `Deutsch ${deutschWort}` aus deutschStufe.ts; Martin
+ *  19.08.2026: „Deutsch Mittel“). Das Mockup hatte nur „Deutsch gut“ (klein), für Mittel/Grund keinen Wortlaut. */
 export function zeilenFakten(nurse: Pick<Nurse, 'experienceYears' | 'language'>): string[] {
   const teile: string[] = [];
   const jahre = nurse.experienceYears ?? 0;
@@ -189,22 +206,23 @@ const PLATZHALTER = 5;
 type RueckrufStand = 'bereit' | 'laeuft' | 'ok' | 'fehler';
 const RUECKRUF_KNOPF = `${FOKUS} flex min-h-[44px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-pm-line bg-white px-4 text-[15px] font-semibold text-pm-ink transition-colors hover:border-pm-taupe-light`;
 
+// Tastatur und Screenreader (Prüfung 07.11.): Während der Anfrage bleibt der Knopf fokussierbar (`aria-disabled` statt
+// `disabled`; ein gesperrter Knopf verliert den Fokus, er fiel auf den Seitenanfang). Der Statusbereich steht von Anfang an
+// leer im DOM und bekommt erst beim Erfolg den Dank (wie der Toast-Rahmen in #145): ein Bereich, der erst mit seinem Text
+// eingefügt wird, sagen Screenreader (vor allem VoiceOver auf iOS) unzuverlässig an. Weil der Knopf danach entfällt, geht
+// der Fokus auf den Dank an seiner Stelle. Die Fehlermeldung bleibt `role="alert"` über dem Knopf, der Fokus auf dem Knopf.
 function RueckrufKnopf({ onRueckruf }: { onRueckruf?: () => Promise<boolean> }) {
   const [stand, setStand] = useState<RueckrufStand>('bereit');
   const laeuft = useRef(false);
+  const dank = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (stand === 'ok') dank.current?.focus();
+  }, [stand]);
   if (!onRueckruf) {
     return <a href={TELEFON_HREF} className={RUECKRUF_KNOPF}>{RUECKRUF}</a>;
   }
-  if (stand === 'ok') {
-    // An der Stelle des Knopfs, gleich hoch (nichts springt).
-    return (
-      <p role="status" className="flex min-h-[44px] items-center justify-center rounded-[14px] bg-pm-mint px-4 text-center text-[15px] font-semibold text-pm-green-deep">
-        {RUECKRUF_OK}
-      </p>
-    );
-  }
   const anfordern = async () => {
-    if (laeuft.current) return; // Doppeltipp: eine Anfrage
+    if (laeuft.current) return; // Doppeltipp (und Tipp während der Anfrage): eine Anfrage
     laeuft.current = true;
     setStand('laeuft');
     let ok = false;
@@ -212,21 +230,33 @@ function RueckrufKnopf({ onRueckruf }: { onRueckruf?: () => Promise<boolean> }) 
     laeuft.current = false;
     setStand(ok ? 'ok' : 'fehler');
   };
+  const busy = stand === 'laeuft';
+  // EIN Element im Raster darüber: der leere Statusbereich nimmt so keinen Abstand ein, nichts verschiebt sich.
   return (
-    <>
+    <div data-rueckruf>
       {stand === 'fehler' && (
-        <p role="alert" className="text-center text-[13px] font-semibold leading-snug text-pm-error-ink">{RUECKRUF_FEHLER}</p>
+        <p role="alert" className="mb-2 text-center text-[13px] font-semibold leading-snug text-pm-error-ink">{RUECKRUF_FEHLER}</p>
       )}
-      <button
-        type="button"
-        onClick={anfordern}
-        disabled={stand === 'laeuft'}
-        aria-busy={stand === 'laeuft' || undefined}
-        className={`${RUECKRUF_KNOPF} disabled:cursor-wait disabled:opacity-70`}
-      >
-        {RUECKRUF}
-      </button>
-    </>
+      <div role="status">
+        {stand === 'ok' && (
+          // An der Stelle des Knopfs, gleich hoch (nichts springt).
+          <p ref={dank} tabIndex={-1} className={`${FOKUS} flex min-h-[44px] items-center justify-center rounded-[14px] bg-pm-mint px-4 text-center text-[15px] font-semibold text-pm-green-deep`}>
+            {RUECKRUF_OK}
+          </p>
+        )}
+      </div>
+      {stand !== 'ok' && (
+        <button
+          type="button"
+          onClick={anfordern}
+          aria-disabled={busy || undefined}
+          aria-busy={busy || undefined}
+          className={`${RUECKRUF_KNOPF} aria-disabled:cursor-wait aria-disabled:opacity-70`}
+        >
+          {RUECKRUF}
+        </button>
+      )}
+    </div>
   );
 }
 
