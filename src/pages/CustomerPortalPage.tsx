@@ -75,6 +75,7 @@ import { MatchCard } from '../components/portal/MatchCard';
 // „Noch 2 Minuten“, Karten mit „Einladen“ + Schloss, offenes Formular mit „Speichern“); Kopf und Häufige Fragen wie heute.
 import { EinstiegVorSpeichern, WarumSheetVorSpeichern } from '../components/portal/EinstiegVorSpeichern';
 import { EinladenSheetVorSpeichern, EinstiegPflegekraefteZuerst, type VorgemerkteKraft } from '../components/portal/EinstiegPflegekraefteZuerst';
+import { EinstiegMinimal, PflegekraftZeile, TestsiegerKopf } from '../components/portal/EinstiegMinimal';
 import { einladbareVormerkungen, eingeladenHinweis, ladeVormerkungen, MAX_VORMERKUNGEN, speichereVormerkungen } from '../lib/vormerkungen';
 import { DANK_DAUER_MS, useToastWarteschlange } from '../lib/toastWarteschlange';
 import { MatchCardVorSpeichern } from '../components/portal/MatchCardVorSpeichern';
@@ -734,6 +735,11 @@ const CustomerPortalPage: FC = () => {
   // „Pflegekräfte zuerst“ — Rückweg und Vorher-Vergleich, kein Kunde bekommt den Schalter. Einmal beim Laden gelesen.
   const [einstiegAlt] = useState(() => {
     try { return new URLSearchParams(window.location.search).get('einstieg') === 'alt'; } catch { return false; }
+  });
+  // Registry #147: `?einstieg=zuerst` zeigt vor dem Speichern „Pflegekräfte zuerst“ (#145) unverändert statt des
+  // Minimal-Einstiegs — Vorher-Vergleich und Rückweg, kein Kunde bekommt den Schalter. Vormerken gilt in beiden.
+  const [einstiegZuerst] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('einstieg') === 'zuerst'; } catch { return false; }
   });
   // Registry #145, Nachbesserung 2: Vormerkungen gibt es nur im Modus „Pflegekräfte zuerst“ (ohne `?einstieg=alt` und ohne
   // `?einstieg=kompakt`) — nur dort werden sie geladen und nach dem ersten Speichern automatisch eingeladen.
@@ -1526,6 +1532,10 @@ const CustomerPortalPage: FC = () => {
   // Registry #145 (Martin 03.11.2026): In genau diesem Zustand die Seite „Pflegekräfte zuerst“ (EinstiegPflegekraefteZuerst)
   // statt des Stands 75b8df8; `?einstieg=alt` zeigt den bisherigen Stand unverändert.
   const pflegekraefteZuerst = rueckbau && !einstiegAlt;
+  // Registry #147 (Martin 07.11.2026, Mockup „Minimal“, Entwurf): in genau diesem Zustand der Minimal-Einstieg
+  // (EinstiegMinimal) — Pflegekräfte und Hauptknopf im ersten Bild; Vormerken und Einladen wie #145. `?einstieg=zuerst`
+  // zeigt #145 unverändert.
+  const minimalEinstieg = pflegekraefteZuerst && !einstiegZuerst;
   // Fassung 31 (Martin 06.10.: „alle 4 ja, aber die anderen screens will ich vorher absegnen"): die Ansicht NACH dem Absenden
   // im Aufbau von Fassung 30 — Kopf wie dort, „So geht es weiter" mit Stand, Pflegekräfte zum Einladen, Angebot und
   // Pflegesituation zugeklappt. Vorerst nur mit `?look=angebot`; ohne Schalter bleibt die heutige Ansicht.
@@ -3792,7 +3802,7 @@ const CustomerPortalPage: FC = () => {
   // Rückbau Registry #122: die Karten vor dem ersten Speichern wie im Stand 75b8df8 (MatchCardVorSpeichern) — dieselbe
   // Auswahl wie oben (Batch-Reveal, Empfehlung zuerst), genau EINE „Unsere Empfehlung für Sie": die mit der höchsten
   // Badge-Bewertung (Erfahrungsjahre + Einsätze).
-  const kartenVorSpeichern = !rueckbau ? [] : (() => {
+  const kartenVorSpeichern = !rueckbau || minimalEinstieg ? [] : (() => {
     const { visibleNurses } = pflegekraftAuswahl;
     let recIdx = -1;
     let recBest = -Infinity;
@@ -3819,6 +3829,20 @@ const CustomerPortalPage: FC = () => {
       />
     ));
   })();
+
+  // Registry #147: dieselbe Auswahl im Minimal-Einstieg als kompakte Zeilen (PflegekraftZeile) — Reihenfolge, Handler und
+  // Messpunkte wie die Karten (`einladen_getippt` und `profil_geoeffnet` mit Quelle `karte`).
+  const zeilenVorSpeichern = !minimalEinstieg ? [] : pflegekraftAuswahl.visibleNurses.map(({ nurse, i, caregiverId }) => (
+    <PflegekraftZeile
+      key={`z-${i}`}
+      nurse={nurse}
+      vorgemerkt={vorgemerktEinladbar.includes(caregiverId)}
+      gesperrt={inviteInFlight}
+      onNurseClick={() => openNurseFromMatch(nurse, i)}
+      onInvite={() => { messeEinladen(nurse, 'karte'); return canInviteNurse(i); }}
+      onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
+    />
+  ));
 
   // Registry #145: die Vorgemerkten für die Zeile über dem Formular — genau die, die nach dem Speichern eingeladen werden
   // (`vorgemerktEinladbar`, Nachbesserung 2: nie mehr Namen, als eingeladen werden können).
@@ -3997,10 +4021,13 @@ const CustomerPortalPage: FC = () => {
 
       {/* Navbar */}
       <nav className="sticky top-0 z-40" style={{background:'white', boxShadow:'0 1px 0 #E9E9EB, 0 2px 8px rgba(0,0,0,0.06)'}}>
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className={`max-w-3xl mx-auto px-4 ${minimalEinstieg && !acceptedApp ? 'py-2' : 'py-3'} flex items-center justify-between`}>
           <div className="flex items-center gap-3">
             <img src="/LOGO-PRIMUNDUS.webp" alt="Primundus" className="h-6" />
           </div>
+          {/* Registry #147: im Minimal-Einstieg rechts „6× Testsieger / DIE WELT“ mit Siegel (Mockup); Anrufen, Rückruf und
+              WhatsApp stehen dort im ersten Bild unter dem Hauptknopf. */}
+          {minimalEinstieg && !acceptedApp ? <TestsiegerKopf /> : (
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowContactPopup(true)}
@@ -4011,6 +4038,7 @@ const CustomerPortalPage: FC = () => {
               Hilfe
             </button>
           </div>
+          )}
         </div>
         {/* Sub-Nav: Einsatz-Kontext (Status + Zeitraum) links, Link zur
             Einsätze-Übersicht rechts. Logo bleibt darüber sichtbar.
@@ -4140,9 +4168,33 @@ const CustomerPortalPage: FC = () => {
               einsatzBeendet={IS_EINSATZ_BEENDET}
             />
             </div>
+      ) : minimalEinstieg ? (
+        // Registry #147 (Martin 07.11.2026, Entwurf): vor dem ersten Speichern der Minimal-Einstieg — Gruß, kompakte
+        // Angebotskarte, Pflegekräfte als Zeilen, Hauptknopf ins Formular, Rückruf und Nummer im ersten Bild; darunter
+        // Pflegesituation, Kostenkarte, So geht es weiter, Fragen, Marta (EinstiegMinimal.tsx). Rückweg `?einstieg=zuerst`.
+        <EinstiegMinimal
+          anrede={lead ? customerSalutation(lead) : 'Herr Mustermann'}
+          lead={lead}
+          onBestpreis={() => setBestpreisOffen(true)}
+          heimEigenanteil={HEIM_EIGENANTEIL}
+          heimQuelle={HEIM_QUELLE}
+          // Auch bevor die Sitzung steht (Onboard beim Erstbesuch bis ca. 10 s): Platzhalter statt leerer Liste.
+          laedt={listeLaedt || (!IS_PREVIEW_ANY && !mmReady && !mmError)}
+          zeilen={zeilenVorSpeichern}
+          gehalteneEinladungen={pflegekraftAuswahl.heldInvites}
+          vorschlaegeVorhanden={pflegekraftAuswahl.allVisible.length > 0}
+          bereitsBearbeitet={bereitsBearbeitet}
+          formular={patientFormular(false, true)}
+          sterne={sterne}
+          vorgemerkte={vorgemerkteKraefte}
+          onVervollstaendigen={zurPflegesituationAus('hauptknopf')}
+          onKostenAufgeklappt={() => messen('kosten_aufgeklappt')}
+          onFaqGeoeffnet={messeFrage}
+        />
       ) : pflegekraefteZuerst ? (
         // Registry #145 (Martin 03.11.2026): vor dem ersten Speichern „Pflegekräfte zuerst" — Preis oben, sofort die
-        // Pflegekräfte, dann die Pflegesituation (EinstiegPflegekraefteZuerst.tsx). Rückweg `?einstieg=alt`.
+        // Pflegekräfte, dann die Pflegesituation (EinstiegPflegekraefteZuerst.tsx). Seit #147 hinter `?einstieg=zuerst`;
+        // Rückweg `?einstieg=alt`.
         <EinstiegPflegekraefteZuerst
           anrede={lead ? customerSalutation(lead) : 'Herr Mustermann'}
           kuerzel={lead && (lead.vorname || lead.nachname)

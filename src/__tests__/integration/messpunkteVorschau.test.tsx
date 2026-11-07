@@ -39,7 +39,8 @@ describe('Messpunkte in der Vorschau (?preview=patient)', () => {
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     // Seit Registry #145 „Pflegekräfte zuerst“: Einladen merkt vor und öffnet „{Name} einladen“ — auch das ohne Meldung.
-    await screen.findByText('Laden Sie ein, wer Ihnen gefällt. Dafür beschreiben Sie kurz die Pflegesituation.', {}, { timeout: 5000 });
+    // Seit Registry #147 Minimal-Einstieg: dazu „Details ›“ und der Hauptknopf, Profil über die Zeile.
+    await screen.findByRole('button', { name: /^Angaben vervollständigen und Bewerbungen erhalten/ }, { timeout: 5000 });
 
     await user.click(screen.getByRole('button', { name: /^Bestpreisgarantie/ }));
     await user.click(within(await screen.findByRole('dialog')).getAllByRole('button', { name: 'Schließen' })[0]);
@@ -47,7 +48,9 @@ describe('Messpunkte in der Vorschau (?preview=patient)', () => {
     await user.click(screen.getByRole('button', { name: 'Was brauche ich zu Hause?' }));
     await user.click(screen.getAllByRole('button', { name: 'Einladen' })[0]);
     await user.click(within(await screen.findByRole('dialog', { name: /einladen$/ })).getByRole('button', { name: 'Später' }));
-    await user.click(screen.getByText('Anna N.'));
+    await user.click(screen.getByRole('button', { name: 'Details ›' }));
+    await user.click(screen.getByRole('button', { name: /^Angaben vervollständigen und Bewerbungen erhalten/ }));
+    await user.click(screen.getByText('Anna, 58'));
 
     await new Promise((r) => setTimeout(r, 50));
     expect(meldungen).toEqual([]);

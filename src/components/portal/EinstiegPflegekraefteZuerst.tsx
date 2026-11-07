@@ -12,7 +12,9 @@
 //
 // Rückweg: `?einstieg=alt` zeigt die bisherige Seite (EinstiegVorSpeichern.tsx, Stand 75b8df8) unverändert;
 // `?einstieg=kompakt` den Kompakt-Einstieg (#780). Alles nach dem ersten Speichern bleibt wie bisher.
-import { useState, type ReactNode } from 'react';
+// Seit Registry #147 (Entwurf 07.11.2026) steht diese Seite hinter `?einstieg=zuerst`; ohne Schalter zeigt das Portal den
+// Minimal-Einstieg (EinstiegMinimal.tsx), der Kostenkarte, Abschnitt Pflegesituation, Fenster und Zeile von hier nutzt.
+import { useEffect, useState, type ReactNode } from 'react';
 import { Check, ChevronDown, ShieldCheck } from 'lucide-react';
 import { formatEuro, type Lead } from '../../lib/supabase';
 import type { SterneStand } from '../../lib/sterne';
@@ -47,7 +49,7 @@ const mitTrennstellen = (text: string) => text
 // Dieselbe Karte wie bisher (Klassen, Chevron am Eyebrow klappt die ganze Karte), nur weniger hoch und mit neuen Punkten:
 // Siegel klein rechts neben dem Preis, die vier Punkte als 2×2, „Kosten erst …“, Heimvergleich und Testsieger-Zeile im
 // Aufklapper oben (Heimvergleich bleibt dort, Martin 03.11.).
-export function KostenkarteKompakt({ lead, onBestpreis, heimEigenanteil, heimQuelle, onKostenAufgeklappt }: {
+export function KostenkarteKompakt({ lead, onBestpreis, heimEigenanteil, heimQuelle, onKostenAufgeklappt, aufklappen }: {
   lead: Lead | null;
   onBestpreis: () => void;
   /** Heim-Eigenanteil im 1. Jahr und Quelle (eine Konstante in CustomerPortalPage). */
@@ -55,9 +57,16 @@ export function KostenkarteKompakt({ lead, onBestpreis, heimEigenanteil, heimQue
   heimQuelle: string;
   /** Messpunkt (Registry #123): „Alle Kosten im Überblick" aufgeklappt. Unsichtbar. */
   onKostenAufgeklappt?: () => void;
+  /** Registry #147 (Minimal-Einstieg): jede Erhöhung klappt Karte und „Alle Kosten im Überblick" auf („Details ›" oben). */
+  aufklappen?: number;
 }) {
   const [offerExpandedManual, setOfferExpandedManual] = useState<boolean | null>(null);
   const [costsExpanded, setCostsExpanded] = useState(false);
+  useEffect(() => {
+    if (!aufklappen) return;
+    setOfferExpandedManual(true);
+    setCostsExpanded(true);
+  }, [aufklappen]);
   const offerExpanded = offerExpandedManual ?? true;
   const brutto = lead?.kalkulation?.bruttopreis ?? 3050;
   const tagessatz = Math.round(brutto / 30);
@@ -132,7 +141,9 @@ export function KostenkarteKompakt({ lead, onBestpreis, heimEigenanteil, heimQue
               type="button"
               onClick={() => { if (!costsExpanded) onKostenAufgeklappt?.(); setCostsExpanded(!costsExpanded); }}
               aria-expanded={costsExpanded}
-              className="mt-3 w-full min-h-[48px] flex items-center justify-between gap-2 border-t border-pm-line-soft pt-2 text-[15px] font-semibold text-pm-taupe-ink"
+              // Registry #147: Sprungziel von „Details ›“ (Minimal-Einstieg); scroll-mt = Höhe der Navigationsleiste + Luft.
+              data-kostenaufstellung
+              className="mt-3 w-full min-h-[48px] flex items-center justify-between gap-2 border-t border-pm-line-soft pt-2 text-[15px] font-semibold text-pm-taupe-ink scroll-mt-20"
             >
               {costsExpanded ? 'Weniger anzeigen' : 'Alle Kosten im Überblick'}
               <ChevronDown className={`w-5 h-5 text-pm-taupe transition-transform duration-200 ${costsExpanded ? 'rotate-180' : ''}`} />
@@ -305,6 +316,27 @@ export function VormerkZeile({ kraefte }: { kraefte: VorgemerkteKraft[] }) {
   );
 }
 
+// ── Abschnitt „Pflegesituation“ mit offenem Formular (auch im Minimal-Einstieg, Registry #147) ───────────────────────────
+export function AbschnittPflegesituation({ vorgemerkte, formular }: { vorgemerkte: VorgemerkteKraft[]; formular: ReactNode }) {
+  return (
+    <div>
+      {/* id = Sprungziel aller Knöpfe ins Formular und des Mail-Deeplinks `goto=anfragen`. */}
+      <div id="patientendaten" className="px-1 pt-6 scroll-mt-24">
+        <SectionHeader
+          eyebrow="Für Ihre Bewerbungen"
+          titel="Pflegesituation"
+          rechts={<StatusBadge ton="warnung">Unvollständig</StatusBadge>}
+          zeile="Danach können Sie Pflegekräfte einladen und bekommen Bewerbungen. Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten."
+        />
+      </div>
+      <VormerkZeile kraefte={vorgemerkte} />
+      <div>
+        {formular}
+      </div>
+    </div>
+  );
+}
+
 // ── Die Seite vor dem Speichern: Pflegekräfte zuerst ─────────────────────────────────────────────────────────────────────
 export function EinstiegPflegekraefteZuerst({
   anrede, kuerzel, lead, onBestpreis, heimEigenanteil, heimQuelle,
@@ -395,21 +427,7 @@ export function EinstiegPflegekraefteZuerst({
 
       <div>
         <div className="max-w-3xl mx-auto px-3.5 pt-1 pb-4 space-y-4">
-          <div>
-            {/* id = Sprungziel aller Knöpfe ins Formular und des Mail-Deeplinks `goto=anfragen`. */}
-            <div id="patientendaten" className="px-1 pt-6 scroll-mt-24">
-              <SectionHeader
-                eyebrow="Für Ihre Bewerbungen"
-                titel="Pflegesituation"
-                rechts={<StatusBadge ton="warnung">Unvollständig</StatusBadge>}
-                zeile="Danach können Sie Pflegekräfte einladen und bekommen Bewerbungen. Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten."
-              />
-            </div>
-            <VormerkZeile kraefte={vorgemerkte} />
-            <div>
-              {formular}
-            </div>
-          </div>
+          <AbschnittPflegesituation vorgemerkte={vorgemerkte} formular={formular} />
         </div>
       </div>
 

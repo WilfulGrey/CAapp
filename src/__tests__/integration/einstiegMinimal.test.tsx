@@ -1,0 +1,317 @@
+/** @vitest-environment jsdom */
+// Minimal-Einstieg vor dem ersten Speichern der Pflegesituation (Registry #147, Entwurf; Martin 07.11.2026 zum Mockup
+// „Minimal“: „Ja, alle drei“).
+//   - Reihenfolge im ersten Bild: Kopf mit Testsieger statt „Hilfe“ → „Guten Tag, …“ → kompakte Angebotskarte → „Passende
+//     Pflegekräfte“ mit Anzahl als Zeilen → Hauptknopf → „Rückruf vereinbaren“ (Anruf-Link) → Nummer und WhatsApp;
+//     darunter Pflegesituation mit Formular, Kostenkarte, So geht es weiter, Fragen, Marta
+//   - Platzhalterzeilen ohne Text, solange die Liste lädt (Hauptknopf steht schon da)
+//   - „Einladen“ in der Zeile = Logik aus #145 (Fenster, Vormerken, nach dem Speichern automatisch einladen)
+//   - Messpunkte: Hauptknopf als Quelle `hauptknopf`, „Details ›“ als `kosten_aufgeklappt`, Zeile wie die Karte (`karte`)
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { server } from '../../../test/mocks/server';
+import { http, HttpResponse } from 'msw';
+import { defaultHandlers, defaultLead, sampleCaregiver, sampleMatching, bridgeHandler } from '../../../test/fixtures/mamamia-mocks';
+import { vormerkSchluessel } from '../../lib/vormerkungen';
+import { zeilenFakten } from '../../components/portal/EinstiegMinimal';
+import type { Nurse } from '../../types';
+
+vi.mock('../../lib/supabase', async () => {
+  const actual = await vi.importActual<typeof import('../../lib/supabase')>('../../lib/supabase');
+  return {
+    ...actual,
+    // Jeder Test mit eigenem Token (Sitzungs-Dedupe der Meldungen je Token). Lead wie im Rechner: eine Person, Pflegegrad 3.
+    fetchLeadByToken: vi.fn(async (token: string) => token.startsWith('token-mi-')
+      ? { lead: { ...defaultLead, token, kalkulation: { ...defaultLead.kalkulation, formularDaten: { ...defaultLead.kalkulation.formularDaten, betreuung_fuer: '1-person' } } } as unknown as import('../../lib/supabase').Lead, error: null }
+      : { lead: null, error: 'Token nicht gefunden' }),
+    fetchNotfallTelefon: vi.fn(async () => null),
+  };
+});
+vi.mock('../../lib/einladenWiederholung', async () => ({
+  ...(await vi.importActual<typeof import('../../lib/einladenWiederholung')>('../../lib/einladenWiederholung')),
+  EINLADEN_ABSTAND_MS: 5,
+}));
+vi.mock('../../lib/toastWarteschlange', async () => ({
+  ...(await vi.importActual<typeof import('../../lib/toastWarteschlange')>('../../lib/toastWarteschlange')),
+  DANK_DAUER_MS: 2500,
+}));
+
+import CustomerPortalPage from '../../pages/CustomerPortalPage';
+
+beforeAll(() => {
+  window.URL.createObjectURL = vi.fn(() => 'blob:mock');
+  window.scrollTo = vi.fn();
+  Element.prototype.scrollTo = vi.fn() as unknown as typeof Element.prototype.scrollTo;
+  Element.prototype.scrollIntoView = vi.fn();
+  if (!('IntersectionObserver' in window)) {
+    (window as unknown as { IntersectionObserver: unknown }).IntersectionObserver = class {
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    };
+  }
+});
+beforeEach(() => {
+  localStorage.clear();
+  (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
+});
+
+// Zwei Vorschläge: Helena K. (50002, Empfehlung — mehr Einsätze, steht oben) und Emilia W. (50003).
+const emilia = { ...sampleMatching, id: 10002, is_best_matching: false, caregiver: { ...sampleCaregiver, id: 50003, first_name: 'Emilia', last_name: 'Wójcik', hp_total_jobs: 3 } };
+const zweiVorschlaege = () => ({ JobOfferMatchingsWithPagination: { total: 2, data: [sampleMatching, emilia] } });
+const ohneBewerbung = { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) };
+const lesen = [
+  http.get('https://kostenrechner.primundus.de/api/lead-event', () => HttpResponse.json({ events: [] })),
+  http.get('https://primundus.de/api/bewertungen-stand', () => HttpResponse.json({ schnitt: '4,9', wert: 4.9, anzahl: 126 })),
+];
+const nebenlaeufer = http.post('https://test.supabase.co/functions/v1/mamamia-proxy', async ({ request }) => {
+  const body = await request.clone().json() as { action?: string };
+  if (body.action === 'updateJobOfferDates') return HttpResponse.json({ data: { UpdateJobOfferDates: { id: 7001 } } });
+  if (body.action === 'generateJobDescription') return HttpResponse.json({ data: { description: null } });
+  return undefined;
+});
+const ort = { searchLocations: () => ({ LocationsWithPagination: { data: [{ id: 4711, location: 'München', zip_code: '80331', country_code: 'DE' }] } }) };
+const vollerEntwurf = (token: string) => localStorage.setItem(`patient_${token}`, JSON.stringify({
+  _isDraft: true,
+  anzahl: '1', geschlecht: 'Weiblich',
+  mobilitaet: 'Rollatorfähig', heben: 'Nein', demenz: 'Nein', nacht: 'Nein',
+  plz: '80331', ort: 'München',
+  wohnungstyp: 'Einfamilienhaus', urbanisierung: 'Großstadt', startDate: '2099-12-01',
+  wunschGeschlecht: 'Weiblich', fuehrerschein: 'Nein',
+}));
+type Meldung = { token?: string; event?: string; metadata?: Record<string, unknown>; notify?: boolean };
+const HAUPTKNOPF = /^Angaben vervollständigen und Bewerbungen erhalten/;
+const davor = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+const gescrollt = () => (Element.prototype.scrollIntoView as unknown as { mock: { contexts: Element[] } }).mock.contexts;
+const zeilen = () => [...document.querySelectorAll('[data-pflegekraft-zeile]')] as HTMLElement[];
+const zeileVon = (vorname: string) => zeilen().find((z) => z.textContent?.startsWith(`${vorname},`)) as HTMLElement;
+
+describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
+  it('Reihenfolge und Wortlaut: Kopf mit Testsieger, Gruß, Angebotskarte, Pflegekräfte als Zeilen mit Anzahl, Hauptknopf, Rückruf, Nummer; darunter Formular, Kosten, So geht es weiter, Fragen, Marta', async () => {
+    server.use(...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
+    window.history.replaceState({}, '', '/?token=token-mi-reihe');
+    render(<CustomerPortalPage />);
+
+    const h1 = await screen.findByRole('heading', { level: 1, name: 'Guten Tag, Frau Testerin' }, { timeout: 5000 });
+    // Kopf: rechts „6× Testsieger“ (fett) / „DIE WELT“ mit Siegel, kein „Hilfe“.
+    const kopf = document.querySelector('[data-testsieger-kopf]') as HTMLElement;
+    expect(kopf.closest('nav')).not.toBeNull();
+    expect(within(kopf).getByText('6× Testsieger').tagName).toBe('B');
+    expect(kopf.textContent).toBe('6× TestsiegerDIE WELT');
+    expect(within(kopf).getByAltText('Testsieger Die Welt')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Hilfe' })).toBeNull();
+
+    // Kompakte Angebotskarte: angebotFuer klein, Preis, „/ Monat“, „Details ›“, drei Punkte.
+    const karte = document.querySelector('[data-angebot-minimal]') as HTMLElement;
+    expect(within(karte).getByText('Ihr Angebot · für eine Person mit Pflegegrad 3')).toBeInTheDocument();
+    expect(within(karte).getByText(/^2\.800 €/).textContent).toBe('2.800 € / Monat');
+    expect(within(karte).getByRole('button', { name: 'Details ›' })).toBeInTheDocument();
+    expect(within(karte).getByText('Täglich kündbar · Keine Vermittlungsgebühr · Bestpreisgarantie')).toBeInTheDocument();
+
+    // Pflegekräfte: Abschnitt mit Anzahl, Zeilen „Vorname, Alter“ und „N Jahre Erfahrung · Deutsch gut“, Empfehlung oben.
+    await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
+    const abschnitt = document.getElementById('pflegekraefte')!;
+    expect(within(abschnitt).getByRole('heading', { level: 2 }).textContent).toBe('Passende Pflegekräfte2');
+    const [erste, zweite] = zeilen();
+    // Die Zeile bricht nur hinter „·“ (geschütztes Leerzeichen davor, jede Angabe ohne Umbruch).
+    expect(erste.textContent).toMatch(/^Helena, \d+5 Jahre Erfahrung\u00A0· Deutsch gutEinladen$/);
+    expect([...erste.querySelectorAll('.whitespace-nowrap')].map((e) => e.textContent)).toEqual(['5 Jahre Erfahrung', 'Deutsch gut', 'Einladen']);
+    expect(zweite.textContent).toMatch(/^Emilia, \d+5 Jahre Erfahrung\u00A0· Deutsch gutEinladen$/);
+    // Rundes Foto wie heute (Name steht daneben, darum alt="").
+    expect(erste.querySelector('img')).toHaveAttribute('src', 'https://example.test/avatar.jpg');
+    expect(erste.querySelector('img')!.className).toContain('rounded-full');
+    expect(screen.getAllByRole('button', { name: 'Einladen' })).toHaveLength(2);
+    // Nicht mehr im ersten Bild: Titel, Satz und Empfehlungszeile von #145, große Karten.
+    expect(screen.queryByText('Ihr Angebot zur 24-Stunden-Betreuung')).toBeNull();
+    expect(screen.queryByText('Laden Sie ein, wer Ihnen gefällt. Dafür beschreiben Sie kurz die Pflegesituation.')).toBeNull();
+    expect(screen.queryByText('Unsere Empfehlung für Sie')).toBeNull();
+    expect(document.querySelector('.rounded-card.cursor-pointer')).toBeNull();
+
+    // Hauptknopf mit Unterzeile, darunter Rückruf (Anruf-Link) und Nummer/WhatsApp.
+    const haupt = screen.getByRole('button', { name: HAUPTKNOPF });
+    expect(haupt.textContent).toBe('Angaben vervollständigen und Bewerbungen erhaltendauert etwa 2 Minuten · kostenlos und unverbindlich');
+    expect(haupt.className).toContain('bg-pm-coral');
+    const rueckruf = screen.getByRole('link', { name: 'Rückruf vereinbaren' });
+    expect(rueckruf).toHaveAttribute('href', 'tel:+4989200000830');
+    const zeileTel = screen.getByText(/^oder anrufen, auch per/);
+    expect(zeileTel.textContent).toBe('oder anrufen, auch per WhatsApp:089 200 000 830 (täglich 8–20 Uhr)');
+    expect(within(zeileTel).getByRole('link', { name: 'WhatsApp' }).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/4989200000830/);
+    expect(within(zeileTel).getByRole('link', { name: '089 200 000 830' })).toHaveAttribute('href', 'tel:+4989200000830');
+
+    // Darunter: Pflegesituation mit offenem Formular, Kostenkarte, So geht es weiter, Fragen, Marta.
+    const pflegesituation = document.getElementById('patientendaten')!;
+    expect(within(pflegesituation).getByRole('heading', { level: 2, name: 'Pflegesituation' })).toBeInTheDocument();
+    const schritt = screen.getByText(/Schritt 1 von 4/);
+    const kosten = screen.getByText('Ihre Betreuungskosten');
+    const soGehts = screen.getByRole('heading', { level: 2, name: 'So geht es weiter' });
+    const fragen = screen.getByRole('heading', { level: 2, name: 'Häufige Fragen' });
+    const marta = screen.getByText('Noch Fragen?');
+    const reihe = [h1, karte, abschnitt, zweite, haupt, rueckruf, zeileTel, pflegesituation, schritt, kosten, soGehts, fragen, marta];
+    for (let i = 1; i < reihe.length; i++) expect(davor(reihe[i - 1], reihe[i])).toBe(true);
+    // Wortlaut-Regeln: nie „Betreuungskräfte“, nie „vermitteln“.
+    expect(document.body.textContent).not.toMatch(/Betreuungskräfte|vermitteln/);
+  }, 20_000);
+
+  it('Platzhalterzeilen ohne Text, solange die Liste lädt; Hauptknopf steht schon da, danach die Zeilen mit Anzahl', async () => {
+    let freigeben: () => void = () => {};
+    const freigabe = new Promise<void>((r) => { freigeben = r; });
+    server.use(
+      // listMatchings hält, bis der Test freigibt; danach fällt die Anfrage zum Standard durch.
+      http.post('https://test.supabase.co/functions/v1/mamamia-proxy', async ({ request }) => {
+        const body = await request.clone().json() as { action?: string };
+        if (body.action === 'listMatchings') await freigabe;
+        return undefined;
+      }),
+      ...lesen,
+      ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }),
+    );
+    window.history.replaceState({}, '', '/?token=token-mi-laedt');
+    render(<CustomerPortalPage />);
+    await screen.findByRole('heading', { level: 1, name: 'Guten Tag, Frau Testerin' }, { timeout: 5000 });
+    const platzhalter = () => [...document.querySelectorAll('[data-platzhalter]')];
+    await waitFor(() => expect(platzhalter()).toHaveLength(5), { timeout: 5000 });
+    for (const p of platzhalter()) expect(p.textContent).toBe('');
+    expect(document.querySelector('ul[aria-busy="true"]')).not.toBeNull();
+    expect(within(document.getElementById('pflegekraefte')!).getByRole('heading', { level: 2 }).textContent).toBe('Passende Pflegekräfte');
+    expect(screen.getByRole('button', { name: HAUPTKNOPF })).toBeInTheDocument();
+    expect(zeilen()).toHaveLength(0);
+
+    freigeben();
+    await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
+    expect(platzhalter()).toHaveLength(0);
+    expect(within(document.getElementById('pflegekraefte')!).getByRole('heading', { level: 2 }).textContent).toBe('Passende Pflegekräfte2');
+  }, 20_000);
+
+  it('„Einladen“ in der Zeile: Fenster „{Name} einladen“, „Vorgemerkt ✓“, Zeile über dem Formular, localStorage; Messpunkte wie bei der Karte', async () => {
+    let einladungen = 0;
+    const meldungen: Meldung[] = [];
+    server.use(
+      bridgeHandler((b) => { meldungen.push(b as Meldung); }),
+      ...lesen,
+      ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege, inviteCaregiver: () => { einladungen += 1; return { StoreRequest: { id: 1 } }; } } }),
+    );
+    window.history.replaceState({}, '', '/?token=token-mi-einladen');
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
+
+    await user.click(within(zeileVon('Emilia')).getByRole('button', { name: 'Einladen' }));
+    const fenster = await screen.findByRole('dialog', { name: 'Emilia W. einladen' });
+    await user.click(within(fenster).getByRole('button', { name: 'Später' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    const vorgemerkt = within(zeileVon('Emilia')).getByRole('button', { name: 'Vorgemerkt ✓' });
+    expect(within(zeileVon('Helena')).getByRole('button', { name: 'Einladen' })).toBeInTheDocument();
+    expect(screen.getByText('Nach dem Speichern laden wir Emilia W. für Sie ein.')).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem(vormerkSchluessel('token-mi-einladen'))!)).toEqual([50003]);
+
+    // „Vorgemerkt ✓“ öffnet das Fenster erneut; der Knopf darin springt zum Formular (Quelle einladen_fenster).
+    await user.click(vorgemerkt);
+    await user.click(within(await screen.findByRole('dialog', { name: 'Emilia W. einladen' })).getByRole('button', { name: 'Pflegesituation vervollständigen' }));
+    await waitFor(() => expect(gescrollt().map((e) => e.id)).toContain('patientendaten'));
+
+    await waitFor(() => expect(meldungen.find((m) => m.event === 'einladung_vorgemerkt')?.metadata).toEqual({ caregiver_id: 50003 }));
+    expect(meldungen.find((m) => m.event === 'einladen_getippt')?.metadata).toEqual({ caregiver_id: 50003, quelle: 'karte', vor_speichern: true });
+    await waitFor(() => expect(meldungen.find((m) => m.event === 'zur_pflegesituation')?.metadata).toEqual({ quelle: 'einladen_fenster', vor_speichern: true }));
+    expect(einladungen).toBe(0);
+  }, 20_000);
+
+  it('Hauptknopf springt zum offenen Formular (Messpunkt zur_pflegesituation, Quelle hauptknopf); Tipp auf die Zeile öffnet das Profil (Quelle karte)', async () => {
+    const meldungen: Meldung[] = [];
+    server.use(
+      bridgeHandler((b) => { meldungen.push(b as Meldung); }),
+      ...lesen,
+      ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }),
+    );
+    window.history.replaceState({}, '', '/?token=token-mi-haupt');
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
+
+    await user.click(screen.getByRole('button', { name: HAUPTKNOPF }));
+    await waitFor(() => expect(gescrollt().map((e) => e.id)).toContain('patientendaten'));
+    await waitFor(() => expect(meldungen.find((m) => m.event === 'zur_pflegesituation')?.metadata).toEqual({ quelle: 'hauptknopf', vor_speichern: true }));
+    expect(meldungen.find((m) => m.event === 'zur_pflegesituation')?.notify).toBe(false);
+
+    await user.click(within(zeileVon('Helena')).getByText(/^Helena, \d+$/));
+    await screen.findByRole('button', { name: 'Nein danke' }, { timeout: 5000 });
+    await waitFor(() => expect(meldungen.find((m) => m.event === 'profil_geoeffnet')?.metadata).toEqual({ caregiver_id: 50002, quelle: 'karte', vor_speichern: true }));
+  }, 20_000);
+
+  it('„Details ›“ klappt die Kostenkarte mit „Alle Kosten im Überblick“ auf und springt hin (Messpunkt kosten_aufgeklappt)', async () => {
+    const meldungen: Meldung[] = [];
+    server.use(
+      bridgeHandler((b) => { meldungen.push(b as Meldung); }),
+      ...lesen,
+      ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }),
+    );
+    window.history.replaceState({}, '', '/?token=token-mi-details');
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
+    const kostenkarte = screen.getByText('Ihre Betreuungskosten').closest('.shadow-lift') as HTMLElement;
+    expect(within(kostenkarte).queryByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Details ›' }));
+    expect(await within(kostenkarte).findByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeInTheDocument();
+    expect(within(kostenkarte).getByRole('button', { name: 'Weniger anzeigen' })).toBeInTheDocument();
+    // Gesprungen wird an den Anfang der Aufstellung („Weniger anzeigen“), nicht an den Preis.
+    await waitFor(() => expect(gescrollt().some((e) => e.textContent === 'Weniger anzeigen' && kostenkarte.contains(e))).toBe(true));
+    await waitFor(() => expect(meldungen.filter((m) => m.event === 'kosten_aufgeklappt')).toHaveLength(1));
+  }, 20_000);
+
+  it('nach dem ersten erfolgreichen Speichern: die in den Zeilen Vorgemerkten werden eingeladen (Logik #145), danach die Ansicht nach dem Speichern', async () => {
+    const TOKEN = 'token-mi-speichern';
+    const eingeladen: number[] = [];
+    server.use(
+      nebenlaeufer,
+      ...lesen,
+      ...defaultHandlers({ proxy: {
+        ...ohneBewerbung, ...ort, listMatchings: zweiVorschlaege,
+        inviteCaregiver: (vars) => { eingeladen.push(vars.caregiver_id as number); return { StoreRequest: { id: 1, caregiver_id: vars.caregiver_id } }; },
+      } }),
+    );
+    vollerEntwurf(TOKEN);
+    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
+    await user.click(within(zeileVon('Helena')).getByRole('button', { name: 'Einladen' }));
+    await user.click(within(await screen.findByRole('dialog', { name: 'Helena K. einladen' })).getByRole('button', { name: 'Später' }));
+    expect(eingeladen).toEqual([]);
+    for (let i = 0; i < 3; i++) await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
+    await user.click(await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 }));
+
+    expect(await screen.findByText('Helena K. ist eingeladen.', {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(eingeladen).toEqual([50002]);
+    expect(localStorage.getItem(vormerkSchluessel(TOKEN))).toBeNull();
+    // Nach dem Speichern weder Zeilen noch Hauptknopf; die Navigationsleiste zeigt wieder „Hilfe“.
+    expect(zeilen()).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: HAUPTKNOPF })).toBeNull();
+    expect(document.querySelector('[data-testsieger-kopf]')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Hilfe' })).toBeInTheDocument();
+  }, 30_000);
+
+  it('?einstieg=zuerst zeigt „Pflegekräfte zuerst“ (#145) unverändert, ohne Minimal-Einstieg', async () => {
+    server.use(...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
+    window.history.replaceState({}, '', '/?token=token-mi-zuerst&einstieg=zuerst');
+    render(<CustomerPortalPage />);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText('Helena K.', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(document.querySelector('[data-einstieg="minimal"]')).toBeNull();
+    expect(screen.queryByRole('button', { name: HAUPTKNOPF })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Hilfe' })).toBeInTheDocument();
+  }, 20_000);
+});
+
+describe('zeilenFakten (Registry #147)', () => {
+  const kraft = (experienceYears: number, level: string) => ({ experienceYears, language: { level, bars: 0 } }) as Pick<Nurse, 'experienceYears' | 'language'>;
+  it('„N Jahre Erfahrung“, „Deutsch gut“ wie kraftZeile im Kostenrechner; Einzahl, fehlende Angaben entfallen', () => {
+    expect(zeilenFakten(kraft(7, 'Gut'))).toEqual(['7 Jahre Erfahrung', 'Deutsch gut']);
+    expect(zeilenFakten(kraft(11, 'Mittel'))).toEqual(['11 Jahre Erfahrung', 'Deutsch mittel']);
+    expect(zeilenFakten(kraft(1, 'Grund'))).toEqual(['1 Jahr Erfahrung', 'Deutsch grund']);
+    expect(zeilenFakten(kraft(0, 'Gut'))).toEqual(['Deutsch gut']);
+    expect(zeilenFakten(kraft(4, '—'))).toEqual(['4 Jahre Erfahrung']);
+    expect(zeilenFakten(kraft(0, ''))).toEqual([]);
+  });
+});
