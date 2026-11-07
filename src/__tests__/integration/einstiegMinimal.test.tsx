@@ -2,8 +2,10 @@
 // Minimal-Einstieg vor dem ersten Speichern der Pflegesituation (Registry #147, Entwurf; Martin 07.11.2026 zum Mockup
 // „Minimal“: „Ja, alle drei“).
 //   - Reihenfolge im ersten Bild: Kopf mit Testsieger statt „Hilfe“ → „Guten Tag, …“ → kompakte Angebotskarte → „Passende
-//     Pflegekräfte“ mit Anzahl als Zeilen → Hauptknopf → „Rückruf vereinbaren“ (Anruf-Link) → Nummer und WhatsApp;
-//     darunter Pflegesituation mit Formular, Kostenkarte, So geht es weiter, Fragen, Marta
+//     Pflegekräfte“ mit Anzahl als Zeilen → Hauptknopf → „Rückruf vereinbaren“ (Knopf, mit Rückrufnummer im Lead) →
+//     Nummer und WhatsApp; darunter Pflegesituation mit Formular, Kostenkarte, So geht es weiter, Fragen, Marta
+//   - „Rückruf vereinbaren“ schickt die Bitte an /api/rueckmeldung (Quelle portal_einstieg) und zeigt danach wörtlich die
+//     Rückmeldeseite: „Danke, Marta ruft Sie an.“ bzw. „Das hat nicht geklappt“; ohne Rückrufnummer bleibt es ein tel:-Link
 //   - Platzhalterzeilen ohne Text, solange die Liste lädt (Hauptknopf steht schon da)
 //   - „Einladen“ in der Zeile = Logik aus #145 (Fenster, Vormerken, nach dem Speichern automatisch einladen)
 //   - Messpunkte: Hauptknopf als Quelle `hauptknopf`, „Details ›“ als `kosten_aufgeklappt`, Zeile wie die Karte (`karte`)
@@ -14,7 +16,7 @@ import { server } from '../../../test/mocks/server';
 import { http, HttpResponse } from 'msw';
 import { defaultHandlers, defaultLead, sampleCaregiver, sampleMatching, bridgeHandler } from '../../../test/fixtures/mamamia-mocks';
 import { vormerkSchluessel } from '../../lib/vormerkungen';
-import { zeilenFakten } from '../../components/portal/EinstiegMinimal';
+import { EinstiegMinimal, zeilenFakten } from '../../components/portal/EinstiegMinimal';
 import type { Nurse } from '../../types';
 
 vi.mock('../../lib/supabase', async () => {
@@ -22,8 +24,9 @@ vi.mock('../../lib/supabase', async () => {
   return {
     ...actual,
     // Jeder Test mit eigenem Token (Sitzungs-Dedupe der Meldungen je Token). Lead wie im Rechner: eine Person, Pflegegrad 3.
+    // Token mit „ohnetel“: Lead ohne Rückrufnummer (Kontakt in drei Schritten, Registry #76).
     fetchLeadByToken: vi.fn(async (token: string) => token.startsWith('token-mi-')
-      ? { lead: { ...defaultLead, token, kalkulation: { ...defaultLead.kalkulation, formularDaten: { ...defaultLead.kalkulation.formularDaten, betreuung_fuer: '1-person' } } } as unknown as import('../../lib/supabase').Lead, error: null }
+      ? { lead: { ...defaultLead, token, telefon: token.includes('ohnetel') ? null : defaultLead.telefon, kalkulation: { ...defaultLead.kalkulation, formularDaten: { ...defaultLead.kalkulation.formularDaten, betreuung_fuer: '1-person' } } } as unknown as import('../../lib/supabase').Lead, error: null }
       : { lead: null, error: 'Token nicht gefunden' }),
     fetchNotfallTelefon: vi.fn(async () => null),
   };
@@ -102,22 +105,23 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(within(kopf).getByAltText('Testsieger Die Welt')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hilfe' })).toBeNull();
 
-    // Kompakte Angebotskarte: angebotFuer klein, Preis, „/ Monat“, „Details ›“, drei Punkte.
+    // Kompakte Angebotskarte: „Ihr Angebot“ + angebotFuer (ohne „·“), Preis, „/ Monat“, „Details ›“, drei Punkte.
     const karte = document.querySelector('[data-angebot-minimal]') as HTMLElement;
-    expect(within(karte).getByText('Ihr Angebot · für eine Person mit Pflegegrad 3')).toBeInTheDocument();
+    expect(within(karte).getByText('Ihr Angebot für eine Person mit Pflegegrad 3')).toBeInTheDocument();
     expect(within(karte).getByText(/^2\.800 €/).textContent).toBe('2.800 € / Monat');
     expect(within(karte).getByRole('button', { name: 'Details ›' })).toBeInTheDocument();
     expect(within(karte).getByText('Täglich kündbar · Keine Vermittlungsgebühr · Bestpreisgarantie')).toBeInTheDocument();
 
-    // Pflegekräfte: Abschnitt mit Anzahl, Zeilen „Vorname, Alter“ und „N Jahre Erfahrung · Deutsch gut“, Empfehlung oben.
+    // Pflegekräfte: Abschnitt mit Anzahl, Zeilen „Vorname, Alter“ und „N Jahre Erfahrung · Deutsch Gut“ (Stufe wie auf der
+    // Karte vor dem Speichern), Empfehlung oben.
     await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
     const abschnitt = document.getElementById('pflegekraefte')!;
     expect(within(abschnitt).getByRole('heading', { level: 2 }).textContent).toBe('Passende Pflegekräfte2');
     const [erste, zweite] = zeilen();
     // Die Zeile bricht nur hinter „·“ (geschütztes Leerzeichen davor, jede Angabe ohne Umbruch).
-    expect(erste.textContent).toMatch(/^Helena, \d+5 Jahre Erfahrung\u00A0· Deutsch gutEinladen$/);
-    expect([...erste.querySelectorAll('.whitespace-nowrap')].map((e) => e.textContent)).toEqual(['5 Jahre Erfahrung', 'Deutsch gut', 'Einladen']);
-    expect(zweite.textContent).toMatch(/^Emilia, \d+5 Jahre Erfahrung\u00A0· Deutsch gutEinladen$/);
+    expect(erste.textContent).toMatch(/^Helena, \d+5 Jahre Erfahrung\u00A0· Deutsch GutEinladen$/);
+    expect([...erste.querySelectorAll('.whitespace-nowrap')].map((e) => e.textContent)).toEqual(['5 Jahre Erfahrung', 'Deutsch Gut', 'Einladen']);
+    expect(zweite.textContent).toMatch(/^Emilia, \d+5 Jahre Erfahrung\u00A0· Deutsch GutEinladen$/);
     // Rundes Foto wie heute (Name steht daneben, darum alt="").
     expect(erste.querySelector('img')).toHaveAttribute('src', 'https://example.test/avatar.jpg');
     expect(erste.querySelector('img')!.className).toContain('rounded-full');
@@ -128,12 +132,12 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(screen.queryByText('Unsere Empfehlung für Sie')).toBeNull();
     expect(document.querySelector('.rounded-card.cursor-pointer')).toBeNull();
 
-    // Hauptknopf mit Unterzeile, darunter Rückruf (Anruf-Link) und Nummer/WhatsApp.
+    // Hauptknopf mit Unterzeile, darunter Rückruf (Knopf: der Lead hat eine Rückrufnummer) und Nummer/WhatsApp.
     const haupt = screen.getByRole('button', { name: HAUPTKNOPF });
     expect(haupt.textContent).toBe('Angaben vervollständigen und Bewerbungen erhaltendauert etwa 2 Minuten · kostenlos und unverbindlich');
     expect(haupt.className).toContain('bg-pm-coral');
-    const rueckruf = screen.getByRole('link', { name: 'Rückruf vereinbaren' });
-    expect(rueckruf).toHaveAttribute('href', 'tel:+4989200000830');
+    const rueckruf = screen.getByRole('button', { name: 'Rückruf vereinbaren' });
+    expect(screen.queryByRole('link', { name: 'Rückruf vereinbaren' })).toBeNull();
     const zeileTel = screen.getByText(/^oder anrufen, auch per/);
     expect(zeileTel.textContent).toBe('oder anrufen, auch per WhatsApp:089 200 000 830 (täglich 8–20 Uhr)');
     expect(within(zeileTel).getByRole('link', { name: 'WhatsApp' }).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/4989200000830/);
@@ -151,6 +155,8 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     for (let i = 1; i < reihe.length; i++) expect(davor(reihe[i - 1], reihe[i])).toBe(true);
     // Wortlaut-Regeln: nie „Betreuungskräfte“, nie „vermitteln“.
     expect(document.body.textContent).not.toMatch(/Betreuungskräfte|vermitteln/);
+    // Pille rechts in jedem Zustand gleich breit (die Zeile hält ihre Höhe, der Hauptknopf wandert nicht).
+    for (const z of zeilen()) expect(within(z).getByRole('button', { name: 'Einladen' }).className).toContain('w-[88px]');
   }, 20_000);
 
   it('Platzhalterzeilen ohne Text, solange die Liste lädt; Hauptknopf steht schon da, danach die Zeilen mit Anzahl', async () => {
@@ -201,6 +207,9 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     await user.click(within(fenster).getByRole('button', { name: 'Später' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     const vorgemerkt = within(zeileVon('Emilia')).getByRole('button', { name: 'Vorgemerkt ✓' });
+    // Gleich breite Pille wie „Einladen“: die Zeile wird mit der Vormerkung nicht höher.
+    expect(vorgemerkt.className).toContain('w-[88px]');
+    expect(zeileVon('Emilia')).toHaveAttribute('data-vorgemerkt', 'true');
     expect(within(zeileVon('Helena')).getByRole('button', { name: 'Einladen' })).toBeInTheDocument();
     expect(screen.getByText('Nach dem Speichern laden wir Emilia W. für Sie ein.')).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem(vormerkSchluessel('token-mi-einladen'))!)).toEqual([50003]);
@@ -292,6 +301,94 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(screen.getByRole('button', { name: 'Hilfe' })).toBeInTheDocument();
   }, 30_000);
 
+  it('„Rückruf vereinbaren“: genau ein POST mit Token und Quelle portal_einstieg, danach „Danke, Marta ruft Sie an.“ statt des Knopfs; Nummer bleibt', async () => {
+    const TOKEN = 'token-mi-rueckruf-ok';
+    const bitten: Record<string, unknown>[] = [];
+    let freigeben: () => void = () => {};
+    const freigabe = new Promise<void>((r) => { freigeben = r; });
+    server.use(
+      http.post('https://kostenrechner.primundus.de/api/rueckmeldung', async ({ request }) => {
+        bitten.push(await request.json() as Record<string, unknown>);
+        await freigabe;
+        return HttpResponse.json({ ok: true });
+      }),
+      ...lesen,
+      ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }),
+    );
+    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
+    const haupt = screen.getByRole('button', { name: HAUPTKNOPF });
+    const knopf = screen.getByRole('button', { name: 'Rückruf vereinbaren' });
+
+    // Während der Anfrage gesperrt, ein Doppeltipp sendet nicht zweimal; die Beschriftung bleibt.
+    await user.click(knopf);
+    await waitFor(() => expect(knopf).toBeDisabled());
+    expect(knopf).toHaveAttribute('aria-busy', 'true');
+    expect(knopf.textContent).toBe('Rückruf vereinbaren');
+    await user.click(knopf);
+    freigeben();
+
+    const aktionen = document.querySelector('[data-aktionen-minimal]') as HTMLElement;
+    const danke = await within(aktionen).findByRole('status');
+    expect(danke.textContent).toBe('Danke, Marta ruft Sie an.');
+    expect(screen.queryByRole('button', { name: 'Rückruf vereinbaren' })).toBeNull();
+    expect(bitten).toEqual([{ token: TOKEN, aktion: 'rueckruf', quelle: 'portal_einstieg' }]);
+    // Hauptknopf und Nummer bleiben, in derselben Reihenfolge.
+    expect(screen.getByRole('button', { name: HAUPTKNOPF })).toBe(haupt);
+    const zeileTel = screen.getByText(/^oder anrufen, auch per/);
+    expect(davor(haupt, danke)).toBe(true);
+    expect(davor(danke, zeileTel)).toBe(true);
+    expect(document.body.textContent).not.toMatch(/Betreuungskräfte|vermitteln/);
+  }, 20_000);
+
+  it('„Rückruf vereinbaren“ ohne Erfolg (502): „Das hat nicht geklappt“ über dem weiter tippbaren Knopf, zweiter Tipp sendet erneut', async () => {
+    let anzahl = 0;
+    server.use(
+      http.post('https://kostenrechner.primundus.de/api/rueckmeldung', () => {
+        anzahl += 1;
+        return anzahl === 1 ? HttpResponse.json({ error: 'Mail fehlgeschlagen' }, { status: 502 }) : HttpResponse.json({ ok: true });
+      }),
+      ...lesen,
+      ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }),
+    );
+    window.history.replaceState({}, '', '/?token=token-mi-rueckruf-fehler');
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
+
+    await user.click(screen.getByRole('button', { name: 'Rückruf vereinbaren' }));
+    const aktionen = document.querySelector('[data-aktionen-minimal]') as HTMLElement;
+    const fehler = await within(aktionen).findByRole('alert');
+    expect(fehler.textContent).toBe('Das hat nicht geklappt');
+    const knopf = screen.getByRole('button', { name: 'Rückruf vereinbaren' });
+    expect(knopf).toBeEnabled();
+    expect(davor(fehler, knopf)).toBe(true);
+    expect(screen.queryByText('Danke, Marta ruft Sie an.')).toBeNull();
+    expect(screen.getByText(/^oder anrufen, auch per/)).toBeInTheDocument();
+
+    await user.click(knopf);
+    expect((await within(aktionen).findByRole('status')).textContent).toBe('Danke, Marta ruft Sie an.');
+    expect(anzahl).toBe(2);
+  }, 20_000);
+
+  it('Lead ohne Rückrufnummer: „Rückruf vereinbaren“ bleibt ein Anruf-Link, kein POST', async () => {
+    let bitten = 0;
+    server.use(
+      http.post('https://kostenrechner.primundus.de/api/rueckmeldung', () => { bitten += 1; return HttpResponse.json({ ok: true }); }),
+      ...lesen,
+      ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }),
+    );
+    window.history.replaceState({}, '', '/?token=token-mi-ohnetel');
+    render(<CustomerPortalPage />);
+    await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
+    const link = screen.getByRole('link', { name: 'Rückruf vereinbaren' });
+    expect(link).toHaveAttribute('href', 'tel:+4989200000830');
+    expect(screen.queryByRole('button', { name: 'Rückruf vereinbaren' })).toBeNull();
+    expect(bitten).toBe(0);
+  }, 20_000);
+
   it('?einstieg=zuerst zeigt „Pflegekräfte zuerst“ (#145) unverändert, ohne Minimal-Einstieg', async () => {
     server.use(...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
     window.history.replaceState({}, '', '/?token=token-mi-zuerst&einstieg=zuerst');
@@ -306,12 +403,43 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
 
 describe('zeilenFakten (Registry #147)', () => {
   const kraft = (experienceYears: number, level: string) => ({ experienceYears, language: { level, bars: 0 } }) as Pick<Nurse, 'experienceYears' | 'language'>;
-  it('„N Jahre Erfahrung“, „Deutsch gut“ wie kraftZeile im Kostenrechner; Einzahl, fehlende Angaben entfallen', () => {
-    expect(zeilenFakten(kraft(7, 'Gut'))).toEqual(['7 Jahre Erfahrung', 'Deutsch gut']);
-    expect(zeilenFakten(kraft(11, 'Mittel'))).toEqual(['11 Jahre Erfahrung', 'Deutsch mittel']);
-    expect(zeilenFakten(kraft(1, 'Grund'))).toEqual(['1 Jahr Erfahrung', 'Deutsch grund']);
-    expect(zeilenFakten(kraft(0, 'Gut'))).toEqual(['Deutsch gut']);
+  it('„N Jahre Erfahrung“, „Deutsch Gut“ (Stufe wie auf der Karte, nie „grund“ klein); Einzahl, fehlende Angaben entfallen', () => {
+    expect(zeilenFakten(kraft(7, 'Gut'))).toEqual(['7 Jahre Erfahrung', 'Deutsch Gut']);
+    expect(zeilenFakten(kraft(11, 'Mittel'))).toEqual(['11 Jahre Erfahrung', 'Deutsch Mittel']);
+    expect(zeilenFakten(kraft(1, 'Grund'))).toEqual(['1 Jahr Erfahrung', 'Deutsch Grund']);
+    expect(zeilenFakten(kraft(0, 'Gut'))).toEqual(['Deutsch Gut']);
     expect(zeilenFakten(kraft(4, '—'))).toEqual(['4 Jahre Erfahrung']);
     expect(zeilenFakten(kraft(0, ''))).toEqual([]);
+  });
+});
+
+describe('Leerzustände ohne Gedankenstrich (Registry #147)', () => {
+  const leer = (gehalteneEinladungen: number) => render(
+    <EinstiegMinimal
+      anrede="Frau Testerin" lead={null} onBestpreis={() => {}} heimEigenanteil={0} heimQuelle=""
+      laedt={false} zeilen={[]} gehalteneEinladungen={gehalteneEinladungen} vorschlaegeVorhanden bereitsBearbeitet={null}
+      formular={<div />} sterne={null} vorgemerkte={[]} onVervollstaendigen={() => {}}
+    />,
+  );
+  it('„Ihre Auswahl ist eingeladen“: Punkt statt Gedankenstrich, sonst Wortlaut gleich', () => {
+    leer(1);
+    expect(screen.getByText('Ihre Auswahl ist eingeladen')).toBeInTheDocument();
+    expect(screen.getByText(/^Die Pflegekräfte melden sich/).textContent).toBe(
+      'Die Pflegekräfte melden sich meist innerhalb von 1–2 Tagen. Sobald Rückmeldungen da sind, sehen Sie sie hier. Meldet sich niemand, schlagen wir Ihnen automatisch weitere Pflegekräfte vor.',
+    );
+    expect(document.querySelector('[data-einstieg="minimal"]')!.textContent).not.toContain('—');
+  });
+  it('„Alle aktuellen Vorschläge bearbeitet“: Punkt statt Gedankenstrich, sonst Wortlaut gleich', () => {
+    leer(0);
+    expect(screen.getByText('Alle aktuellen Vorschläge bearbeitet')).toBeInTheDocument();
+    expect(screen.getByText(/^Sie haben alle passenden Pflegekräfte/).textContent).toBe(
+      'Sie haben alle passenden Pflegekräfte durchgesehen. Wir schlagen Ihnen in Kürze weitere vor. Sie hören von uns.',
+    );
+    expect(document.querySelector('[data-einstieg="minimal"]')!.textContent).not.toContain('—');
+  });
+  it('Angebotskarte ohne Angaben: nur „Ihr Angebot“', () => {
+    leer(0);
+    const karte = document.querySelector('[data-angebot-minimal]') as HTMLElement;
+    expect(karte.querySelector('p')!.textContent).toBe('Ihr Angebot');
   });
 });

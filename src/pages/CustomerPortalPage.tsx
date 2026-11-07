@@ -70,6 +70,7 @@ import { HERO_PUNKTE } from '../lib/heroPunkte';
 import { kalenderTag } from '../components/portal/DateField';
 import { reserviertBis as berechneReservierung, RESERVIERUNG_STUNDEN, nochReserviertText } from '../lib/reservierung';
 import type { FetchedLeadEvent } from '../lib/leadEvents';
+import { rueckrufAnfordern } from '../lib/rueckruf';
 import { MatchCard } from '../components/portal/MatchCard';
 // Rückbau Registry #122: vor dem ersten Speichern wieder der Einstieg aus Stand 75b8df8 (Kostenkarte, Kasten
 // „Noch 2 Minuten“, Karten mit „Einladen“ + Schloss, offenes Formular mit „Speichern“); Kopf und Häufige Fragen wie heute.
@@ -154,6 +155,14 @@ const IS_PREVIEW_WARTET = PREVIEW_PARAM === 'wartet';
 const IS_PREVIEW_LEER =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('leer') === '1';
 const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIEW_GEBUCHT || IS_PREVIEW_CHAT || IS_PREVIEW_PATIENT || IS_PREVIEW_WARTET;
+// Dev-only (Registry #147): ?preview=patient&rueckruf=ok|fehler zeigt „Rückruf vereinbaren“ im Minimal-Einstieg als Knopf
+// und spielt die Antwort der Route nach (ok = „Danke, Marta ruft Sie an.“, fehler = „Das hat nicht geklappt“), OHNE Netz.
+// Nur zum Ansehen und Fotografieren der Zustände; ohne den Parameter bleibt es in der Vorschau beim Anruf-Link.
+const PREVIEW_RUECKRUF: 'ok' | 'fehler' | null = (() => {
+  if (!IS_PREVIEW_PATIENT || typeof window === 'undefined') return null;
+  const w = new URLSearchParams(window.location.search).get('rueckruf');
+  return w === 'ok' || w === 'fehler' ? w : null;
+})();
 
 // PROTOTYP 14.10.2026 — Kontaktbereich im ALTEN Gebucht-Bildschirm (BookedScreen + GebuchtKontakt). NUR in der Vorschau
 // ?preview=gebucht&seite=alt, außerhalb AUS (undefined). Echte Kunden bekommen die Nummer seit Registry #139 auf der neuen
@@ -4021,7 +4030,7 @@ const CustomerPortalPage: FC = () => {
 
       {/* Navbar */}
       <nav className="sticky top-0 z-40" style={{background:'white', boxShadow:'0 1px 0 #E9E9EB, 0 2px 8px rgba(0,0,0,0.06)'}}>
-        <div className={`max-w-3xl mx-auto px-4 ${minimalEinstieg && !acceptedApp ? 'py-2' : 'py-3'} flex items-center justify-between`}>
+        <div className={`max-w-3xl mx-auto px-4 ${minimalEinstieg && !acceptedApp ? 'py-1' : 'py-3'} flex items-center justify-between`}>
           <div className="flex items-center gap-3">
             <img src="/LOGO-PRIMUNDUS.webp" alt="Primundus" className="h-6" />
           </div>
@@ -4188,6 +4197,14 @@ const CustomerPortalPage: FC = () => {
           sterne={sterne}
           vorgemerkte={vorgemerkteKraefte}
           onVervollstaendigen={zurPflegesituationAus('hauptknopf')}
+          // „Rückruf vereinbaren“ (Registry #147): Bitte über /api/rueckmeldung (Quelle portal_einstieg, Team-Mail an info@).
+          // Nur mit Rückrufnummer im Lead — ohne (Kontakt in drei Schritten, Registry #76) könnte niemand zurückrufen, dann
+          // bleibt es beim Anruf-Link. In der Vorschau ebenfalls der Link (außer `&rueckruf=ok|fehler`, ohne Netz).
+          onRueckruf={PREVIEW_RUECKRUF
+            ? () => new Promise<boolean>((fertig) => setTimeout(() => fertig(PREVIEW_RUECKRUF === 'ok'), 600))
+            : !IS_PREVIEW_ANY && lead?.token && lead.telefon?.trim()
+              ? () => rueckrufAnfordern(lead.token)
+              : undefined}
           onKostenAufgeklappt={() => messen('kosten_aufgeklappt')}
           onFaqGeoeffnet={messeFrage}
         />

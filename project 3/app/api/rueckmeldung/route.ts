@@ -5,7 +5,10 @@ import {
   anlassAus,
   istOffen,
   knopfAus,
+  portalCors,
+  portalDarf,
   PREIS_ANLAESSE,
+  quelleAus,
   teamMail,
   WANN,
   wannAus,
@@ -28,6 +31,13 @@ import {
 // Gebuchte Kunden bleiben unangetastet (istOffen), das Team bekommt dann nur die Info.
 // Alles nur per POST aus einem Klick auf der Seite, nie beim blossen Aufruf:
 // Mail-Scanner (Outlook Safe Links, Gmail) öffnen Links von selbst.
+//
+// Seit Registry #147 auch aus dem Kundenportal („Rückruf vereinbaren“ im Minimal-Einstieg): Body mit
+// `quelle: 'portal_einstieg'`, nur Aktion `rueckruf` (`portalDarf`), CORS nur für die Portal-Hosts (`portalCors`, an
+// JEDER Antwort, dazu OPTIONS). Ohne `quelle` gilt `nachfass_3` (Rückmeldeseite unverändert). Unterschiede für das
+// Portal: unbekannter Token ⇒ 404 statt {ok:true} — sonst sagte das Portal nach einer Token-Rotation „Danke, Marta ruft
+// Sie an.“, ohne dass etwas ankam (Heilige Regel 1); Team-Mail „Rückruf erbeten (Kundenportal)“. Die 24-h-Sperre über
+// `rueckruf_erbeten_mail` gilt für beide Quellen gemeinsam (Marta ruft einmal an, egal wo geklickt wurde).
 
 const TEAM_EMPFAENGER = 'info@primundus.de';
 const SITE_BASIS = (process.env.NEXT_PUBLIC_SITE_URL || 'https://kostenrechner.primundus.de').replace(/\/$/, '');
@@ -64,26 +74,37 @@ async function allesGeplanteCanceln(supabase: Supa, leadId: string): Promise<num
   return data?.length ?? 0;
 }
 
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, { status: 204, headers: portalCors(request.headers.get('origin')) });
+}
+
 async function handlePost(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const cors = portalCors(origin);
+  const antwort = (body: Record<string, unknown>, status = 200) => NextResponse.json(body, { status, headers: cors });
   let body: Record<string, unknown>;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Ungültige Anfrage' }, { status: 400 });
+    return antwort({ error: 'Ungültige Anfrage' }, 400);
   }
   const token = typeof body.token === 'string' ? body.token : '';
   const aktion = body.aktion;
-  if (token.length < 8) return NextResponse.json({ error: 'Token fehlt' }, { status: 400 });
+  if (token.length < 8) return antwort({ error: 'Token fehlt' }, 400);
   if (aktion !== 'pausieren' && aktion !== 'stoppen' && aktion !== 'rueckruf' && aktion !== 'grund') {
-    return NextResponse.json({ error: 'Unbekannte Aktion' }, { status: 400 });
+    return antwort({ error: 'Unbekannte Aktion' }, 400);
   }
+  // Ohne `quelle` = Rückmeldeseite (Abschiedsmail); ein unbekannter Wert ist ein Fehler, kein Ersatzwert.
+  const quelle = body.quelle === undefined ? 'nachfass_3' : quelleAus(body.quelle);
+  if (!quelle) return antwort({ error: 'Unbekannte Quelle' }, 400);
+  if (!portalDarf(origin, aktion, quelle)) return antwort({ error: 'Nicht erlaubt' }, 403);
   const knopf = knopfAus(body.knopf);
   const anlass = anlassAus(body.anlass);
   const wann = wannAus(body.wann);
   const text = typeof body.text === 'string' ? body.text.trim().slice(0, 1000) : '';
-  if (aktion === 'pausieren' && !wann) return NextResponse.json({ error: 'Termin fehlt' }, { status: 400 });
+  if (aktion === 'pausieren' && !wann) return antwort({ error: 'Termin fehlt' }, 400);
   if (aktion === 'grund' && !(anlass && PREIS_ANLAESSE.has(anlass))) {
-    return NextResponse.json({ error: 'Grund fehlt' }, { status: 400 });
+    return antwort({ error: 'Grund fehlt' }, 400);
   }
 
   try {
@@ -94,8 +115,9 @@ async function handlePost(request: NextRequest) {
       .select('id, status, vorname, nachname, email, telefon, source')
       .eq('token', token)
       .maybeSingle();
-    // Unbekannter Token: trotzdem ok, kein Hinweis, ob es den Token gibt.
-    if (!lead) return NextResponse.json({ ok: true });
+    // Unbekannter Token: für die Rückmeldeseite trotzdem ok, kein Hinweis, ob es den Token gibt. Das Portal bekommt 404
+    // (wie /api/lead-event), damit es nie „Danke, Marta ruft Sie an.“ zeigt, wenn nichts angekommen ist.
+    if (!lead) return quelle === 'portal_einstieg' ? antwort({ error: 'Lead nicht gefunden' }, 404) : antwort({ ok: true });
 
     const statusVorher = String(lead.status ?? '');
     const offen = istOffen(statusVorher);
@@ -105,6 +127,7 @@ async function handlePost(request: NextRequest) {
       email: String(lead.email ?? ''),
       telefon: String(lead.telefon ?? ''),
       quelle: String(lead.source ?? ''),
+      herkunft: quelle,
       adminUrl: `${SITE_BASIS}/admin/leads/${lead.id}`,
       knopf,
       anlass,
@@ -122,10 +145,11 @@ async function handlePost(request: NextRequest) {
 
     if (aktion === 'rueckruf') {
       const letzter = await letztesEreignis(supabase, lead.id, 'rueckruf_erbeten_mail');
-      if (letzter && jetzt.getTime() - new Date(letzter.created_at).getTime() < TAG_MS) return NextResponse.json({ ok: true });
-      if (!(await teamSenden())) return NextResponse.json({ error: 'Mail fehlgeschlagen' }, { status: 502 });
-      await supabase.from('lead_events').insert({ lead_id: lead.id, event_type: 'rueckruf_erbeten_mail', metadata: { knopf, quelle: 'nachfass_3' } });
-      return NextResponse.json({ ok: true });
+      if (letzter && jetzt.getTime() - new Date(letzter.created_at).getTime() < TAG_MS) return antwort({ ok: true });
+      if (!(await teamSenden())) return antwort({ error: 'Mail fehlgeschlagen' }, 502);
+      await supabase.from('lead_events').insert({ lead_id: lead.id, event_type: 'rueckruf_erbeten_mail', metadata: { knopf, quelle } });
+      console.log(`[rueckmeldung] rueckruf lead=${lead.id} quelle=${quelle}`);
+      return antwort({ ok: true });
     }
 
     if (aktion === 'grund') {
@@ -135,7 +159,7 @@ async function handlePost(request: NextRequest) {
         await supabase.from('lead_events').insert({ lead_id: lead.id, event_type: 'kunde_rueckmeldung', metadata: { knopf, anlass, quelle: 'nachfass_3' } });
         await teamSenden();
       }
-      return NextResponse.json({ ok: true });
+      return antwort({ ok: true });
     }
 
     if (aktion === 'pausieren' && wann) {
@@ -145,12 +169,12 @@ async function handlePost(request: NextRequest) {
       const letzte = await letztesEreignis(supabase, lead.id, 'kunde_pausiert');
       if (letzte && jetzt.getTime() - new Date(letzte.created_at).getTime() < 60_000) {
         const m = (letzte.metadata ?? {}) as { datumText?: string };
-        return NextResponse.json({ ok: true, datumText: m.datumText ?? termin.text });
+        return antwort({ ok: true, datumText: m.datumText ?? termin.text });
       }
       if (!offen) {
         await supabase.from('lead_events').insert({ lead_id: lead.id, event_type: 'kunde_pausiert', metadata: { wann, knopf, anlass, status_vorher: statusVorher, eingeplant: false } });
         await teamSenden();
-        return NextResponse.json({ ok: true });
+        return antwort({ ok: true });
       }
       info.mailsGestoppt = await allesGeplanteCanceln(supabase, lead.id);
       const { error: planFehler } = await supabase.from('scheduled_emails').insert({
@@ -168,11 +192,11 @@ async function handlePost(request: NextRequest) {
         metadata: { bis: termin.iso, datum: termin.datum, datumText: termin.text, wann, knopf, anlass, text: text || undefined, mails_gestoppt: info.mailsGestoppt, eingeplant: true },
       });
       await teamSenden();
-      return NextResponse.json({ ok: true, datumText: termin.text });
+      return antwort({ ok: true, datumText: termin.text });
     }
 
     // stoppen — idempotent: zweiter Klick ändert nichts und schickt keine zweite Team-Mail.
-    if (await letztesEreignis(supabase, lead.id, 'kunde_kein_interesse')) return NextResponse.json({ ok: true });
+    if (await letztesEreignis(supabase, lead.id, 'kunde_kein_interesse')) return antwort({ ok: true });
     if (offen) {
       const { error: statusFehler } = await supabase.from('leads').update({ status: 'nicht_interessiert' }).eq('id', lead.id);
       if (statusFehler) throw new Error(`Status-Update: ${statusFehler.message}`);
@@ -185,10 +209,10 @@ async function handlePost(request: NextRequest) {
     });
     await teamSenden();
     console.log(`[rueckmeldung] stoppen lead=${lead.id} anlass=${anlass ?? '-'} status_gesetzt=${offen}`);
-    return NextResponse.json({ ok: true });
+    return antwort({ ok: true });
   } catch (e) {
     console.error('[rueckmeldung] Fehler:', e instanceof Error ? e.message : String(e));
-    return NextResponse.json({ error: 'Fehler' }, { status: 500 });
+    return antwort({ error: 'Fehler' }, 500);
   }
 }
 

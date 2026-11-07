@@ -44,6 +44,50 @@ export const knopfAus = (w: unknown): Knopf | null => (hat(KNOEPFE, w) ? (w as K
 export const anlassAus = (w: unknown): Anlass | null => (hat(ANLAESSE, w) ? (w as Anlass) : null);
 export const wannAus = (w: unknown): Wann | null => (hat(WANN, w) ? (w as Wann) : null);
 
+// ─── Quelle der Anfrage (Registry #147) ──────────────────────────────────
+// Die Route bedient zwei Stellen: die Rückmeldeseite der Abschiedsmail (alle vier Aktionen, ohne `quelle` im Body —
+// alte Seite und offene Tabs bleiben gleich) und seit #147 den Knopf „Rückruf vereinbaren“ im Kundenportal (nur
+// `rueckruf`, `quelle: 'portal_einstieg'`, Aufruf von einer anderen Domain ⇒ CORS).
+export const QUELLEN = {
+  nachfass_3: 'Abschiedsmail',
+  portal_einstieg: 'Kundenportal',
+} as const;
+export type Quelle = keyof typeof QUELLEN;
+export const quelleAus = (w: unknown): Quelle | null => (hat(QUELLEN, w) ? (w as Quelle) : null);
+
+/** Die Hosts des Kundenportals — wie `supabase/functions/_shared/cors.ts` (Prod-Domain, Prod-Slot mit demselben Build,
+ *  Staging, Vite lokal); `portal.primundus.de` dort ohne Beleg für eine Nutzung, darum nicht übernommen. */
+export const PORTAL_ORIGINS = [
+  'https://kundenportal.primundus.de',
+  'https://caapp-beta.onrender.com',
+  'https://caapp-staging.onrender.com',
+  'http://localhost:5173',
+];
+export function istPortalOrigin(origin: string | null | undefined): boolean {
+  return !!origin && PORTAL_ORIGINS.indexOf(origin) >= 0;
+}
+
+/** CORS fürs Portal nach dem Muster von `corsHeaders` in lib/bewertungen.ts: Origin-Echo NUR für die Portal-Hosts,
+ *  nie `*`, keine Credentials (der Token steht im Body). Hängt an jeder Antwort der Route. */
+export function portalCors(origin: string | null | undefined): Record<string, string> {
+  const h: Record<string, string> = {
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
+    Vary: 'Origin',
+  };
+  if (origin && istPortalOrigin(origin)) h['Access-Control-Allow-Origin'] = origin;
+  return h;
+}
+
+/** Was das Portal darf: aus dem Portal (Origin eines Portal-Hosts) NUR `rueckruf` mit `portal_einstieg` — kein
+ *  Pausieren, Abmelden oder Preis-Einwand aus dem Portal. `portal_einstieg` gibt es nur mit `rueckruf`. */
+export function portalDarf(origin: string | null | undefined, aktion: string, quelle: Quelle): boolean {
+  if (quelle === 'portal_einstieg' && aktion !== 'rueckruf') return false;
+  if (istPortalOrigin(origin)) return aktion === 'rueckruf' && quelle === 'portal_einstieg';
+  return true;
+}
+
 /** Bei diesen Gründen zeigt die Seite die Bestpreisgarantie und das Team bekommt sofort Bescheid. */
 export const PREIS_ANLAESSE: ReadonlySet<Anlass> = new Set<Anlass>(['anderer-anbieter', 'zu-teuer']);
 /** Bei diesen Gründen bietet die Seite an, sich in 3 Monaten noch einmal zu melden. */
@@ -81,7 +125,10 @@ export interface TeamInfo {
   kunde: string;
   email: string;
   telefon: string;
+  /** leads.source (z. B. rechner) — nicht die Stelle der Anfrage, die steht in `herkunft`. */
   quelle: string;
+  /** Wo der Kunde geklickt hat (Registry #147). Ohne = Abschiedsmail (nachfass_3). */
+  herkunft?: Quelle;
   adminUrl: string;
   knopf: Knopf | null;
   anlass?: Anlass | null;
@@ -122,8 +169,14 @@ export function teamMail(i: TeamInfo): { subject: string; html: string; text: st
         : nichtOffen);
       break;
     case 'rueckruf':
-      subject = `📞 Rückruf erbeten: ${i.kunde}`;
-      saetze.push(`${i.kunde} möchte angerufen werden (Knopf ${knopf} in der letzten Nachfass-Mail). Die Seite sagt dem Kunden: „Marta ruft Sie an.“`);
+      if (i.herkunft === 'portal_einstieg') {
+        // Registry #147: Knopf im Kundenportal; das Portal zeigt danach wörtlich „Danke, Marta ruft Sie an.“
+        subject = `📞 Rückruf erbeten (Kundenportal): ${i.kunde}`;
+        saetze.push(`${i.kunde} möchte angerufen werden (Knopf „Rückruf vereinbaren“ im Kundenportal, Einstieg vor dem ersten Speichern der Pflegesituation). Das Portal sagt dem Kunden: „Danke, Marta ruft Sie an.“`);
+      } else {
+        subject = `📞 Rückruf erbeten: ${i.kunde}`;
+        saetze.push(`${i.kunde} möchte angerufen werden (Knopf ${knopf} in der letzten Nachfass-Mail). Die Seite sagt dem Kunden: „Marta ruft Sie an.“`);
+      }
       if (!i.telefon) saetze.push('Keine Telefonnummer im Lead — bitte per Mail melden.');
       break;
     case 'grund':

@@ -7,7 +7,11 @@ import {
   istOffen,
   KNOEPFE,
   knopfAus,
+  PORTAL_ORIGINS,
+  portalCors,
+  portalDarf,
   PREIS_ANLAESSE,
+  quelleAus,
   SPAETER_ANLAESSE,
   teamMail,
   WANN,
@@ -107,6 +111,24 @@ describe('teamMail', () => {
     expect(teamMail({ ...basis, aktion: 'rueckruf', telefon: '' }).text).toContain('Keine Telefonnummer');
   });
 
+  it('Rückruf aus der Abschiedsmail: Wortlaut wie bisher (ohne herkunft)', () => {
+    const m = teamMail({ ...basis, aktion: 'rueckruf', knopf: 'interesse' });
+    expect(m.subject).toBe('📞 Rückruf erbeten: Erika <b>Muster</b>');
+    expect(m.text).toContain('(Knopf „Ja, ich habe noch Interesse“ in der letzten Nachfass-Mail). Die Seite sagt dem Kunden: „Marta ruft Sie an.“');
+    expect(teamMail({ ...basis, aktion: 'rueckruf', herkunft: 'nachfass_3' }).subject).toBe('📞 Rückruf erbeten: Erika <b>Muster</b>');
+  });
+
+  it('Rückruf aus dem Kundenportal (Registry #147): eigener Betreff, Knopf und Satz des Portals, nicht „Nachfass-Mail“', () => {
+    const m = teamMail({ ...basis, aktion: 'rueckruf', knopf: null, herkunft: 'portal_einstieg' });
+    expect(m.subject).toBe('📞 Rückruf erbeten (Kundenportal): Erika <b>Muster</b>');
+    expect(m.text).toContain('„Rückruf vereinbaren“ im Kundenportal');
+    expect(m.text).toContain('„Danke, Marta ruft Sie an.“');
+    expect(m.text).not.toContain('Nachfass-Mail');
+    expect(m.text).not.toContain('Keine Telefonnummer');
+    expect(m.text).toContain('Telefon: 0170 1234567');
+    expect(m.html).not.toContain('<b>Muster</b>');
+  });
+
   it('gebuchte Kunden: Status NICHT geändert', () => {
     const m = teamMail({ ...basis, offen: false, statusVorher: 'betreuung_beauftragt' });
     expect(m.text).toContain('NICHT geändert');
@@ -133,5 +155,51 @@ describe('Gleichlauf mit der Mail-Funktion', () => {
   it('die Mail-Funktion kennt den neuen Mail-Typ der Route', () => {
     expect(mail('index.ts')).toContain('email_type === "wiedervorlage"');
     expect(readFileSync(resolve(__dirname, '../../project 3/app/api/rueckmeldung/route.ts'), 'utf8')).toContain("email_type: 'wiedervorlage'");
+  });
+});
+
+describe('Quelle, CORS und Erlaubnis fürs Kundenportal (Registry #147)', () => {
+  it('quelleAus: nur nachfass_3 und portal_einstieg', () => {
+    expect(quelleAus('nachfass_3')).toBe('nachfass_3');
+    expect(quelleAus('portal_einstieg')).toBe('portal_einstieg');
+    for (const w of ['', 'toString', '__proto__', 'constructor', 'PORTAL_EINSTIEG', null, undefined, 3]) expect(quelleAus(w)).toBeNull();
+  });
+
+  it('portalCors: Origin-Echo nur für die vier Portal-Hosts, nie *, nie Credentials, immer Vary', () => {
+    expect(PORTAL_ORIGINS).toEqual([
+      'https://kundenportal.primundus.de',
+      'https://caapp-beta.onrender.com',
+      'https://caapp-staging.onrender.com',
+      'http://localhost:5173',
+    ]);
+    for (const o of PORTAL_ORIGINS) {
+      const h = portalCors(o);
+      expect(h['Access-Control-Allow-Origin']).toBe(o);
+      expect(h['Access-Control-Allow-Methods']).toBe('POST, OPTIONS');
+      expect(h['Access-Control-Allow-Headers']).toBe('Content-Type');
+      expect(h.Vary).toBe('Origin');
+    }
+    for (const o of ['https://primundus.de', 'https://evil.test', 'https://kundenportal.primundus.de.evil.test', 'null', null, undefined]) {
+      const h = portalCors(o);
+      expect(h['Access-Control-Allow-Origin']).toBeUndefined();
+      expect(h.Vary).toBe('Origin');
+    }
+    const alle = JSON.stringify(PORTAL_ORIGINS.map(portalCors));
+    expect(alle).not.toContain('"*"');
+    expect(alle).not.toContain('Credentials');
+  });
+
+  it('portalDarf: aus dem Portal nur Rückruf mit portal_einstieg; portal_einstieg nur mit Rückruf; die Seite wie bisher', () => {
+    const portal = 'https://kundenportal.primundus.de';
+    expect(portalDarf(portal, 'rueckruf', 'portal_einstieg')).toBe(true);
+    for (const a of ['stoppen', 'pausieren', 'grund']) {
+      expect(portalDarf(portal, a, 'portal_einstieg')).toBe(false);
+      expect(portalDarf(portal, a, 'nachfass_3')).toBe(false);
+      expect(portalDarf('https://kostenrechner.primundus.de', a, 'portal_einstieg')).toBe(false);
+      expect(portalDarf('https://kostenrechner.primundus.de', a, 'nachfass_3')).toBe(true);
+    }
+    expect(portalDarf(portal, 'rueckruf', 'nachfass_3')).toBe(false);
+    expect(portalDarf(null, 'rueckruf', 'nachfass_3')).toBe(true);
+    expect(portalDarf(null, 'rueckruf', 'portal_einstieg')).toBe(true);
   });
 });
