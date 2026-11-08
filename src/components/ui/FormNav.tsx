@@ -21,8 +21,13 @@ export function meldeFeldAufgeklappt(auf: boolean) {
 }
 
 export function FormNav({
-  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, zurueckAlsLink, ruhig = false, stand75b8df8 = false,
+  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, zurueckAlsLink, ruhig = false, stand75b8df8 = false, band = false,
 }: {
+  /** Minimal-Einstieg (Registry #147, Martin 08.11.: „reicht nicht, wenn der eine Button … einfach immer da ist und … dann
+   *  bleibt der da, wo Weiter-Button steht am unteren Rand“): dasselbe Band wie der feste Knopf über dem Formular — grauer
+   *  Grund über die ganze Seitenbreite, Knöpfe mit 12 px Rundung. Am Formular fährt der feste Knopf weg, dieses Band steht
+   *  an derselben Stelle; es wirkt wie ein Knopf, der nur die Beschriftung wechselt. Sonst unverändert. */
+  band?: boolean;
   /** Rückbau Registry #122: vor dem ersten Speichern der Hauptknopf wie im Stand 75b8df8 (ohne die
    *  späteren Klassen `px-2 whitespace-nowrap`). Sonst unverändert. */
   stand75b8df8?: boolean;
@@ -72,15 +77,18 @@ export function FormNav({
 
   return (
     // data-knopfleiste: daran misst ein aufgeklapptes Feld, wie viel die Leiste unten verdeckt.
-    <div data-knopfleiste="" className={`${imFluss ? '' : 'sticky bottom-0'} z-10 ${ruhig ? '-mx-6 px-6' : '-mx-5 px-5'} pt-3.5 pb-[calc(16px+env(safe-area-inset-bottom))] bg-white border-t border-[#EFEBE4] rounded-b-card`}>
+    <div data-knopfleiste="" className={band
+      // Karte 16 px + Seitenrand 12 px (unter 375 px 8 px): das Band reicht bis an den Bildschirmrand wie der feste Knopf.
+      ? `${imFluss ? '' : 'sticky bottom-0'} z-10 -mx-7 max-[374px]:-mx-6 px-3 max-[374px]:px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-pm-grund/95 backdrop-blur shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)]`
+      : `${imFluss ? '' : 'sticky bottom-0'} z-10 ${ruhig ? '-mx-6 px-6' : '-mx-5 px-5'} pt-3.5 pb-[calc(16px+env(safe-area-inset-bottom))] bg-white border-t border-[#EFEBE4] rounded-b-card`}>
       {hinweis && <div className="mb-2.5 text-center text-[13.5px] text-pm-error-ink">{hinweis}</div>}
       <div className={onZurueck && !zurueckAlsLink ? 'grid grid-cols-[auto_1fr] gap-2.5' : ''}>
         {onZurueck && !zurueckAlsLink && (
-          <Button variante="sekundaer" onClick={onZurueck} className="px-5 font-semibold text-[16px]">
+          <Button variante="sekundaer" onClick={onZurueck} className={band ? '!min-h-[48px] !rounded-[12px] px-5 font-semibold text-[16px]' : 'px-5 font-semibold text-[16px]'}>
             Zurück
           </Button>
         )}
-        <Button data-mess="weiter" onClick={onWeiter} laedt={laedt} ladeText={ladeText} breit className={stand75b8df8 ? undefined : `px-2 whitespace-nowrap${ruhig ? ' !font-semibold' : ''}`}>
+        <Button data-mess="weiter" onClick={onWeiter} laedt={laedt} ladeText={ladeText} breit className={band ? '!min-h-[48px] !rounded-[12px] text-[16px]' : stand75b8df8 ? undefined : `px-2 whitespace-nowrap${ruhig ? ' !font-semibold' : ''}`}>
           {weiterText}
         </Button>
       </div>

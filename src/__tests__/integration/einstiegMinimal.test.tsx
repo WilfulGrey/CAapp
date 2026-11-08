@@ -163,6 +163,12 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     const pflegesituation = document.getElementById('patientendaten')!;
     // Titel „Pflegesituation vervollständigen“ (Martin 08.11.: „was soll das heißen“).
     expect(within(pflegesituation).getByRole('heading', { level: 2, name: 'Pflegesituation vervollständigen' })).toBeInTheDocument();
+    // Formular als weiße Karte (Titel und Satz oben in der Karte, kein Abschnittskopf mit „Für Ihre Bewerbungen“), EIN dünner
+    // Fortschrittsbalken, Knopfleiste als Band wie der feste Knopf (Martin 08.11.: „dann bleibt der da, wo Weiter-Button steht“).
+    expect(within(pflegesituation).queryByText('Für Ihre Bewerbungen')).toBeNull();
+    expect(within(pflegesituation).getByText('Danach können Sie Pflegekräfte einladen und bekommen Bewerbungen. Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten.')).toBeInTheDocument();
+    expect(within(pflegesituation).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1');
+    expect(pflegesituation.querySelector('[data-knopfleiste]')!.className).toContain('bg-pm-grund/95');
     const schritt = screen.getByText(/Schritt 1 von 4/);
     expect(screen.queryByText('Ihre Betreuungskosten')).toBeNull();
     const soGehts = screen.getByRole('heading', { level: 2, name: 'So geht es weiter' });

@@ -45,8 +45,10 @@ export const ANGEBOT_TITEL = 'Ihr persönliches Angebot';
 export const FEST_TITEL = 'Bewerbungen erhalten';
 export const FEST_TITEL_2 = 'Pflegesituation vervollständigen';
 export const FEST_ZEILE = '100% kostenfrei & unverbindlich';
-/** Titel des Abschnitts mit dem Formular (Martin 08.11.: „was soll das heißen: Pflegesituation vervollständigen“). */
+/** Kopf des Formulars in der weißen Karte (Martin 08.11.: „was soll das heißen: Pflegesituation vervollständigen“); der Satz
+ *  darunter ist der bisherige Satz des Abschnitts (Martins 60-Minuten-Satz). */
 export const FORMULAR_TITEL = 'Pflegesituation vervollständigen';
+export const FORMULAR_ZEILE = 'Danach können Sie Pflegekräfte einladen und bekommen Bewerbungen. Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten.';
 /** Panel der Ansprechpartnerin: Unterzeile wie im Marta-Kasten („Ihre Beraterin“). */
 export const BERATERIN_ROLLE = 'Ihre Beraterin';
 /** Grüner Kasten in der Angebotskarte: vier gleichwertige, kurze Punkte, die Bestpreisgarantie zuerst (Martin: „Ist das
@@ -455,14 +457,15 @@ export function EinstiegMinimal({
   /** Titel des festen Knopfs (Vorschau-Vergleich `?knopf=2`). */
   knopfTitel?: string;
 }) {
-  // Formular „Pflegesituation“ in den oberen drei Vierteln des Bildes (oder schon darüber) → fester Knopf und Reiter weg.
+  // Formular „Pflegesituation“ im Bild (oder schon darüber) → fester Knopf und Reiter weg; an derselben Stelle steht dann die
+  // Knopfleiste des Formulars („Weiter“, gleiches Band), es bleibt ein Knopf unten.
   const [formularImBild, setFormularImBild] = useState(false);
   useEffect(() => {
     const ziel = document.getElementById('patientendaten');
     if (!ziel || typeof IntersectionObserver === 'undefined') return;
     const beobachter = new IntersectionObserver(([e]) => {
       setFormularImBild(e.isIntersecting || e.boundingClientRect.top < 0);
-    }, { rootMargin: '0px 0px -25% 0px' });
+    });
     beobachter.observe(ziel);
     return () => beobachter.disconnect();
   }, []);
@@ -514,8 +517,9 @@ export function EinstiegMinimal({
         )}
 
         {/* Fester Knopf (Martin 08.11.: „den wir festmachen unten“): Sticky-Anker ohne Höhe am Ende des ersten Teils, das
-            Band hängt nach oben daran. Sobald das Formular in den oberen drei Vierteln des Bildes steht, fährt es nach unten weg
-            (Martin: „Weiter, auch in der gleichen Farbe, sieht irgendwie komisch aus“ — zwei Koralle-Knöpfe übereinander). */}
+            Band hängt nach oben daran. Sobald das Formular ins Bild kommt, fährt es nach unten weg und die Knopfleiste des
+            Formulars steht an derselben Stelle (Martin: „reicht nicht, wenn der eine Button … einfach immer da ist und … dann
+            bleibt der da, wo Weiter-Button steht“; vorher standen zwei Koralle-Knöpfe übereinander). */}
         <div className="sticky bottom-0 z-20 h-0" data-fester-knopf-anker>
           <div
             className={`absolute bottom-0 -left-3 -right-3 max-[374px]:-left-2 max-[374px]:-right-2 bg-pm-grund/95 px-3 max-[374px]:px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)] backdrop-blur transition-[transform,opacity] duration-300 motion-reduce:transition-none ${
@@ -541,7 +545,7 @@ export function EinstiegMinimal({
       {/* Darunter wie in „Pflegekräfte zuerst“ (#145): Pflegesituation mit offenem Formular. */}
       <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2 pb-4 space-y-4">
         {bereitsBearbeitet && <div className="pt-6">{bereitsBearbeitet}</div>}
-        <AbschnittPflegesituation vorgemerkte={vorgemerkte} formular={formular} titel={FORMULAR_TITEL} />
+        <AbschnittPflegesituation vorgemerkte={vorgemerkte} formular={formular} schlicht />
       </div>
 
       {/* Die Kostenkarte entfällt hier: ihre Aufstellung steht unter „Details“ in der Angebotskarte (Martin 08.11.). */}

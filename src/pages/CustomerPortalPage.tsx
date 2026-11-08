@@ -75,7 +75,7 @@ import { MatchCard } from '../components/portal/MatchCard';
 // „Noch 2 Minuten“, Karten mit „Einladen“ + Schloss, offenes Formular mit „Speichern“); Kopf und Häufige Fragen wie heute.
 import { EinstiegVorSpeichern, WarumSheetVorSpeichern } from '../components/portal/EinstiegVorSpeichern';
 import { EinladenSheetVorSpeichern, EinstiegPflegekraefteZuerst, type VorgemerkteKraft } from '../components/portal/EinstiegPflegekraefteZuerst';
-import { EinstiegMinimal, PflegekraftZeile, TestsiegerKopf } from '../components/portal/EinstiegMinimal';
+import { EinstiegMinimal, FORMULAR_TITEL, FORMULAR_ZEILE, PflegekraftZeile, TestsiegerKopf } from '../components/portal/EinstiegMinimal';
 import { einladbareVormerkungen, eingeladenHinweis, ladeVormerkungen, MAX_VORMERKUNGEN, speichereVormerkungen } from '../lib/vormerkungen';
 import { DANK_DAUER_MS, useToastWarteschlange } from '../lib/toastWarteschlange';
 import { MatchCardVorSpeichern } from '../components/portal/MatchCardVorSpeichern';
@@ -3036,10 +3036,13 @@ const CustomerPortalPage: FC = () => {
       // Fassung 33: das Formular der Pflegesituation an EINER Stelle gebaut. Vor dem Absenden steht es wie bisher im Hinweis
       // bzw. unter „Pflegesituation", nach dem Absenden (Look „angebot") in der Karte „Angebot und Pflegesituation".
       // `stand75b8df8` (Rückbau Registry #122): Formularschluss und Wortlaut wie im Stand 75b8df8 — nur vor dem ersten Speichern.
-      const patientFormular = (eingebettet: boolean, stand75b8df8 = false) => (
+      // `schlicht` (Registry #147, Minimal-Einstieg): Karte, Kopf und Knopfleiste im Stil der Karten darüber.
+      const patientFormular = (eingebettet: boolean, stand75b8df8 = false, schlicht = false) => (
         <AngebotCard
           eingebettet={eingebettet}
           stand75b8df8={stand75b8df8}
+          schlicht={schlicht}
+          kopf={schlicht ? { titel: FORMULAR_TITEL, zeile: FORMULAR_ZEILE } : undefined}
           onMesspunkt={messen}
           lead={lead}
           mmCustomer={mmCustomer}
@@ -4195,7 +4198,7 @@ const CustomerPortalPage: FC = () => {
           gehalteneEinladungen={pflegekraftAuswahl.heldInvites}
           vorschlaegeVorhanden={pflegekraftAuswahl.allVisible.length > 0}
           bereitsBearbeitet={bereitsBearbeitet}
-          formular={patientFormular(false, true)}
+          formular={patientFormular(false, true, true)}
           sterne={sterne}
           vorgemerkte={vorgemerkteKraefte}
           onVervollstaendigen={zurPflegesituationAus('hauptknopf')}

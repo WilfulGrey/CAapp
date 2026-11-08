@@ -91,6 +91,10 @@ export const AngebotCard: FC<{
    *  75b8df8 — letzter Knopf „Speichern" mit „Zurück" daneben, kein Satz darüber, Ladetext „Speichern…", beim
    *  festen Wert „Aus Ihrem Kostenrechner übernommen". Datenfluss, Prüfungen und Speichern bleiben wie heute. */
   stand75b8df8?: boolean;
+  /** Minimal-Einstieg (Registry #147, Martin 08.11.): weiße Karte ohne Rahmen wie die Karten darüber, oben Titel und Satz
+   *  (`kopf`), Fortschritt schlicht, Knopfleiste als Band wie der feste Knopf. Wortlaut der Knöpfe unverändert. */
+  schlicht?: boolean;
+  kopf?: { titel: string; zeile: string };
   /** Unsichtbare Messpunkte des Patientenbogens: Kalender geöffnet / zu ohne Datum (Registry #123), Feld-Messung
    *  (Registry #132): erstes Feld im Bild, Feld auf Seite 1 oder 3 angetippt, „Weiter“ mit offenen Pflichtfeldern.
    *  Das Portal meldet sie nur für echte Leads; ohne Rückruf passiert nichts. */
@@ -99,7 +103,7 @@ export const AngebotCard: FC<{
       | 'weiter_getippt' | 'knopf_im_bild' | 'feld_gewaehlt' | 'hinweis_im_bild' | 'speichern_gestartet' | 'speichern_antwort',
     metadata?: LeadEventMetadata,
   ) => void;
-}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet, gewaehlterStart, schonAbgesendet, onImBlick, eingebettet = false, stand75b8df8 = false, onMesspunkt }) => {
+}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet, gewaehlterStart, schonAbgesendet, onImBlick, eingebettet = false, stand75b8df8 = false, onMesspunkt, schlicht = false, kopf }) => {
   // Offen, sobald die Karte gerendert wird: Seit dem Wegfall des
   // Zwischenkopfs (11.08.) steuert allein der Abschnittskopf in
   // CustomerPortalPage, ob dieser Block überhaupt erscheint.
@@ -808,7 +812,7 @@ export const AngebotCard: FC<{
   // lokalen Vermerk mit `_isDraft: true` (Review 25.09.).
   const nurAenderung = hasFinalSave || !!schonAbgesendet || (mmCustomer?.status != null && mmCustomer.status !== 'draft');
   // Eingebettet trägt der Kasten Rand und Innenabstand (px-6, passend zur mitlaufenden Knopfleiste mit `ruhig`).
-  const Rahmen: ElementType = eingebettet ? 'div' : Card;
+  const Rahmen: ElementType = eingebettet || schlicht ? 'div' : Card;
 
   // ── Feld-Messung (Registry #132, für Kunden unsichtbar) ──────────────────────────────────────────────────────────────
   // Wo steigen Kunden im Patientenbogen aus? Gemeldet wird, ob das erste Feld überhaupt ins Bild kommt, welche Felder auf
@@ -892,11 +896,18 @@ export const AngebotCard: FC<{
   return (
     <div ref={patientFormRef} id="pflegesituation-formular" data-schritt={step} className="scroll-mt-16">
       {patientOpen && (
-        <Rahmen className={eingebettet ? 'pt-4' : 'px-5 pt-5'}>
+        <Rahmen className={schlicht ? 'rounded-card bg-white px-4 pt-4' : eingebettet ? 'pt-4' : 'px-5 pt-5'}>
+          {schlicht && kopf && (
+            <div className="mb-4">
+              <h2 className="text-[17px] font-semibold leading-6 text-pm-ink">{kopf.titel}</h2>
+              <p className="mt-1 text-[13.5px] leading-[1.45] text-pm-muted">{kopf.zeile}</p>
+            </div>
+          )}
           <ProgressSteps
             schritte={STEP_LABELS}
             aktuell={step}
             onSchritt={i => { setFehlerZeigen(false); setStep(i); scrollToFormTop(); }}
+            schlicht={schlicht}
           />
 
           <div className="mt-2">
@@ -1233,6 +1244,7 @@ export const AngebotCard: FC<{
           <FormNav
             ruhig={eingebettet}
             stand75b8df8={stand75b8df8}
+            band={schlicht}
             onZurueck={step > 0 ? zurueck : undefined}
             onWeiter={letzterSchritt ? () => { void speichern(); } : weiter}
             // „Bewerbungen erhalten" statt „Speichern" (Martin 25./26.09.): Der Kunde hat
