@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { ElementType, FC, ReactNode } from 'react';
 import { Check, Lock } from 'lucide-react';
 import {
@@ -91,6 +91,11 @@ export const AngebotCard: FC<{
    *  75b8df8 — letzter Knopf „Speichern" mit „Zurück" daneben, kein Satz darüber, Ladetext „Speichern…", beim
    *  festen Wert „Aus Ihrem Kostenrechner übernommen". Datenfluss, Prüfungen und Speichern bleiben wie heute. */
   stand75b8df8?: boolean;
+  /** Minimal-Einstieg (Registry #147, Martin 08.11.): weiße Karte ohne Rahmen wie die Karten darüber, oben Titel und Satz
+   *  (`kopf`), Fortschritt schlicht. Stellt die Seite `AussenKnopf` bereit, übernimmt ihr fester Knopf „Weiter“ und das
+   *  Absenden („Zurück“ steht dann klein in der Schrittzeile); sonst Knopfleiste als Band. */
+  schlicht?: boolean;
+  kopf?: { titel: string; zeile: string };
   /** Unsichtbare Messpunkte des Patientenbogens: Kalender geöffnet / zu ohne Datum (Registry #123), Feld-Messung
    *  (Registry #132): erstes Feld im Bild, Feld auf Seite 1 oder 3 angetippt, „Weiter“ mit offenen Pflichtfeldern.
    *  Das Portal meldet sie nur für echte Leads; ohne Rückruf passiert nichts. */
@@ -99,7 +104,7 @@ export const AngebotCard: FC<{
       | 'weiter_getippt' | 'knopf_im_bild' | 'feld_gewaehlt' | 'hinweis_im_bild' | 'speichern_gestartet' | 'speichern_antwort',
     metadata?: LeadEventMetadata,
   ) => void;
-}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet, gewaehlterStart, schonAbgesendet, onImBlick, eingebettet = false, stand75b8df8 = false, onMesspunkt }) => {
+}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet, gewaehlterStart, schonAbgesendet, onImBlick, eingebettet = false, stand75b8df8 = false, onMesspunkt, schlicht = false, kopf }) => {
   // Offen, sobald die Karte gerendert wird: Seit dem Wegfall des
   // Zwischenkopfs (11.08.) steuert allein der Abschnittskopf in
   // CustomerPortalPage, ob dieser Block überhaupt erscheint.
@@ -254,6 +259,13 @@ export const AngebotCard: FC<{
   }, [gewaehlterStart]);
 
   const zwei = patient.anzahl === '2';
+  // Minimal-Einstieg (Registry #147, Martin 08.11.: „beim ersten … deutlich kleiner machen, damit man sofort den Button sieht und
+  // sieht, dass das jetzt weitergeht … vielleicht nur eine Frage dort. Und dann geht es halt eben zur nächsten und dann kommt
+  // der Fragebogen“): erste Seite mit EINER Frage zum Antippen (Geschlecht der Person 1), ohne Schrittzeile; nach der Antwort
+  // geht es von selbst zum Rest von Schritt 1. Grund: 22 von 34 echten Anfragen fingen das Formular nie an, wer anfing, wurde zu
+  // 83 % fertig (Auswertung 03.09.2026). Schon beantwortet → keine Seite.
+  const einstiegSeite = useRef(schlicht && (!patient.geschlecht || (patient.anzahl === '2' && !patient.p2_geschlecht))).current;
+  const [einstieg, setEinstieg] = useState(einstiegSeite);
 
   // userDirty — set ONLY by user-driven setPatient (set() / ChipSelect
   // onChange wrappers below). Programmatic merges (mm-rehydrate) leave
@@ -780,9 +792,18 @@ export const AngebotCard: FC<{
   );
 
   // Zwischenkopf („Person 1"); das Feld direkt darunter braucht keine eigene Trennlinie.
-  const personKopf = (text: string) => (
+  // Minimal-Einstieg (Martin 08.11.: „man erkennt kaum, wo Person 1 und Person 2 steht. Das muss deutlich markanter sein“; er las
+  // „Nachteinsätze“ zweimal): Band über die ganze Kartenbreite mit Nummer im Kreis statt der kleinen Überschrift.
+  const personKopf = (text: string) => (schlicht ? (
+    <div className="-mx-4 mt-4 flex items-center gap-2.5 border-y border-pm-line bg-pm-grund px-4 py-2.5 [&+[data-field]]:border-t-0" data-person-kopf>
+      <span aria-hidden="true" className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-pm-ink text-[12.5px] font-bold text-white">
+        {text.replace(/\D/g, '')}
+      </span>
+      <p className="text-[15.5px] font-semibold text-pm-ink">{text}</p>
+    </div>
+  ) : (
     <p className={`${EYEBROW} pt-6 [&+[data-field]]:border-t-0 [&+[data-field]]:pt-3`}>{text}</p>
-  );
+  ));
 
   const geburtsjahrFeld = (k: 'geburtsjahr' | 'p2_geburtsjahr') => (
     <input
@@ -808,7 +829,7 @@ export const AngebotCard: FC<{
   // lokalen Vermerk mit `_isDraft: true` (Review 25.09.).
   const nurAenderung = hasFinalSave || !!schonAbgesendet || (mmCustomer?.status != null && mmCustomer.status !== 'draft');
   // Eingebettet trägt der Kasten Rand und Innenabstand (px-6, passend zur mitlaufenden Knopfleiste mit `ruhig`).
-  const Rahmen: ElementType = eingebettet ? 'div' : Card;
+  const Rahmen: ElementType = eingebettet || schlicht ? 'div' : Card;
 
   // ── Feld-Messung (Registry #132, für Kunden unsichtbar) ──────────────────────────────────────────────────────────────
   // Wo steigen Kunden im Patientenbogen aus? Gemeldet wird, ob das erste Feld überhaupt ins Bild kommt, welche Felder auf
@@ -866,19 +887,46 @@ export const AngebotCard: FC<{
   // Zeigt, ob Kunden nicht tippen oder etwas bricht: Knopf im Bild, Tipp auf den Knopf (pointerup, also auch ein Tipp, der
   // keinen Klick auslöst; Wischen endet in pointercancel), Feld wirklich gewählt. Nur Schlüssel und Zähler.
   const tippZaehler = useRef<Record<number, number>>({});
+  const zaehleTipp = () => {
+    const { step: s, vorSpeichern, melden } = messStand.current;
+    const tipp = (tippZaehler.current[s] ?? 0) + 1;
+    tippZaehler.current[s] = tipp;
+    if (tipp <= 5) melden?.('weiter_getippt', { schritt: s, tipp, vor_speichern: vorSpeichern });
+  };
   useEffect(() => {
     const el = patientFormRef.current;
     if (!el) return;
     const getippt = (e: Event) => {
-      if (!(e.target as Element | null)?.closest?.('[data-mess="weiter"]')) return;
-      const { step: s, vorSpeichern, melden } = messStand.current;
-      const tipp = (tippZaehler.current[s] ?? 0) + 1;
-      tippZaehler.current[s] = tipp;
-      if (tipp <= 5) melden?.('weiter_getippt', { schritt: s, tipp, vor_speichern: vorSpeichern });
+      if ((e.target as Element | null)?.closest?.('[data-mess="weiter"]')) zaehleTipp();
     };
     el.addEventListener('pointerup', getippt, true);
     return () => el.removeEventListener('pointerup', getippt, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Minimal-Einstieg (Registry #147): erste Seite = erste Hälfte von Schritt 1 (siehe `einstiegSeite`).
+  const einstiegAktiv = schlicht && einstieg;
+  const einstiegFertig = () => { setFehlerZeigen(false); setEinstieg(false); scrollToFormTop(); };
+  // Ehepaar: beide Personen auf der Einstiegsseite (statt „Person 1“ allein, das las sich holprig).
+  const einstiegOffen = [!patient.geschlecht && 'geschlecht', zwei && !patient.p2_geschlecht && 'p2_geschlecht'].filter(Boolean) as string[];
+  // Hinweis im Format von `navHinweis` („Geschlecht fehlt“, „2 Angaben offen: …“).
+  const einstiegName = (k: string) => (zwei ? `${FIELD_LABELS.geschlecht} (Person ${k === 'geschlecht' ? 1 : 2})` : FIELD_LABELS.geschlecht);
+  const einstiegHinweis = fehlerZeigen && einstiegOffen.length
+    ? (einstiegOffen.length === 1 ? `${einstiegName(einstiegOffen[0])} fehlt` : `${einstiegOffen.length} Angaben offen: ${einstiegOffen.map(einstiegName).join(', ')}`)
+    : null;
+  const einstiegWeiter = () => {
+    if (einstiegOffen.length === 0) { einstiegFertig(); return; }
+    onMesspunkt?.('weiter_blockiert', { schritt: 0, offen: einstiegOffen, vor_speichern: !nurAenderung });
+    setFehlerZeigen(true);
+    zumErstenFehler();
+  };
+  // Nach der Antwort kurz die Auswahl zeigen, dann von selbst weiter (wie die Frage im Kostenrechner); beim Ehepaar erst, wenn
+  // beide beantwortet sind.
+  const einstiegGewaehlt = (k: 'geschlecht' | 'p2_geschlecht', v: string) => {
+    updatePatient(p => ({ ...p, [k]: v }));
+    const anderes = k === 'geschlecht' ? (!zwei || !!patient.p2_geschlecht) : !!patient.geschlecht;
+    if (v && anderes) window.setTimeout(einstiegFertig, 350);
+  };
   // Nur Änderungen des Kunden: Vorbelegung und Nachladen aus mamamia laufen ohne userDirty.
   const letzterPatient = useRef(patient);
   useEffect(() => {
@@ -892,26 +940,68 @@ export const AngebotCard: FC<{
   return (
     <div ref={patientFormRef} id="pflegesituation-formular" data-schritt={step} className="scroll-mt-16">
       {patientOpen && (
-        <Rahmen className={eingebettet ? 'pt-4' : 'px-5 pt-5'}>
+        <Rahmen className={schlicht ? 'rounded-card bg-white px-4 shadow-lift ring-1 ring-pm-coral/20' : eingebettet ? 'pt-4' : 'px-5 pt-5'}>
+          {/* Minimal-Einstieg (Martin 08.11.: „das Formular geht ja unter, weil das alles weißer Hintergrund … das muss man
+              irgendwie schöner machen“): Kopf mit Titel, Satz und Fortschritt auf hellem Koralle-Grund (Farbe des Knopfs und
+              des aktuellen Schritts in „So geht es weiter“), Karte mit Schatten. Ohne `overflow-hidden`: der Kalender klappt
+              über den Kartenrand. */}
+          <div className={schlicht ? '-mx-4 mb-1 rounded-t-card bg-pm-coral-tint px-4 pt-4 pb-3.5' : ''}>
+          {schlicht && kopf && (
+            <div className="mb-3">
+              <h2 className="text-[17px] font-semibold leading-6 text-pm-ink">{kopf.titel}</h2>
+              <p className="mt-1 text-[13.5px] leading-[1.45] text-pm-body">{kopf.zeile}</p>
+            </div>
+          )}
           <ProgressSteps
             schritte={STEP_LABELS}
             aktuell={step}
             onSchritt={i => { setFehlerZeigen(false); setStep(i); scrollToFormTop(); }}
+            schlicht={schlicht}
+            // Einstiegsseite = erste Hälfte von Schritt 1 (Martin 08.11.: „man sieht jetzt nicht, wie viele Schritte wir da
+            // haben … das würde ich schon irgendwie einblenden“).
+            anteil={einstiegAktiv ? 0.5 / STEP_LABELS.length : undefined}
+            onZurueck={schlicht ? (step > 0 ? zurueck : einstiegSeite && !einstiegAktiv ? () => { setFehlerZeigen(false); setEinstieg(true); scrollToFormTop(); } : undefined) : undefined}
           />
+          </div>
 
-          <div className="mt-2">
-            {/* ── Step 1: Zur Person ── */}
-            {step === 0 && (
+          {/* Minimal-Einstieg: Felder etwas enger (Martin 08.11.: „die Abstände … einen Tick verkleinern“), 14 statt 18 px. */}
+          <div className={schlicht ? 'mt-2 [&_[data-field]]:pb-[14px] [&_[data-field]:not(:first-child)]:pt-[14px]' : 'mt-2'}>
+            {/* ── Einstieg (Minimal), erste Hälfte von Schritt 1: Anzahl (fest, preisrelevant) und Geschlecht, Wortlaut wie bisher
+                (Martin 08.11.: „Personen … können wir nicht ändern. Weil das preisrelevant ist … dann fragst du noch ein
+                Geschlecht“). Die letzte Antwort führt von selbst weiter. ── */}
+            {step === 0 && einstiegAktiv && (
               <>
                 <FormField feld="anzahl" label="Anzahl zu betreuender Personen">
                   {festWert('anzahl', patient.anzahl === '2' ? '2 Personen' : '1 Person')}
                 </FormField>
+                {(zwei ? (['geschlecht', 'p2_geschlecht'] as const) : (['geschlecht'] as const)).map((k, i) => (
+                  <Fragment key={k}>
+                    {zwei && personKopf(`Person ${i + 1}`)}
+                    <FormField feld={k} label="Geschlecht" pflicht fehler={fehlerFuer(k)}>
+                      <ChipSelect invalid={!!fehlerFuer(k)} value={patient[k]} onChange={v => einstiegGewaehlt(k, v)}
+                        options={['Männlich', 'Weiblich']} />
+                    </FormField>
+                  </Fragment>
+                ))}
+              </>
+            )}
+            {/* ── Step 1: Zur Person ── */}
+            {step === 0 && !einstiegAktiv && (
+              <>
+                {!(schlicht && einstiegSeite) && (
+                <FormField feld="anzahl" label="Anzahl zu betreuender Personen">
+                  {festWert('anzahl', patient.anzahl === '2' ? '2 Personen' : '1 Person')}
+                </FormField>
+                )}
 
                 {zwei && personKopf('Person 1')}
+                {/* Nach der Einstiegsseite steht das Geschlecht schon fest; ändern geht über „Zurück“. */}
+                {!(schlicht && einstiegSeite) && (
                 <FormField feld="geschlecht" label="Geschlecht" pflicht fehler={fehlerFuer('geschlecht')}>
                   <ChipSelect invalid={!!fehlerFuer('geschlecht')} value={patient.geschlecht} onChange={v => updatePatient(p=>({...p,geschlecht:v}))}
                     options={['Männlich','Weiblich']} />
                 </FormField>
+                )}
                 <FormField feld="geburtsjahr" label="Geburtsjahr" fehler={fehlerFuer('geburtsjahr')}>
                   {geburtsjahrFeld('geburtsjahr')}
                 </FormField>
@@ -931,10 +1021,12 @@ export const AngebotCard: FC<{
                 {zwei && (
                   <>
                     {personKopf('Person 2')}
+                    {!(schlicht && einstiegSeite) && (
                     <FormField feld="p2_geschlecht" label="Geschlecht" pflicht fehler={fehlerFuer('p2_geschlecht')}>
                       <ChipSelect invalid={!!fehlerFuer('p2_geschlecht')} value={patient.p2_geschlecht} onChange={v => updatePatient(p=>({...p,p2_geschlecht:v}))}
                         options={['Männlich','Weiblich']} />
                     </FormField>
+                    )}
                     <FormField feld="p2_geburtsjahr" label="Geburtsjahr" fehler={fehlerFuer('p2_geburtsjahr')}>
                       {geburtsjahrFeld('p2_geburtsjahr')}
                     </FormField>
@@ -1233,22 +1325,26 @@ export const AngebotCard: FC<{
           <FormNav
             ruhig={eingebettet}
             stand75b8df8={stand75b8df8}
-            onZurueck={step > 0 ? zurueck : undefined}
-            onWeiter={letzterSchritt ? () => { void speichern(); } : weiter}
+            band={schlicht}
+            // Minimal-Einstieg: „Zurück“ steht klein in der Schrittzeile, unter dem Formular nur der eine Knopf.
+            onZurueck={!schlicht && step > 0 ? zurueck : undefined}
+            onWeiter={einstiegAktiv ? einstiegWeiter : letzterSchritt ? () => { void speichern(); } : weiter}
             // „Bewerbungen erhalten" statt „Speichern" (Martin 25./26.09.): Der Kunde hat
             // unter der Kostenkarte „Ja" gesagt; der Knopf nennt, was er jetzt bekommt.
             // Rückbau Registry #122: vor dem ersten Speichern wieder „Speichern", „Zurück" als Knopf daneben (Stand 75b8df8).
-            weiterText={letzterSchritt ? (nurAenderung ? 'Änderungen speichern' : stand75b8df8 ? 'Speichern' : 'Bewerbungen erhalten') : 'Weiter →'}
-            zurueckAlsLink={letzterSchritt && !stand75b8df8 ? `Zurück zu Schritt ${step}` : undefined}
+            // Minimal-Einstieg: im letzten Schritt „Bewerbungen erhalten“ (Martin 08.11.: „wozu brauche ich dann Bewerbungen
+            // erhalten? … dann ist es vorbei“, also erst am Ende), davor „Weiter →“.
+            weiterText={letzterSchritt ? (nurAenderung ? 'Änderungen speichern' : stand75b8df8 && !schlicht ? 'Speichern' : 'Bewerbungen erhalten') : 'Weiter →'}
+            zurueckAlsLink={letzterSchritt && !stand75b8df8 && !schlicht ? `Zurück zu Schritt ${step}` : undefined}
             laedt={isSaving}
-            ladeText={nurAenderung || stand75b8df8 ? 'Speichern…' : 'Wird gesendet…'}
-            hinweis={navHinweis && (
+            ladeText={nurAenderung || (stand75b8df8 && !schlicht) ? 'Speichern…' : 'Wird gesendet…'}
+            hinweis={(einstiegAktiv ? einstiegHinweis : navHinweis) && (
               <button
                 type="button"
                 onClick={zumErstenFehler}
                 className="inline-flex min-h-[44px] -my-2.5 items-center px-2 underline decoration-pm-error/40 underline-offset-4"
               >
-                {navHinweis}
+                {einstiegAktiv ? einstiegHinweis : navHinweis}
               </button>
             )}
           />

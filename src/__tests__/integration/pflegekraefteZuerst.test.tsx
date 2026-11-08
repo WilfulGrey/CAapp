@@ -117,10 +117,12 @@ const speichernBisZumEnde = async (user: ReturnType<typeof userEvent.setup>) => 
 };
 const zeilenText = () => document.querySelector('[data-vormerk-zeile]')?.textContent ?? null;
 
-describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => {
+// Seit Registry #147 (Minimal-Einstieg, Entwurf 07.11.2026) steht diese Seite hinter `?einstieg=zuerst`. Vormerken und
+// Einladen nach dem Speichern sind dieselbe Logik; im Minimal-Einstieg prüft sie integration/einstiegMinimal.test.tsx.
+describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145, ?einstieg=zuerst)', () => {
   it('Reihenfolge: Kopf, Kostenkarte kompakt, sofort die Pflegekräfte ohne Kasten, Pflegesituation, So geht es weiter, Fragen, Marta', async () => {
     server.use(...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
-    window.history.replaceState({}, '', '/?token=token-pz-reihe');
+    window.history.replaceState({}, '', '/?token=token-pz-reihe&einstieg=zuerst');
     render(<CustomerPortalPage />);
 
     const h1 = await screen.findByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' }, { timeout: 5000 });
@@ -221,7 +223,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
       ...lesen,
       ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege, inviteCaregiver: () => { einladungen += 1; return { StoreRequest: { id: 1 } }; } } }),
     );
-    window.history.replaceState({}, '', '/?token=token-pz-fenster');
+    window.history.replaceState({}, '', '/?token=token-pz-fenster&einstieg=zuerst');
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await screen.findByText('Emilia W.', {}, { timeout: 5000 });
@@ -277,7 +279,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
 
   it('„Einladen“ im geöffneten Profil öffnet dasselbe Fenster mit dem Namen und merkt vor, das Profil geht zu', async () => {
     server.use(...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
-    window.history.replaceState({}, '', '/?token=token-pz-profil');
+    window.history.replaceState({}, '', '/?token=token-pz-profil&einstieg=zuerst');
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await user.click(await screen.findByText('Helena K.', {}, { timeout: 5000 }));
@@ -293,7 +295,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
     localStorage.setItem(vormerkSchluessel('token-pz-neuladen'), JSON.stringify([50003]));
     localStorage.setItem(vormerkSchluessel('token-pz-anderer'), JSON.stringify([50002]));
     server.use(...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
-    window.history.replaceState({}, '', '/?token=token-pz-neuladen');
+    window.history.replaceState({}, '', '/?token=token-pz-neuladen&einstieg=zuerst');
     render(<CustomerPortalPage />);
     await screen.findByText('Emilia W.', {}, { timeout: 5000 });
     const karteEmilia = screen.getByText('Emilia W.').closest('.rounded-card') as HTMLElement;
@@ -320,7 +322,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
       } }),
     );
     vollerEntwurf(TOKEN);
-    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=zuerst`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await screen.findByText('Emilia W.', {}, { timeout: 5000 });
@@ -364,7 +366,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
       } }),
     );
     vollerEntwurf(TOKEN);
-    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=zuerst`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await screen.findByText('Nach dem Speichern laden wir Helena K. für Sie ein.', {}, { timeout: 5000 });
@@ -391,7 +393,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
       ...defaultHandlers({ proxy: { ...ohneBewerbung, ...ort, listMatchings: zweiVorschlaege } }),
     );
     vollerEntwurf(TOKEN);
-    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=zuerst`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await screen.findByText('Emilia W.', {}, { timeout: 5000 });
@@ -421,7 +423,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
       ...defaultHandlers({ proxy: { ...ohneBewerbung, ...ort, listMatchings: zweiVorschlaege } }),
     );
     vollerEntwurf(TOKEN);
-    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=zuerst`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await screen.findByText('Nach dem Speichern laden wir Emilia W. für Sie ein.', {}, { timeout: 5000 });
@@ -440,7 +442,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
     server.use(nebenlaeufer, einladenMitSperre(99, zaehler), ...lesen,
       ...defaultHandlers({ proxy: { ...ohneBewerbung, ...ort, listMatchings: zweiVorschlaege } }));
     vollerEntwurf(TOKEN);
-    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=zuerst`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await screen.findByText('Nach dem Speichern laden wir Emilia W. für Sie ein.', {}, { timeout: 5000 });
@@ -456,7 +458,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
     const zaehler = { versuche: 0 };
     server.use(einladenMitSperre(99, zaehler), ...lesen,
       ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
-    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=zuerst`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await screen.findByText('Emilia W.', {}, { timeout: 5000 });
@@ -491,7 +493,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
       inviteCaregiver: (vars) => { eingeladen.push(vars.caregiver_id as number); return { StoreRequest: { id: 1 } }; },
     } }));
     vollerEntwurf(TOKEN);
-    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=zuerst`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await screen.findByText('Nach dem Speichern laden wir Emilia W. und Helena K. für Sie ein.', {}, { timeout: 5000 });
@@ -528,7 +530,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
       ...defaultHandlers({ proxy: { ...ohneBewerbung, ...ort, listMatchings: zweiVorschlaege } }),
     );
     vollerEntwurf(TOKEN);
-    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=zuerst`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await screen.findByText('Nach dem Speichern laden wir Emilia W. für Sie ein.', {}, { timeout: 5000 });
@@ -544,7 +546,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
     const TOKEN = 'token-pz-ablehnen';
     localStorage.setItem(vormerkSchluessel(TOKEN), JSON.stringify([50003, 50002]));
     server.use(...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
-    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=zuerst`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await screen.findByText('Nach dem Speichern laden wir Emilia W. und Helena K. für Sie ein.', {}, { timeout: 5000 });
@@ -559,7 +561,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
     const TOKEN = 'token-pz-ausgeblendet';
     localStorage.setItem(vormerkSchluessel(TOKEN), JSON.stringify([50003, 50002]));
     server.use(einladungsStand(0, 4), ...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
-    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=zuerst`);
     render(<CustomerPortalPage />);
     // Genau eine Karte zu sehen; nur sie steht in der Zeile und bleibt im localStorage.
     await waitFor(() => expect(screen.getAllByRole('button', { name: /^(Einladen|Vorgemerkt ✓)$/ })).toHaveLength(1), { timeout: 5000 });
@@ -577,7 +579,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145)', () => 
       inviteCaregiver: (vars) => { eingeladen.push(vars.caregiver_id as number); return { StoreRequest: { id: 1 } }; },
     } }));
     vollerEntwurf(TOKEN);
-    window.history.replaceState({}, '', `/?token=${TOKEN}`);
+    window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=zuerst`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await screen.findByText('Helena K.', {}, { timeout: 5000 });

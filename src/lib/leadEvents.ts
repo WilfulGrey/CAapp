@@ -70,7 +70,9 @@ export type EinladenQuelle = 'karte' | 'interesse' | 'profil';
  *  „Stand heute" nach dem Absenden. */
 export type FormularQuelle = 'kasten' | 'warum' | 'karte' | 'schritte' | 'frage' | 'mail' | 'stand'
   // Registry #145: Knopf im Fenster „{Name} einladen" (Pflegekräfte zuerst).
-  | 'einladen_fenster';
+  | 'einladen_fenster'
+  // Registry #147: Hauptknopf „Angaben vervollständigen und Bewerbungen erhalten" im ersten Bild (Minimal-Einstieg).
+  | 'hauptknopf';
 
 // Mini-Snapshot der Nurse-Daten, die wir brauchen um eine declined-from-
 // Interest Pflegekraft im bearbeitet-Bereich als virtuelle MatchCard zu
