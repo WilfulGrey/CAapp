@@ -357,7 +357,7 @@ function KontaktReiter({ eingeklappt, erreichbar, sterne, verborgen = false }: {
   }, [anker]);
   const schliessen = () => setAnker(null);
   const weg = verborgen || offen;
-  const kachel = `${FOKUS} flex items-center justify-center gap-2 rounded-[14px] px-2 py-2.5 text-[14px] font-medium shadow-[0_0_0_1px_rgba(28,28,28,.08)]`;
+  const kachel = `${FOKUS} flex flex-col items-center justify-center gap-2 rounded-[18px] px-2 py-3.5 text-[14.5px] font-medium shadow-[0_0_0_1px_rgba(28,28,28,.08)]`;
   return (
     <>
       <button
@@ -386,58 +386,65 @@ function KontaktReiter({ eingeklappt, erreichbar, sterne, verborgen = false }: {
           <div className="absolute inset-0 bg-[rgba(15,8,22,.22)]" onClick={schliessen} />
           <div
             ref={karte}
-            className="absolute right-3 w-[min(316px,calc(100vw-24px))] origin-right rounded-[22px] bg-white p-4 shadow-[0_18px_50px_rgba(15,8,22,.22),0_0_0_1px_rgba(28,28,28,.05)]"
+            className="absolute right-3 w-[min(344px,calc(100vw-24px))] origin-right rounded-[24px] bg-white p-5 shadow-[0_18px_50px_rgba(15,8,22,.22),0_0_0_1px_rgba(28,28,28,.05)]"
             style={{ top: lage?.top ?? 64, visibility: lage ? 'visible' : 'hidden' }}
           >
-            <div className="flex items-start gap-3">
-              <img src="/marta-kapcio.jpg" alt="" className="h-14 w-14 flex-none rounded-full object-cover object-top" />
-              <div className="min-w-0 flex-1 pt-0.5">
-                <p className="text-[17px] font-semibold leading-tight text-pm-ink">{BERATERIN}</p>
-                <p className="text-[13.5px] text-pm-muted">{BERATERIN_ROLLE}</p>
-                <span className={`mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[12.5px] font-medium ${erreichbar ? 'bg-pm-mint text-pm-green-deep' : 'bg-pm-shell text-pm-muted'}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${erreichbar ? 'bg-pm-green' : 'bg-pm-mute'}`} aria-hidden="true" />{ERREICHBAR}
+            <div className="flex items-start gap-3.5">
+              <img src="/marta-kapcio.jpg" alt="" className="h-16 w-16 flex-none rounded-full object-cover object-top" />
+              <div className="min-w-0 flex-1 pt-1">
+                <p className="text-[18px] font-semibold leading-tight text-pm-ink">{BERATERIN}</p>
+                <p className="mt-0.5 text-[14px] text-pm-muted">{BERATERIN_ROLLE}</p>
+                <span className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-medium ${erreichbar ? 'bg-pm-mint text-pm-green-deep' : 'bg-pm-shell text-pm-muted'}`}>
+                  <span className={`h-2 w-2 rounded-full ${erreichbar ? 'bg-pm-green' : 'bg-pm-mute'}`} aria-hidden="true" />{ERREICHBAR}
                 </span>
               </div>
-              <button type="button" onClick={schliessen} aria-label="Schließen" className={`${FOKUS} -mr-1 -mt-1 flex h-9 w-9 flex-none items-center justify-center rounded-full text-pm-muted hover:bg-pm-grund`}>
-                <X className="h-[18px] w-[18px]" aria-hidden="true" />
+              <button type="button" onClick={schliessen} aria-label="Schließen" className={`${FOKUS} -mr-1.5 -mt-1.5 flex h-9 w-9 flex-none items-center justify-center rounded-full text-pm-muted hover:bg-pm-grund`}>
+                <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
             {/* Außerhalb von 8–20 Uhr ist Anrufen ausgegraut und nicht antippbar, WhatsApp bleibt (Martin 08.11.: „nicht den
                 Button wegnehmen, das sieht irgendwie komisch aus, sondern einfach nur rausgrauen“). */}
-            <div className="mt-3.5 grid grid-cols-2 gap-2">
+            <div className="mt-5 grid grid-cols-2 gap-2.5">
               {erreichbar ? (
                 <a href={TELEFON_HREF} aria-label={`${BERATERIN} anrufen: ${TELEFON}`} className={`${kachel} bg-white text-pm-ink`}>
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pm-green text-white"><Phone className="h-4 w-4" aria-hidden="true" /></span>
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-pm-green text-white"><Phone className="h-5 w-5" aria-hidden="true" /></span>
                   Anrufen
                 </a>
               ) : (
                 <span aria-disabled="true" className={`${kachel} bg-pm-grund/60 text-pm-mute`} data-anrufen-aus>
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pm-line text-white"><Phone className="h-4 w-4" aria-hidden="true" /></span>
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-pm-line text-white"><Phone className="h-5 w-5" aria-hidden="true" /></span>
                   Anrufen
                 </span>
               )}
               <a href={WHATSAPP_HREF} target="_blank" rel="noreferrer" aria-label={`${BERATERIN} per WhatsApp schreiben`} className={`${kachel} bg-white text-pm-ink`}>
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pm-whatsapp text-white"><WhatsAppIcon className="h-[18px] w-[18px]" /></span>
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-pm-whatsapp text-white"><WhatsAppIcon className="h-[22px] w-[22px]" /></span>
                 WhatsApp
               </a>
             </div>
             {erreichbar
-              ? <p className="mt-2.5 text-center text-[13.5px] tabular-nums text-pm-muted">{TELEFON}</p>
+              ? <p className="mt-3 text-center text-[14px] tabular-nums text-pm-muted">{TELEFON}</p>
               // Wortlaut: Martin 08.11. („außerhalb der Geschäftszeiten senden Sie eine WhatsApp oder so“), OpenAI 08.11. ohne
               // Antwortversprechen.
-              : <p className="mt-2.5 text-center text-[13px] leading-snug text-pm-muted">{AUSSERHALB_ZEITEN}</p>}
-            {/* Siegel und Sterne wie im Marta-Kasten („6× Testsieger“, „DIE WELT · Preis & Qualität“); ohne Stand keine Sterne. */}
-            <div className="mt-3.5 flex items-center gap-3 border-t border-pm-line-soft pt-3.5" data-marta-vertrauen>
-              <img src="/badge-testsieger.webp" alt="Testsieger DIE WELT" className="h-11 w-auto flex-none object-contain" />
-              <div className="min-w-0 leading-[1.3]">
-                <p className="text-[14.5px] font-bold text-pm-ink">6× Testsieger</p>
-                <p className="text-[12.5px]"><span className="font-bold text-pm-taupe">DIE WELT</span><span className="text-pm-muted"> · Preis &amp; Qualität</span></p>
-                {sterne && (
-                  <a href={ERFAHRUNGEN_URL} target="_blank" rel="noreferrer" className={`${FOKUS} mt-1 inline-flex items-center gap-1.5 rounded text-[12.5px] text-pm-muted`}>
-                    <FuenfSterne wert={sterne.wert} />
-                    <b className="text-pm-ink">{sterne.schnitt}</b> · <span className="underline underline-offset-2">{anzahlText(sterne.anzahl)}</span>
-                  </a>
-                )}
+              : <p className="mt-3 text-center text-[13.5px] leading-snug text-pm-muted">{AUSSERHALB_ZEITEN}</p>}
+            {/* Sterne und Siegel als zwei getrennte Spalten wie die Kennzahlen der Angebotskarte, nicht in einem Block (Martin
+                08.11.: „du kannst nicht die Sterne einfach bei den Testsieger reinpacken“; schon zu Fassung 20: „als würde das
+                zusammengehören“). Ohne Stand keine Sterne-Spalte. */}
+            <div className="mt-5 flex items-stretch border-t border-pm-line-soft pt-4" data-marta-vertrauen>
+              {sterne && (
+                <a href={ERFAHRUNGEN_URL} target="_blank" rel="noreferrer" className={`${FOKUS} flex min-w-0 flex-1 flex-col justify-center rounded pr-3`} data-marta-sterne>
+                  <span className="flex items-center gap-1.5 text-[17px] font-bold leading-5 text-pm-ink">
+                    {sterne.schnitt}
+                    <FuenfSterne wert={sterne.wert} groesse={13} />
+                  </span>
+                  <span className="mt-1 text-[12.5px] leading-4 text-pm-muted underline underline-offset-2">{anzahlText(sterne.anzahl)}</span>
+                </a>
+              )}
+              <div className={`flex min-w-0 flex-1 items-center gap-2.5 ${sterne ? 'border-l border-pm-line-soft pl-3' : ''}`} data-marta-siegel>
+                <img src="/badge-testsieger.webp" alt="Testsieger DIE WELT" className="h-11 w-auto flex-none object-contain" />
+                <p className="min-w-0 leading-[1.25]">
+                  <b className="block text-[14.5px] text-pm-ink">6× Testsieger</b>
+                  <span className="text-[12.5px] font-bold text-pm-taupe">DIE WELT</span>
+                </p>
               </div>
             </div>
           </div>

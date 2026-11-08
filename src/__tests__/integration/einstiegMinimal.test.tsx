@@ -164,6 +164,9 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     // schön platzieren“).
     expect(within(panel).getByText('6× Testsieger')).toBeInTheDocument();
     expect(within(panel).getByRole('link', { name: /4,9.*126 Bewertungen/ })).toHaveAttribute('href', 'https://primundus.de/erfahrungen');
+    // Sterne und Siegel getrennt (Martin 08.11.: „du kannst nicht die Sterne einfach bei den Testsieger reinpacken“).
+    expect(panel.querySelector('[data-marta-siegel]')!.textContent).toBe('6× TestsiegerDIE WELT');
+    expect(panel.querySelector('[data-marta-sterne]')!.contains(panel.querySelector('[data-marta-siegel]'))).toBe(false);
     expect(within(panel).getByRole('link', { name: /per WhatsApp schreiben$/ }).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/4989200000830/);
     await userEvent.setup().click(within(panel).getByRole('button', { name: 'Schließen' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
