@@ -475,8 +475,9 @@ describe('Portal integration: golden paths', () => {
       render(<CustomerPortalPage />);
       await waitFor(() => expect(gescrollt()).toContain('patientendaten'), { timeout: 5000 });
       expect(laedtBeimSprung).toEqual([false]);
-      // Stand 75b8df8: Abschnittskopf „Pflegesituation · Unvollständig", das Formular steht offen darunter.
-      expect(screen.getByRole('heading', { level: 2, name: 'Pflegesituation' })).toBeInTheDocument();
+      // Abschnittskopf „Pflegesituation · Unvollständig", das Formular steht offen darunter (im Minimal-Einstieg, Registry #147,
+      // heißt der Titel „Pflegesituation vervollständigen“).
+      expect(screen.getByRole('heading', { level: 2, name: /^Pflegesituation( vervollständigen)?$/ })).toBeInTheDocument();
       expect(await screen.findByText(/Schritt 1 von 4/, {}, { timeout: 5000 })).toBeInTheDocument();
       // … und gesprungen wird genau einmal.
       await new Promise((r) => setTimeout(r, 300));

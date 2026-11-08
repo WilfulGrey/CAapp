@@ -333,14 +333,16 @@ export function VormerkZeile({ kraefte }: { kraefte: VorgemerkteKraft[] }) {
 }
 
 // ── Abschnitt „Pflegesituation“ mit offenem Formular (auch im Minimal-Einstieg, Registry #147) ───────────────────────────
-export function AbschnittPflegesituation({ vorgemerkte, formular }: { vorgemerkte: VorgemerkteKraft[]; formular: ReactNode }) {
+// `titel` (Registry #147, Martin 08.11.: „Pflegsituation… was soll das heißen: Pflegesituation vervollständigen“): im
+// Minimal-Einstieg „Pflegesituation vervollständigen“, sonst wie bisher „Pflegesituation“.
+export function AbschnittPflegesituation({ vorgemerkte, formular, titel = 'Pflegesituation' }: { vorgemerkte: VorgemerkteKraft[]; formular: ReactNode; titel?: string }) {
   return (
     <div>
       {/* id = Sprungziel aller Knöpfe ins Formular und des Mail-Deeplinks `goto=anfragen`. */}
       <div id="patientendaten" className="px-1 pt-6 scroll-mt-24">
         <SectionHeader
           eyebrow="Für Ihre Bewerbungen"
-          titel="Pflegesituation"
+          titel={titel}
           rechts={<StatusBadge ton="warnung">Unvollständig</StatusBadge>}
           zeile="Danach können Sie Pflegekräfte einladen und bekommen Bewerbungen. Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten."
         />

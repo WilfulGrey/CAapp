@@ -5,8 +5,11 @@
 // „Einladen“ ist die Logik aus #145 unverändert (CustomerPortalPage: Fenster „{Name} einladen“, Vormerken, nach dem
 // ersten Speichern automatisch einladen).
 //
-// Kontakt unter den Pflegekräften: die Marta-Zeile des Portals (`MartaZeile`, runde Knöpfe Anrufen und WhatsApp), statt
-// „Rückruf vereinbaren“ (Martin 08.11.: „rückruf finde ich auch kacke - lieber anrufen oder schreiben? Auch optisch schön“).
+// Kontakt: kleiner runder Knopf mit Martas Foto rechts neben dem festen Knopf, der aufgeht, sobald man aufhört zu scrollen
+// (wie der runde Knopf unten rechts in der CG-App); Tipp öffnet die Marta-Zeile des Portals (`MartaZeile`, Anrufen und
+// WhatsApp). Neben dem Knopf statt darüber: so verdeckt er nie Preis oder „Einladen“ einer Pflegekraft. Statt „Rückruf vereinbaren“ (Martin 08.11.: „lieber anrufen
+// oder schreiben?“) und statt einer Marta-Zeile in der Liste („wirkt wie Pflegekraft … dass rechts so ein kleines ding aufgeht
+// wenn wir stoppen und dann kann man das anklicken“).
 //
 // Rückweg: `?einstieg=zuerst` zeigt „Pflegekräfte zuerst“ (#145) unverändert, `?einstieg=alt` den Stand 75b8df8.
 //
@@ -17,7 +20,7 @@
 // „sehr vorteilhaft“ mit „keine Vermittlungsgebühr, täglich kündbar“, Sterne unter dem Gruß; die Pflegekräfte als Zeilen
 // „wie auf dem ersten Bild“, immer mit Preis vor „Einladen“; der Hauptknopf schmal und fest unten, Wortlaut „Pflegesituation
 // vervollständigen und Bewerbungen erhalten“.
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Check, ChevronDown, Info } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { formatEuro, type Lead } from '../../lib/supabase';
@@ -25,6 +28,7 @@ import { eigenanteilAus } from '../../lib/angebotZuschuss';
 import { anzahlText, sternFuellung, type SterneStand } from '../../lib/sterne';
 import { ERREICHBAR } from '../../lib/kontakt';
 import { initials } from './shared';
+import { Sheet } from '../ui/Sheet';
 import { SCHRITTE_STAND_75B8DF8 } from './EinstiegVorSpeichern';
 import { AbschnittPflegesituation, KostenAufstellung, type VorgemerkteKraft } from './EinstiegPflegekraefteZuerst';
 import { FaqListe } from './FaqListe';
@@ -32,11 +36,14 @@ import { MartaBox, MartaZeile } from './MartaBox';
 
 // Wortlaut (Martin 08.11.2026, diktiert; Entwurf, Freigabe des Wortlauts offen). Tests prüfen genau diese Texte.
 export const ANGEBOT_TITEL = 'Ihr persönliches Angebot';
-/** Fester schmaler Knopf unten: kurzer Titel und Unterzeile (Martin 08.11.: „den button-text finde ich zu lang (auch fehlt
- *  kostenlos und unverbindlich??“). Titel aus seinem Wortlaut, Unterzeile die freigegebene vom 07.11. (OpenAI schlug
- *  „Bewerbungen freischalten“ vor, zu technisch). */
-export const FEST_TITEL = 'Bewerbungen erhalten';
-export const FEST_ZEILE = 'dauert etwa 2 Minuten · kostenlos und unverbindlich';
+/** Fester Knopf unten, Martins Wortlaut (08.11.: „button muss lauten: Pflegesituation vervollständigen & Bewerbungen
+ *  erhalten - darunter: 100% kostenfrei & unverbindlich“). Titel in zwei festen Zeilen. */
+export const FEST_TITEL = ['Pflegesituation vervollständigen', '& Bewerbungen erhalten'] as const;
+export const FEST_ZEILE = '100% kostenfrei & unverbindlich';
+/** Titel des Abschnitts mit dem Formular (Martin 08.11.: „was soll das heißen: Pflegesituation vervollständigen“). */
+export const FORMULAR_TITEL = 'Pflegesituation vervollständigen';
+/** Titel des Kontakt-Fensters: Wortlaut des Marta-Kastens („Noch Fragen?“). */
+export const LASCHE = 'Noch Fragen?';
 /** Grüner Kasten in der Angebotskarte: vier gleichwertige, kurze Punkte, die Bestpreisgarantie zuerst (Martin: „Ist das
  *  unsere Bestpreisgarantie? Oder ist das nur ein Punkt davon?“ — die anderen drei gehören nicht zur Garantie; „Es gilt
  *  immer unsere Bestpreisgarantie“ mit „Mehr Infos“ darunter war ihm zu kompliziert: „Ich will das clean haben“).
@@ -234,7 +241,8 @@ export function PflegekraftZeile({ nurse, preis, preisUnten = false, vorgemerkt,
   const preisText = preis ? (
     <span className="whitespace-nowrap text-[15px] font-semibold tabular-nums text-pm-ink" data-preis>{formatEuro(preis)}</span>
   ) : null;
-  // „Einladen“ als helle Koralle-Pille (passt zum festen Knopf, kein Formular-Rahmen), „Ausgewählt“ in Mint.
+  // „Einladen“ grün umrandet (Martin 08.11.: die Koralle-Fläche „wirkt nicht passend zum rest und wirkt negativ“); Grün wie
+  // die Zuschuss-Zeile und der Kasten, „Ausgewählt“ dann grün gefüllt (Mint).
   const knopf = gesperrt ? (
     <button type="button" disabled aria-disabled="true" className={`${PILLE} cursor-not-allowed bg-pm-grund text-[12px] text-pm-muted`}>
       Bitte warten…
@@ -244,7 +252,7 @@ export function PflegekraftZeile({ nurse, preis, preisUnten = false, vorgemerkt,
       {AUSGEWAEHLT}<Check aria-hidden="true" className="h-3 w-3 flex-none" strokeWidth={3} />
     </button>
   ) : (
-    <button type="button" onClick={einladen} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} bg-pm-coral-tint text-[13.5px] text-pm-coral-ink hover:bg-pm-coral hover:text-white`}>
+    <button type="button" onClick={einladen} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} border-[1.5px] border-pm-green bg-white text-[13.5px] text-pm-green-deep hover:bg-pm-mint`}>
       Einladen
     </button>
   );
@@ -295,6 +303,46 @@ function Platzhalterzeile() {
   );
 }
 const PLATZHALTER = 5;
+
+// ── Kontakt-Knopf ─────────────────────────────────────────────────────────────────────────────────────────────────────
+// Rechts in der Leiste des festen Knopfs. Während des Scrollens zu (Breite 0), nach 0,7 s Ruhe geht er auf (beim Laden nach
+// 1,2 s); der Hauptknopf wird dabei schmaler, sein Text bricht nicht anders um. Tipp öffnet ein Fenster mit der Marta-Zeile.
+function KontaktKnopf() {
+  const [ruhig, setRuhig] = useState(false);
+  const [offen, setOffen] = useState(false);
+  useEffect(() => {
+    let t = window.setTimeout(() => setRuhig(true), 1200);
+    // `capture`: auch das Scrollen im Handyrahmen am Computer (#portal-scroll-container) kommt hier an.
+    const beimScrollen = () => {
+      setRuhig(false);
+      window.clearTimeout(t);
+      t = window.setTimeout(() => setRuhig(true), 700);
+    };
+    document.addEventListener('scroll', beimScrollen, { capture: true, passive: true });
+    return () => { window.clearTimeout(t); document.removeEventListener('scroll', beimScrollen, { capture: true }); };
+  }, []);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOffen(true)}
+        aria-label={`${LASCHE} Marta Kapcio anrufen oder schreiben`}
+        aria-hidden={!ruhig || undefined}
+        tabIndex={ruhig ? 0 : -1}
+        className={`${FOKUS} relative flex-none overflow-visible rounded-full transition-[width,margin,opacity] duration-300 motion-reduce:transition-none ${
+          ruhig ? 'ml-2 w-[52px] opacity-100' : 'pointer-events-none ml-0 w-0 opacity-0'
+        }`}
+        data-kontakt-knopf
+      >
+        <img src="/marta-kapcio.jpg" alt="" className="h-[52px] w-[52px] max-w-none rounded-full border-2 border-white object-cover object-top shadow-lift" />
+        <span className="absolute bottom-0.5 right-0.5 h-3 w-3 rounded-full border-2 border-white bg-pm-whatsapp" aria-hidden="true" />
+      </button>
+      <Sheet offen={offen} titel={LASCHE} onClose={() => setOffen(false)}>
+        <MartaZeile eng unterzeile={<>Ihre Beraterin · {ERREICHBAR}</>} />
+      </Sheet>
+    </>
+  );
+}
 
 // ── So geht es weiter ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Martin 08.11.: „der Ablauf deutlich schöner dargestellt … optisch ist das nicht schön“. Wie die Stufen im CGA-Panel:
@@ -403,32 +451,31 @@ export function EinstiegMinimal({
           </section>
         )}
 
-        {/* Kontakt: die Marta-Zeile des Portals (Foto, Name, Zeiten, runde Knöpfe Anrufen und WhatsApp). */}
-        <div className={`${KARTE} mt-3 px-4 py-3.5`} data-kontakt-minimal>
-          <MartaZeile eng unterzeile={<>Ihre Beraterin · {ERREICHBAR}</>} />
-        </div>
-
         {/* Fester schmaler Knopf (Martin 08.11.: „den wir festmachen unten“). Sticky am Ende des ersten Teils: steht beim
             Laden unten am Bildschirm, scrollt man bis hierher, bleibt er hier liegen und das Formular darunter ist frei. */}
         <div
           className="sticky bottom-0 z-20 -mx-3 max-[374px]:-mx-2 mt-3 bg-pm-grund/95 px-3 max-[374px]:px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)] backdrop-blur"
           data-fester-knopf
         >
+          <div className="flex items-center">
           <button
             type="button"
             onClick={onVervollstaendigen}
-            className={`${FOKUS} block w-full rounded-[12px] bg-pm-coral px-4 py-2 text-center text-[15px] font-bold leading-5 text-white transition-colors hover:bg-pm-coral-deep active:scale-[0.99]`}
+            className={`${FOKUS} block min-w-0 flex-1 rounded-[12px] bg-pm-coral px-3 py-2 text-center text-[15px] max-[374px]:text-[14px] font-bold leading-5 text-white transition-colors hover:bg-pm-coral-deep active:scale-[0.99]`}
           >
-            <span className="block">{FEST_TITEL}</span>
-            <span className="block text-[12px] max-[374px]:text-[11.5px] font-medium leading-4 opacity-90">{FEST_ZEILE}</span>
+            <span className="block">{FEST_TITEL[0]}</span>
+            <span className="block">{FEST_TITEL[1]}</span>
+            <span className="mt-0.5 block text-[12px] font-medium leading-4 opacity-90">{FEST_ZEILE}</span>
           </button>
+          <KontaktKnopf />
+          </div>
         </div>
       </div>
 
       {/* Darunter wie in „Pflegekräfte zuerst“ (#145): Pflegesituation mit offenem Formular. */}
       <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2 pb-4 space-y-4">
         {bereitsBearbeitet && <div className="pt-6">{bereitsBearbeitet}</div>}
-        <AbschnittPflegesituation vorgemerkte={vorgemerkte} formular={formular} />
+        <AbschnittPflegesituation vorgemerkte={vorgemerkte} formular={formular} titel={FORMULAR_TITEL} />
       </div>
 
       {/* Die Kostenkarte entfällt hier: ihre Aufstellung steht unter „Details“ in der Angebotskarte (Martin 08.11.). */}

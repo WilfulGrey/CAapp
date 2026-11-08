@@ -101,7 +101,7 @@ describe('Schwebende Frage „Was sagen Sie zum Angebot?“ bei echten Kunden', 
           ? 'Noch 2 Minuten bis zu Ihren Bewerbungen'
           : look === '&einstieg=zuerst'
             ? 'Laden Sie ein, wer Ihnen gefällt. Dafür beschreiben Sie kurz die Pflegesituation.'
-            : 'dauert etwa 2 Minuten · kostenlos und unverbindlich';
+            : '100% kostenfrei & unverbindlich';
         expect(await screen.findByText(kennung, {}, { timeout: 5000 })).toBeInTheDocument();
         await new Promise((r) => setTimeout(r, 200));
         expect(screen.queryByText('Was sagen Sie zum Angebot?')).toBeNull();

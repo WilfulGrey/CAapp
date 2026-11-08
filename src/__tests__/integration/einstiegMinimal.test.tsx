@@ -2,7 +2,7 @@
 // Minimal-Einstieg vor dem ersten Speichern der Pflegesituation (Registry #147, Entwurf; Martin 07.11.2026 zum Mockup
 // „Minimal“: „Ja, alle drei“).
 //   - Reihenfolge: Kopf mit Testsieger statt „Hilfe“ → „Guten Tag, …“ → Angebotskarte → „Passende Pflegekräfte“ mit Anzahl
-//     als Zeilen → Marta-Zeile (Anrufen, WhatsApp) → fester Knopf; darunter Pflegesituation mit Formular, So geht es
+//     als Zeilen → fester Knopf mit rundem Kontakt-Knopf (Anrufen, WhatsApp); darunter Pflegesituation mit Formular, So geht es
 //     weiter, Fragen, Marta (Fassung „CGA-Stil“, Martin 08.11.)
 //   - Platzhalterzeilen ohne Text, solange die Liste lädt (Hauptknopf steht schon da)
 //   - „Einladen“ in der Zeile = Logik aus #145 (Fenster, Vormerken, nach dem Speichern automatisch einladen)
@@ -82,7 +82,7 @@ const vollerEntwurf = (token: string) => localStorage.setItem(`patient_${token}`
   wunschGeschlecht: 'Weiblich', fuehrerschein: 'Nein',
 }));
 type Meldung = { token?: string; event?: string; metadata?: Record<string, unknown>; notify?: boolean };
-const HAUPTKNOPF = /^Bewerbungen erhalten/;
+const HAUPTKNOPF = /^Pflegesituation vervollständigen\s*&\s*Bewerbungen erhalten/;
 const davor = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 const gescrollt = () => (Element.prototype.scrollIntoView as unknown as { mock: { contexts: Element[] } }).mock.contexts;
 const zeilen = () => [...document.querySelectorAll('[data-pflegekraft-zeile]')] as HTMLElement[];
@@ -141,28 +141,34 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(screen.queryByText('Unsere Empfehlung für Sie')).toBeNull();
     expect(document.querySelector('.rounded-card.cursor-pointer')).toBeNull();
 
-    // Fester Knopf unten (sticky am Ende des ersten Teils) mit Unterzeile; davor die Marta-Zeile mit Anrufen und WhatsApp
-    // (statt „Rückruf vereinbaren“, Martin 08.11.).
+    // Fester Knopf unten (sticky am Ende des ersten Teils) in Martins Wortlaut; rechts daneben der runde Kontakt-Knopf, der nach
+    // kurzer Ruhe aufgeht und „Noch Fragen?“ mit Anrufen und WhatsApp öffnet (statt „Rückruf vereinbaren“, Martin 08.11.).
     const haupt = screen.getByRole('button', { name: HAUPTKNOPF });
-    expect(haupt.textContent).toBe('Bewerbungen erhaltendauert etwa 2 Minuten · kostenlos und unverbindlich');
+    expect(haupt.textContent).toBe('Pflegesituation vervollständigen& Bewerbungen erhalten100% kostenfrei & unverbindlich');
     expect(haupt.className).toContain('bg-pm-coral');
-    expect(haupt.closest('[data-fester-knopf]')!.className).toContain('sticky bottom-0');
+    const leiste = haupt.closest('[data-fester-knopf]') as HTMLElement;
+    expect(leiste.className).toContain('sticky bottom-0');
     expect(screen.queryByText('Rückruf vereinbaren')).toBeNull();
-    const kontakt = document.querySelector('[data-kontakt-minimal]') as HTMLElement;
-    expect(within(kontakt).getByText('Marta Kapcio')).toBeInTheDocument();
-    expect(within(kontakt).getByRole('link', { name: /anrufen: 089 200 000 830$/ })).toHaveAttribute('href', 'tel:+4989200000830');
-    expect(within(kontakt).getByRole('link', { name: /per WhatsApp schreiben$/ }).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/4989200000830/);
+    const kontaktKnopf = await within(leiste).findByRole('button', { name: /^Noch Fragen\? Marta Kapcio/ }, { timeout: 3000 });
+    await userEvent.setup().click(kontaktKnopf);
+    const fenster = await screen.findByRole('dialog', { name: 'Noch Fragen?' });
+    expect(within(fenster).getByText('Marta Kapcio')).toBeInTheDocument();
+    expect(within(fenster).getByRole('link', { name: /anrufen: 089 200 000 830$/ })).toHaveAttribute('href', 'tel:+4989200000830');
+    expect(within(fenster).getByRole('link', { name: /per WhatsApp schreiben$/ }).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/4989200000830/);
+    await userEvent.setup().click(within(fenster).getAllByRole('button', { name: 'Schließen' })[0]);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 
     // Darunter: Pflegesituation mit offenem Formular, So geht es weiter, Fragen, Marta. Keine Kostenkarte mehr (ihre
     // Aufstellung steht unter „Details“).
     const pflegesituation = document.getElementById('patientendaten')!;
-    expect(within(pflegesituation).getByRole('heading', { level: 2, name: 'Pflegesituation' })).toBeInTheDocument();
+    // Titel „Pflegesituation vervollständigen“ (Martin 08.11.: „was soll das heißen“).
+    expect(within(pflegesituation).getByRole('heading', { level: 2, name: 'Pflegesituation vervollständigen' })).toBeInTheDocument();
     const schritt = screen.getByText(/Schritt 1 von 4/);
     expect(screen.queryByText('Ihre Betreuungskosten')).toBeNull();
     const soGehts = screen.getByRole('heading', { level: 2, name: 'So geht es weiter' });
     const fragen = screen.getByRole('heading', { level: 2, name: 'Häufige Fragen' });
     const marta = screen.getByText('Noch Fragen?');
-    const reihe = [h1, karte, abschnitt, zweite, kontakt, haupt, pflegesituation, schritt, soGehts, fragen, marta];
+    const reihe = [h1, karte, abschnitt, zweite, haupt, pflegesituation, schritt, soGehts, fragen, marta];
     for (let i = 1; i < reihe.length; i++) expect(davor(reihe[i - 1], reihe[i])).toBe(true);
     // Wortlaut-Regeln: nie „Betreuungskräfte“, nie „vermitteln“.
     expect(document.body.textContent).not.toMatch(/Betreuungskräfte|vermitteln/);
