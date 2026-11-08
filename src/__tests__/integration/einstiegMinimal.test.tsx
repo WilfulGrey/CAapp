@@ -160,6 +160,10 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     const panel = await screen.findByRole('dialog', { name: 'Marta Kapcio, Ihre Beraterin' });
     expect(within(panel).getByText('täglich 8–20 Uhr')).toBeInTheDocument();
     expect(within(panel).getByRole('link', { name: /anrufen: 089 200 000 830$/ })).toHaveAttribute('href', 'tel:+4989200000830');
+    // Kleine Karte neben dem Reiter mit Siegel und Sterne (Martin 08.11.: „viel zu groß … den Testsieger und die Sterne da …
+    // schön platzieren“).
+    expect(within(panel).getByText('6× Testsieger')).toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: /4,9.*126 Bewertungen/ })).toHaveAttribute('href', 'https://primundus.de/erfahrungen');
     expect(within(panel).getByRole('link', { name: /per WhatsApp schreiben$/ }).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/4989200000830/);
     await userEvent.setup().click(within(panel).getByRole('button', { name: 'Schließen' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());

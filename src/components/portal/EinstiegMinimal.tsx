@@ -21,13 +21,13 @@
 // „sehr vorteilhaft“ mit „keine Vermittlungsgebühr, täglich kündbar“, Sterne unter dem Gruß; die Pflegekräfte als Zeilen
 // „wie auf dem ersten Bild“, immer mit Preis vor „Einladen“; der Hauptknopf schmal und fest unten, Wortlaut „Pflegesituation
 // vervollständigen und Bewerbungen erhalten“.
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowRight, ArrowUp, Check, ChevronDown, Info, Phone, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { formatEuro, type Lead } from '../../lib/supabase';
 import { eigenanteilAus } from '../../lib/angebotZuschuss';
-import { anzahlText, sternFuellung, type SterneStand } from '../../lib/sterne';
+import { anzahlText, ERFAHRUNGEN_URL, sternFuellung, type SterneStand } from '../../lib/sterne';
 import { BERATERIN, ERREICHBAR, TELEFON, TELEFON_HREF, WHATSAPP_HREF, istErreichbar } from '../../lib/kontakt';
 import { initials } from './shared';
 import { SCHRITTE_STAND_75B8DF8 } from './EinstiegVorSpeichern';
@@ -75,6 +75,22 @@ const PILLE = 'flex h-9 w-[104px] max-[374px]:w-24 flex-none items-center justif
 // Karte wie im CGA-Panel: weiß auf dem Seitengrund, ohne Rahmen und Schatten.
 const KARTE = 'rounded-card bg-white';
 const STERN = 'M10 1.6l2.47 5.2 5.7.72-4.2 3.93 1.08 5.64L10 14.3l-5.05 2.79 1.08-5.64-4.2-3.93 5.7-.72z';
+/** Fünf Sterne, anteilig gefüllt wie in der Bewertungszeile (Angebotskarte und Marta-Karte). */
+function FuenfSterne({ wert, groesse = 12 }: { wert: number; groesse?: number }) {
+  return (
+    <span className="inline-flex gap-px" aria-hidden="true">
+      {[0, 1, 2, 3, 4].map((i) => {
+        const fuellung = sternFuellung(wert, i);
+        return (
+          <svg key={i} viewBox="0 0 20 20" width={groesse} height={groesse} className="flex-none">
+            <path d={STERN} fill="#E5E3DF" />
+            {fuellung > 0 && <path d={STERN} fill="#D4A843" style={fuellung < 1 ? { clipPath: `inset(0 ${Math.round((1 - fuellung) * 100)}% 0 0)` } : undefined} />}
+          </svg>
+        );
+      })}
+    </span>
+  );
+}
 
 // ── Kopf rechts: „6× Testsieger / DIE WELT“ mit Siegel (statt „Hilfe“ in der Navigationsleiste) ──────────────────────────
 export function TestsiegerKopf() {
@@ -179,17 +195,7 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
             {/* „4,9“ und dahinter alle fünf Sterne (Martin 08.11.), anteilig gefüllt wie in der Bewertungszeile. */}
             <dd className="flex items-center gap-1.5 text-[15px] font-bold leading-5 text-pm-ink">
               {sterne.schnitt}
-              <span className="inline-flex gap-px" aria-hidden="true">
-                {[0, 1, 2, 3, 4].map((i) => {
-                  const fuellung = sternFuellung(sterne.wert, i);
-                  return (
-                    <svg key={i} viewBox="0 0 20 20" width={12} height={12} className="flex-none">
-                      <path d={STERN} fill="#E5E3DF" />
-                      {fuellung > 0 && <path d={STERN} fill="#D4A843" style={fuellung < 1 ? { clipPath: `inset(0 ${Math.round((1 - fuellung) * 100)}% 0 0)` } : undefined} />}
-                    </svg>
-                  );
-                })}
-              </span>
+              <FuenfSterne wert={sterne.wert} />
             </dd>
             <dd className="text-[12px] leading-4 text-pm-muted">{anzahlText(sterne.anzahl)}</dd>
           </div>
@@ -312,13 +318,19 @@ function Platzhalterzeile() {
 const PLATZHALTER = 5;
 
 // ── Kontakt-Reiter (wie die CG-App) ───────────────────────────────────────────────────────────────────────────────────
-// Reiter: weiße Pille am rechten Rand mit Griff, Foto und grünem Punkt; 20 px eingeschoben, beim Scrollen 44 px, 0,9 s nach
-// dem Scrollen zurück. Im Formular bleibt er eingeklappt (44 px, Martin 08.11.: „auf dem Formular … rechts eingeklappt
-// lassen“), damit er kein Feld verdeckt. Tipp öffnet das Panel (von rechts, 86 % breit, Hintergrund abgedunkelt): Foto groß,
-// Name, Rolle, Erreichbarkeit, zwei Kacheln Anrufen und WhatsApp. Wortlaut wie im Marta-Kasten.
-function KontaktReiter({ eingeklappt, erreichbar, verborgen = false }: { eingeklappt: boolean; erreichbar: boolean; verborgen?: boolean }) {
+// Reiter: weiße Pille am rechten Rand mit Griff, Foto und Punkt (grün 8–20 Uhr, sonst grau); 20 px eingeschoben, beim
+// Scrollen 44 px, 0,9 s nach dem Scrollen zurück, im Formular eingeklappt (44 px, Martin 08.11.: „auf dem Formular … rechts
+// eingeklappt lassen“). Tipp öffnet eine kleine Karte direkt neben dem Reiter (Martin 08.11.: „diese Marta-Seite … viel zu
+// groß … Da, wo man klickt, könnte man das öffnen. Und … den Testsieger und die Sterne da … schön platzieren“; vorher ein
+// Panel über 86 % der Breite und die ganze Höhe): Foto, Name, Rolle, Erreichbarkeit, Anrufen und WhatsApp, darunter Siegel und
+// Sterne wie im Marta-Kasten. Wortlaute wie im Marta-Kasten.
+function KontaktReiter({ eingeklappt, erreichbar, sterne, verborgen = false }: { eingeklappt: boolean; erreichbar: boolean; sterne: SterneStand | null; verborgen?: boolean }) {
   const [scrollt, setScrollt] = useState(false);
-  const [offen, setOffen] = useState(false);
+  // Stelle des Reiters beim Tipp (Bildschirmkoordinaten): daran richtet sich die Karte aus.
+  const [anker, setAnker] = useState<DOMRect | null>(null);
+  const offen = anker !== null;
+  const karte = useRef<HTMLDivElement>(null);
+  const [lage, setLage] = useState<{ top: number } | null>(null);
   useEffect(() => {
     let t = 0;
     // `capture`: auch das Scrollen im Handyrahmen am Computer (#portal-scroll-container) kommt hier an.
@@ -332,16 +344,25 @@ function KontaktReiter({ eingeklappt, erreichbar, verborgen = false }: { eingekl
   }, []);
   useEffect(() => {
     if (!offen) return;
-    const taste = (e: KeyboardEvent) => { if (e.key === 'Escape') setOffen(false); };
+    const taste = (e: KeyboardEvent) => { if (e.key === 'Escape') setAnker(null); };
     document.addEventListener('keydown', taste);
     return () => document.removeEventListener('keydown', taste);
   }, [offen]);
+  // Karte mittig neben dem Reiter, aber ganz im Bild (unter der Navigationsleiste, über dem unteren Rand).
+  useLayoutEffect(() => {
+    if (!anker || !karte.current) { setLage(null); return; }
+    const hoehe = karte.current.offsetHeight;
+    const oben = anker.top + anker.height / 2 - hoehe / 2;
+    setLage({ top: Math.max(64, Math.min(oben, window.innerHeight - hoehe - 12)) });
+  }, [anker]);
+  const schliessen = () => setAnker(null);
   const weg = verborgen || offen;
+  const kachel = `${FOKUS} flex items-center justify-center gap-2 rounded-[14px] px-2 py-2.5 text-[14px] font-medium shadow-[0_0_0_1px_rgba(28,28,28,.08)]`;
   return (
     <>
       <button
         type="button"
-        onClick={() => setOffen(true)}
+        onClick={(e) => setAnker(e.currentTarget.getBoundingClientRect())}
         aria-label={`${BERATERIN}, ${BERATERIN_ROLLE}: ${erreichbar ? 'anrufen oder schreiben' : 'per WhatsApp schreiben'}`}
         aria-hidden={weg || undefined}
         tabIndex={weg ? -1 : 0}
@@ -359,47 +380,67 @@ function KontaktReiter({ eingeklappt, erreichbar, verborgen = false }: { eingekl
           <span className={`absolute -bottom-px -right-px h-[11px] w-[11px] rounded-full border-2 border-white ${erreichbar ? 'bg-pm-green' : 'bg-pm-mute'}`} aria-hidden="true" data-erreichbar={erreichbar || undefined} />
         </span>
       </button>
-      {/* Portal an <body>: Das Band hat `backdrop-blur`/`transform`, darin wäre `fixed` am Band statt am Bildschirm. */}
+      {/* Portal an <body>: `fixed` in einem Element mit `transform`/`backdrop-blur` hinge sonst an diesem Element. */}
       {offen && createPortal(
         <div className="fixed inset-0 z-50 font-pm" role="dialog" aria-modal="true" aria-label={`${BERATERIN}, ${BERATERIN_ROLLE}`} data-kontakt-panel>
-          <div className="absolute inset-0 bg-[rgba(15,8,22,.38)]" onClick={() => setOffen(false)} />
-          <aside className="absolute inset-y-0 right-0 flex w-[86%] max-w-[380px] flex-col overflow-y-auto rounded-l-[30px] bg-pm-grund px-5 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[max(20px,env(safe-area-inset-top))] shadow-[-24px_0_60px_rgba(15,8,22,.22)]">
-            <div className="flex justify-end">
-              <button type="button" onClick={() => setOffen(false)} aria-label="Schließen" className={`${FOKUS} flex h-10 w-10 items-center justify-center rounded-full bg-white text-pm-ink`}>
-                <X className="h-5 w-5" aria-hidden="true" />
+          <div className="absolute inset-0 bg-[rgba(15,8,22,.22)]" onClick={schliessen} />
+          <div
+            ref={karte}
+            className="absolute right-3 w-[min(316px,calc(100vw-24px))] origin-right rounded-[22px] bg-white p-4 shadow-[0_18px_50px_rgba(15,8,22,.22),0_0_0_1px_rgba(28,28,28,.05)]"
+            style={{ top: lage?.top ?? 64, visibility: lage ? 'visible' : 'hidden' }}
+          >
+            <div className="flex items-start gap-3">
+              <img src="/marta-kapcio.jpg" alt="" className="h-14 w-14 flex-none rounded-full object-cover object-top" />
+              <div className="min-w-0 flex-1 pt-0.5">
+                <p className="text-[17px] font-semibold leading-tight text-pm-ink">{BERATERIN}</p>
+                <p className="text-[13.5px] text-pm-muted">{BERATERIN_ROLLE}</p>
+                <span className={`mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[12.5px] font-medium ${erreichbar ? 'bg-pm-mint text-pm-green-deep' : 'bg-pm-shell text-pm-muted'}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${erreichbar ? 'bg-pm-green' : 'bg-pm-mute'}`} aria-hidden="true" />{ERREICHBAR}
+                </span>
+              </div>
+              <button type="button" onClick={schliessen} aria-label="Schließen" className={`${FOKUS} -mr-1 -mt-1 flex h-9 w-9 flex-none items-center justify-center rounded-full text-pm-muted hover:bg-pm-grund`}>
+                <X className="h-[18px] w-[18px]" aria-hidden="true" />
               </button>
-            </div>
-            <div className="mt-2 flex flex-col items-center text-center">
-              <img src="/marta-kapcio.jpg" alt="" className="h-[88px] w-[88px] rounded-full object-cover object-top shadow-[0_0_0_4px_#fff,0_10px_26px_rgba(28,28,28,.18)]" />
-              <p className="mt-4 text-[21px] font-semibold leading-tight tracking-[-0.02em] text-pm-ink">{BERATERIN}</p>
-              <p className="mt-0.5 text-[15px] text-pm-muted">{BERATERIN_ROLLE}</p>
-              <span className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13.5px] font-medium ${erreichbar ? 'bg-pm-mint text-pm-green-deep' : 'bg-pm-shell text-pm-muted'}`}>
-                <span className={`h-2 w-2 rounded-full ${erreichbar ? 'bg-pm-green' : 'bg-pm-mute'}`} aria-hidden="true" />{ERREICHBAR}
-              </span>
             </div>
             {/* Außerhalb von 8–20 Uhr ist Anrufen ausgegraut und nicht antippbar, WhatsApp bleibt (Martin 08.11.: „nicht den
                 Button wegnehmen, das sieht irgendwie komisch aus, sondern einfach nur rausgrauen“). */}
-            <div className="mt-6 grid grid-cols-2 gap-2">
-              {erreichbar ? <a href={TELEFON_HREF} aria-label={`${BERATERIN} anrufen: ${TELEFON}`} className={`${FOKUS} flex flex-col items-center gap-2 rounded-[18px] bg-white px-2 py-3.5 text-[14px] font-medium text-pm-ink shadow-[0_0_0_1px_rgba(28,28,28,.05)]`}>
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-pm-green text-white"><Phone className="h-5 w-5" aria-hidden="true" /></span>
-                Anrufen
-              </a> : (
-                <span aria-disabled="true" className="flex flex-col items-center gap-2 rounded-[18px] bg-white/60 px-2 py-3.5 text-[14px] font-medium text-pm-mute shadow-[0_0_0_1px_rgba(28,28,28,.05)]" data-anrufen-aus>
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-pm-line text-white"><Phone className="h-5 w-5" aria-hidden="true" /></span>
+            <div className="mt-3.5 grid grid-cols-2 gap-2">
+              {erreichbar ? (
+                <a href={TELEFON_HREF} aria-label={`${BERATERIN} anrufen: ${TELEFON}`} className={`${kachel} bg-white text-pm-ink`}>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pm-green text-white"><Phone className="h-4 w-4" aria-hidden="true" /></span>
+                  Anrufen
+                </a>
+              ) : (
+                <span aria-disabled="true" className={`${kachel} bg-pm-grund/60 text-pm-mute`} data-anrufen-aus>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pm-line text-white"><Phone className="h-4 w-4" aria-hidden="true" /></span>
                   Anrufen
                 </span>
               )}
-              <a href={WHATSAPP_HREF} target="_blank" rel="noreferrer" aria-label={`${BERATERIN} per WhatsApp schreiben`} className={`${FOKUS} flex flex-col items-center gap-2 rounded-[18px] bg-white px-2 py-3.5 text-[14px] font-medium text-pm-ink shadow-[0_0_0_1px_rgba(28,28,28,.05)]`}>
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-pm-whatsapp text-white"><WhatsAppIcon className="h-[22px] w-[22px]" /></span>
+              <a href={WHATSAPP_HREF} target="_blank" rel="noreferrer" aria-label={`${BERATERIN} per WhatsApp schreiben`} className={`${kachel} bg-white text-pm-ink`}>
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pm-whatsapp text-white"><WhatsAppIcon className="h-[18px] w-[18px]" /></span>
                 WhatsApp
               </a>
             </div>
             {erreichbar
-              ? <p className="mt-4 text-center text-[14px] text-pm-muted">{TELEFON}</p>
+              ? <p className="mt-2.5 text-center text-[13.5px] tabular-nums text-pm-muted">{TELEFON}</p>
               // Wortlaut: Martin 08.11. („außerhalb der Geschäftszeiten senden Sie eine WhatsApp oder so“), OpenAI 08.11. ohne
               // Antwortversprechen.
-              : <p className="mt-4 text-center text-[14px] leading-snug text-pm-muted">{AUSSERHALB_ZEITEN}</p>}
-          </aside>
+              : <p className="mt-2.5 text-center text-[13px] leading-snug text-pm-muted">{AUSSERHALB_ZEITEN}</p>}
+            {/* Siegel und Sterne wie im Marta-Kasten („6× Testsieger“, „DIE WELT · Preis & Qualität“); ohne Stand keine Sterne. */}
+            <div className="mt-3.5 flex items-center gap-3 border-t border-pm-line-soft pt-3.5" data-marta-vertrauen>
+              <img src="/badge-testsieger.webp" alt="Testsieger DIE WELT" className="h-11 w-auto flex-none object-contain" />
+              <div className="min-w-0 leading-[1.3]">
+                <p className="text-[14.5px] font-bold text-pm-ink">6× Testsieger</p>
+                <p className="text-[12.5px]"><span className="font-bold text-pm-taupe">DIE WELT</span><span className="text-pm-muted"> · Preis &amp; Qualität</span></p>
+                {sterne && (
+                  <a href={ERFAHRUNGEN_URL} target="_blank" rel="noreferrer" className={`${FOKUS} mt-1 inline-flex items-center gap-1.5 rounded text-[12.5px] text-pm-muted`}>
+                    <FuenfSterne wert={sterne.wert} />
+                    <b className="text-pm-ink">{sterne.schnitt}</b> · <span className="underline underline-offset-2">{anzahlText(sterne.anzahl)}</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
         </div>,
         document.body,
       )}
@@ -605,7 +646,7 @@ export function EinstiegMinimal({
       </div>
       {/* Martas Reiter: eigener Sticky-Anker über die ganze Seite (rechter Rand), im Formular eingeklappt, weg beim Marta-Kasten. */}
       <div className="sticky bottom-0 z-20 h-0" data-reiter-anker>
-        <KontaktReiter eingeklappt={formularImBild} erreichbar={erreichbar} verborgen={kastenImBild} />
+        <KontaktReiter eingeklappt={formularImBild} erreichbar={erreichbar} sterne={sterne} verborgen={kastenImBild} />
       </div>
     </div>
   );
