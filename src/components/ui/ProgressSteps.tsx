@@ -1,9 +1,11 @@
 // Fortschritt im Formular: Segmente über die ganze Breite, darunter „Schritt 2 von 4 · Pflegebedarf".
 // Zurückspringen geht nur zu früheren Schritten (wie bisher im Stepper), nie nach vorn.
 export function ProgressSteps({
-  schritte, aktuell, onSchritt, schlicht = false, onZurueck,
+  schritte, aktuell, onSchritt, schlicht = false, onZurueck, anteil,
 }: {
   schritte: readonly string[]; aktuell: number; onSchritt: (i: number) => void; schlicht?: boolean;
+  /** Nur mit `schlicht`: Füllung des Balkens (0–1) statt „aktueller Schritt / Anzahl“, z. B. halber erster Schritt. */
+  anteil?: number;
   /** Nur mit `schlicht`: „Zurück“ klein rechts in der Zeile, wenn die Seite keine eigene Knopfleiste zeigt. */
   onZurueck?: () => void;
 }) {
@@ -35,9 +37,9 @@ export function ProgressSteps({
           aria-valuemin={1}
           aria-valuemax={schritte.length}
           aria-valuenow={aktuell + 1}
-          className="mt-2 h-1 overflow-hidden rounded-full bg-pm-line-soft"
+          className="mt-2 h-1 overflow-hidden rounded-full bg-white"
         >
-          <span className="block h-full rounded-full bg-pm-coral transition-[width] duration-300" style={{ width: `${((aktuell + 1) / schritte.length) * 100}%` }} />
+          <span className="block h-full rounded-full bg-pm-coral transition-[width] duration-300" style={{ width: `${(anteil ?? (aktuell + 1) / schritte.length) * 100}%` }} />
         </div>
       </div>
     );

@@ -72,7 +72,9 @@ export type FormularQuelle = 'kasten' | 'warum' | 'karte' | 'schritte' | 'frage'
   // Registry #145: Knopf im Fenster „{Name} einladen" (Pflegekräfte zuerst).
   | 'einladen_fenster'
   // Registry #147: Hauptknopf „Angaben vervollständigen und Bewerbungen erhalten" im ersten Bild (Minimal-Einstieg).
-  | 'hauptknopf';
+  | 'hauptknopf'
+  // Registry #147 (08.11.): derselbe Knopf, getippt unterhalb des Formulars (So geht es weiter, Fragen, Marta) → Sprung zurück.
+  | 'hauptknopf_unten';
 
 // Mini-Snapshot der Nurse-Daten, die wir brauchen um eine declined-from-
 // Interest Pflegekraft im bearbeitet-Bereich als virtuelle MatchCard zu

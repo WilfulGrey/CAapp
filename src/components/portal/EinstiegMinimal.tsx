@@ -28,7 +28,7 @@ import type { Nurse } from '../../types';
 import { formatEuro, type Lead } from '../../lib/supabase';
 import { eigenanteilAus } from '../../lib/angebotZuschuss';
 import { anzahlText, sternFuellung, type SterneStand } from '../../lib/sterne';
-import { BERATERIN, ERREICHBAR, TELEFON, TELEFON_HREF, WHATSAPP_HREF } from '../../lib/kontakt';
+import { BERATERIN, ERREICHBAR, TELEFON, TELEFON_HREF, WHATSAPP_HREF, istErreichbar } from '../../lib/kontakt';
 import { initials } from './shared';
 import { SCHRITTE_STAND_75B8DF8 } from './EinstiegVorSpeichern';
 import { AbschnittPflegesituation, KostenAufstellung, type VorgemerkteKraft } from './EinstiegPflegekraefteZuerst';
@@ -62,15 +62,17 @@ export const GARANTIE_PUNKTE = ['Keine Vorauszahlung', 'Keine Vermittlungsgebüh
 /** Vertrauen unten in der Angebotskarte (Martin: „seit 20 Jahren und 6 Jahre in Folge … Testsieger … die Sterne“): Wert
  *  groß, Beschriftung klein darunter, wie die Kennzahlen im CGA-Panel. Wortlaut „6× in Folge“ wie die Auszeichnungsseite. */
 export const VERTRAUEN = [['20 Jahre', 'Erfahrung'], ['6× in Folge', 'Testsieger']] as const;
-/** Knopf der Zeile nach dem Tipp auf „Einladen“ (statt „Vorgemerkt“, Martin: „sieht natürlich komisch aus“). „Ausgewählt“
- *  statt „Eingeladen“ (OpenAI-Prüfung 08.11.): verschickt wird die Einladung erst nach dem Speichern der Pflegesituation. */
-export const AUSGEWAEHLT = 'Ausgewählt';
+/** Knopf der Zeile nach dem Tipp auf „Einladen“ (statt „Vorgemerkt“, Martin: „sieht natürlich komisch aus“). „Eingeladen“
+ *  (Martin 08.11. abends: „warum steht da ausgewählt, wenn ich eingeladen habe … muss auch eingeladen sein“); verschickt wird
+ *  die Einladung technisch mit dem Absenden der Pflegesituation (Logik #145 unverändert). */
+export const EINGELADEN = 'Eingeladen';
 // Wie in der Navigationsleiste: Tippfläche ≥ 44 px über ein unsichtbares ::before, die sichtbare Pille bleibt kleiner.
 const TIPPFLAECHE = "relative before:absolute before:-inset-y-1.5 before:-inset-x-1 before:content-['']";
 const FOKUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-taupe';
-// Knopf rechts in der Zeile: in allen Zuständen gleich breit und hoch (88 × 34 px), damit die Zeile ihre Höhe hält.
-// 88 px: „Ausgewählt“ mit Haken-Symbol (12 px halbfett, ca. 83 px) passt mit etwas Luft hinein.
-const PILLE = 'flex h-[34px] w-[88px] flex-none items-center justify-center rounded-[10px] font-semibold whitespace-nowrap';
+// Knopf rechts in der Zeile: in allen Zuständen gleich breit und hoch, damit die Zeile ihre Höhe hält. 104 × 36 px (unter
+// 375 px 96 px): „Eingeladen“ mit Haken in 13 px passt mit Luft hinein (Martin 08.11.: „passender in den Button … macht die
+// Button-Tick größer von vornherein“); vorher 88 × 34 px mit 12 px Schrift.
+const PILLE = 'flex h-9 w-[104px] max-[374px]:w-24 flex-none items-center justify-center rounded-[10px] font-semibold whitespace-nowrap';
 // Karte wie im CGA-Panel: weiß auf dem Seitengrund, ohne Rahmen und Schatten.
 const KARTE = 'rounded-card bg-white';
 const STERN = 'M10 1.6l2.47 5.2 5.7.72-4.2 3.93 1.08 5.64L10 14.3l-5.05 2.79 1.08-5.64-4.2-3.93 5.7-.72z';
@@ -230,7 +232,7 @@ export function PflegekraftZeile({ nurse, preis, preisUnten = false, vorgemerkt,
   /** Vergleich 08.11. (`?zeile=b`): Preis als dritte Zeile unter den Angaben, „Einladen“ mittig rechts. Sonst Preis oben
    *  rechts auf der Höhe des Namens, „Einladen“ darunter. */
   preisUnten?: boolean;
-  /** Registry #145: vorgemerkt → `AUSGEWAEHLT` mit Haken, bleibt tippbar und öffnet das Fenster erneut. */
+  /** Registry #145: vorgemerkt → `EINGELADEN` mit Haken, bleibt tippbar und öffnet das Fenster erneut. */
   vorgemerkt: boolean;
   /** Eine Einladung läuft gerade (nach dem Speichern) → „Bitte warten…“ wie auf der Karte. */
   gesperrt: boolean;
@@ -254,17 +256,17 @@ export function PflegekraftZeile({ nurse, preis, preisUnten = false, vorgemerkt,
     <span className="whitespace-nowrap text-[15px] font-semibold tabular-nums text-pm-ink" data-preis>{formatEuro(preis)}</span>
   ) : null;
   // „Einladen“ grün umrandet (Martin 08.11.: die Koralle-Fläche „wirkt nicht passend zum rest und wirkt negativ“); Grün wie
-  // die Zuschuss-Zeile und der Kasten, „Ausgewählt“ dann grün gefüllt (Mint).
+  // die Zuschuss-Zeile und der Kasten, „Eingeladen“ dann grün gefüllt (Mint).
   const knopf = gesperrt ? (
-    <button type="button" disabled aria-disabled="true" className={`${PILLE} cursor-not-allowed bg-pm-grund text-[12px] text-pm-muted`}>
+    <button type="button" disabled aria-disabled="true" className={`${PILLE} cursor-not-allowed bg-pm-grund text-[13px] text-pm-muted`}>
       Bitte warten…
     </button>
   ) : vorgemerkt ? (
-    <button type="button" onClick={einladen} aria-label={`${AUSGEWAEHLT} ✓`} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} gap-0.5 bg-pm-mint text-[12px] text-pm-green-deep`}>
-      {AUSGEWAEHLT}<Check aria-hidden="true" className="h-3 w-3 flex-none" strokeWidth={3} />
+    <button type="button" onClick={einladen} aria-label={`${EINGELADEN} ✓`} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} gap-1 bg-pm-mint text-[13px] text-pm-green-deep`}>
+      {EINGELADEN}<Check aria-hidden="true" className="h-3.5 w-3.5 flex-none" strokeWidth={3} />
     </button>
   ) : (
-    <button type="button" onClick={einladen} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} border-[1.5px] border-pm-green bg-white text-[13.5px] text-pm-green-deep hover:bg-pm-mint`}>
+    <button type="button" onClick={einladen} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} border-[1.5px] border-pm-green bg-white text-[14px] text-pm-green-deep hover:bg-pm-mint`}>
       Einladen
     </button>
   );
@@ -321,7 +323,7 @@ const PLATZHALTER = 5;
 // dem Scrollen zurück. Im Formular bleibt er eingeklappt (44 px, Martin 08.11.: „auf dem Formular … rechts eingeklappt
 // lassen“), damit er kein Feld verdeckt. Tipp öffnet das Panel (von rechts, 86 % breit, Hintergrund abgedunkelt): Foto groß,
 // Name, Rolle, Erreichbarkeit, zwei Kacheln Anrufen und WhatsApp. Wortlaut wie im Marta-Kasten.
-function KontaktReiter({ eingeklappt }: { eingeklappt: boolean }) {
+function KontaktReiter({ eingeklappt, erreichbar, verborgen = false }: { eingeklappt: boolean; erreichbar: boolean; verborgen?: boolean }) {
   const [scrollt, setScrollt] = useState(false);
   const [offen, setOffen] = useState(false);
   useEffect(() => {
@@ -341,13 +343,13 @@ function KontaktReiter({ eingeklappt }: { eingeklappt: boolean }) {
     document.addEventListener('keydown', taste);
     return () => document.removeEventListener('keydown', taste);
   }, [offen]);
-  const weg = offen;
+  const weg = verborgen || offen;
   return (
     <>
       <button
         type="button"
         onClick={() => setOffen(true)}
-        aria-label={`${BERATERIN}, ${BERATERIN_ROLLE}: anrufen oder schreiben`}
+        aria-label={`${BERATERIN}, ${BERATERIN_ROLLE}: ${erreichbar ? 'anrufen oder schreiben' : 'per WhatsApp schreiben'}`}
         aria-hidden={weg || undefined}
         tabIndex={weg ? -1 : 0}
         className={`${FOKUS} absolute right-0 flex items-center gap-1.5 rounded-l-[26px] bg-white/95 py-[5px] pl-2 pr-[7px] shadow-[0_0_0_1px_rgba(28,28,28,.06),0_10px_28px_rgba(28,28,28,.16)] backdrop-blur transition-[transform,opacity] duration-300 motion-reduce:transition-none ${
@@ -360,7 +362,8 @@ function KontaktReiter({ eingeklappt }: { eingeklappt: boolean }) {
         <span className="h-4 w-[3px] rounded-sm bg-pm-chip" aria-hidden="true" />
         <span className="relative">
           <img src="/marta-kapcio.jpg" alt="" className="h-[38px] w-[38px] rounded-full object-cover object-top" />
-          <span className="absolute -bottom-px -right-px h-[11px] w-[11px] rounded-full border-2 border-white bg-pm-green" aria-hidden="true" />
+          {/* Grün = jetzt erreichbar (8–20 Uhr), sonst grau wie in der CG-App am Abend (`body.abend .edge .on-dot`). */}
+          <span className={`absolute -bottom-px -right-px h-[11px] w-[11px] rounded-full border-2 border-white ${erreichbar ? 'bg-pm-green' : 'bg-pm-mute'}`} aria-hidden="true" data-erreichbar={erreichbar || undefined} />
         </span>
       </button>
       {/* Portal an <body>: Das Band hat `backdrop-blur`/`transform`, darin wäre `fixed` am Band statt am Bildschirm. */}
@@ -377,21 +380,22 @@ function KontaktReiter({ eingeklappt }: { eingeklappt: boolean }) {
               <img src="/marta-kapcio.jpg" alt="" className="h-[88px] w-[88px] rounded-full object-cover object-top shadow-[0_0_0_4px_#fff,0_10px_26px_rgba(28,28,28,.18)]" />
               <p className="mt-4 text-[21px] font-semibold leading-tight tracking-[-0.02em] text-pm-ink">{BERATERIN}</p>
               <p className="mt-0.5 text-[15px] text-pm-muted">{BERATERIN_ROLLE}</p>
-              <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-pm-mint px-3 py-1 text-[13.5px] font-medium text-pm-green-deep">
-                <span className="h-2 w-2 rounded-full bg-pm-green" aria-hidden="true" />{ERREICHBAR}
+              <span className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13.5px] font-medium ${erreichbar ? 'bg-pm-mint text-pm-green-deep' : 'bg-pm-shell text-pm-muted'}`}>
+                <span className={`h-2 w-2 rounded-full ${erreichbar ? 'bg-pm-green' : 'bg-pm-mute'}`} aria-hidden="true" />{ERREICHBAR}
               </span>
             </div>
-            <div className="mt-6 grid grid-cols-2 gap-2">
-              <a href={TELEFON_HREF} aria-label={`${BERATERIN} anrufen: ${TELEFON}`} className={`${FOKUS} flex flex-col items-center gap-2 rounded-[18px] bg-white px-2 py-3.5 text-[14px] font-medium text-pm-ink shadow-[0_0_0_1px_rgba(28,28,28,.05)]`}>
+            {/* Außerhalb von 8–20 Uhr nur WhatsApp (Martin 08.11.: „danach blenden wir Anrufen aus … nur noch WhatsApp aktiv“). */}
+            <div className={`mt-6 grid ${erreichbar ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
+              {erreichbar && <a href={TELEFON_HREF} aria-label={`${BERATERIN} anrufen: ${TELEFON}`} className={`${FOKUS} flex flex-col items-center gap-2 rounded-[18px] bg-white px-2 py-3.5 text-[14px] font-medium text-pm-ink shadow-[0_0_0_1px_rgba(28,28,28,.05)]`}>
                 <span className="flex h-11 w-11 items-center justify-center rounded-full bg-pm-green text-white"><Phone className="h-5 w-5" aria-hidden="true" /></span>
                 Anrufen
-              </a>
+              </a>}
               <a href={WHATSAPP_HREF} target="_blank" rel="noreferrer" aria-label={`${BERATERIN} per WhatsApp schreiben`} className={`${FOKUS} flex flex-col items-center gap-2 rounded-[18px] bg-white px-2 py-3.5 text-[14px] font-medium text-pm-ink shadow-[0_0_0_1px_rgba(28,28,28,.05)]`}>
                 <span className="flex h-11 w-11 items-center justify-center rounded-full bg-pm-whatsapp text-white"><WhatsAppIcon className="h-[22px] w-[22px]" /></span>
                 WhatsApp
               </a>
             </div>
-            <p className="mt-4 text-center text-[14px] text-pm-muted">{TELEFON}</p>
+            {erreichbar && <p className="mt-4 text-center text-[14px] text-pm-muted">{TELEFON}</p>}
           </aside>
         </div>,
         document.body,
@@ -438,7 +442,7 @@ function AblaufMinimal() {
 export function EinstiegMinimal({
   anrede, lead, onBestpreis, heimEigenanteil, heimQuelle,
   laedt, zeilen, gehalteneEinladungen, vorschlaegeVorhanden, bereitsBearbeitet, formular, sterne, vorgemerkte,
-  onVervollstaendigen, onKostenAufgeklappt, onFaqGeoeffnet, knopfTitel = FEST_TITEL,
+  onVervollstaendigen, onKostenAufgeklappt, onFaqGeoeffnet, knopfTitel = FEST_TITEL, knopfImmerUnten = false,
 }: {
   /** Anrede für „Guten Tag, …“ (customerSalutation), ohne Anrede nur „Guten Tag“. */
   anrede: string | null;
@@ -458,11 +462,15 @@ export function EinstiegMinimal({
   sterne: SterneStand | null;
   vorgemerkte: VorgemerkteKraft[];
   /** Fester Knopf unten: ins Formular (CustomerPortalPage, Messpunkt `zur_pflegesituation` mit Quelle `hauptknopf`). */
-  onVervollstaendigen: () => void;
+  onVervollstaendigen: (unten?: boolean) => void;
   onKostenAufgeklappt?: () => void;
   onFaqGeoeffnet?: (schluessel: string) => void;
   /** Titel des festen Knopfs (Vorschau-Vergleich `?knopf=2`). */
   knopfTitel?: string;
+  /** Vorschau-Vergleich `?unten=immer` (Variante B): der Knopf bleibt auf der ganzen Seite unten, auch bei So geht es weiter,
+   *  Fragen und Marta; außerhalb des Formulars springt er ins Formular, nie blind einen Schritt weiter. Standard (A): er bleibt
+   *  am Formularende stehen. */
+  knopfImmerUnten?: boolean;
 }) {
   // EIN Knopf (Martin 08.11.: „Ich würde keinen Weiter-Button machen, sondern der Button scrollt einfach mit runter und bleibt
   // dann unten … am Formular, sodass er weitergeht“). Vor dem Formular springt er hinein; steht das Formular oben im Bild
@@ -473,11 +481,14 @@ export function EinstiegMinimal({
     const ziel = document.getElementById('patientendaten');
     if (!ziel || typeof IntersectionObserver === 'undefined') return;
     const beobachter = new IntersectionObserver(([e]) => {
-      setImFormular(e.isIntersecting || e.boundingClientRect.top < 0);
-    }, { rootMargin: '0px 0px -40% 0px' });
+      // A: ab 60 % Höhe bis zum Ende „im Formular“ (der Knopf steht dann am Formularende). B: nur solange das Formular den
+      // Streifen zwischen 40 % und 60 % der Höhe berührt (Anfang über 60 %, Ende unter 40 %); darüber und darunter springt
+      // der Knopf zum aktuellen Schritt.
+      setImFormular(knopfImmerUnten ? e.isIntersecting : e.isIntersecting || e.boundingClientRect.top < 0);
+    }, { rootMargin: knopfImmerUnten ? '-40% 0px -40% 0px' : '0px 0px -40% 0px' });
     beobachter.observe(ziel);
     return () => beobachter.disconnect();
-  }, []);
+  }, [knopfImmerUnten]);
   // Stand des Formulars (AngebotCard meldet ihn über `AussenKnopf`): Handlungen im Ref, Anzeige im State; neu gezeichnet wird
   // nur, wenn sich Ladezustand oder Hinweis ändern.
   const formStand = useRef<AussenKnopfStand | null>(null);
@@ -490,16 +501,92 @@ export function EinstiegMinimal({
       return { laedt: s.laedt, ladeText: s.ladeText, hinweis: s.hinweis };
     });
   }, []);
+  // Nach dem Sprung ins Formular 0,6 s keine Tipps (Prüfung 08.11.: ein Doppeltipp, bei Älteren häufig, löste sonst sofort die
+  // Prüfung mit roten Feldern aus, bevor das Formular überhaupt zu sehen war). performance.now: läuft auch bei gestellter Uhr.
+  const sperreBis = useRef(0);
   const tippen = () => {
+    if (performance.now() < sperreBis.current) return;
     const stand = formStand.current;
     if (stand && imFormular) { stand.onWeiter(); return; }
-    // Der Sprung ins Formular zählt schon als „im Formular“: Ein zweiter Tipp während des Scrollens geht weiter.
+    // Außerhalb des Formulars nie weiter, nie absenden: nur der Sprung zum aktuellen Schritt. „unten“ = Formular liegt schon
+    // über der Bildmitte (eigene Messquelle, Variante B).
+    const r = document.getElementById('patientendaten')?.getBoundingClientRect();
+    const unten = !!r && r.height > 0 && r.bottom < window.innerHeight * 0.4;
+    // Der Sprung zählt schon als „im Formular“ (ohne Meldung des Beobachters, z. B. im Test, geht es sonst nie weiter).
     setImFormular(true);
-    onVervollstaendigen();
+    sperreBis.current = performance.now() + 600;
+    onVervollstaendigen(unten);
   };
+  // Marta-Kasten im Bild → Reiter weg (sonst steht Marta am Seitenende doppelt, Variante B).
+  const martaKasten = useRef<HTMLDivElement>(null);
+  const [kastenImBild, setKastenImBild] = useState(false);
+  useEffect(() => {
+    const ziel = martaKasten.current;
+    if (!ziel || typeof IntersectionObserver === 'undefined') return;
+    const beobachter = new IntersectionObserver(([e]) => setKastenImBild(e.isIntersecting));
+    beobachter.observe(ziel);
+    return () => beobachter.disconnect();
+  }, []);
+  // Marta erreichbar (täglich 8–20 Uhr deutscher Zeit)? Jede Minute neu, damit eine offene Seite um 20 Uhr umspringt.
+  const [erreichbar, setErreichbar] = useState(() => istErreichbar());
+  useEffect(() => {
+    const t = window.setInterval(() => setErreichbar(istErreichbar()), 60_000);
+    return () => window.clearInterval(t);
+  }, []);
   // Tastatur offen oder Kalender aufgeklappt: Band im Fluss (am Formularende) statt über dem Feld (wie FormNav).
   const imFluss = useKnopfleisteImFluss();
   const laedtJetzt = !!anzeige?.laedt;
+  const band = (
+    <>
+        {/* Der eine feste Knopf (Martin 08.11.: „den wir festmachen unten“ … „bleibt dann unten am Formular“): letztes Element
+            des ersten Teils, also bis zum Formularende unten am Bildschirm, danach am Formularende. Band bis an den
+            Bildschirmrand. `data-knopfleiste`: daran misst der Kalender, wie viel unten verdeckt ist (DateField). */}
+        <div
+          className={`${imFluss ? 'relative' : 'sticky bottom-0'} z-20 mt-3 bg-pm-grund/95 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)] backdrop-blur ${
+            knopfImmerUnten ? '' : '-mx-3 max-[374px]:-mx-2 px-3 max-[374px]:px-2'
+          }`}
+          data-fester-knopf
+          data-knopfleiste=""
+        >
+          <div className={knopfImmerUnten ? 'max-w-3xl mx-auto px-3 max-[374px]:px-2' : ''}>
+          {imFormular && anzeige?.hinweis && (
+            <div className="mb-2 text-center text-[13.5px] text-pm-error-ink">
+              <button
+                type="button"
+                onClick={() => formStand.current?.zumFehler()}
+                className="inline-flex min-h-[36px] -my-1 items-center px-2 underline decoration-pm-error/40 underline-offset-4"
+              >
+                {anzeige.hinweis}
+              </button>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={tippen}
+            onPointerUp={() => { if (imFormular) formStand.current?.getippt(); }}
+            disabled={laedtJetzt}
+            aria-busy={laedtJetzt || undefined}
+            className={`${FOKUS} block w-full rounded-[12px] bg-pm-coral px-4 py-2.5 text-center text-white transition-colors hover:bg-pm-coral-deep active:scale-[0.99] disabled:opacity-80`}
+          >
+            {laedtJetzt ? (
+              <span className="block py-2 text-[16px] font-bold leading-5">{anzeige?.ladeText}</span>
+            ) : (
+              <>
+                {/* Pfeil (Martin 08.11.: „wir lassen Bewerbungen erhalten. Und dann kommt so ein Pfeil dahin“): der Knopf
+                    führt weiter, in jedem Schritt gleich beschriftet. */}
+                <span className="flex items-center justify-center gap-1.5 text-[16px] font-bold leading-5">
+                  {knopfTitel}
+                  <ArrowRight className="h-[18px] w-[18px] flex-none" strokeWidth={2.5} aria-hidden="true" data-pfeil />
+                </span>
+                <span className="mt-0.5 block text-[12.5px] font-medium leading-4 opacity-90">{FEST_ZEILE}</span>
+              </>
+            )}
+          </button>
+          </div>
+          <KontaktReiter eingeklappt={imFormular} erreichbar={erreichbar} verborgen={kastenImBild} />
+        </div>
+    </>
+  );
   const anzahl = zeilen.length;
   const leer = !laedt && anzahl === 0;
   const hinweis = (titel: string, text: string) => (
@@ -555,61 +642,20 @@ export function EinstiegMinimal({
           <AbschnittPflegesituation vorgemerkte={vorgemerkte} formular={formular} schlicht />
         </div>
 
-        {/* Der eine feste Knopf (Martin 08.11.: „den wir festmachen unten“ … „bleibt dann unten am Formular“): letztes Element
-            des ersten Teils, also bis zum Formularende unten am Bildschirm, danach am Formularende. Band bis an den
-            Bildschirmrand. `data-knopfleiste`: daran misst der Kalender, wie viel unten verdeckt ist (DateField). */}
-        <div
-          className={`${imFluss ? 'relative' : 'sticky bottom-0'} z-20 mt-3 -mx-3 max-[374px]:-mx-2 bg-pm-grund/95 px-3 max-[374px]:px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)] backdrop-blur`}
-          data-fester-knopf
-          data-knopfleiste=""
-        >
-          {imFormular && anzeige?.hinweis && (
-            <div className="mb-2 text-center text-[13.5px] text-pm-error-ink">
-              <button
-                type="button"
-                onClick={() => formStand.current?.zumFehler()}
-                className="inline-flex min-h-[36px] -my-1 items-center px-2 underline decoration-pm-error/40 underline-offset-4"
-              >
-                {anzeige.hinweis}
-              </button>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={tippen}
-            onPointerUp={() => { if (imFormular) formStand.current?.getippt(); }}
-            disabled={laedtJetzt}
-            aria-busy={laedtJetzt || undefined}
-            className={`${FOKUS} block w-full rounded-[12px] bg-pm-coral px-4 py-2.5 text-center text-white transition-colors hover:bg-pm-coral-deep active:scale-[0.99] disabled:opacity-80`}
-          >
-            {laedtJetzt ? (
-              <span className="block py-2 text-[16px] font-bold leading-5">{anzeige?.ladeText}</span>
-            ) : (
-              <>
-                {/* Pfeil (Martin 08.11.: „wir lassen Bewerbungen erhalten. Und dann kommt so ein Pfeil dahin“): der Knopf
-                    führt weiter, in jedem Schritt gleich beschriftet. */}
-                <span className="flex items-center justify-center gap-1.5 text-[16px] font-bold leading-5">
-                  {knopfTitel}
-                  <ArrowRight className="h-[18px] w-[18px] flex-none" strokeWidth={2.5} aria-hidden="true" data-pfeil />
-                </span>
-                <span className="mt-0.5 block text-[12.5px] font-medium leading-4 opacity-90">{FEST_ZEILE}</span>
-              </>
-            )}
-          </button>
-          <KontaktReiter eingeklappt={imFormular} />
-        </div>
+        {!knopfImmerUnten && band}
       </div>
 
       {/* Die Kostenkarte entfällt hier: ihre Aufstellung steht unter „Details“ in der Angebotskarte (Martin 08.11.). */}
       <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2 pt-2 pb-6 space-y-4">
         <AblaufMinimal />
         <div className="pt-6">
-          <FaqListe ruhig karte onFrageGeoeffnet={onFaqGeoeffnet} />
+          <FaqListe ruhig karte minimal onFrageGeoeffnet={onFaqGeoeffnet} />
         </div>
-        <div className="pt-4">
-          <MartaBox sterne={sterne} />
+        <div className="pt-4" ref={martaKasten}>
+          <MartaBox sterne={sterne} erreichbar={erreichbar} />
         </div>
       </div>
+      {knopfImmerUnten && band}
     </div>
     </AussenKnopf.Provider>
   );

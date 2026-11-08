@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { Fragment, useContext, useEffect, useRef, useState } from 'react';
 import type { ElementType, FC, ReactNode } from 'react';
 import { Check, Lock } from 'lucide-react';
 import {
@@ -259,6 +259,13 @@ export const AngebotCard: FC<{
   }, [gewaehlterStart]);
 
   const zwei = patient.anzahl === '2';
+  // Minimal-Einstieg (Registry #147, Martin 08.11.: „beim ersten … deutlich kleiner machen, damit man sofort den Button sieht und
+  // sieht, dass das jetzt weitergeht … vielleicht nur eine Frage dort. Und dann geht es halt eben zur nächsten und dann kommt
+  // der Fragebogen“): erste Seite mit EINER Frage zum Antippen (Geschlecht der Person 1), ohne Schrittzeile; nach der Antwort
+  // geht es von selbst zum Rest von Schritt 1. Grund: 22 von 34 echten Anfragen fingen das Formular nie an, wer anfing, wurde zu
+  // 83 % fertig (Auswertung 03.09.2026). Nur mit dem festen Knopf der Seite (`knopfAussen`); schon beantwortet → keine Seite.
+  const einstiegSeite = useRef(schlicht && (!patient.geschlecht || (patient.anzahl === '2' && !patient.p2_geschlecht))).current;
+  const [einstieg, setEinstieg] = useState(einstiegSeite);
 
   // userDirty — set ONLY by user-driven setPatient (set() / ChipSelect
   // onChange wrappers below). Programmatic merges (mm-rehydrate) leave
@@ -786,7 +793,7 @@ export const AngebotCard: FC<{
 
   // Zwischenkopf („Person 1"); das Feld direkt darunter braucht keine eigene Trennlinie.
   const personKopf = (text: string) => (
-    <p className={`${EYEBROW} pt-6 [&+[data-field]]:border-t-0 [&+[data-field]]:pt-3`}>{text}</p>
+    <p className={`${EYEBROW} ${schlicht ? 'pt-4' : 'pt-6'} [&+[data-field]]:border-t-0 [&+[data-field]]:pt-3`}>{text}</p>
   );
 
   const geburtsjahrFeld = (k: 'geburtsjahr' | 'p2_geburtsjahr') => (
@@ -893,14 +900,36 @@ export const AngebotCard: FC<{
   // dort (der Knopf steht immer unten), „weiter_getippt“ meldet der feste Knopf per pointerup über `getippt`.
   const aussenKnopf = useContext(AussenKnopf);
   const knopfAussen = schlicht && !!aussenKnopf;
+  const einstiegAktiv = knopfAussen && einstieg;
+  const einstiegFertig = () => { setFehlerZeigen(false); setEinstieg(false); scrollToFormTop(); };
+  // Ehepaar: beide Personen auf der Einstiegsseite (statt „Person 1“ allein, das las sich holprig).
+  const einstiegOffen = [!patient.geschlecht && 'geschlecht', zwei && !patient.p2_geschlecht && 'p2_geschlecht'].filter(Boolean) as string[];
+  // Hinweis im Format von `navHinweis` („Geschlecht fehlt“, „2 Angaben offen: …“).
+  const einstiegName = (k: string) => (zwei ? `${FIELD_LABELS.geschlecht} (Person ${k === 'geschlecht' ? 1 : 2})` : FIELD_LABELS.geschlecht);
+  const einstiegHinweis = fehlerZeigen && einstiegOffen.length
+    ? (einstiegOffen.length === 1 ? `${einstiegName(einstiegOffen[0])} fehlt` : `${einstiegOffen.length} Angaben offen: ${einstiegOffen.map(einstiegName).join(', ')}`)
+    : null;
+  const einstiegWeiter = () => {
+    if (einstiegOffen.length === 0) { einstiegFertig(); return; }
+    onMesspunkt?.('weiter_blockiert', { schritt: 0, offen: einstiegOffen, vor_speichern: !nurAenderung });
+    setFehlerZeigen(true);
+    zumErstenFehler();
+  };
+  // Nach der Antwort kurz die Auswahl zeigen, dann von selbst weiter (wie die Frage im Kostenrechner); beim Ehepaar erst, wenn
+  // beide beantwortet sind.
+  const einstiegGewaehlt = (k: 'geschlecht' | 'p2_geschlecht', v: string) => {
+    updatePatient(p => ({ ...p, [k]: v }));
+    const anderes = k === 'geschlecht' ? (!zwei || !!patient.p2_geschlecht) : !!patient.geschlecht;
+    if (v && anderes) window.setTimeout(einstiegFertig, 350);
+  };
   useEffect(() => {
     if (!knopfAussen || !aussenKnopf) return;
     if (!patientOpen) { aussenKnopf(null); return; }
     aussenKnopf({
-      onWeiter: step === STEP_LABELS.length - 1 ? () => { void speichern(); } : weiter,
+      onWeiter: einstiegAktiv ? einstiegWeiter : step === STEP_LABELS.length - 1 ? () => { void speichern(); } : weiter,
       laedt: isSaving,
       ladeText: 'Wird gesendet…',
-      hinweis: navHinweis || null,
+      hinweis: einstiegAktiv ? einstiegHinweis : navHinweis || null,
       zumFehler: zumErstenFehler,
       getippt: zaehleTipp,
     });
@@ -919,11 +948,16 @@ export const AngebotCard: FC<{
   return (
     <div ref={patientFormRef} id="pflegesituation-formular" data-schritt={step} className="scroll-mt-16">
       {patientOpen && (
-        <Rahmen className={schlicht ? 'rounded-card bg-white px-4 pt-4' : eingebettet ? 'pt-4' : 'px-5 pt-5'}>
+        <Rahmen className={schlicht ? 'rounded-card bg-white px-4 shadow-lift ring-1 ring-pm-coral/20' : eingebettet ? 'pt-4' : 'px-5 pt-5'}>
+          {/* Minimal-Einstieg (Martin 08.11.: „das Formular geht ja unter, weil das alles weißer Hintergrund … das muss man
+              irgendwie schöner machen“): Kopf mit Titel, Satz und Fortschritt auf hellem Koralle-Grund (Farbe des Knopfs und
+              des aktuellen Schritts in „So geht es weiter“), Karte mit Schatten. Ohne `overflow-hidden`: der Kalender klappt
+              über den Kartenrand. */}
+          <div className={schlicht ? '-mx-4 mb-1 rounded-t-card bg-pm-coral-tint px-4 pt-4 pb-3.5' : ''}>
           {schlicht && kopf && (
-            <div className="mb-4">
+            <div className="mb-3">
               <h2 className="text-[17px] font-semibold leading-6 text-pm-ink">{kopf.titel}</h2>
-              <p className="mt-1 text-[13.5px] leading-[1.45] text-pm-muted">{kopf.zeile}</p>
+              <p className="mt-1 text-[13.5px] leading-[1.45] text-pm-body">{kopf.zeile}</p>
             </div>
           )}
           <ProgressSteps
@@ -931,22 +965,51 @@ export const AngebotCard: FC<{
             aktuell={step}
             onSchritt={i => { setFehlerZeigen(false); setStep(i); scrollToFormTop(); }}
             schlicht={schlicht}
-            onZurueck={knopfAussen && step > 0 ? zurueck : undefined}
+            // Einstiegsseite = erste Hälfte von Schritt 1 (Martin 08.11.: „man sieht jetzt nicht, wie viele Schritte wir da
+            // haben … das würde ich schon irgendwie einblenden“).
+            anteil={einstiegAktiv ? 0.5 / STEP_LABELS.length : undefined}
+            onZurueck={knopfAussen ? (step > 0 ? zurueck : einstiegSeite && !einstiegAktiv ? () => { setFehlerZeigen(false); setEinstieg(true); scrollToFormTop(); } : undefined) : undefined}
           />
+          </div>
 
-          <div className="mt-2">
-            {/* ── Step 1: Zur Person ── */}
-            {step === 0 && (
+          {/* Minimal-Einstieg: Felder etwas enger (Martin 08.11.: „die Abstände … einen Tick verkleinern“), 14 statt 18 px. */}
+          <div className={schlicht ? 'mt-2 [&_[data-field]]:pb-[14px] [&_[data-field]:not(:first-child)]:pt-[14px]' : 'mt-2'}>
+            {/* ── Einstieg (Minimal), erste Hälfte von Schritt 1: Anzahl (fest, preisrelevant) und Geschlecht, Wortlaut wie bisher
+                (Martin 08.11.: „Personen … können wir nicht ändern. Weil das preisrelevant ist … dann fragst du noch ein
+                Geschlecht“). Die letzte Antwort führt von selbst weiter. ── */}
+            {step === 0 && einstiegAktiv && (
               <>
                 <FormField feld="anzahl" label="Anzahl zu betreuender Personen">
                   {festWert('anzahl', patient.anzahl === '2' ? '2 Personen' : '1 Person')}
                 </FormField>
+                {(zwei ? (['geschlecht', 'p2_geschlecht'] as const) : (['geschlecht'] as const)).map((k, i) => (
+                  <Fragment key={k}>
+                    {zwei && personKopf(`Person ${i + 1}`)}
+                    <FormField feld={k} label="Geschlecht" pflicht fehler={fehlerFuer(k)}>
+                      <ChipSelect invalid={!!fehlerFuer(k)} value={patient[k]} onChange={v => einstiegGewaehlt(k, v)}
+                        options={['Männlich', 'Weiblich']} />
+                    </FormField>
+                  </Fragment>
+                ))}
+              </>
+            )}
+            {/* ── Step 1: Zur Person ── */}
+            {step === 0 && !einstiegAktiv && (
+              <>
+                {!(knopfAussen && einstiegSeite) && (
+                <FormField feld="anzahl" label="Anzahl zu betreuender Personen">
+                  {festWert('anzahl', patient.anzahl === '2' ? '2 Personen' : '1 Person')}
+                </FormField>
+                )}
 
                 {zwei && personKopf('Person 1')}
+                {/* Nach der Einstiegsseite steht das Geschlecht schon fest; ändern geht über „Zurück“. */}
+                {!(knopfAussen && einstiegSeite) && (
                 <FormField feld="geschlecht" label="Geschlecht" pflicht fehler={fehlerFuer('geschlecht')}>
                   <ChipSelect invalid={!!fehlerFuer('geschlecht')} value={patient.geschlecht} onChange={v => updatePatient(p=>({...p,geschlecht:v}))}
                     options={['Männlich','Weiblich']} />
                 </FormField>
+                )}
                 <FormField feld="geburtsjahr" label="Geburtsjahr" fehler={fehlerFuer('geburtsjahr')}>
                   {geburtsjahrFeld('geburtsjahr')}
                 </FormField>
@@ -966,10 +1029,12 @@ export const AngebotCard: FC<{
                 {zwei && (
                   <>
                     {personKopf('Person 2')}
+                    {!(knopfAussen && einstiegSeite) && (
                     <FormField feld="p2_geschlecht" label="Geschlecht" pflicht fehler={fehlerFuer('p2_geschlecht')}>
                       <ChipSelect invalid={!!fehlerFuer('p2_geschlecht')} value={patient.p2_geschlecht} onChange={v => updatePatient(p=>({...p,p2_geschlecht:v}))}
                         options={['Männlich','Weiblich']} />
                     </FormField>
+                    )}
                     <FormField feld="p2_geburtsjahr" label="Geburtsjahr" fehler={fehlerFuer('p2_geburtsjahr')}>
                       {geburtsjahrFeld('p2_geburtsjahr')}
                     </FormField>

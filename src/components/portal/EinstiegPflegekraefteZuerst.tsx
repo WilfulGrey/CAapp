@@ -338,8 +338,10 @@ export function VormerkZeile({ kraefte }: { kraefte: VorgemerkteKraft[] }) {
 // (AngebotCard `schlicht`/`kopf`). Sonst unverändert.
 export function AbschnittPflegesituation({ vorgemerkte, formular, schlicht = false }: { vorgemerkte: VorgemerkteKraft[]; formular: ReactNode; schlicht?: boolean }) {
   if (schlicht) {
+    // Sprung ins Formular (Minimal): Karte direkt unter der Navigationsleiste (52 px), nicht 96 px tiefer mit der letzten
+    // Pflegekraft darüber (Martin 08.11.: „dann lande ich hier irgendwo beim Ablauf“).
     return (
-      <div id="patientendaten" className="pt-5 scroll-mt-24">
+      <div id="patientendaten" className="pt-5 scroll-mt-10">
         <VormerkZeile kraefte={vorgemerkte} />
         {formular}
       </div>

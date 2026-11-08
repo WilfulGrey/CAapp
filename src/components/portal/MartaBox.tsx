@@ -44,8 +44,13 @@ function Sterne({ wert }: { wert: number }) {
  * 10 statt 12 px neben dem Text.
  * Gemessen bei 360 px: sonst bleiben dem Namen 94 px, „Marta Kapcio" braucht 108 px und bricht um. Knöpfe bleiben 48 px.
  */
-export function MartaZeile({ unterzeile, className = '', eng = false }: { unterzeile: ReactNode; className?: string; eng?: boolean }) {
+export function MartaZeile({ unterzeile, className = '', eng = false, ohneAnrufen = false }: {
+  unterzeile: ReactNode; className?: string; eng?: boolean;
+  /** Außerhalb der Erreichbarkeit nur WhatsApp (Minimal-Einstieg, Registry #147). */
+  ohneAnrufen?: boolean;
+}) {
   const knoepfe = (<>
+      {!ohneAnrufen && (
       <a
         href={TELEFON_HREF}
         aria-label={`${BERATERIN} anrufen: ${TELEFON}`}
@@ -53,6 +58,7 @@ export function MartaZeile({ unterzeile, className = '', eng = false }: { unterz
       >
         <Phone className="w-5 h-5" aria-hidden="true" />
       </a>
+      )}
       <a
         href={WHATSAPP_HREF}
         target="_blank"
@@ -78,13 +84,15 @@ export function MartaZeile({ unterzeile, className = '', eng = false }: { unterz
 /** `ohneVertrauen` (Look „angebot", Runde 27): ohne Siegel und Sterne — die stehen dort oben, getrennt (Martin zu Fassung 20:
  *  „die Sterne passen da nicht dazu … als würde das zusammengehören").
  *  `nurVertrauen` (Prototyp Gebucht-Kontakt 14.10.): nur Siegel und Sterne, ohne „Noch Fragen?" und Personenzeile — für den Fall,
- *  dass Marta mit denselben Knöpfen schon oben auf der Seite steht (Entscheidung 5 offen). */
-export function MartaBox({ sterne, ohneVertrauen = false, nurVertrauen = false }: { sterne: SterneStand | null; ohneVertrauen?: boolean; nurVertrauen?: boolean }) {
+ *  dass Marta mit denselben Knöpfen schon oben auf der Seite steht (Entscheidung 5 offen).
+ *  `erreichbar` (Minimal-Einstieg, Registry #147): `false` = außerhalb von 8–20 Uhr, dann nur WhatsApp. Ohne Angabe wie
+ *  bisher beide Knöpfe. */
+export function MartaBox({ sterne, ohneVertrauen = false, nurVertrauen = false, erreichbar }: { sterne: SterneStand | null; ohneVertrauen?: boolean; nurVertrauen?: boolean; erreichbar?: boolean }) {
   return (
     <div className="rounded-card bg-white border border-[#EFEBE4] p-[18px]">
       {!nurVertrauen && (<>
       <p className="text-[15px] font-bold text-pm-ink">Noch Fragen?</p>
-      <MartaZeile className="mt-3" unterzeile={<>Ihre Beraterin · {ERREICHBAR}</>} />
+      <MartaZeile className="mt-3" unterzeile={<>Ihre Beraterin · {ERREICHBAR}</>} ohneAnrufen={erreichbar === false} />
       </>)}
       {!ohneVertrauen && (<>
       <div className={`${nurVertrauen ? '' : 'mt-4 pt-3.5 border-t border-pm-line-soft '}flex items-center gap-3`}>

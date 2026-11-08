@@ -86,6 +86,19 @@ export const FAQ_ANGEBOT = [FAQ[0], ...FAQ_GRUNDFRAGEN, ...FAQ.slice(1).filter((
 
 const SICHTBAR = 4;
 
+/** Minimal-Einstieg (Registry #147, Martin 08.11.: „Ist das legal? Und warum ist Primundus günstiger als andere? … wegen keine
+ *  Vermittler, Direktanbieter … in den sichtbaren Bereich“). Antwort aus freigegebenen Bausteinen: Website /24-stunden-pflege
+ *  („Kein Vermittler dazwischen“), Ortsseiten („Primundus ist ein Direktanbieter: Die Betreuungskräfte sind bei uns angestellt“,
+ *  Martin 24.09.), Bestpreisgarantie im Wortlaut GARANTIE_PORTAL. OpenAI 08.11. geprüft; Wortlaut-Freigabe Martin offen. */
+export const FAQ_GUENSTIGER = {
+  q: 'Warum ist Primundus günstiger als andere?',
+  a: `Weil kein Vermittler dazwischen steht: Primundus ist Direktanbieter, die Pflegekräfte sind bei Primundus angestellt. Eine Vermittlungsgebühr gibt es nicht. Dazu gilt unsere Bestpreisgarantie: ${GARANTIE_PORTAL.zusage}`,
+};
+const LEGAL = FAQ.find((x) => x.q === 'Ist das legal?')!;
+/** Minimal-Einstieg: „Ist das legal?“ und „Warum ist Primundus günstiger als andere?“ zuerst, dann die Liste „angebot“. */
+export const FAQ_MINIMAL = [LEGAL, FAQ_GUENSTIGER, ...FAQ_ANGEBOT.filter((x) => x !== LEGAL)];
+const SICHTBAR_MINIMAL = 6;
+
 /** Kurzer, fester Schlüssel je Frage für den Messpunkt `faq_geoeffnet` (Registry #123) — unabhängig von der Reihenfolge
  *  in FAQ bzw. FAQ_ANGEBOT und vom Wortlaut der Antwort. Neue Frage = neuer Schlüssel (ein Test prüft, dass keine fehlt). */
 export const FAQ_SCHLUESSEL: Record<string, string> = {
@@ -105,21 +118,25 @@ export const FAQ_SCHLUESSEL: Record<string, string> = {
   'Was übernimmt die Pflegekraft, was ein Pflegedienst?': 'pflegedienst',
   'Was brauche ich zu Hause?': 'zuhause',
   'Wie läuft die Betreuung ab?': 'ablauf',
+  'Warum ist Primundus günstiger als andere?': 'warum_guenstiger',
 };
 
 /** `ruhig` (Kompakt-Einstieg, Runde 15): Kopf ohne Eyebrow im ruhigen H2-Stil; sonst unverändert.
  *  `karte` (Look „angebot", Runde 27 — Martin zu Fassung 21: „die häufig gestellten Fragen sehen nicht gut aus … alles mit
  *  diesem komischen Hintergrund"): die Fragen in einer weißen Karte mit Zeilen wie die Karten darüber, Pfeil statt Plus. */
-export function FaqListe({ ruhig = false, karte = false, onFrageGeoeffnet }: {
+export function FaqListe({ ruhig = false, karte = false, minimal = false, onFrageGeoeffnet }: {
   ruhig?: boolean;
   karte?: boolean;
+  /** Minimal-Einstieg (Registry #147): Liste FAQ_MINIMAL, sechs Fragen sichtbar (nur mit `karte`). */
+  minimal?: boolean;
   /** Messpunkt (Registry #123): eine Frage wurde aufgeklappt, mit ihrem Schlüssel aus FAQ_SCHLUESSEL. Unsichtbar. */
   onFrageGeoeffnet?: (schluessel: string) => void;
 } = {}) {
   const [offen, setOffen] = useState<number | null>(null);
   const [alle, setAlle] = useState(false);
-  const quelle = karte ? FAQ_ANGEBOT : FAQ;
-  const liste = alle ? quelle : quelle.slice(0, SICHTBAR);
+  const quelle = karte ? (minimal ? FAQ_MINIMAL : FAQ_ANGEBOT) : FAQ;
+  const sichtbar = karte && minimal ? SICHTBAR_MINIMAL : SICHTBAR;
+  const liste = alle ? quelle : quelle.slice(0, sichtbar);
   // Auf- und zuklappen wie bisher; nur beim Aufklappen meldet die Liste den Schlüssel der Frage.
   const umschalten = (i: number, q: string) => {
     const auf = offen === i;
@@ -151,9 +168,9 @@ export function FaqListe({ ruhig = false, karte = false, onFrageGeoeffnet }: {
               </div>
             );
           })}
-          {!alle && quelle.length > SICHTBAR && (
+          {!alle && quelle.length > sichtbar && (
             <button type="button" onClick={() => setAlle(true)} className={`${zeile} border-t border-pm-line text-[15.5px] font-semibold text-pm-taupe-ink`}>
-              {quelle.length - SICHTBAR} weitere Fragen
+              {quelle.length - sichtbar} weitere Fragen
               <ChevronDown className="h-5 w-5 flex-none text-pm-taupe" aria-hidden="true" />
             </button>
           )}

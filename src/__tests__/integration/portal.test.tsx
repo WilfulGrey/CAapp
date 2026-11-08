@@ -328,6 +328,7 @@ describe('Portal integration: golden paths', () => {
     // fünfte sendet ab.
     for (let i = 0; i < 5; i++) {
       await user.click(await screen.findByRole('button', { name: /^Bewerbungen erhalten/ }, { timeout: 5000 }));
+      if (i === 0) await new Promise((r) => setTimeout(r, 650)); // Tipp-Sperre nach dem Sprung ins Formular (0,6 s)
     }
     expect(await screen.findByText('Ihre Suche läuft', {}, { timeout: 5000 })).toBeInTheDocument();
 
@@ -650,6 +651,7 @@ describe('Portal integration: golden paths', () => {
     // sendet ab.
     for (let i = 0; i < 5; i++) {
       await user.click(await screen.findByRole('button', { name: /^Bewerbungen erhalten/ }, { timeout: 5000 }));
+      if (i === 0) await new Promise((r) => setTimeout(r, 650)); // Tipp-Sperre nach dem Sprung ins Formular (0,6 s)
     }
 
     // Der Kunde bekommt den Satz zu sehen — und zwar auf Schritt 3, wo das Feld

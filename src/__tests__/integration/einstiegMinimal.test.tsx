@@ -7,7 +7,7 @@
 //   - Platzhalterzeilen ohne Text, solange die Liste lädt (Hauptknopf steht schon da)
 //   - „Einladen“ in der Zeile = Logik aus #145 (Fenster, Vormerken, nach dem Speichern automatisch einladen)
 //   - Messpunkte: fester Knopf als Quelle `hauptknopf`, „Details“ als `kosten_aufgeklappt`, Zeile wie die Karte (`karte`)
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../../../test/mocks/server';
@@ -57,6 +57,9 @@ beforeEach(() => {
   localStorage.clear();
   (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
 });
+// Martas Erreichbarkeit hängt an der Uhrzeit (8–20 Uhr): Tests, die sie prüfen, stellen die Uhr; danach wieder echt.
+afterEach(() => { vi.useRealTimers(); });
+const uhrzeit = (iso: string) => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(iso)); };
 
 // Zwei Vorschläge: Helena K. (50002, Empfehlung — mehr Einsätze, steht oben) und Emilia W. (50003).
 const emilia = { ...sampleMatching, id: 10002, is_best_matching: false, caregiver: { ...sampleCaregiver, id: 50003, first_name: 'Emilia', last_name: 'Wójcik', hp_total_jobs: 3 } };
@@ -90,6 +93,7 @@ const zeileVon = (vorname: string) => zeilen().find((z) => z.textContent?.starts
 
 describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
   it('Reihenfolge und Wortlaut: Kopf mit Testsieger, Gruß, Angebotskarte, Pflegekräfte als Zeilen mit Anzahl, Kontakt, fester Knopf; darunter Formular, So geht es weiter, Fragen, Marta', async () => {
+    uhrzeit('2026-11-09T10:00:00+01:00'); // Montag 10 Uhr: Marta erreichbar
     server.use(...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
     window.history.replaceState({}, '', '/?token=token-mi-reihe');
     render(<CustomerPortalPage />);
@@ -170,21 +174,33 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     // durch die Schritte (Martin 08.11.: „Ich würde keinen Weiter-Button machen“).
     expect(within(pflegesituation).queryByText('Für Ihre Bewerbungen')).toBeNull();
     expect(within(pflegesituation).getByText('Danach können Sie Pflegekräfte einladen und bekommen Bewerbungen. Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten.')).toBeInTheDocument();
-    expect(within(pflegesituation).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1');
+    // Erste Seite = erste Hälfte von Schritt 1: Schrittzeile da, Balken halb so weit wie ein ganzer Schritt (Martin 08.11.:
+    // „man sieht jetzt nicht, wie viele Schritte wir da haben … das würde ich schon irgendwie einblenden“).
+    const balken = within(pflegesituation).getByRole('progressbar');
+    expect(balken).toHaveAttribute('aria-valuenow', '1');
+    expect((balken.firstElementChild as HTMLElement).style.width).toBe('12.5%');
     expect(pflegesituation.querySelector('[data-knopfleiste]')).toBeNull();
     expect(screen.queryByRole('button', { name: /^Weiter/ })).toBeNull();
     expect(screen.getAllByRole('button', { name: HAUPTKNOPF })).toHaveLength(1);
-    const schritt = screen.getByText(/Schritt 1 von 4/);
+    // Erste Formularseite kurz (Martin 08.11.: „vielleicht nur eine Frage dort“): Anzahl fest (preisrelevant, „Personen …
+    // können wir nicht ändern“), dazu nur das Geschlecht im bisherigen Wortlaut; Geburtsjahr usw. erst auf der zweiten Seite.
+    const schritt = within(pflegesituation).getByText(/Schritt 1 von 4/);
+    expect(within(pflegesituation).getByText('Anzahl zu betreuender Personen')).toBeInTheDocument();
+    expect(within(pflegesituation).getByText('Geschlecht')).toBeInTheDocument();
+    expect(within(pflegesituation).getByRole('button', { name: 'Weiblich' })).toBeInTheDocument();
+    expect(within(pflegesituation).queryByText('Geburtsjahr')).toBeNull();
+    expect(within(pflegesituation).queryByText('Wer wird betreut?')).toBeNull();
     expect(screen.queryByText('Ihre Betreuungskosten')).toBeNull();
     const soGehts = screen.getByRole('heading', { level: 2, name: 'So geht es weiter' });
     const fragen = screen.getByRole('heading', { level: 2, name: 'Häufige Fragen' });
     const marta = screen.getByText('Noch Fragen?');
-    const reihe = [h1, karte, abschnitt, zweite, pflegesituation, schritt, haupt, soGehts, fragen, marta];
+    // Variante B (Standard seit 08.11.): der Knopf steht als letztes Element der Seite und klebt bis dorthin unten.
+    const reihe = [h1, karte, abschnitt, zweite, pflegesituation, schritt, soGehts, fragen, marta, haupt];
     for (let i = 1; i < reihe.length; i++) expect(davor(reihe[i - 1], reihe[i])).toBe(true);
     // Wortlaut-Regeln: nie „Betreuungskräfte“, nie „vermitteln“.
     expect(document.body.textContent).not.toMatch(/Betreuungskräfte|vermitteln/);
     // Knopf rechts in jedem Zustand gleich breit (die Zeile hält ihre Höhe).
-    for (const z of zeilen()) expect(within(z).getByRole('button', { name: 'Einladen' }).className).toContain('w-[88px]');
+    for (const z of zeilen()) expect(within(z).getByRole('button', { name: 'Einladen' }).className).toContain('w-[104px]');
   }, 20_000);
 
   it('Platzhalterzeilen ohne Text, solange die Liste lädt; Hauptknopf steht schon da, danach die Zeilen mit Anzahl', async () => {
@@ -217,7 +233,7 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(within(document.getElementById('pflegekraefte')!).getByRole('heading', { level: 2 }).textContent).toBe('Passende Pflegekräfte2');
   }, 20_000);
 
-  it('„Einladen“ in der Zeile: Fenster „{Name} einladen“, „Ausgewählt ✓“, Zeile über dem Formular, localStorage; Messpunkte wie bei der Karte', async () => {
+  it('„Einladen“ in der Zeile: Fenster „{Name} einladen“, „Eingeladen ✓“, Zeile über dem Formular, localStorage; Messpunkte wie bei der Karte', async () => {
     let einladungen = 0;
     const meldungen: Meldung[] = [];
     server.use(
@@ -234,18 +250,17 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     const fenster = await screen.findByRole('dialog', { name: 'Emilia W. einladen' });
     await user.click(within(fenster).getByRole('button', { name: 'Später' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    // „Ausgewählt“ statt „Vorgemerkt“ (Martin 08.11.: „sieht natürlich komisch aus“); nicht „Eingeladen“, verschickt wird
-    // erst nach dem Speichern.
-    const vorgemerkt = within(zeileVon('Emilia')).getByRole('button', { name: 'Ausgewählt ✓' });
-    expect(vorgemerkt.textContent).toBe('Ausgewählt');
+    // „Eingeladen“ statt „Vorgemerkt“ (Martin 08.11.: „sieht natürlich komisch aus“, abends: „muss auch eingeladen sein“).
+    const vorgemerkt = within(zeileVon('Emilia')).getByRole('button', { name: 'Eingeladen ✓' });
+    expect(vorgemerkt.textContent).toBe('Eingeladen');
     // Gleich breit wie „Einladen“: die Zeile wird mit der Vormerkung nicht höher.
-    expect(vorgemerkt.className).toContain('w-[88px]');
+    expect(vorgemerkt.className).toContain('w-[104px]');
     expect(zeileVon('Emilia')).toHaveAttribute('data-vorgemerkt', 'true');
     expect(within(zeileVon('Helena')).getByRole('button', { name: 'Einladen' })).toBeInTheDocument();
     expect(screen.getByText('Nach dem Speichern laden wir Emilia W. für Sie ein.')).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem(vormerkSchluessel('token-mi-einladen'))!)).toEqual([50003]);
 
-    // „Ausgewählt ✓“ öffnet das Fenster erneut; der Knopf darin springt zum Formular (Quelle einladen_fenster).
+    // „Eingeladen ✓“ öffnet das Fenster erneut; der Knopf darin springt zum Formular (Quelle einladen_fenster).
     await user.click(vorgemerkt);
     await user.click(within(await screen.findByRole('dialog', { name: 'Emilia W. einladen' })).getByRole('button', { name: 'Pflegesituation vervollständigen' }));
     await waitFor(() => expect(gescrollt().map((e) => e.id)).toContain('patientendaten'));
@@ -309,6 +324,61 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(meldungen.filter((m) => m.event === 'kosten_aufgeklappt')).toHaveLength(1);
   }, 20_000);
 
+  it('Einstiegsseite: Anzahl fest und Geschlecht; ohne Antwort hält der Knopf mit Hinweis, die Antwort führt von selbst zur zweiten Hälfte von Schritt 1, „Zurück“ wieder zurück', async () => {
+    server.use(...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
+    window.history.replaceState({}, '', '/?token=token-mi-einstieg');
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await waitFor(() => expect(document.getElementById('pflegesituation-formular')).not.toBeNull(), { timeout: 5000 });
+    const formular = document.getElementById('patientendaten')!;
+    await within(formular).findByText('Anzahl zu betreuender Personen', {}, { timeout: 5000 });
+    // Erster Tipp: ins Formular. Doppeltipp direkt danach zählt nicht (keine roten Felder, bevor das Formular zu sehen ist).
+    await user.click(screen.getByRole('button', { name: HAUPTKNOPF }));
+    await user.click(screen.getByRole('button', { name: HAUPTKNOPF }));
+    expect(screen.queryByRole('button', { name: 'Geschlecht fehlt' })).toBeNull();
+    await new Promise((r) => setTimeout(r, 650)); // Tipp-Sperre nach dem Sprung ins Formular (0,6 s)
+    await user.click(screen.getByRole('button', { name: HAUPTKNOPF }));
+    expect(await screen.findByRole('button', { name: 'Geschlecht fehlt' })).toBeInTheDocument();
+    expect(within(formular).queryByText('Geburtsjahr')).toBeNull();
+    // Antwort antippen: kurz die Auswahl, dann von selbst die zweite Hälfte von Schritt 1, ohne Anzahl und Geschlecht.
+    await user.click(within(formular).getByRole('button', { name: 'Weiblich' }));
+    expect(await within(formular).findByText('Geburtsjahr', {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(within(formular).getByText(/Schritt 1 von 4/)).toBeInTheDocument();
+    expect((within(formular).getByRole('progressbar').firstElementChild as HTMLElement).style.width).toBe('25%');
+    expect(within(formular).queryByText('Anzahl zu betreuender Personen')).toBeNull();
+    expect(within(formular).queryByText('Geschlecht')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Geschlecht fehlt' })).toBeNull();
+    // „Zurück“ in der Schrittzeile führt zur ersten Seite, die Antwort ist noch gewählt.
+    await user.click(within(formular).getByRole('button', { name: 'Zurück' }));
+    expect(await within(formular).findByText('Anzahl zu betreuender Personen')).toBeInTheDocument();
+    expect(within(formular).getByRole('button', { name: 'Weiblich' })).toHaveAttribute('aria-pressed', 'true');
+    // Mit Antwort geht der Knopf weiter.
+    await user.click(screen.getByRole('button', { name: HAUPTKNOPF }));
+    expect(await within(formular).findByText('Geburtsjahr')).toBeInTheDocument();
+  }, 20_000);
+
+  it('Häufige Fragen: „Ist das legal?“ und „Warum ist Primundus günstiger als andere?“ zuerst, sechs sichtbar', async () => {
+    server.use(...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
+    window.history.replaceState({}, '', '/?token=token-mi-faq');
+    render(<CustomerPortalPage />);
+    const titel = await screen.findByRole('heading', { level: 2, name: 'Häufige Fragen' }, { timeout: 5000 });
+    const liste = titel.parentElement as HTMLElement;
+    const fragen = within(liste).getAllByRole('button').map((b) => b.textContent);
+    expect(fragen.slice(0, 6)).toEqual([
+      'Ist das legal?',
+      'Warum ist Primundus günstiger als andere?',
+      'Was bedeuten die Deutsch-Niveaus (Grund, Mittel, Gut)?',
+      'Was übernimmt die Pflegekraft, was ein Pflegedienst?',
+      'Was brauche ich zu Hause?',
+      'Wie läuft die Betreuung ab?',
+    ]);
+    expect(fragen[6]).toMatch(/^\d+ weitere Fragen$/);
+    await userEvent.setup().click(within(liste).getByRole('button', { name: 'Warum ist Primundus günstiger als andere?' }));
+    expect(within(liste).getByText('Weil kein Vermittler dazwischen steht: Primundus ist Direktanbieter, die Pflegekräfte sind bei Primundus angestellt. Eine Vermittlungsgebühr gibt es nicht. Dazu gilt unsere Bestpreisgarantie: Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot.')).toBeInTheDocument();
+    // Nie „vermitteln“ für Primundus.
+    expect(liste.textContent).not.toMatch(/vermitteln/);
+  }, 20_000);
+
   it('nach dem ersten erfolgreichen Speichern: die in den Zeilen Vorgemerkten werden eingeladen (Logik #145), danach die Ansicht nach dem Speichern', async () => {
     const TOKEN = 'token-mi-speichern';
     const eingeladen: number[] = [];
@@ -333,6 +403,7 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     const reiter = document.querySelector('[data-kontakt-reiter]') as HTMLElement;
     expect(reiter).not.toHaveAttribute('data-eingeklappt');
     await user.click(await screen.findByRole('button', { name: HAUPTKNOPF }, { timeout: 5000 }));
+    await new Promise((r) => setTimeout(r, 650)); // Tipp-Sperre nach dem Sprung ins Formular (0,6 s)
     expect(screen.getByText(/Schritt 1 von 4/)).toBeInTheDocument();
     expect(reiter).toHaveAttribute('data-eingeklappt', 'true');
     expect(screen.queryByRole('button', { name: 'Zurück' })).toBeNull();
@@ -445,6 +516,32 @@ describe('Angebotskarte mit Zuschüssen und Sternen (Fassung „CGA-Stil“, 08.
     expect(vertrauen.textContent).toBe('Bewertungen4,9126 BewertungenErfahrung20 JahreErfahrungTestsieger6× in FolgeTestsieger');
     // Kein Satz mehr zu zwei Personen, keine Chips.
     expect(document.body.textContent).not.toMatch(/für eine Person|Zwei Personen|Pflegegrad 4/);
+  });
+  // Martin 08.11.: „in der Arbeitszeit … so einen grünen Punkt … danach blenden wir Anrufen aus … nur noch WhatsApp aktiv“.
+  it('Marta 8–20 Uhr: grüner Punkt, Anrufen und WhatsApp; danach grauer Punkt und nur WhatsApp (Fenster und Kasten unten)', async () => {
+    uhrzeit('2026-11-09T21:15:00+01:00'); // Montag 21:15 deutscher Zeit
+    const { unmount } = zeigen(3364);
+    const reiter = document.querySelector('[data-kontakt-reiter]') as HTMLElement;
+    expect(reiter).toHaveAccessibleName('Marta Kapcio, Ihre Beraterin: per WhatsApp schreiben');
+    expect(reiter.querySelector('[data-erreichbar]')).toBeNull();
+    await userEvent.setup().click(reiter);
+    const panel = await screen.findByRole('dialog', { name: 'Marta Kapcio, Ihre Beraterin' });
+    expect(within(panel).queryByRole('link', { name: /anrufen/ })).toBeNull();
+    expect(within(panel).queryByText('089 200 000 830')).toBeNull();
+    expect(within(panel).getByRole('link', { name: /per WhatsApp schreiben$/ })).toBeInTheDocument();
+    expect(within(panel).getByText('täglich 8–20 Uhr')).toBeInTheDocument();
+    const kasten = screen.getByText('Noch Fragen?').parentElement as HTMLElement;
+    expect(within(kasten).queryByRole('link', { name: /anrufen/ })).toBeNull();
+    expect(within(kasten).getByRole('link', { name: /per WhatsApp schreiben$/ })).toBeInTheDocument();
+    unmount();
+
+    uhrzeit('2026-07-01T06:30:00Z'); // Sommerzeit: 8:30 deutscher Zeit
+    zeigen(3364);
+    const reiter2 = document.querySelector('[data-kontakt-reiter]') as HTMLElement;
+    expect(reiter2).toHaveAccessibleName('Marta Kapcio, Ihre Beraterin: anrufen oder schreiben');
+    expect(reiter2.querySelector('[data-erreichbar]')).not.toBeNull();
+    const kasten2 = screen.getByText('Noch Fragen?').parentElement as HTMLElement;
+    expect(within(kasten2).getByRole('link', { name: /anrufen: 089 200 000 830$/ })).toBeInTheDocument();
   });
   it('ohne Vorteil gegenüber dem Heim kein Vergleich', () => {
     zeigen(1500);
