@@ -1,18 +1,34 @@
 // Fortschritt im Formular: Segmente über die ganze Breite, darunter „Schritt 2 von 4 · Pflegebedarf".
 // Zurückspringen geht nur zu früheren Schritten (wie bisher im Stepper), nie nach vorn.
 export function ProgressSteps({
-  schritte, aktuell, onSchritt, schlicht = false,
-}: { schritte: readonly string[]; aktuell: number; onSchritt: (i: number) => void; schlicht?: boolean }) {
+  schritte, aktuell, onSchritt, schlicht = false, onZurueck,
+}: {
+  schritte: readonly string[]; aktuell: number; onSchritt: (i: number) => void; schlicht?: boolean;
+  /** Nur mit `schlicht`: „Zurück“ klein rechts in der Zeile, wenn die Seite keine eigene Knopfleiste zeigt. */
+  onZurueck?: () => void;
+}) {
   // Minimal-Einstieg (Registry #147, Martin 08.11.: „das Formular mit diesen Strichen … schwer zu erkennen“): erst die Zeile
-  // „Schritt 1 von 4 · Zur Person“, darunter EIN dünner Balken; zurück geht es über „Zurück“ in der Knopfleiste.
+  // „Schritt 1 von 4 · Zur Person“, darunter EIN dünner Balken. Unten steht nur EIN Knopf (Martin: „keinen Weiter-Button“),
+  // darum „Zurück“ hier rechts in der Zeile.
   if (schlicht) {
     return (
       <div>
-        <p className="text-[13.5px] text-pm-muted">
-          <span>Schritt {aktuell + 1} von {schritte.length}</span>
-          <span aria-hidden="true"> · </span>
-          <b className="font-semibold text-pm-ink">{schritte[aktuell]}</b>
-        </p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[13.5px] text-pm-muted">
+            <span>Schritt {aktuell + 1} von {schritte.length}</span>
+            <span aria-hidden="true"> · </span>
+            <b className="font-semibold text-pm-ink">{schritte[aktuell]}</b>
+          </p>
+          {onZurueck && (
+            <button
+              type="button"
+              onClick={onZurueck}
+              className="-my-3 inline-flex min-h-[44px] flex-none items-center text-[13.5px] font-medium text-pm-muted underline decoration-pm-line underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-pm-taupe"
+            >
+              Zurück
+            </button>
+          )}
+        </div>
         <div
           role="progressbar"
           aria-label="Fortschritt"

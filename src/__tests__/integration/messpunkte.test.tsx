@@ -157,8 +157,8 @@ describe('Messpunkte vor dem ersten Speichern (Rückbau, Registry #122/#123, ?ei
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await screen.findByText(/Schritt 1 von 4/, {}, { timeout: 5000 });
-    await user.click(screen.getByRole('button', { name: 'Weiter →' }));
-    await user.click(screen.getByRole('button', { name: 'Weiter →' }));
+    // Minimal-Einstieg (Registry #147): EIN Knopf unten — erster Tipp springt ins Formular, die nächsten zwei gehen weiter.
+    for (let i = 0; i < 3; i++) await user.click(screen.getByRole('button', { name: /^Bewerbungen erhalten/ }));
     await screen.findByText(/Schritt 3 von 4/);
     const feld = screen.getByRole('button', { name: 'Datum wählen' });
     await user.click(feld);

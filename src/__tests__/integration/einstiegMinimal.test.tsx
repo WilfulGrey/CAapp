@@ -145,8 +145,10 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     // der CG-App: Tipp öffnet das Panel mit Marta, Anrufen und WhatsApp (statt „Rückruf vereinbaren“, Martin 08.11.).
     const haupt = screen.getByRole('button', { name: HAUPTKNOPF });
     expect(haupt.textContent).toBe('Bewerbungen erhalten100% kostenfrei & unverbindlich');
+    // Pfeil hinter dem Titel (Martin 08.11.), für Vorleseprogramme ausgeblendet.
+    expect(haupt.querySelector('[data-pfeil]')).toHaveAttribute('aria-hidden', 'true');
     expect(haupt.className).toContain('bg-pm-coral');
-    expect(haupt.closest('[data-fester-knopf-anker]')!.className).toContain('sticky bottom-0');
+    expect(haupt.closest('[data-fester-knopf]')!.className).toContain('sticky bottom-0');
     expect(screen.queryByText('Rückruf vereinbaren')).toBeNull();
     const reiter = document.querySelector('[data-kontakt-reiter]') as HTMLElement;
     expect(reiter).toHaveAccessibleName('Marta Kapcio, Ihre Beraterin: anrufen oder schreiben');
@@ -164,17 +166,20 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     // Titel „Pflegesituation vervollständigen“ (Martin 08.11.: „was soll das heißen“).
     expect(within(pflegesituation).getByRole('heading', { level: 2, name: 'Pflegesituation vervollständigen' })).toBeInTheDocument();
     // Formular als weiße Karte (Titel und Satz oben in der Karte, kein Abschnittskopf mit „Für Ihre Bewerbungen“), EIN dünner
-    // Fortschrittsbalken, Knopfleiste als Band wie der feste Knopf (Martin 08.11.: „dann bleibt der da, wo Weiter-Button steht“).
+    // Fortschrittsbalken. Keine eigene Knopfleiste und kein „Weiter“: der eine feste Knopf steht hinter dem Formular und führt
+    // durch die Schritte (Martin 08.11.: „Ich würde keinen Weiter-Button machen“).
     expect(within(pflegesituation).queryByText('Für Ihre Bewerbungen')).toBeNull();
     expect(within(pflegesituation).getByText('Danach können Sie Pflegekräfte einladen und bekommen Bewerbungen. Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten.')).toBeInTheDocument();
     expect(within(pflegesituation).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1');
-    expect(pflegesituation.querySelector('[data-knopfleiste]')!.className).toContain('bg-pm-grund/95');
+    expect(pflegesituation.querySelector('[data-knopfleiste]')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Weiter/ })).toBeNull();
+    expect(screen.getAllByRole('button', { name: HAUPTKNOPF })).toHaveLength(1);
     const schritt = screen.getByText(/Schritt 1 von 4/);
     expect(screen.queryByText('Ihre Betreuungskosten')).toBeNull();
     const soGehts = screen.getByRole('heading', { level: 2, name: 'So geht es weiter' });
     const fragen = screen.getByRole('heading', { level: 2, name: 'Häufige Fragen' });
     const marta = screen.getByText('Noch Fragen?');
-    const reihe = [h1, karte, abschnitt, zweite, haupt, pflegesituation, schritt, soGehts, fragen, marta];
+    const reihe = [h1, karte, abschnitt, zweite, pflegesituation, schritt, haupt, soGehts, fragen, marta];
     for (let i = 1; i < reihe.length; i++) expect(davor(reihe[i - 1], reihe[i])).toBe(true);
     // Wortlaut-Regeln: nie „Betreuungskräfte“, nie „vermitteln“.
     expect(document.body.textContent).not.toMatch(/Betreuungskräfte|vermitteln/);
@@ -323,8 +328,22 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     await user.click(within(zeileVon('Helena')).getByRole('button', { name: 'Einladen' }));
     await user.click(within(await screen.findByRole('dialog', { name: 'Helena K. einladen' })).getByRole('button', { name: 'Später' }));
     expect(eingeladen).toEqual([]);
-    for (let i = 0; i < 3; i++) await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
-    await user.click(await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 }));
+    // EIN Knopf: erster Tipp springt ins Formular, die nächsten drei gehen weiter (mit „Zurück“ in der Schrittzeile), der
+    // fünfte sendet ab. Der Reiter bleibt dabei sichtbar und eingeklappt.
+    const reiter = document.querySelector('[data-kontakt-reiter]') as HTMLElement;
+    expect(reiter).not.toHaveAttribute('data-eingeklappt');
+    await user.click(await screen.findByRole('button', { name: HAUPTKNOPF }, { timeout: 5000 }));
+    expect(screen.getByText(/Schritt 1 von 4/)).toBeInTheDocument();
+    expect(reiter).toHaveAttribute('data-eingeklappt', 'true');
+    expect(screen.queryByRole('button', { name: 'Zurück' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: HAUPTKNOPF }));
+    expect(await screen.findByText(/Schritt 2 von 4/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Zurück' }));
+    expect(await screen.findByText(/Schritt 1 von 4/)).toBeInTheDocument();
+    for (let i = 0; i < 3; i++) await user.click(screen.getByRole('button', { name: HAUPTKNOPF }));
+    expect(await screen.findByText(/Schritt 4 von 4/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^(Weiter|Speichern)/ })).toBeNull();
+    await user.click(screen.getByRole('button', { name: HAUPTKNOPF }));
 
     expect(await screen.findByText('Helena K. ist eingeladen.', {}, { timeout: 8000 })).toBeInTheDocument();
     expect(eingeladen).toEqual([50002]);

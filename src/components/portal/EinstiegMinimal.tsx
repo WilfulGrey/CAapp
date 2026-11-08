@@ -21,9 +21,9 @@
 // „sehr vorteilhaft“ mit „keine Vermittlungsgebühr, täglich kündbar“, Sterne unter dem Gruß; die Pflegekräfte als Zeilen
 // „wie auf dem ersten Bild“, immer mit Preis vor „Einladen“; der Hauptknopf schmal und fest unten, Wortlaut „Pflegesituation
 // vervollständigen und Bewerbungen erhalten“.
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, Info, Phone, X } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Info, Phone, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { formatEuro, type Lead } from '../../lib/supabase';
 import { eigenanteilAus } from '../../lib/angebotZuschuss';
@@ -35,6 +35,7 @@ import { AbschnittPflegesituation, KostenAufstellung, type VorgemerkteKraft } fr
 import { FaqListe } from './FaqListe';
 import { MartaBox } from './MartaBox';
 import { WhatsAppIcon } from './WhatsAppIcon';
+import { AussenKnopf, useKnopfleisteImFluss, type AussenKnopfStand } from '../ui/FormNav';
 
 // Wortlaut (Martin 08.11.2026, diktiert; Entwurf, Freigabe des Wortlauts offen). Tests prüfen genau diese Texte.
 export const ANGEBOT_TITEL = 'Ihr persönliches Angebot';
@@ -313,9 +314,10 @@ const PLATZHALTER = 5;
 
 // ── Kontakt-Reiter (wie die CG-App) ───────────────────────────────────────────────────────────────────────────────────
 // Reiter: weiße Pille am rechten Rand mit Griff, Foto und grünem Punkt; 20 px eingeschoben, beim Scrollen 44 px, 0,9 s nach
-// dem Scrollen zurück. Tipp öffnet das Panel (von rechts, 86 % breit, Hintergrund abgedunkelt): Foto groß, Name, Rolle,
-// Erreichbarkeit, zwei Kacheln Anrufen und WhatsApp. Wortlaut wie im Marta-Kasten.
-function KontaktReiter({ verborgen }: { verborgen: boolean }) {
+// dem Scrollen zurück. Im Formular bleibt er eingeklappt (44 px, Martin 08.11.: „auf dem Formular … rechts eingeklappt
+// lassen“), damit er kein Feld verdeckt. Tipp öffnet das Panel (von rechts, 86 % breit, Hintergrund abgedunkelt): Foto groß,
+// Name, Rolle, Erreichbarkeit, zwei Kacheln Anrufen und WhatsApp. Wortlaut wie im Marta-Kasten.
+function KontaktReiter({ eingeklappt }: { eingeklappt: boolean }) {
   const [scrollt, setScrollt] = useState(false);
   const [offen, setOffen] = useState(false);
   useEffect(() => {
@@ -335,7 +337,7 @@ function KontaktReiter({ verborgen }: { verborgen: boolean }) {
     document.addEventListener('keydown', taste);
     return () => document.removeEventListener('keydown', taste);
   }, [offen]);
-  const weg = verborgen || offen;
+  const weg = offen;
   return (
     <>
       <button
@@ -345,8 +347,9 @@ function KontaktReiter({ verborgen }: { verborgen: boolean }) {
         aria-hidden={weg || undefined}
         tabIndex={weg ? -1 : 0}
         className={`${FOKUS} absolute right-0 flex items-center gap-1.5 rounded-l-[26px] bg-white/95 py-[5px] pl-2 pr-[7px] shadow-[0_0_0_1px_rgba(28,28,28,.06),0_10px_28px_rgba(28,28,28,.16)] backdrop-blur transition-[transform,opacity] duration-300 motion-reduce:transition-none ${
-          weg ? 'pointer-events-none translate-x-[80px] opacity-0' : scrollt ? 'translate-x-[44px]' : 'translate-x-[20px] hover:translate-x-0'
+          weg ? 'pointer-events-none translate-x-[80px] opacity-0' : scrollt || eingeklappt ? 'translate-x-[44px]' : 'translate-x-[20px] hover:translate-x-0'
         }`}
+        data-eingeklappt={eingeklappt || undefined}
         style={{ bottom: 'calc(100% + 150px)' }}
         data-kontakt-reiter
       >
@@ -457,18 +460,42 @@ export function EinstiegMinimal({
   /** Titel des festen Knopfs (Vorschau-Vergleich `?knopf=2`). */
   knopfTitel?: string;
 }) {
-  // Formular „Pflegesituation“ im Bild (oder schon darüber) → fester Knopf und Reiter weg; an derselben Stelle steht dann die
-  // Knopfleiste des Formulars („Weiter“, gleiches Band), es bleibt ein Knopf unten.
-  const [formularImBild, setFormularImBild] = useState(false);
+  // EIN Knopf (Martin 08.11.: „Ich würde keinen Weiter-Button machen, sondern der Button scrollt einfach mit runter und bleibt
+  // dann unten … am Formular, sodass er weitergeht“). Vor dem Formular springt er hinein; steht das Formular oben im Bild
+  // (Anfang über 60 % der Höhe) oder ist schon darüber, führt er durch die Schritte und sendet im letzten ab. Wortlaut bleibt
+  // in jedem Schritt gleich. Der Reiter bleibt im Formular eingeklappt.
+  const [imFormular, setImFormular] = useState(false);
   useEffect(() => {
     const ziel = document.getElementById('patientendaten');
     if (!ziel || typeof IntersectionObserver === 'undefined') return;
     const beobachter = new IntersectionObserver(([e]) => {
-      setFormularImBild(e.isIntersecting || e.boundingClientRect.top < 0);
-    });
+      setImFormular(e.isIntersecting || e.boundingClientRect.top < 0);
+    }, { rootMargin: '0px 0px -40% 0px' });
     beobachter.observe(ziel);
     return () => beobachter.disconnect();
   }, []);
+  // Stand des Formulars (AngebotCard meldet ihn über `AussenKnopf`): Handlungen im Ref, Anzeige im State; neu gezeichnet wird
+  // nur, wenn sich Ladezustand oder Hinweis ändern.
+  const formStand = useRef<AussenKnopfStand | null>(null);
+  const [anzeige, setAnzeige] = useState<{ laedt: boolean; ladeText: string; hinweis: string | null } | null>(null);
+  const meldeFormular = useCallback((s: AussenKnopfStand | null) => {
+    formStand.current = s;
+    setAnzeige((alt) => {
+      if (!s) return null;
+      if (alt && alt.laedt === s.laedt && alt.ladeText === s.ladeText && alt.hinweis === s.hinweis) return alt;
+      return { laedt: s.laedt, ladeText: s.ladeText, hinweis: s.hinweis };
+    });
+  }, []);
+  const tippen = () => {
+    const stand = formStand.current;
+    if (stand && imFormular) { stand.onWeiter(); return; }
+    // Der Sprung ins Formular zählt schon als „im Formular“: Ein zweiter Tipp während des Scrollens geht weiter.
+    setImFormular(true);
+    onVervollstaendigen();
+  };
+  // Tastatur offen oder Kalender aufgeklappt: Band im Fluss (am Formularende) statt über dem Feld (wie FormNav).
+  const imFluss = useKnopfleisteImFluss();
+  const laedtJetzt = !!anzeige?.laedt;
   const anzahl = zeilen.length;
   const leer = !laedt && anzahl === 0;
   const hinweis = (titel: string, text: string) => (
@@ -480,9 +507,11 @@ export function EinstiegMinimal({
   return (
     // `overflow-x-clip` (kein Scrollbereich, sticky bleibt): der halb eingeschobene Kontakt-Reiter ragt über den rechten
     // Rand und darf keinen Querscroll erzeugen.
+    <AussenKnopf.Provider value={meldeFormular}>
     <div className="bg-pm-grund overflow-x-clip" data-einstieg="minimal">
-      {/* Erster Teil: Gruß mit Sternen, Angebotskarte, Pflegekräfte, Rückruf und Nummer; der feste Knopf hängt am Ende dieses
-          Teils und bleibt bis dorthin unten am Bildschirm stehen (sticky, ohne Skript: auch im Handyrahmen am Computer). */}
+      {/* Erster Teil: Gruß, Angebotskarte, Pflegekräfte und das Formular; der feste Knopf ist das letzte Element dieses Teils
+          und bleibt bis dorthin unten am Bildschirm stehen (sticky, ohne Skript: auch im Handyrahmen am Computer). Danach
+          steht er am Ende des Formulars. */}
       {/* Seitenrand 12 px, unter 375 px 8 px (Android 360: mehr Platz für die Zeilen). */}
       <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2">
         <h1 className="px-1 pt-4 pb-3 text-[22px] font-semibold leading-[1.2] tracking-[-0.015em] text-pm-ink">
@@ -516,36 +545,55 @@ export function EinstiegMinimal({
           </section>
         )}
 
-        {/* Fester Knopf (Martin 08.11.: „den wir festmachen unten“): Sticky-Anker ohne Höhe am Ende des ersten Teils, das
-            Band hängt nach oben daran. Sobald das Formular ins Bild kommt, fährt es nach unten weg und die Knopfleiste des
-            Formulars steht an derselben Stelle (Martin: „reicht nicht, wenn der eine Button … einfach immer da ist und … dann
-            bleibt der da, wo Weiter-Button steht“; vorher standen zwei Koralle-Knöpfe übereinander). */}
-        <div className="sticky bottom-0 z-20 h-0" data-fester-knopf-anker>
-          <div
-            className={`absolute bottom-0 -left-3 -right-3 max-[374px]:-left-2 max-[374px]:-right-2 bg-pm-grund/95 px-3 max-[374px]:px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)] backdrop-blur transition-[transform,opacity] duration-300 motion-reduce:transition-none ${
-              formularImBild ? 'pointer-events-none translate-y-full opacity-0' : ''
-            }`}
-            aria-hidden={formularImBild || undefined}
-            data-fester-knopf
-          >
-            <button
-              type="button"
-              onClick={onVervollstaendigen}
-              tabIndex={formularImBild ? -1 : 0}
-              className={`${FOKUS} block w-full rounded-[12px] bg-pm-coral px-4 py-2.5 text-center text-white transition-colors hover:bg-pm-coral-deep active:scale-[0.99]`}
-            >
-              <span className="block text-[16px] font-bold leading-5">{knopfTitel}</span>
-              <span className="mt-0.5 block text-[12.5px] font-medium leading-4 opacity-90">{FEST_ZEILE}</span>
-            </button>
-            <KontaktReiter verborgen={formularImBild} />
-          </div>
+        {/* Pflegesituation mit offenem Formular (Logik wie „Pflegekräfte zuerst“, #145). */}
+        <div className="space-y-4">
+          {bereitsBearbeitet && <div className="pt-6">{bereitsBearbeitet}</div>}
+          <AbschnittPflegesituation vorgemerkte={vorgemerkte} formular={formular} schlicht />
         </div>
-      </div>
 
-      {/* Darunter wie in „Pflegekräfte zuerst“ (#145): Pflegesituation mit offenem Formular. */}
-      <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2 pb-4 space-y-4">
-        {bereitsBearbeitet && <div className="pt-6">{bereitsBearbeitet}</div>}
-        <AbschnittPflegesituation vorgemerkte={vorgemerkte} formular={formular} schlicht />
+        {/* Der eine feste Knopf (Martin 08.11.: „den wir festmachen unten“ … „bleibt dann unten am Formular“): letztes Element
+            des ersten Teils, also bis zum Formularende unten am Bildschirm, danach am Formularende. Band bis an den
+            Bildschirmrand. `data-knopfleiste`: daran misst der Kalender, wie viel unten verdeckt ist (DateField). */}
+        <div
+          className={`${imFluss ? 'relative' : 'sticky bottom-0'} z-20 mt-3 -mx-3 max-[374px]:-mx-2 bg-pm-grund/95 px-3 max-[374px]:px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)] backdrop-blur`}
+          data-fester-knopf
+          data-knopfleiste=""
+        >
+          {imFormular && anzeige?.hinweis && (
+            <div className="mb-2 text-center text-[13.5px] text-pm-error-ink">
+              <button
+                type="button"
+                onClick={() => formStand.current?.zumFehler()}
+                className="inline-flex min-h-[36px] -my-1 items-center px-2 underline decoration-pm-error/40 underline-offset-4"
+              >
+                {anzeige.hinweis}
+              </button>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={tippen}
+            onPointerUp={() => { if (imFormular) formStand.current?.getippt(); }}
+            disabled={laedtJetzt}
+            aria-busy={laedtJetzt || undefined}
+            className={`${FOKUS} block w-full rounded-[12px] bg-pm-coral px-4 py-2.5 text-center text-white transition-colors hover:bg-pm-coral-deep active:scale-[0.99] disabled:opacity-80`}
+          >
+            {laedtJetzt ? (
+              <span className="block py-2 text-[16px] font-bold leading-5">{anzeige?.ladeText}</span>
+            ) : (
+              <>
+                {/* Pfeil (Martin 08.11.: „wir lassen Bewerbungen erhalten. Und dann kommt so ein Pfeil dahin“): der Knopf
+                    führt weiter, in jedem Schritt gleich beschriftet. */}
+                <span className="flex items-center justify-center gap-1.5 text-[16px] font-bold leading-5">
+                  {knopfTitel}
+                  <ArrowRight className="h-[18px] w-[18px] flex-none" strokeWidth={2.5} aria-hidden="true" data-pfeil />
+                </span>
+                <span className="mt-0.5 block text-[12.5px] font-medium leading-4 opacity-90">{FEST_ZEILE}</span>
+              </>
+            )}
+          </button>
+          <KontaktReiter eingeklappt={imFormular} />
+        </div>
       </div>
 
       {/* Die Kostenkarte entfällt hier: ihre Aufstellung steht unter „Details“ in der Angebotskarte (Martin 08.11.). */}
@@ -559,5 +607,6 @@ export function EinstiegMinimal({
         </div>
       </div>
     </div>
+    </AussenKnopf.Provider>
   );
 }

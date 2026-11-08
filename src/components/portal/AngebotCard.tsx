@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import type { ElementType, FC, ReactNode } from 'react';
 import { Check, Lock } from 'lucide-react';
 import {
@@ -8,7 +8,7 @@ import {
 import { ChipSelect } from './ChipSelect';
 import { Card } from '../ui/Card';
 import { FormField } from '../ui/FormField';
-import { FormNav } from '../ui/FormNav';
+import { AussenKnopf, FormNav } from '../ui/FormNav';
 import { ProgressSteps } from '../ui/ProgressSteps';
 import { EYEBROW } from '../ui/SectionHeader';
 import { DateField, kalenderTag, localTodayIso } from './DateField';
@@ -92,7 +92,8 @@ export const AngebotCard: FC<{
    *  festen Wert „Aus Ihrem Kostenrechner übernommen". Datenfluss, Prüfungen und Speichern bleiben wie heute. */
   stand75b8df8?: boolean;
   /** Minimal-Einstieg (Registry #147, Martin 08.11.): weiße Karte ohne Rahmen wie die Karten darüber, oben Titel und Satz
-   *  (`kopf`), Fortschritt schlicht, Knopfleiste als Band wie der feste Knopf. Wortlaut der Knöpfe unverändert. */
+   *  (`kopf`), Fortschritt schlicht. Stellt die Seite `AussenKnopf` bereit, übernimmt ihr fester Knopf „Weiter“ und das
+   *  Absenden („Zurück“ steht dann klein in der Schrittzeile); sonst Knopfleiste als Band. */
   schlicht?: boolean;
   kopf?: { titel: string; zeile: string };
   /** Unsichtbare Messpunkte des Patientenbogens: Kalender geöffnet / zu ohne Datum (Registry #123), Feld-Messung
@@ -870,19 +871,41 @@ export const AngebotCard: FC<{
   // Zeigt, ob Kunden nicht tippen oder etwas bricht: Knopf im Bild, Tipp auf den Knopf (pointerup, also auch ein Tipp, der
   // keinen Klick auslöst; Wischen endet in pointercancel), Feld wirklich gewählt. Nur Schlüssel und Zähler.
   const tippZaehler = useRef<Record<number, number>>({});
+  const zaehleTipp = () => {
+    const { step: s, vorSpeichern, melden } = messStand.current;
+    const tipp = (tippZaehler.current[s] ?? 0) + 1;
+    tippZaehler.current[s] = tipp;
+    if (tipp <= 5) melden?.('weiter_getippt', { schritt: s, tipp, vor_speichern: vorSpeichern });
+  };
   useEffect(() => {
     const el = patientFormRef.current;
     if (!el) return;
     const getippt = (e: Event) => {
-      if (!(e.target as Element | null)?.closest?.('[data-mess="weiter"]')) return;
-      const { step: s, vorSpeichern, melden } = messStand.current;
-      const tipp = (tippZaehler.current[s] ?? 0) + 1;
-      tippZaehler.current[s] = tipp;
-      if (tipp <= 5) melden?.('weiter_getippt', { schritt: s, tipp, vor_speichern: vorSpeichern });
+      if ((e.target as Element | null)?.closest?.('[data-mess="weiter"]')) zaehleTipp();
     };
     el.addEventListener('pointerup', getippt, true);
     return () => el.removeEventListener('pointerup', getippt, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Minimal-Einstieg (Registry #147): Der feste Knopf der Seite übernimmt „Weiter“ und das Absenden (Kontext `AussenKnopf`);
+  // das Formular zeichnet dann keine eigene Knopfleiste und meldet nach jedem Rendern seinen Stand. „knopf_im_bild“ entfällt
+  // dort (der Knopf steht immer unten), „weiter_getippt“ meldet der feste Knopf per pointerup über `getippt`.
+  const aussenKnopf = useContext(AussenKnopf);
+  const knopfAussen = schlicht && !!aussenKnopf;
+  useEffect(() => {
+    if (!knopfAussen || !aussenKnopf) return;
+    if (!patientOpen) { aussenKnopf(null); return; }
+    aussenKnopf({
+      onWeiter: step === STEP_LABELS.length - 1 ? () => { void speichern(); } : weiter,
+      laedt: isSaving,
+      ladeText: 'Wird gesendet…',
+      hinweis: navHinweis || null,
+      zumFehler: zumErstenFehler,
+      getippt: zaehleTipp,
+    });
+  });
+  useEffect(() => () => aussenKnopf?.(null), [aussenKnopf]);
   // Nur Änderungen des Kunden: Vorbelegung und Nachladen aus mamamia laufen ohne userDirty.
   const letzterPatient = useRef(patient);
   useEffect(() => {
@@ -908,6 +931,7 @@ export const AngebotCard: FC<{
             aktuell={step}
             onSchritt={i => { setFehlerZeigen(false); setStep(i); scrollToFormTop(); }}
             schlicht={schlicht}
+            onZurueck={knopfAussen && step > 0 ? zurueck : undefined}
           />
 
           <div className="mt-2">
@@ -1241,7 +1265,7 @@ export const AngebotCard: FC<{
             )}
           </div>
 
-          <FormNav
+          {knopfAussen ? <div className="pb-4" /> : <FormNav
             ruhig={eingebettet}
             stand75b8df8={stand75b8df8}
             band={schlicht}
@@ -1263,7 +1287,7 @@ export const AngebotCard: FC<{
                 {navHinweis}
               </button>
             )}
-          />
+          />}
         </Rahmen>
       )}
       {/* Unter der Karte statt in der mitlaufenden Leiste — dort kostete die

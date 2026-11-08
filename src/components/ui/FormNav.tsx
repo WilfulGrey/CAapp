@@ -6,7 +6,7 @@
 // hohe Kalender am Handy zum großen Teil hinter der 83–117 px hohen Leiste (iPhone SE
 // bei 553 px Höhe 0 von 19 Tagen antippbar, Messung 13.10.), und ein Tipp auf einen
 // verdeckten Tag traf „Zurück“ oder „Weiter“.
-import { useEffect, useState, type ReactNode } from 'react';
+import { createContext, useEffect, useState, type ReactNode } from 'react';
 import { Button } from './Button';
 
 /** Ereignis an `document`: Ein Feld klappt unter sich etwas auf (detail `true`) bzw. wieder zu
@@ -20,31 +20,27 @@ export function meldeFeldAufgeklappt(auf: boolean) {
   document.dispatchEvent(new CustomEvent<boolean>(FELD_AUFGEKLAPPT, { detail: auf }));
 }
 
-export function FormNav({
-  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, zurueckAlsLink, ruhig = false, stand75b8df8 = false, band = false,
-}: {
-  /** Minimal-Einstieg (Registry #147, Martin 08.11.: „reicht nicht, wenn der eine Button … einfach immer da ist und … dann
-   *  bleibt der da, wo Weiter-Button steht am unteren Rand“): dasselbe Band wie der feste Knopf über dem Formular — grauer
-   *  Grund über die ganze Seitenbreite, Knöpfe mit 12 px Rundung. Am Formular fährt der feste Knopf weg, dieses Band steht
-   *  an derselben Stelle; es wirkt wie ein Knopf, der nur die Beschriftung wechselt. Sonst unverändert. */
-  band?: boolean;
-  /** Rückbau Registry #122: vor dem ersten Speichern der Hauptknopf wie im Stand 75b8df8 (ohne die
-   *  späteren Klassen `px-2 whitespace-nowrap`). Sonst unverändert. */
-  stand75b8df8?: boolean;
-  /** Kompakt-Einstieg (Runde 15): im Hinweis-Kasten mit 24 px Innenabstand — Leiste bündig bis an den
-   *  Rand (-mx-6), Hauptknopf in 600 wie alle Knöpfe dort. Sonst unverändert. */
-  ruhig?: boolean;
-  onZurueck?: () => void;
-  /** Letzter Schritt: Hauptknopf allein über die volle Breite, „Zurück" als Textlink
-   *  darunter (Martin 25.09.: „Bewerbungen anfragen" passte neben „Zurück" nicht). */
-  zurueckAlsLink?: string;
+/** Was ein Knopf außerhalb des Formulars braucht, um „Weiter“ bzw. das Absenden zu übernehmen. */
+export type AussenKnopfStand = {
   onWeiter: () => void;
-  weiterText: string;
-  laedt?: boolean;
-  ladeText?: string;
-  /** z. B. „Pflegegrad fehlt" — Tippen darauf springt zum Feld (Aufrufer) */
-  hinweis?: ReactNode;
-}) {
+  laedt: boolean;
+  ladeText: string;
+  /** z. B. „Pflegegrad fehlt“; Tippen darauf ruft `zumFehler`. */
+  hinweis: string | null;
+  zumFehler: () => void;
+  /** Kernmessung (Registry #144): Tipp auf den Knopf, auch ohne Klick (pointerup). */
+  getippt: () => void;
+};
+
+/** Minimal-Einstieg (Registry #147, Martin 08.11.: „Ich würde keinen Weiter-Button machen, sondern der Button scrollt einfach
+ *  mit runter und bleibt dann unten … am Formular, sodass er weitergeht“): Liegt das Formular in diesem Kontext, zeichnet es
+ *  keine eigene Knopfleiste, sondern meldet seinen Stand nach außen (`null` = Formular zu). Der feste Knopf der Seite
+ *  übernimmt dann „Weiter“ und das Absenden. */
+export const AussenKnopf = createContext<((stand: AussenKnopfStand | null) => void) | null>(null);
+
+/** `true`, solange die Tastatur offen ist oder ein Feld unter sich etwas aufgeklappt hat: Dann läuft eine Knopfleiste im
+ *  Fluss statt unten zu kleben (Begründung im Kopf dieser Datei). */
+export function useKnopfleisteImFluss() {
   const [tastatur, setTastatur] = useState(false);
   useEffect(() => {
     const istEingabe = (el: EventTarget | null) =>
@@ -73,7 +69,33 @@ export function FormNav({
     document.addEventListener(FELD_AUFGEKLAPPT, melden);
     return () => document.removeEventListener(FELD_AUFGEKLAPPT, melden);
   }, []);
-  const imFluss = tastatur || aufgeklappt > 0;
+  return tastatur || aufgeklappt > 0;
+}
+
+export function FormNav({
+  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, zurueckAlsLink, ruhig = false, stand75b8df8 = false, band = false,
+}: {
+  /** Grauer Grund über die ganze Seitenbreite, Knöpfe mit 12 px Rundung (Stil des festen Knopfs im Minimal-Einstieg,
+   *  Registry #147). Sonst unverändert. */
+  band?: boolean;
+  /** Rückbau Registry #122: vor dem ersten Speichern der Hauptknopf wie im Stand 75b8df8 (ohne die
+   *  späteren Klassen `px-2 whitespace-nowrap`). Sonst unverändert. */
+  stand75b8df8?: boolean;
+  /** Kompakt-Einstieg (Runde 15): im Hinweis-Kasten mit 24 px Innenabstand — Leiste bündig bis an den
+   *  Rand (-mx-6), Hauptknopf in 600 wie alle Knöpfe dort. Sonst unverändert. */
+  ruhig?: boolean;
+  onZurueck?: () => void;
+  /** Letzter Schritt: Hauptknopf allein über die volle Breite, „Zurück" als Textlink
+   *  darunter (Martin 25.09.: „Bewerbungen anfragen" passte neben „Zurück" nicht). */
+  zurueckAlsLink?: string;
+  onWeiter: () => void;
+  weiterText: string;
+  laedt?: boolean;
+  ladeText?: string;
+  /** z. B. „Pflegegrad fehlt" — Tippen darauf springt zum Feld (Aufrufer) */
+  hinweis?: ReactNode;
+}) {
+  const imFluss = useKnopfleisteImFluss();
 
   return (
     // data-knopfleiste: daran misst ein aufgeklapptes Feld, wie viel die Leiste unten verdeckt.

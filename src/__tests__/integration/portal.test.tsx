@@ -324,12 +324,11 @@ describe('Portal integration: golden paths', () => {
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
 
-    // Rückbau Registry #122 (Stand 75b8df8): Das Formular steht vor dem Speichern offen auf der Seite, der letzte
-    // Knopf heißt „Speichern".
-    for (let i = 0; i < 3; i++) {
-      await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
+    // Minimal-Einstieg (Registry #147): EIN Knopf unten — erster Tipp springt ins Formular, drei Tipps gehen weiter, der
+    // fünfte sendet ab.
+    for (let i = 0; i < 5; i++) {
+      await user.click(await screen.findByRole('button', { name: /^Bewerbungen erhalten/ }, { timeout: 5000 }));
     }
-    await user.click(await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 }));
     expect(await screen.findByText('Ihre Suche läuft', {}, { timeout: 5000 })).toBeInTheDocument();
 
     // Fassung 33: Angaben im Bereich „Angebot und Pflegesituation" öffnen und eine Angabe ändern.
@@ -646,14 +645,12 @@ describe('Portal integration: golden paths', () => {
     render(<CustomerPortalPage />);
 
     // Durch die vier Schritte — der Entwurf ist vollständig, also lässt jeder
-    // „Weiter" durch; der Einsatzort fällt erst beim Speichern auf.
-    // Rückbau Registry #122: Das Formular steht vor dem Speichern offen, der letzte Knopf heißt „Speichern".
-    for (let i = 0; i < 3; i++) {
-      const weiter = await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 });
-      await user.click(weiter);
+    // Tipp durch; der Einsatzort fällt erst beim Absenden auf.
+    // Minimal-Einstieg (Registry #147): EIN Knopf unten — erster Tipp springt ins Formular, drei gehen weiter, der fünfte
+    // sendet ab.
+    for (let i = 0; i < 5; i++) {
+      await user.click(await screen.findByRole('button', { name: /^Bewerbungen erhalten/ }, { timeout: 5000 }));
     }
-    const speichern = await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 });
-    await user.click(speichern);
 
     // Der Kunde bekommt den Satz zu sehen — und zwar auf Schritt 3, wo das Feld
     // steht, nicht auf Schritt 4, wo er geklickt hat.
@@ -793,7 +790,8 @@ describe('Einstieg vor dem ersten Speichern wie Stand 75b8df8 (Rückbau Registry
       wohnungstyp: 'Einfamilienhaus', urbanisierung: 'Großstadt', startDate: '2099-12-01',
       wunschGeschlecht: 'Weiblich', fuehrerschein: 'Nein',
     }));
-    setLocation('?token=token-rueckbau');
+    // Stand 75b8df8 mit eigener Knopfleiste nur noch hinter `?einstieg=alt` (Standard ist seit #147 der Minimal-Einstieg).
+    setLocation('?token=token-rueckbau&einstieg=alt');
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     expect(await screen.findByText(/Schritt 1 von 4/, {}, { timeout: 5000 })).toBeInTheDocument();
