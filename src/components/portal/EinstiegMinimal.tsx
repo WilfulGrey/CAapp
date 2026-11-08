@@ -386,15 +386,15 @@ function KontaktReiter({ eingeklappt, erreichbar, sterne, verborgen = false }: {
           <div className="absolute inset-0 bg-[rgba(15,8,22,.22)]" onClick={schliessen} />
           <div
             ref={karte}
-            className="absolute right-3 w-[min(344px,calc(100vw-24px))] origin-right rounded-[24px] bg-white p-5 shadow-[0_18px_50px_rgba(15,8,22,.22),0_0_0_1px_rgba(28,28,28,.05)]"
+            className="absolute right-3 max-[374px]:right-2 w-[min(344px,calc(100vw-24px))] max-[374px]:w-[calc(100vw-16px)] origin-right rounded-[24px] bg-white p-5 max-[374px]:p-4 shadow-[0_18px_50px_rgba(15,8,22,.22),0_0_0_1px_rgba(28,28,28,.05)]"
             style={{ top: lage?.top ?? 64, visibility: lage ? 'visible' : 'hidden' }}
           >
             <div className="flex items-start gap-3.5">
-              <img src="/marta-kapcio.jpg" alt="" className="h-16 w-16 flex-none rounded-full object-cover object-top" />
+              <img src="/marta-kapcio.jpg" alt="" className="h-16 w-16 max-[374px]:h-14 max-[374px]:w-14 flex-none rounded-full object-cover object-top" />
               <div className="min-w-0 flex-1 pt-1">
                 <p className="text-[18px] font-semibold leading-tight text-pm-ink">{BERATERIN}</p>
                 <p className="mt-0.5 text-[14px] text-pm-muted">{BERATERIN_ROLLE}</p>
-                <span className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-medium ${erreichbar ? 'bg-pm-mint text-pm-green-deep' : 'bg-pm-shell text-pm-muted'}`}>
+                <span className={`mt-2 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium ${erreichbar ? 'bg-pm-mint text-pm-green-deep' : 'bg-pm-shell text-pm-muted'}`}>
                   <span className={`h-2 w-2 rounded-full ${erreichbar ? 'bg-pm-green' : 'bg-pm-mute'}`} aria-hidden="true" />{ERREICHBAR}
                 </span>
               </div>
@@ -431,7 +431,7 @@ function KontaktReiter({ eingeklappt, erreichbar, sterne, verborgen = false }: {
                 zusammengehören“). Ohne Stand keine Sterne-Spalte. */}
             <div className="mt-5 flex items-stretch border-t border-pm-line-soft pt-4" data-marta-vertrauen>
               {sterne && (
-                <a href={ERFAHRUNGEN_URL} target="_blank" rel="noreferrer" className={`${FOKUS} flex min-w-0 flex-1 flex-col justify-center rounded pr-3`} data-marta-sterne>
+                <a href={ERFAHRUNGEN_URL} target="_blank" rel="noreferrer" className={`${FOKUS} flex flex-1 max-[374px]:flex-none flex-col justify-center whitespace-nowrap rounded pr-3`} data-marta-sterne>
                   <span className="flex items-center gap-1.5 text-[17px] font-bold leading-5 text-pm-ink">
                     {sterne.schnitt}
                     <FuenfSterne wert={sterne.wert} groesse={13} />
@@ -439,10 +439,10 @@ function KontaktReiter({ eingeklappt, erreichbar, sterne, verborgen = false }: {
                   <span className="mt-1 text-[12.5px] leading-4 text-pm-muted underline underline-offset-2">{anzahlText(sterne.anzahl)}</span>
                 </a>
               )}
-              <div className={`flex min-w-0 flex-1 items-center gap-2.5 ${sterne ? 'border-l border-pm-line-soft pl-3' : ''}`} data-marta-siegel>
-                <img src="/badge-testsieger.webp" alt="Testsieger DIE WELT" className="h-11 w-auto flex-none object-contain" />
-                <p className="min-w-0 leading-[1.25]">
-                  <b className="block text-[14.5px] text-pm-ink">6× Testsieger</b>
+              <div className={`flex flex-1 items-center gap-2.5 max-[374px]:gap-2 whitespace-nowrap ${sterne ? 'border-l border-pm-line-soft pl-3' : ''}`} data-marta-siegel>
+                <img src="/badge-testsieger.webp" alt="Testsieger DIE WELT" className="h-11 max-[374px]:h-10 w-auto flex-none object-contain" />
+                <p className="leading-[1.25]">
+                  <b className="block text-[14.5px] max-[374px]:text-[14px] text-pm-ink">6× Testsieger</b>
                   <span className="text-[12.5px] font-bold text-pm-taupe">DIE WELT</span>
                 </p>
               </div>
