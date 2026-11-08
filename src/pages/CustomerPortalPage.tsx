@@ -160,10 +160,6 @@ const PREVIEW_ZEILE_B = IS_PREVIEW_PATIENT && typeof window !== 'undefined' && n
 // Dev-only (Registry #147, Vergleich 08.11.): ?preview=patient&knopf=2 zeigt den festen Knopf mit dem Titel
 // „Pflegesituation vervollständigen“ statt „Bewerbungen erhalten“.
 const PREVIEW_KNOPF_2 = IS_PREVIEW_PATIENT && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('knopf') === '2';
-// Minimal-Einstieg (Martin 08.11.: „oder machen wir ihn ab dann immer unten? … Was wäre denn sinnvoll?“): Standard ist Variante B,
-// der Knopf steht auf der ganzen Seite unten (Empfehlung nach Prüfung aus drei Blickwinkeln und OpenAI, 08.11.). Vergleich in
-// der Vorschau: `?unten=formular` = Variante A, der Knopf bleibt am Formularende stehen.
-const PREVIEW_UNTEN_FORMULAR = IS_PREVIEW_PATIENT && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('unten') === 'formular';
 
 // PROTOTYP 14.10.2026 — Kontaktbereich im ALTEN Gebucht-Bildschirm (BookedScreen + GebuchtKontakt). NUR in der Vorschau
 // ?preview=gebucht&seite=alt, außerhalb AUS (undefined). Echte Kunden bekommen die Nummer seit Registry #139 auf der neuen
@@ -4205,11 +4201,11 @@ const CustomerPortalPage: FC = () => {
           formular={patientFormular(false, true, true)}
           sterne={sterne}
           vorgemerkte={vorgemerkteKraefte}
-          onVervollstaendigen={(unten) => zurPflegesituationAus(unten ? 'hauptknopf_unten' : 'hauptknopf')()}
+          onVervollstaendigen={zurPflegesituationAus('hauptknopf')}
+          onAblaufZumFormular={zurPflegesituationAus('schritte')}
           onKostenAufgeklappt={() => messen('kosten_aufgeklappt')}
           onFaqGeoeffnet={messeFrage}
           knopfTitel={PREVIEW_KNOPF_2 ? 'Pflegesituation vervollständigen' : undefined}
-          knopfImmerUnten={!PREVIEW_UNTEN_FORMULAR}
         />
       ) : pflegekraefteZuerst ? (
         // Registry #145 (Martin 03.11.2026): vor dem ersten Speichern „Pflegekräfte zuerst" — Preis oben, sofort die

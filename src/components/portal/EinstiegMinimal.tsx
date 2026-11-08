@@ -21,9 +21,9 @@
 // „sehr vorteilhaft“ mit „keine Vermittlungsgebühr, täglich kündbar“, Sterne unter dem Gruß; die Pflegekräfte als Zeilen
 // „wie auf dem ersten Bild“, immer mit Preis vor „Einladen“; der Hauptknopf schmal und fest unten, Wortlaut „Pflegesituation
 // vervollständigen und Bewerbungen erhalten“.
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowRight, Check, ChevronDown, Info, Phone, X } from 'lucide-react';
+import { ArrowRight, ArrowUp, Check, ChevronDown, Info, Phone, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { formatEuro, type Lead } from '../../lib/supabase';
 import { eigenanteilAus } from '../../lib/angebotZuschuss';
@@ -35,7 +35,6 @@ import { AbschnittPflegesituation, KostenAufstellung, type VorgemerkteKraft } fr
 import { FaqListe } from './FaqListe';
 import { MartaBox } from './MartaBox';
 import { WhatsAppIcon } from './WhatsAppIcon';
-import { AussenKnopf, useKnopfleisteImFluss, type AussenKnopfStand } from '../ui/FormNav';
 
 // Wortlaut (Martin 08.11.2026, diktiert; Entwurf, Freigabe des Wortlauts offen). Tests prüfen genau diese Texte.
 export const ANGEBOT_TITEL = 'Ihr persönliches Angebot';
@@ -356,7 +355,7 @@ function KontaktReiter({ eingeklappt, erreichbar, verborgen = false }: { eingekl
           weg ? 'pointer-events-none translate-x-[80px] opacity-0' : scrollt || eingeklappt ? 'translate-x-[44px]' : 'translate-x-[20px] hover:translate-x-0'
         }`}
         data-eingeklappt={eingeklappt || undefined}
-        style={{ bottom: 'calc(100% + 150px)' }}
+        style={{ bottom: 224 }}
         data-kontakt-reiter
       >
         <span className="h-4 w-[3px] rounded-sm bg-pm-chip" aria-hidden="true" />
@@ -408,7 +407,7 @@ function KontaktReiter({ eingeklappt, erreichbar, verborgen = false }: { eingekl
 // Martin 08.11.: „der Ablauf deutlich schöner dargestellt … optisch ist das nicht schön“. Wie die Stufen im CGA-Panel:
 // weiße Karte, Punkte auf einer senkrechten Linie, der aktuelle Schritt hervorgehoben. Wortlaut der drei Schritte
 // unverändert (`SCHRITTE_STAND_75B8DF8`, Stand 75b8df8); vor dem Speichern ist Schritt 1 der aktuelle.
-function AblaufMinimal() {
+function AblaufMinimal({ onZumFormular }: { onZumFormular?: () => void }) {
   return (
     <section className={`${KARTE} px-4 pt-3.5 pb-2`} aria-labelledby="ablauf-titel" data-ablauf-minimal>
       <h2 id="ablauf-titel" className="text-[16px] font-semibold leading-6 text-pm-ink">So geht es weiter</h2>
@@ -426,10 +425,23 @@ function AblaufMinimal() {
               >
                 {i + 1}
               </span>
-              <div className={`min-w-0 flex-1 rounded-[12px] px-3 py-2 ${jetzt ? 'bg-pm-coral-tint' : ''}`}>
-                <p className="text-[15px] font-semibold leading-5 text-pm-ink">{schritt.titel}</p>
-                <p className="mt-0.5 text-[13.5px] leading-[1.45] text-pm-muted">{schritt.text}</p>
-              </div>
+              {jetzt && onZumFormular ? (
+                // Martin 08.11.: „wenn ich da draufklicke, dass ich nach oben springe. Nicht zu auffällig, aber schon ein Link …
+                // mit so einem Pfeil da auch rechts, ganz dezent. Darf nicht umspringen“: gleiche Fläche als Knopf, kleiner Pfeil
+                // in der Titelzeile, nichts verschiebt sich.
+                <button type="button" onClick={onZumFormular} className={`${FOKUS} block min-w-0 flex-1 rounded-[12px] bg-pm-coral-tint px-3 py-2 text-left hover:bg-pm-coral/15`} data-ablauf-link>
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="text-[15px] font-semibold leading-5 text-pm-ink">{schritt.titel}</span>
+                    <ArrowUp className="mt-0.5 h-4 w-4 flex-none text-pm-coral-deep/70" strokeWidth={2.25} aria-hidden="true" />
+                  </span>
+                  <span className="mt-0.5 block text-[13.5px] leading-[1.45] text-pm-muted">{schritt.text}</span>
+                </button>
+              ) : (
+                <div className={`min-w-0 flex-1 rounded-[12px] px-3 py-2 ${jetzt ? 'bg-pm-coral-tint' : ''}`}>
+                  <p className="text-[15px] font-semibold leading-5 text-pm-ink">{schritt.titel}</p>
+                  <p className="mt-0.5 text-[13.5px] leading-[1.45] text-pm-muted">{schritt.text}</p>
+                </div>
+              )}
             </li>
           );
         })}
@@ -442,7 +454,7 @@ function AblaufMinimal() {
 export function EinstiegMinimal({
   anrede, lead, onBestpreis, heimEigenanteil, heimQuelle,
   laedt, zeilen, gehalteneEinladungen, vorschlaegeVorhanden, bereitsBearbeitet, formular, sterne, vorgemerkte,
-  onVervollstaendigen, onKostenAufgeklappt, onFaqGeoeffnet, knopfTitel = FEST_TITEL, knopfImmerUnten = false,
+  onVervollstaendigen, onAblaufZumFormular, onKostenAufgeklappt, onFaqGeoeffnet, knopfTitel = FEST_TITEL,
 }: {
   /** Anrede für „Guten Tag, …“ (customerSalutation), ohne Anrede nur „Guten Tag“. */
   anrede: string | null;
@@ -462,62 +474,28 @@ export function EinstiegMinimal({
   sterne: SterneStand | null;
   vorgemerkte: VorgemerkteKraft[];
   /** Fester Knopf unten: ins Formular (CustomerPortalPage, Messpunkt `zur_pflegesituation` mit Quelle `hauptknopf`). */
-  onVervollstaendigen: (unten?: boolean) => void;
+  onVervollstaendigen: () => void;
+  /** „Pflegesituation vervollständigen“ in „So geht es weiter“: Sprung zum Formular (Messpunkt `zur_pflegesituation`, Quelle
+   *  `schritte`). Ohne Rückruf bleibt der Schritt reiner Text. */
+  onAblaufZumFormular?: () => void;
   onKostenAufgeklappt?: () => void;
   onFaqGeoeffnet?: (schluessel: string) => void;
   /** Titel des festen Knopfs (Vorschau-Vergleich `?knopf=2`). */
   knopfTitel?: string;
-  /** Vorschau-Vergleich `?unten=immer` (Variante B): der Knopf bleibt auf der ganzen Seite unten, auch bei So geht es weiter,
-   *  Fragen und Marta; außerhalb des Formulars springt er ins Formular, nie blind einen Schritt weiter. Standard (A): er bleibt
-   *  am Formularende stehen. */
-  knopfImmerUnten?: boolean;
 }) {
-  // EIN Knopf (Martin 08.11.: „Ich würde keinen Weiter-Button machen, sondern der Button scrollt einfach mit runter und bleibt
-  // dann unten … am Formular, sodass er weitergeht“). Vor dem Formular springt er hinein; steht das Formular oben im Bild
-  // (Anfang über 60 % der Höhe) oder ist schon darüber, führt er durch die Schritte und sendet im letzten ab. Wortlaut bleibt
-  // in jedem Schritt gleich. Der Reiter bleibt im Formular eingeklappt.
-  const [imFormular, setImFormular] = useState(false);
+  // Der feste Knopf steht nur über Angebot und Pflegekräften (Martin 08.11.: „den wir festmachen unten“). Kommt das Formular
+  // ins Bild, fährt er weg; im Formular steht dessen eigener Knopf fest UNTER dem Formular, nichts schwebt mehr darüber (Martin
+  // 08.11. abends: „den Button dann schon immer unter dem Formular lassen und nicht mehr Flugding“; „wozu brauche ich dann
+  // Bewerbungen erhalten? … dann ist es vorbei“ → dort „Weiter →“, erst im letzten Schritt „Bewerbungen erhalten“).
+  const [formularImBild, setFormularImBild] = useState(false);
   useEffect(() => {
     const ziel = document.getElementById('patientendaten');
     if (!ziel || typeof IntersectionObserver === 'undefined') return;
-    const beobachter = new IntersectionObserver(([e]) => {
-      // A: ab 60 % Höhe bis zum Ende „im Formular“ (der Knopf steht dann am Formularende). B: nur solange das Formular den
-      // Streifen zwischen 40 % und 60 % der Höhe berührt (Anfang über 60 %, Ende unter 40 %); darüber und darunter springt
-      // der Knopf zum aktuellen Schritt.
-      setImFormular(knopfImmerUnten ? e.isIntersecting : e.isIntersecting || e.boundingClientRect.top < 0);
-    }, { rootMargin: knopfImmerUnten ? '-40% 0px -40% 0px' : '0px 0px -40% 0px' });
+    const beobachter = new IntersectionObserver(([e]) => setFormularImBild(e.isIntersecting || e.boundingClientRect.top < 0));
     beobachter.observe(ziel);
     return () => beobachter.disconnect();
-  }, [knopfImmerUnten]);
-  // Stand des Formulars (AngebotCard meldet ihn über `AussenKnopf`): Handlungen im Ref, Anzeige im State; neu gezeichnet wird
-  // nur, wenn sich Ladezustand oder Hinweis ändern.
-  const formStand = useRef<AussenKnopfStand | null>(null);
-  const [anzeige, setAnzeige] = useState<{ laedt: boolean; ladeText: string; hinweis: string | null } | null>(null);
-  const meldeFormular = useCallback((s: AussenKnopfStand | null) => {
-    formStand.current = s;
-    setAnzeige((alt) => {
-      if (!s) return null;
-      if (alt && alt.laedt === s.laedt && alt.ladeText === s.ladeText && alt.hinweis === s.hinweis) return alt;
-      return { laedt: s.laedt, ladeText: s.ladeText, hinweis: s.hinweis };
-    });
   }, []);
-  // Nach dem Sprung ins Formular 0,6 s keine Tipps (Prüfung 08.11.: ein Doppeltipp, bei Älteren häufig, löste sonst sofort die
-  // Prüfung mit roten Feldern aus, bevor das Formular überhaupt zu sehen war). performance.now: läuft auch bei gestellter Uhr.
-  const sperreBis = useRef(0);
-  const tippen = () => {
-    if (performance.now() < sperreBis.current) return;
-    const stand = formStand.current;
-    if (stand && imFormular) { stand.onWeiter(); return; }
-    // Außerhalb des Formulars nie weiter, nie absenden: nur der Sprung zum aktuellen Schritt. „unten“ = Formular liegt schon
-    // über der Bildmitte (eigene Messquelle, Variante B).
-    const r = document.getElementById('patientendaten')?.getBoundingClientRect();
-    const unten = !!r && r.height > 0 && r.bottom < window.innerHeight * 0.4;
-    // Der Sprung zählt schon als „im Formular“ (ohne Meldung des Beobachters, z. B. im Test, geht es sonst nie weiter).
-    setImFormular(true);
-    sperreBis.current = performance.now() + 600;
-    onVervollstaendigen(unten);
-  };
-  // Marta-Kasten im Bild → Reiter weg (sonst steht Marta am Seitenende doppelt, Variante B).
+  // Marta-Kasten im Bild → Reiter weg (sonst steht Marta am Seitenende doppelt).
   const martaKasten = useRef<HTMLDivElement>(null);
   const [kastenImBild, setKastenImBild] = useState(false);
   useEffect(() => {
@@ -533,60 +511,6 @@ export function EinstiegMinimal({
     const t = window.setInterval(() => setErreichbar(istErreichbar()), 60_000);
     return () => window.clearInterval(t);
   }, []);
-  // Tastatur offen oder Kalender aufgeklappt: Band im Fluss (am Formularende) statt über dem Feld (wie FormNav).
-  const imFluss = useKnopfleisteImFluss();
-  const laedtJetzt = !!anzeige?.laedt;
-  const band = (
-    <>
-        {/* Der eine feste Knopf (Martin 08.11.: „den wir festmachen unten“ … „bleibt dann unten am Formular“): letztes Element
-            des ersten Teils, also bis zum Formularende unten am Bildschirm, danach am Formularende. Band bis an den
-            Bildschirmrand. `data-knopfleiste`: daran misst der Kalender, wie viel unten verdeckt ist (DateField). */}
-        <div
-          className={`${imFluss ? 'relative' : 'sticky bottom-0'} z-20 mt-3 bg-pm-grund/95 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)] backdrop-blur ${
-            knopfImmerUnten ? '' : '-mx-3 max-[374px]:-mx-2 px-3 max-[374px]:px-2'
-          }`}
-          data-fester-knopf
-          data-knopfleiste=""
-        >
-          <div className={knopfImmerUnten ? 'max-w-3xl mx-auto px-3 max-[374px]:px-2' : ''}>
-          {imFormular && anzeige?.hinweis && (
-            <div className="mb-2 text-center text-[13.5px] text-pm-error-ink">
-              <button
-                type="button"
-                onClick={() => formStand.current?.zumFehler()}
-                className="inline-flex min-h-[36px] -my-1 items-center px-2 underline decoration-pm-error/40 underline-offset-4"
-              >
-                {anzeige.hinweis}
-              </button>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={tippen}
-            onPointerUp={() => { if (imFormular) formStand.current?.getippt(); }}
-            disabled={laedtJetzt}
-            aria-busy={laedtJetzt || undefined}
-            className={`${FOKUS} block w-full rounded-[12px] bg-pm-coral px-4 py-2.5 text-center text-white transition-colors hover:bg-pm-coral-deep active:scale-[0.99] disabled:opacity-80`}
-          >
-            {laedtJetzt ? (
-              <span className="block py-2 text-[16px] font-bold leading-5">{anzeige?.ladeText}</span>
-            ) : (
-              <>
-                {/* Pfeil (Martin 08.11.: „wir lassen Bewerbungen erhalten. Und dann kommt so ein Pfeil dahin“): der Knopf
-                    führt weiter, in jedem Schritt gleich beschriftet. */}
-                <span className="flex items-center justify-center gap-1.5 text-[16px] font-bold leading-5">
-                  {knopfTitel}
-                  <ArrowRight className="h-[18px] w-[18px] flex-none" strokeWidth={2.5} aria-hidden="true" data-pfeil />
-                </span>
-                <span className="mt-0.5 block text-[12.5px] font-medium leading-4 opacity-90">{FEST_ZEILE}</span>
-              </>
-            )}
-          </button>
-          </div>
-          <KontaktReiter eingeklappt={imFormular} erreichbar={erreichbar} verborgen={kastenImBild} />
-        </div>
-    </>
-  );
   const anzahl = zeilen.length;
   const leer = !laedt && anzahl === 0;
   const hinweis = (titel: string, text: string) => (
@@ -598,11 +522,9 @@ export function EinstiegMinimal({
   return (
     // `overflow-x-clip` (kein Scrollbereich, sticky bleibt): der halb eingeschobene Kontakt-Reiter ragt über den rechten
     // Rand und darf keinen Querscroll erzeugen.
-    <AussenKnopf.Provider value={meldeFormular}>
     <div className="bg-pm-grund overflow-x-clip" data-einstieg="minimal">
-      {/* Erster Teil: Gruß, Angebotskarte, Pflegekräfte und das Formular; der feste Knopf ist das letzte Element dieses Teils
-          und bleibt bis dorthin unten am Bildschirm stehen (sticky, ohne Skript: auch im Handyrahmen am Computer). Danach
-          steht er am Ende des Formulars. */}
+      {/* Erster Teil: Gruß, Angebotskarte, Pflegekräfte; der feste Knopf hängt am Ende dieses Teils und bleibt bis dorthin unten
+          am Bildschirm stehen (sticky, ohne Skript: auch im Handyrahmen am Computer). */}
       {/* Seitenrand 12 px, unter 375 px 8 px (Android 360: mehr Platz für die Zeilen). */}
       <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2">
         <h1 className="px-1 pt-4 pb-3 text-[22px] font-semibold leading-[1.2] tracking-[-0.015em] text-pm-ink">
@@ -636,18 +558,42 @@ export function EinstiegMinimal({
           </section>
         )}
 
-        {/* Pflegesituation mit offenem Formular (Logik wie „Pflegekräfte zuerst“, #145). */}
-        <div className="space-y-4">
-          {bereitsBearbeitet && <div className="pt-6">{bereitsBearbeitet}</div>}
-          <AbschnittPflegesituation vorgemerkte={vorgemerkte} formular={formular} schlicht />
+        {/* Fester Knopf: Sticky-Anker ohne Höhe am Ende des ersten Teils, das Band hängt nach oben daran. Sobald das Formular ins
+            Bild kommt, fährt es nach unten weg; dann gilt der Knopf unter dem Formular. */}
+        <div className="sticky bottom-0 z-20 h-0" data-fester-knopf-anker>
+          <div
+            className={`absolute bottom-0 -left-3 -right-3 max-[374px]:-left-2 max-[374px]:-right-2 bg-pm-grund/95 px-3 max-[374px]:px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)] backdrop-blur transition-[transform,opacity] duration-300 motion-reduce:transition-none ${
+              formularImBild ? 'pointer-events-none translate-y-full opacity-0' : ''
+            }`}
+            aria-hidden={formularImBild || undefined}
+            data-fester-knopf
+          >
+            <button
+              type="button"
+              onClick={onVervollstaendigen}
+              tabIndex={formularImBild ? -1 : 0}
+              className={`${FOKUS} block w-full rounded-[12px] bg-pm-coral px-4 py-2.5 text-center text-white transition-colors hover:bg-pm-coral-deep active:scale-[0.99]`}
+            >
+              {/* Pfeil (Martin 08.11.: „wir lassen Bewerbungen erhalten. Und dann kommt so ein Pfeil dahin“). */}
+              <span className="flex items-center justify-center gap-1.5 text-[16px] font-bold leading-5">
+                {knopfTitel}
+                <ArrowRight className="h-[18px] w-[18px] flex-none" strokeWidth={2.5} aria-hidden="true" data-pfeil />
+              </span>
+              <span className="mt-0.5 block text-[12.5px] font-medium leading-4 opacity-90">{FEST_ZEILE}</span>
+            </button>
+          </div>
         </div>
+      </div>
 
-        {!knopfImmerUnten && band}
+      {/* Pflegesituation mit offenem Formular (Logik wie „Pflegekräfte zuerst“, #145); der Knopf steht fest darunter. */}
+      <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2 pb-4 space-y-4">
+        {bereitsBearbeitet && <div className="pt-6">{bereitsBearbeitet}</div>}
+        <AbschnittPflegesituation vorgemerkte={vorgemerkte} formular={formular} schlicht />
       </div>
 
       {/* Die Kostenkarte entfällt hier: ihre Aufstellung steht unter „Details“ in der Angebotskarte (Martin 08.11.). */}
       <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2 pt-2 pb-6 space-y-4">
-        <AblaufMinimal />
+        <AblaufMinimal onZumFormular={onAblaufZumFormular} />
         <div className="pt-6">
           <FaqListe ruhig karte minimal onFrageGeoeffnet={onFaqGeoeffnet} />
         </div>
@@ -655,8 +601,10 @@ export function EinstiegMinimal({
           <MartaBox sterne={sterne} erreichbar={erreichbar} />
         </div>
       </div>
-      {knopfImmerUnten && band}
+      {/* Martas Reiter: eigener Sticky-Anker über die ganze Seite (rechter Rand), im Formular eingeklappt, weg beim Marta-Kasten. */}
+      <div className="sticky bottom-0 z-20 h-0" data-reiter-anker>
+        <KontaktReiter eingeklappt={formularImBild} erreichbar={erreichbar} verborgen={kastenImBild} />
+      </div>
     </div>
-    </AussenKnopf.Provider>
   );
 }

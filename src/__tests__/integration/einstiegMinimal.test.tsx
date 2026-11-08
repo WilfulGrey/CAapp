@@ -152,7 +152,7 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     // Pfeil hinter dem Titel (Martin 08.11.), für Vorleseprogramme ausgeblendet.
     expect(haupt.querySelector('[data-pfeil]')).toHaveAttribute('aria-hidden', 'true');
     expect(haupt.className).toContain('bg-pm-coral');
-    expect(haupt.closest('[data-fester-knopf]')!.className).toContain('sticky bottom-0');
+    expect(haupt.closest('[data-fester-knopf-anker]')!.className).toContain('sticky bottom-0');
     expect(screen.queryByText('Rückruf vereinbaren')).toBeNull();
     const reiter = document.querySelector('[data-kontakt-reiter]') as HTMLElement;
     expect(reiter).toHaveAccessibleName('Marta Kapcio, Ihre Beraterin: anrufen oder schreiben');
@@ -179,8 +179,10 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     const balken = within(pflegesituation).getByRole('progressbar');
     expect(balken).toHaveAttribute('aria-valuenow', '1');
     expect((balken.firstElementChild as HTMLElement).style.width).toBe('12.5%');
-    expect(pflegesituation.querySelector('[data-knopfleiste]')).toBeNull();
-    expect(screen.queryByRole('button', { name: /^Weiter/ })).toBeNull();
+    // Im Formular steht der Knopf fest UNTER dem Formular, er klebt nicht (Martin 08.11.: „den Button dann schon immer unter
+    // dem Formular lassen und nicht mehr Flugding“); bis zum letzten Schritt heißt er „Weiter →“.
+    const formKnopf = within(pflegesituation).getByRole('button', { name: /^Weiter →$/ });
+    expect(formKnopf.closest('[data-knopfleiste]')!.className).not.toContain('sticky');
     expect(screen.getAllByRole('button', { name: HAUPTKNOPF })).toHaveLength(1);
     // Erste Formularseite kurz (Martin 08.11.: „vielleicht nur eine Frage dort“): Anzahl fest (preisrelevant, „Personen …
     // können wir nicht ändern“), dazu nur das Geschlecht im bisherigen Wortlaut; Geburtsjahr usw. erst auf der zweiten Seite.
@@ -195,7 +197,8 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     const fragen = screen.getByRole('heading', { level: 2, name: 'Häufige Fragen' });
     const marta = screen.getByText('Noch Fragen?');
     // Variante B (Standard seit 08.11.): der Knopf steht als letztes Element der Seite und klebt bis dorthin unten.
-    const reihe = [h1, karte, abschnitt, zweite, pflegesituation, schritt, soGehts, fragen, marta, haupt];
+    // Der feste Knopf hängt am Ende des ersten Teils (über Angebot und Pflegekräften), das Formular hat seinen eigenen darunter.
+    const reihe = [h1, karte, abschnitt, zweite, haupt, pflegesituation, schritt, formKnopf, soGehts, fragen, marta];
     for (let i = 1; i < reihe.length; i++) expect(davor(reihe[i - 1], reihe[i])).toBe(true);
     // Wortlaut-Regeln: nie „Betreuungskräfte“, nie „vermitteln“.
     expect(document.body.textContent).not.toMatch(/Betreuungskräfte|vermitteln/);
@@ -288,6 +291,14 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     await waitFor(() => expect(meldungen.find((m) => m.event === 'zur_pflegesituation')?.metadata).toEqual({ quelle: 'hauptknopf', vor_speichern: true }));
     expect(meldungen.find((m) => m.event === 'zur_pflegesituation')?.notify).toBe(false);
 
+    // „Pflegesituation vervollständigen“ in „So geht es weiter“ springt ebenfalls zum Formular (Martin 08.11.), Quelle schritte.
+    (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
+    const ablaufLink = document.querySelector('[data-ablauf-link]') as HTMLElement;
+    expect(ablaufLink.textContent).toBe('Pflegesituation vervollständigen2 Minuten. Vieles ist schon ausgefüllt.');
+    await user.click(ablaufLink);
+    await waitFor(() => expect(gescrollt().map((e) => e.id)).toContain('patientendaten'));
+    await waitFor(() => expect(meldungen.filter((m) => m.event === 'zur_pflegesituation').map((m) => m.metadata?.quelle)).toEqual(['hauptknopf', 'schritte']));
+
     await user.click(within(zeileVon('Helena')).getByText((_, el) => el?.tagName === 'SPAN' && /^Helena, \d+$/.test(el.textContent ?? '')));
     await screen.findByRole('button', { name: 'Nein danke' }, { timeout: 5000 });
     await waitFor(() => expect(meldungen.find((m) => m.event === 'profil_geoeffnet')?.metadata).toEqual({ caregiver_id: 50002, quelle: 'karte', vor_speichern: true }));
@@ -332,12 +343,8 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     await waitFor(() => expect(document.getElementById('pflegesituation-formular')).not.toBeNull(), { timeout: 5000 });
     const formular = document.getElementById('patientendaten')!;
     await within(formular).findByText('Anzahl zu betreuender Personen', {}, { timeout: 5000 });
-    // Erster Tipp: ins Formular. Doppeltipp direkt danach zählt nicht (keine roten Felder, bevor das Formular zu sehen ist).
-    await user.click(screen.getByRole('button', { name: HAUPTKNOPF }));
-    await user.click(screen.getByRole('button', { name: HAUPTKNOPF }));
-    expect(screen.queryByRole('button', { name: 'Geschlecht fehlt' })).toBeNull();
-    await new Promise((r) => setTimeout(r, 650)); // Tipp-Sperre nach dem Sprung ins Formular (0,6 s)
-    await user.click(screen.getByRole('button', { name: HAUPTKNOPF }));
+    // „Weiter →“ unter dem Formular ohne Antwort: Hinweis über dem Knopf, die Seite bleibt.
+    await user.click(within(formular).getByRole('button', { name: /^Weiter →$/ }));
     expect(await screen.findByRole('button', { name: 'Geschlecht fehlt' })).toBeInTheDocument();
     expect(within(formular).queryByText('Geburtsjahr')).toBeNull();
     // Antwort antippen: kurz die Auswahl, dann von selbst die zweite Hälfte von Schritt 1, ohne Anzahl und Geschlecht.
@@ -353,7 +360,7 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(await within(formular).findByText('Anzahl zu betreuender Personen')).toBeInTheDocument();
     expect(within(formular).getByRole('button', { name: 'Weiblich' })).toHaveAttribute('aria-pressed', 'true');
     // Mit Antwort geht der Knopf weiter.
-    await user.click(screen.getByRole('button', { name: HAUPTKNOPF }));
+    await user.click(within(formular).getByRole('button', { name: /^Weiter →$/ }));
     expect(await within(formular).findByText('Geburtsjahr')).toBeInTheDocument();
   }, 20_000);
 
@@ -398,23 +405,18 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     await user.click(within(zeileVon('Helena')).getByRole('button', { name: 'Einladen' }));
     await user.click(within(await screen.findByRole('dialog', { name: 'Helena K. einladen' })).getByRole('button', { name: 'Später' }));
     expect(eingeladen).toEqual([]);
-    // EIN Knopf: erster Tipp springt ins Formular, die nächsten drei gehen weiter (mit „Zurück“ in der Schrittzeile), der
-    // fünfte sendet ab. Der Reiter bleibt dabei sichtbar und eingeklappt.
-    const reiter = document.querySelector('[data-kontakt-reiter]') as HTMLElement;
-    expect(reiter).not.toHaveAttribute('data-eingeklappt');
-    await user.click(await screen.findByRole('button', { name: HAUPTKNOPF }, { timeout: 5000 }));
-    await new Promise((r) => setTimeout(r, 650)); // Tipp-Sperre nach dem Sprung ins Formular (0,6 s)
+    // Knopf unter dem Formular: „Weiter →“ (mit „Zurück“ klein in der Schrittzeile), im letzten Schritt „Bewerbungen
+    // erhalten“ (Martin 08.11.: erst dann ist es „vorbei“), nicht „Speichern“.
     expect(screen.getByText(/Schritt 1 von 4/)).toBeInTheDocument();
-    expect(reiter).toHaveAttribute('data-eingeklappt', 'true');
     expect(screen.queryByRole('button', { name: 'Zurück' })).toBeNull();
-    await user.click(screen.getByRole('button', { name: HAUPTKNOPF }));
+    await user.click(screen.getByRole('button', { name: /^Weiter →$/ }));
     expect(await screen.findByText(/Schritt 2 von 4/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Zurück' }));
     expect(await screen.findByText(/Schritt 1 von 4/)).toBeInTheDocument();
-    for (let i = 0; i < 3; i++) await user.click(screen.getByRole('button', { name: HAUPTKNOPF }));
+    for (let i = 0; i < 3; i++) await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }));
     expect(await screen.findByText(/Schritt 4 von 4/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^(Weiter|Speichern)/ })).toBeNull();
-    await user.click(screen.getByRole('button', { name: HAUPTKNOPF }));
+    await user.click(screen.getByRole('button', { name: /^Bewerbungen erhalten$/ }));
 
     expect(await screen.findByText('Helena K. ist eingeladen.', {}, { timeout: 8000 })).toBeInTheDocument();
     expect(eingeladen).toEqual([50002]);

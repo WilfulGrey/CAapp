@@ -324,12 +324,11 @@ describe('Portal integration: golden paths', () => {
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
 
-    // Minimal-Einstieg (Registry #147): EIN Knopf unten — erster Tipp springt ins Formular, drei Tipps gehen weiter, der
-    // fünfte sendet ab.
-    for (let i = 0; i < 5; i++) {
-      await user.click(await screen.findByRole('button', { name: /^Bewerbungen erhalten/ }, { timeout: 5000 }));
-      if (i === 0) await new Promise((r) => setTimeout(r, 650)); // Tipp-Sperre nach dem Sprung ins Formular (0,6 s)
+    // Minimal-Einstieg (Registry #147): Knopf unter dem Formular, „Weiter →“ und im letzten Schritt „Bewerbungen erhalten“.
+    for (let i = 0; i < 3; i++) {
+      await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
     }
+    await user.click(await screen.findByRole('button', { name: /^Bewerbungen erhalten$/ }, { timeout: 5000 }));
     expect(await screen.findByText('Ihre Suche läuft', {}, { timeout: 5000 })).toBeInTheDocument();
 
     // Fassung 33: Angaben im Bereich „Angebot und Pflegesituation" öffnen und eine Angabe ändern.
@@ -647,12 +646,11 @@ describe('Portal integration: golden paths', () => {
 
     // Durch die vier Schritte — der Entwurf ist vollständig, also lässt jeder
     // Tipp durch; der Einsatzort fällt erst beim Absenden auf.
-    // Minimal-Einstieg (Registry #147): EIN Knopf unten — erster Tipp springt ins Formular, drei gehen weiter, der fünfte
-    // sendet ab.
-    for (let i = 0; i < 5; i++) {
-      await user.click(await screen.findByRole('button', { name: /^Bewerbungen erhalten/ }, { timeout: 5000 }));
-      if (i === 0) await new Promise((r) => setTimeout(r, 650)); // Tipp-Sperre nach dem Sprung ins Formular (0,6 s)
+    // Minimal-Einstieg (Registry #147): Knopf unter dem Formular, „Weiter →“ und im letzten Schritt „Bewerbungen erhalten“.
+    for (let i = 0; i < 3; i++) {
+      await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
     }
+    await user.click(await screen.findByRole('button', { name: /^Bewerbungen erhalten$/ }, { timeout: 5000 }));
 
     // Der Kunde bekommt den Satz zu sehen — und zwar auf Schritt 3, wo das Feld
     // steht, nicht auf Schritt 4, wo er geklickt hat.

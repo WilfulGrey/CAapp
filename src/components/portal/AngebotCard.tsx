@@ -1,4 +1,4 @@
-import { Fragment, useContext, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { ElementType, FC, ReactNode } from 'react';
 import { Check, Lock } from 'lucide-react';
 import {
@@ -8,7 +8,7 @@ import {
 import { ChipSelect } from './ChipSelect';
 import { Card } from '../ui/Card';
 import { FormField } from '../ui/FormField';
-import { AussenKnopf, FormNav } from '../ui/FormNav';
+import { FormNav } from '../ui/FormNav';
 import { ProgressSteps } from '../ui/ProgressSteps';
 import { EYEBROW } from '../ui/SectionHeader';
 import { DateField, kalenderTag, localTodayIso } from './DateField';
@@ -263,7 +263,7 @@ export const AngebotCard: FC<{
   // sieht, dass das jetzt weitergeht … vielleicht nur eine Frage dort. Und dann geht es halt eben zur nächsten und dann kommt
   // der Fragebogen“): erste Seite mit EINER Frage zum Antippen (Geschlecht der Person 1), ohne Schrittzeile; nach der Antwort
   // geht es von selbst zum Rest von Schritt 1. Grund: 22 von 34 echten Anfragen fingen das Formular nie an, wer anfing, wurde zu
-  // 83 % fertig (Auswertung 03.09.2026). Nur mit dem festen Knopf der Seite (`knopfAussen`); schon beantwortet → keine Seite.
+  // 83 % fertig (Auswertung 03.09.2026). Schon beantwortet → keine Seite.
   const einstiegSeite = useRef(schlicht && (!patient.geschlecht || (patient.anzahl === '2' && !patient.p2_geschlecht))).current;
   const [einstieg, setEinstieg] = useState(einstiegSeite);
 
@@ -792,9 +792,18 @@ export const AngebotCard: FC<{
   );
 
   // Zwischenkopf („Person 1"); das Feld direkt darunter braucht keine eigene Trennlinie.
-  const personKopf = (text: string) => (
-    <p className={`${EYEBROW} ${schlicht ? 'pt-4' : 'pt-6'} [&+[data-field]]:border-t-0 [&+[data-field]]:pt-3`}>{text}</p>
-  );
+  // Minimal-Einstieg (Martin 08.11.: „man erkennt kaum, wo Person 1 und Person 2 steht. Das muss deutlich markanter sein“; er las
+  // „Nachteinsätze“ zweimal): Band über die ganze Kartenbreite mit Nummer im Kreis statt der kleinen Überschrift.
+  const personKopf = (text: string) => (schlicht ? (
+    <div className="-mx-4 mt-4 flex items-center gap-2.5 border-y border-pm-line bg-pm-grund px-4 py-2.5 [&+[data-field]]:border-t-0" data-person-kopf>
+      <span aria-hidden="true" className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-pm-ink text-[12.5px] font-bold text-white">
+        {text.replace(/\D/g, '')}
+      </span>
+      <p className="text-[15.5px] font-semibold text-pm-ink">{text}</p>
+    </div>
+  ) : (
+    <p className={`${EYEBROW} pt-6 [&+[data-field]]:border-t-0 [&+[data-field]]:pt-3`}>{text}</p>
+  ));
 
   const geburtsjahrFeld = (k: 'geburtsjahr' | 'p2_geburtsjahr') => (
     <input
@@ -895,12 +904,8 @@ export const AngebotCard: FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Minimal-Einstieg (Registry #147): Der feste Knopf der Seite übernimmt „Weiter“ und das Absenden (Kontext `AussenKnopf`);
-  // das Formular zeichnet dann keine eigene Knopfleiste und meldet nach jedem Rendern seinen Stand. „knopf_im_bild“ entfällt
-  // dort (der Knopf steht immer unten), „weiter_getippt“ meldet der feste Knopf per pointerup über `getippt`.
-  const aussenKnopf = useContext(AussenKnopf);
-  const knopfAussen = schlicht && !!aussenKnopf;
-  const einstiegAktiv = knopfAussen && einstieg;
+  // Minimal-Einstieg (Registry #147): erste Seite = erste Hälfte von Schritt 1 (siehe `einstiegSeite`).
+  const einstiegAktiv = schlicht && einstieg;
   const einstiegFertig = () => { setFehlerZeigen(false); setEinstieg(false); scrollToFormTop(); };
   // Ehepaar: beide Personen auf der Einstiegsseite (statt „Person 1“ allein, das las sich holprig).
   const einstiegOffen = [!patient.geschlecht && 'geschlecht', zwei && !patient.p2_geschlecht && 'p2_geschlecht'].filter(Boolean) as string[];
@@ -922,19 +927,6 @@ export const AngebotCard: FC<{
     const anderes = k === 'geschlecht' ? (!zwei || !!patient.p2_geschlecht) : !!patient.geschlecht;
     if (v && anderes) window.setTimeout(einstiegFertig, 350);
   };
-  useEffect(() => {
-    if (!knopfAussen || !aussenKnopf) return;
-    if (!patientOpen) { aussenKnopf(null); return; }
-    aussenKnopf({
-      onWeiter: einstiegAktiv ? einstiegWeiter : step === STEP_LABELS.length - 1 ? () => { void speichern(); } : weiter,
-      laedt: isSaving,
-      ladeText: 'Wird gesendet…',
-      hinweis: einstiegAktiv ? einstiegHinweis : navHinweis || null,
-      zumFehler: zumErstenFehler,
-      getippt: zaehleTipp,
-    });
-  });
-  useEffect(() => () => aussenKnopf?.(null), [aussenKnopf]);
   // Nur Änderungen des Kunden: Vorbelegung und Nachladen aus mamamia laufen ohne userDirty.
   const letzterPatient = useRef(patient);
   useEffect(() => {
@@ -968,7 +960,7 @@ export const AngebotCard: FC<{
             // Einstiegsseite = erste Hälfte von Schritt 1 (Martin 08.11.: „man sieht jetzt nicht, wie viele Schritte wir da
             // haben … das würde ich schon irgendwie einblenden“).
             anteil={einstiegAktiv ? 0.5 / STEP_LABELS.length : undefined}
-            onZurueck={knopfAussen ? (step > 0 ? zurueck : einstiegSeite && !einstiegAktiv ? () => { setFehlerZeigen(false); setEinstieg(true); scrollToFormTop(); } : undefined) : undefined}
+            onZurueck={schlicht ? (step > 0 ? zurueck : einstiegSeite && !einstiegAktiv ? () => { setFehlerZeigen(false); setEinstieg(true); scrollToFormTop(); } : undefined) : undefined}
           />
           </div>
 
@@ -996,7 +988,7 @@ export const AngebotCard: FC<{
             {/* ── Step 1: Zur Person ── */}
             {step === 0 && !einstiegAktiv && (
               <>
-                {!(knopfAussen && einstiegSeite) && (
+                {!(schlicht && einstiegSeite) && (
                 <FormField feld="anzahl" label="Anzahl zu betreuender Personen">
                   {festWert('anzahl', patient.anzahl === '2' ? '2 Personen' : '1 Person')}
                 </FormField>
@@ -1004,7 +996,7 @@ export const AngebotCard: FC<{
 
                 {zwei && personKopf('Person 1')}
                 {/* Nach der Einstiegsseite steht das Geschlecht schon fest; ändern geht über „Zurück“. */}
-                {!(knopfAussen && einstiegSeite) && (
+                {!(schlicht && einstiegSeite) && (
                 <FormField feld="geschlecht" label="Geschlecht" pflicht fehler={fehlerFuer('geschlecht')}>
                   <ChipSelect invalid={!!fehlerFuer('geschlecht')} value={patient.geschlecht} onChange={v => updatePatient(p=>({...p,geschlecht:v}))}
                     options={['Männlich','Weiblich']} />
@@ -1029,7 +1021,7 @@ export const AngebotCard: FC<{
                 {zwei && (
                   <>
                     {personKopf('Person 2')}
-                    {!(knopfAussen && einstiegSeite) && (
+                    {!(schlicht && einstiegSeite) && (
                     <FormField feld="p2_geschlecht" label="Geschlecht" pflicht fehler={fehlerFuer('p2_geschlecht')}>
                       <ChipSelect invalid={!!fehlerFuer('p2_geschlecht')} value={patient.p2_geschlecht} onChange={v => updatePatient(p=>({...p,p2_geschlecht:v}))}
                         options={['Männlich','Weiblich']} />
@@ -1330,29 +1322,32 @@ export const AngebotCard: FC<{
             )}
           </div>
 
-          {knopfAussen ? <div className="pb-4" /> : <FormNav
+          <FormNav
             ruhig={eingebettet}
             stand75b8df8={stand75b8df8}
             band={schlicht}
-            onZurueck={step > 0 ? zurueck : undefined}
-            onWeiter={letzterSchritt ? () => { void speichern(); } : weiter}
+            // Minimal-Einstieg: „Zurück“ steht klein in der Schrittzeile, unter dem Formular nur der eine Knopf.
+            onZurueck={!schlicht && step > 0 ? zurueck : undefined}
+            onWeiter={einstiegAktiv ? einstiegWeiter : letzterSchritt ? () => { void speichern(); } : weiter}
             // „Bewerbungen erhalten" statt „Speichern" (Martin 25./26.09.): Der Kunde hat
             // unter der Kostenkarte „Ja" gesagt; der Knopf nennt, was er jetzt bekommt.
             // Rückbau Registry #122: vor dem ersten Speichern wieder „Speichern", „Zurück" als Knopf daneben (Stand 75b8df8).
-            weiterText={letzterSchritt ? (nurAenderung ? 'Änderungen speichern' : stand75b8df8 ? 'Speichern' : 'Bewerbungen erhalten') : 'Weiter →'}
-            zurueckAlsLink={letzterSchritt && !stand75b8df8 ? `Zurück zu Schritt ${step}` : undefined}
+            // Minimal-Einstieg: im letzten Schritt „Bewerbungen erhalten“ (Martin 08.11.: „wozu brauche ich dann Bewerbungen
+            // erhalten? … dann ist es vorbei“, also erst am Ende), davor „Weiter →“.
+            weiterText={letzterSchritt ? (nurAenderung ? 'Änderungen speichern' : stand75b8df8 && !schlicht ? 'Speichern' : 'Bewerbungen erhalten') : 'Weiter →'}
+            zurueckAlsLink={letzterSchritt && !stand75b8df8 && !schlicht ? `Zurück zu Schritt ${step}` : undefined}
             laedt={isSaving}
-            ladeText={nurAenderung || stand75b8df8 ? 'Speichern…' : 'Wird gesendet…'}
-            hinweis={navHinweis && (
+            ladeText={nurAenderung || (stand75b8df8 && !schlicht) ? 'Speichern…' : 'Wird gesendet…'}
+            hinweis={(einstiegAktiv ? einstiegHinweis : navHinweis) && (
               <button
                 type="button"
                 onClick={zumErstenFehler}
                 className="inline-flex min-h-[44px] -my-2.5 items-center px-2 underline decoration-pm-error/40 underline-offset-4"
               >
-                {navHinweis}
+                {einstiegAktiv ? einstiegHinweis : navHinweis}
               </button>
             )}
-          />}
+          />
         </Rahmen>
       )}
       {/* Unter der Karte statt in der mitlaufenden Leiste — dort kostete die

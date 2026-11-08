@@ -6,7 +6,7 @@
 // hohe Kalender am Handy zum großen Teil hinter der 83–117 px hohen Leiste (iPhone SE
 // bei 553 px Höhe 0 von 19 Tagen antippbar, Messung 13.10.), und ein Tipp auf einen
 // verdeckten Tag traf „Zurück“ oder „Weiter“.
-import { createContext, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from './Button';
 
 /** Ereignis an `document`: Ein Feld klappt unter sich etwas auf (detail `true`) bzw. wieder zu
@@ -19,24 +19,6 @@ export const TASTATUR_NACHLAUF_MS = 400;
 export function meldeFeldAufgeklappt(auf: boolean) {
   document.dispatchEvent(new CustomEvent<boolean>(FELD_AUFGEKLAPPT, { detail: auf }));
 }
-
-/** Was ein Knopf außerhalb des Formulars braucht, um „Weiter“ bzw. das Absenden zu übernehmen. */
-export type AussenKnopfStand = {
-  onWeiter: () => void;
-  laedt: boolean;
-  ladeText: string;
-  /** z. B. „Pflegegrad fehlt“; Tippen darauf ruft `zumFehler`. */
-  hinweis: string | null;
-  zumFehler: () => void;
-  /** Kernmessung (Registry #144): Tipp auf den Knopf, auch ohne Klick (pointerup). */
-  getippt: () => void;
-};
-
-/** Minimal-Einstieg (Registry #147, Martin 08.11.: „Ich würde keinen Weiter-Button machen, sondern der Button scrollt einfach
- *  mit runter und bleibt dann unten … am Formular, sodass er weitergeht“): Liegt das Formular in diesem Kontext, zeichnet es
- *  keine eigene Knopfleiste, sondern meldet seinen Stand nach außen (`null` = Formular zu). Der feste Knopf der Seite
- *  übernimmt dann „Weiter“ und das Absenden. */
-export const AussenKnopf = createContext<((stand: AussenKnopfStand | null) => void) | null>(null);
 
 /** `true`, solange die Tastatur offen ist oder ein Feld unter sich etwas aufgeklappt hat: Dann läuft eine Knopfleiste im
  *  Fluss statt unten zu kleben (Begründung im Kopf dieser Datei). */
@@ -75,8 +57,8 @@ export function useKnopfleisteImFluss() {
 export function FormNav({
   onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, zurueckAlsLink, ruhig = false, stand75b8df8 = false, band = false,
 }: {
-  /** Grauer Grund über die ganze Seitenbreite, Knöpfe mit 12 px Rundung (Stil des festen Knopfs im Minimal-Einstieg,
-   *  Registry #147). Sonst unverändert. */
+  /** Minimal-Einstieg (Registry #147): Knopf fest UNTER dem Formular, klebt nie (Martin 08.11.: „den Button dann schon immer
+   *  unter dem Formular lassen und nicht mehr Flugding“), 52 px hoch mit 12 px Rundung wie der feste Knopf darüber. */
   band?: boolean;
   /** Rückbau Registry #122: vor dem ersten Speichern der Hauptknopf wie im Stand 75b8df8 (ohne die
    *  späteren Klassen `px-2 whitespace-nowrap`). Sonst unverändert. */
@@ -101,16 +83,16 @@ export function FormNav({
     // data-knopfleiste: daran misst ein aufgeklapptes Feld, wie viel die Leiste unten verdeckt.
     <div data-knopfleiste="" className={band
       // Karte 16 px + Seitenrand 12 px (unter 375 px 8 px): das Band reicht bis an den Bildschirmrand wie der feste Knopf.
-      ? `${imFluss ? '' : 'sticky bottom-0'} z-10 -mx-7 max-[374px]:-mx-6 px-3 max-[374px]:px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-pm-grund/95 backdrop-blur shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)]`
+      ? 'mt-1 pt-3 pb-4 border-t border-pm-line-soft'
       : `${imFluss ? '' : 'sticky bottom-0'} z-10 ${ruhig ? '-mx-6 px-6' : '-mx-5 px-5'} pt-3.5 pb-[calc(16px+env(safe-area-inset-bottom))] bg-white border-t border-[#EFEBE4] rounded-b-card`}>
       {hinweis && <div className="mb-2.5 text-center text-[13.5px] text-pm-error-ink">{hinweis}</div>}
       <div className={onZurueck && !zurueckAlsLink ? 'grid grid-cols-[auto_1fr] gap-2.5' : ''}>
         {onZurueck && !zurueckAlsLink && (
-          <Button variante="sekundaer" onClick={onZurueck} className={band ? '!min-h-[48px] !rounded-[12px] px-5 font-semibold text-[16px]' : 'px-5 font-semibold text-[16px]'}>
+          <Button variante="sekundaer" onClick={onZurueck} className={band ? '!min-h-[52px] !rounded-[12px] px-5 font-semibold text-[16px]' : 'px-5 font-semibold text-[16px]'}>
             Zurück
           </Button>
         )}
-        <Button data-mess="weiter" onClick={onWeiter} laedt={laedt} ladeText={ladeText} breit className={band ? '!min-h-[48px] !rounded-[12px] text-[16px]' : stand75b8df8 ? undefined : `px-2 whitespace-nowrap${ruhig ? ' !font-semibold' : ''}`}>
+        <Button data-mess="weiter" onClick={onWeiter} laedt={laedt} ladeText={ladeText} breit className={band ? '!min-h-[52px] !rounded-[12px] text-[16px] !font-bold' : stand75b8df8 ? undefined : `px-2 whitespace-nowrap${ruhig ? ' !font-semibold' : ''}`}>
           {weiterText}
         </Button>
       </div>
