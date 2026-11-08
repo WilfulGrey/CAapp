@@ -157,6 +157,9 @@ const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIE
 // Dev-only (Registry #147, Vergleich 08.11.): ?preview=patient&zeile=b zeigt die Pflegekraft-Zeile mit dem Preis unter den
 // Angaben und „Einladen“ mittig rechts; ohne Parameter Preis oben rechts, „Einladen“ darunter.
 const PREVIEW_ZEILE_B = IS_PREVIEW_PATIENT && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('zeile') === 'b';
+// Dev-only (Registry #147, Vergleich 08.11.): ?preview=patient&knopf=2 zeigt den festen Knopf mit dem Titel
+// „Pflegesituation vervollständigen“ statt „Bewerbungen erhalten“.
+const PREVIEW_KNOPF_2 = IS_PREVIEW_PATIENT && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('knopf') === '2';
 
 // PROTOTYP 14.10.2026 — Kontaktbereich im ALTEN Gebucht-Bildschirm (BookedScreen + GebuchtKontakt). NUR in der Vorschau
 // ?preview=gebucht&seite=alt, außerhalb AUS (undefined). Echte Kunden bekommen die Nummer seit Registry #139 auf der neuen
@@ -4198,6 +4201,7 @@ const CustomerPortalPage: FC = () => {
           onVervollstaendigen={zurPflegesituationAus('hauptknopf')}
           onKostenAufgeklappt={() => messen('kosten_aufgeklappt')}
           onFaqGeoeffnet={messeFrage}
+          knopfTitel={PREVIEW_KNOPF_2 ? 'Pflegesituation vervollständigen' : undefined}
         />
       ) : pflegekraefteZuerst ? (
         // Registry #145 (Martin 03.11.2026): vor dem ersten Speichern „Pflegekräfte zuerst" — Preis oben, sofort die

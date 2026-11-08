@@ -41,7 +41,7 @@ describe('Messpunkte in der Vorschau (?preview=patient)', () => {
     // Seit Registry #145 „Pflegekräfte zuerst“: Einladen merkt vor und öffnet „{Name} einladen“ — auch das ohne Meldung.
     // Seit Registry #147 Minimal-Einstieg: dazu „Details“ (klappt die Kosten in der Angebotskarte auf, die Kostenkarte unten
     // entfällt) und der feste Knopf, Profil über die Zeile.
-    await screen.findByRole('button', { name: /^Pflegesituation vervollständigen\s*&\s*Bewerbungen erhalten/ }, { timeout: 5000 });
+    await screen.findByRole('button', { name: /^Bewerbungen erhalten/ }, { timeout: 5000 });
 
     await user.click(screen.getByRole('button', { name: /^Bestpreisgarantie/ }));
     await user.click(within(await screen.findByRole('dialog')).getAllByRole('button', { name: 'Schließen' })[0]);
@@ -49,7 +49,7 @@ describe('Messpunkte in der Vorschau (?preview=patient)', () => {
     await user.click(screen.getByRole('button', { name: 'Was brauche ich zu Hause?' }));
     await user.click(screen.getAllByRole('button', { name: 'Einladen' })[0]);
     await user.click(within(await screen.findByRole('dialog', { name: /einladen$/ })).getByRole('button', { name: 'Später' }));
-    await user.click(screen.getByRole('button', { name: /^Pflegesituation vervollständigen\s*&\s*Bewerbungen erhalten/ }));
+    await user.click(screen.getByRole('button', { name: /^Bewerbungen erhalten/ }));
     await user.click(screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === 'Anna, 58'));
 
     await new Promise((r) => setTimeout(r, 50));

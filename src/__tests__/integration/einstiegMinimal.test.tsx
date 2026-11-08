@@ -2,7 +2,7 @@
 // Minimal-Einstieg vor dem ersten Speichern der Pflegesituation (Registry #147, Entwurf; Martin 07.11.2026 zum Mockup
 // „Minimal“: „Ja, alle drei“).
 //   - Reihenfolge: Kopf mit Testsieger statt „Hilfe“ → „Guten Tag, …“ → Angebotskarte → „Passende Pflegekräfte“ mit Anzahl
-//     als Zeilen → fester Knopf mit rundem Kontakt-Knopf (Anrufen, WhatsApp); darunter Pflegesituation mit Formular, So geht es
+//     als Zeilen → fester Knopf mit Kontakt-Reiter rechts (Panel: Anrufen, WhatsApp); darunter Pflegesituation mit Formular, So geht es
 //     weiter, Fragen, Marta (Fassung „CGA-Stil“, Martin 08.11.)
 //   - Platzhalterzeilen ohne Text, solange die Liste lädt (Hauptknopf steht schon da)
 //   - „Einladen“ in der Zeile = Logik aus #145 (Fenster, Vormerken, nach dem Speichern automatisch einladen)
@@ -82,7 +82,7 @@ const vollerEntwurf = (token: string) => localStorage.setItem(`patient_${token}`
   wunschGeschlecht: 'Weiblich', fuehrerschein: 'Nein',
 }));
 type Meldung = { token?: string; event?: string; metadata?: Record<string, unknown>; notify?: boolean };
-const HAUPTKNOPF = /^Pflegesituation vervollständigen\s*&\s*Bewerbungen erhalten/;
+const HAUPTKNOPF = /^Bewerbungen erhalten/;
 const davor = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 const gescrollt = () => (Element.prototype.scrollIntoView as unknown as { mock: { contexts: Element[] } }).mock.contexts;
 const zeilen = () => [...document.querySelectorAll('[data-pflegekraft-zeile]')] as HTMLElement[];
@@ -141,21 +141,21 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(screen.queryByText('Unsere Empfehlung für Sie')).toBeNull();
     expect(document.querySelector('.rounded-card.cursor-pointer')).toBeNull();
 
-    // Fester Knopf unten (sticky am Ende des ersten Teils) in Martins Wortlaut; rechts daneben der runde Kontakt-Knopf, der nach
-    // kurzer Ruhe aufgeht und „Noch Fragen?“ mit Anrufen und WhatsApp öffnet (statt „Rückruf vereinbaren“, Martin 08.11.).
+    // Fester Knopf unten (Sticky-Anker am Ende des ersten Teils), kurz mit Martins Unterzeile; daran der Kontakt-Reiter wie in
+    // der CG-App: Tipp öffnet das Panel mit Marta, Anrufen und WhatsApp (statt „Rückruf vereinbaren“, Martin 08.11.).
     const haupt = screen.getByRole('button', { name: HAUPTKNOPF });
-    expect(haupt.textContent).toBe('Pflegesituation vervollständigen& Bewerbungen erhalten100% kostenfrei & unverbindlich');
+    expect(haupt.textContent).toBe('Bewerbungen erhalten100% kostenfrei & unverbindlich');
     expect(haupt.className).toContain('bg-pm-coral');
-    const leiste = haupt.closest('[data-fester-knopf]') as HTMLElement;
-    expect(leiste.className).toContain('sticky bottom-0');
+    expect(haupt.closest('[data-fester-knopf-anker]')!.className).toContain('sticky bottom-0');
     expect(screen.queryByText('Rückruf vereinbaren')).toBeNull();
-    const kontaktKnopf = await within(leiste).findByRole('button', { name: /^Noch Fragen\? Marta Kapcio/ }, { timeout: 3000 });
-    await userEvent.setup().click(kontaktKnopf);
-    const fenster = await screen.findByRole('dialog', { name: 'Noch Fragen?' });
-    expect(within(fenster).getByText('Marta Kapcio')).toBeInTheDocument();
-    expect(within(fenster).getByRole('link', { name: /anrufen: 089 200 000 830$/ })).toHaveAttribute('href', 'tel:+4989200000830');
-    expect(within(fenster).getByRole('link', { name: /per WhatsApp schreiben$/ }).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/4989200000830/);
-    await userEvent.setup().click(within(fenster).getAllByRole('button', { name: 'Schließen' })[0]);
+    const reiter = document.querySelector('[data-kontakt-reiter]') as HTMLElement;
+    expect(reiter).toHaveAccessibleName('Marta Kapcio, Ihre Beraterin: anrufen oder schreiben');
+    await userEvent.setup().click(reiter);
+    const panel = await screen.findByRole('dialog', { name: 'Marta Kapcio, Ihre Beraterin' });
+    expect(within(panel).getByText('täglich 8–20 Uhr')).toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: /anrufen: 089 200 000 830$/ })).toHaveAttribute('href', 'tel:+4989200000830');
+    expect(within(panel).getByRole('link', { name: /per WhatsApp schreiben$/ }).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/4989200000830/);
+    await userEvent.setup().click(within(panel).getByRole('button', { name: 'Schließen' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 
     // Darunter: Pflegesituation mit offenem Formular, So geht es weiter, Fragen, Marta. Keine Kostenkarte mehr (ihre

@@ -5,9 +5,10 @@
 // „Einladen“ ist die Logik aus #145 unverändert (CustomerPortalPage: Fenster „{Name} einladen“, Vormerken, nach dem
 // ersten Speichern automatisch einladen).
 //
-// Kontakt: kleiner runder Knopf mit Martas Foto rechts neben dem festen Knopf, der aufgeht, sobald man aufhört zu scrollen
-// (wie der runde Knopf unten rechts in der CG-App); Tipp öffnet die Marta-Zeile des Portals (`MartaZeile`, Anrufen und
-// WhatsApp). Neben dem Knopf statt darüber: so verdeckt er nie Preis oder „Einladen“ einer Pflegekraft. Statt „Rückruf vereinbaren“ (Martin 08.11.: „lieber anrufen
+// Kontakt: Reiter am rechten Rand mit Martas Foto, wie die Ansprechpartnerin in der CG-App (umbrella/.notes/requests/
+// opiekomat-start/makieta-v59.html, `.edge` + `.drawer`): halb eingeschoben, beim Scrollen weiter weg, nach dem Scrollen
+// zurück; Tipp öffnet von rechts ein Panel mit Marta, Anrufen und WhatsApp (Martin 08.11.: „marta muss rechts schön platziert
+// sein - schau in der cg app“). Statt „Rückruf vereinbaren“ (Martin 08.11.: „lieber anrufen
 // oder schreiben?“) und statt einer Marta-Zeile in der Liste („wirkt wie Pflegekraft … dass rechts so ein kleines ding aufgeht
 // wenn wir stoppen und dann kann man das anklicken“).
 //
@@ -21,29 +22,33 @@
 // „wie auf dem ersten Bild“, immer mit Preis vor „Einladen“; der Hauptknopf schmal und fest unten, Wortlaut „Pflegesituation
 // vervollständigen und Bewerbungen erhalten“.
 import { useEffect, useState, type ReactNode } from 'react';
-import { Check, ChevronDown, Info } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Check, ChevronDown, Info, Phone, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { formatEuro, type Lead } from '../../lib/supabase';
 import { eigenanteilAus } from '../../lib/angebotZuschuss';
 import { anzahlText, sternFuellung, type SterneStand } from '../../lib/sterne';
-import { ERREICHBAR } from '../../lib/kontakt';
+import { BERATERIN, ERREICHBAR, TELEFON, TELEFON_HREF, WHATSAPP_HREF } from '../../lib/kontakt';
 import { initials } from './shared';
-import { Sheet } from '../ui/Sheet';
 import { SCHRITTE_STAND_75B8DF8 } from './EinstiegVorSpeichern';
 import { AbschnittPflegesituation, KostenAufstellung, type VorgemerkteKraft } from './EinstiegPflegekraefteZuerst';
 import { FaqListe } from './FaqListe';
-import { MartaBox, MartaZeile } from './MartaBox';
+import { MartaBox } from './MartaBox';
+import { WhatsAppIcon } from './WhatsAppIcon';
 
 // Wortlaut (Martin 08.11.2026, diktiert; Entwurf, Freigabe des Wortlauts offen). Tests prüfen genau diese Texte.
 export const ANGEBOT_TITEL = 'Ihr persönliches Angebot';
-/** Fester Knopf unten, Martins Wortlaut (08.11.: „button muss lauten: Pflegesituation vervollständigen & Bewerbungen
- *  erhalten - darunter: 100% kostenfrei & unverbindlich“). Titel in zwei festen Zeilen. */
-export const FEST_TITEL = ['Pflegesituation vervollständigen', '& Bewerbungen erhalten'] as const;
+/** Fester Knopf unten: eine Zeile Titel, darunter Martins Unterzeile (08.11.: „Pflegesituation vervollständigen &
+ *  Bewerbungen erhalten - darunter: 100% kostenfrei & unverbindlich“, danach „definitiv zu langtextlich“). Kurz der Nutzen;
+ *  „Pflegesituation vervollständigen“ steht als Titel direkt darunter am Formular. Vergleich `?knopf=2` (Vorschau): Titel
+ *  „Pflegesituation vervollständigen“. */
+export const FEST_TITEL = 'Bewerbungen erhalten';
+export const FEST_TITEL_2 = 'Pflegesituation vervollständigen';
 export const FEST_ZEILE = '100% kostenfrei & unverbindlich';
 /** Titel des Abschnitts mit dem Formular (Martin 08.11.: „was soll das heißen: Pflegesituation vervollständigen“). */
 export const FORMULAR_TITEL = 'Pflegesituation vervollständigen';
-/** Titel des Kontakt-Fensters: Wortlaut des Marta-Kastens („Noch Fragen?“). */
-export const LASCHE = 'Noch Fragen?';
+/** Panel der Ansprechpartnerin: Unterzeile wie im Marta-Kasten („Ihre Beraterin“). */
+export const BERATERIN_ROLLE = 'Ihre Beraterin';
 /** Grüner Kasten in der Angebotskarte: vier gleichwertige, kurze Punkte, die Bestpreisgarantie zuerst (Martin: „Ist das
  *  unsere Bestpreisgarantie? Oder ist das nur ein Punkt davon?“ — die anderen drei gehören nicht zur Garantie; „Es gilt
  *  immer unsere Bestpreisgarantie“ mit „Mehr Infos“ darunter war ihm zu kompliziert: „Ich will das clean haben“).
@@ -304,42 +309,84 @@ function Platzhalterzeile() {
 }
 const PLATZHALTER = 5;
 
-// ── Kontakt-Knopf ─────────────────────────────────────────────────────────────────────────────────────────────────────
-// Rechts in der Leiste des festen Knopfs. Während des Scrollens zu (Breite 0), nach 0,7 s Ruhe geht er auf (beim Laden nach
-// 1,2 s); der Hauptknopf wird dabei schmaler, sein Text bricht nicht anders um. Tipp öffnet ein Fenster mit der Marta-Zeile.
-function KontaktKnopf() {
-  const [ruhig, setRuhig] = useState(false);
+// ── Kontakt-Reiter (wie die CG-App) ───────────────────────────────────────────────────────────────────────────────────
+// Reiter: weiße Pille am rechten Rand mit Griff, Foto und grünem Punkt; 20 px eingeschoben, beim Scrollen 44 px, 0,9 s nach
+// dem Scrollen zurück. Tipp öffnet das Panel (von rechts, 86 % breit, Hintergrund abgedunkelt): Foto groß, Name, Rolle,
+// Erreichbarkeit, zwei Kacheln Anrufen und WhatsApp. Wortlaut wie im Marta-Kasten.
+function KontaktReiter({ verborgen }: { verborgen: boolean }) {
+  const [scrollt, setScrollt] = useState(false);
   const [offen, setOffen] = useState(false);
   useEffect(() => {
-    let t = window.setTimeout(() => setRuhig(true), 1200);
+    let t = 0;
     // `capture`: auch das Scrollen im Handyrahmen am Computer (#portal-scroll-container) kommt hier an.
     const beimScrollen = () => {
-      setRuhig(false);
+      setScrollt(true);
       window.clearTimeout(t);
-      t = window.setTimeout(() => setRuhig(true), 700);
+      t = window.setTimeout(() => setScrollt(false), 900);
     };
     document.addEventListener('scroll', beimScrollen, { capture: true, passive: true });
     return () => { window.clearTimeout(t); document.removeEventListener('scroll', beimScrollen, { capture: true }); };
   }, []);
+  useEffect(() => {
+    if (!offen) return;
+    const taste = (e: KeyboardEvent) => { if (e.key === 'Escape') setOffen(false); };
+    document.addEventListener('keydown', taste);
+    return () => document.removeEventListener('keydown', taste);
+  }, [offen]);
+  const weg = verborgen || offen;
   return (
     <>
       <button
         type="button"
         onClick={() => setOffen(true)}
-        aria-label={`${LASCHE} Marta Kapcio anrufen oder schreiben`}
-        aria-hidden={!ruhig || undefined}
-        tabIndex={ruhig ? 0 : -1}
-        className={`${FOKUS} relative flex-none overflow-visible rounded-full transition-[width,margin,opacity] duration-300 motion-reduce:transition-none ${
-          ruhig ? 'ml-2 w-[52px] opacity-100' : 'pointer-events-none ml-0 w-0 opacity-0'
+        aria-label={`${BERATERIN}, ${BERATERIN_ROLLE}: anrufen oder schreiben`}
+        aria-hidden={weg || undefined}
+        tabIndex={weg ? -1 : 0}
+        className={`${FOKUS} absolute right-0 flex items-center gap-1.5 rounded-l-[26px] bg-white/95 py-[5px] pl-2 pr-[7px] shadow-[0_0_0_1px_rgba(28,28,28,.06),0_10px_28px_rgba(28,28,28,.16)] backdrop-blur transition-[transform,opacity] duration-300 motion-reduce:transition-none ${
+          weg ? 'pointer-events-none translate-x-[80px] opacity-0' : scrollt ? 'translate-x-[44px]' : 'translate-x-[20px] hover:translate-x-0'
         }`}
-        data-kontakt-knopf
+        style={{ bottom: 'calc(100% + 150px)' }}
+        data-kontakt-reiter
       >
-        <img src="/marta-kapcio.jpg" alt="" className="h-[52px] w-[52px] max-w-none rounded-full border-2 border-white object-cover object-top shadow-lift" />
-        <span className="absolute bottom-0.5 right-0.5 h-3 w-3 rounded-full border-2 border-white bg-pm-whatsapp" aria-hidden="true" />
+        <span className="h-4 w-[3px] rounded-sm bg-pm-chip" aria-hidden="true" />
+        <span className="relative">
+          <img src="/marta-kapcio.jpg" alt="" className="h-[38px] w-[38px] rounded-full object-cover object-top" />
+          <span className="absolute -bottom-px -right-px h-[11px] w-[11px] rounded-full border-2 border-white bg-pm-green" aria-hidden="true" />
+        </span>
       </button>
-      <Sheet offen={offen} titel={LASCHE} onClose={() => setOffen(false)}>
-        <MartaZeile eng unterzeile={<>Ihre Beraterin · {ERREICHBAR}</>} />
-      </Sheet>
+      {/* Portal an <body>: Das Band hat `backdrop-blur`/`transform`, darin wäre `fixed` am Band statt am Bildschirm. */}
+      {offen && createPortal(
+        <div className="fixed inset-0 z-50 font-pm" role="dialog" aria-modal="true" aria-label={`${BERATERIN}, ${BERATERIN_ROLLE}`} data-kontakt-panel>
+          <div className="absolute inset-0 bg-[rgba(15,8,22,.38)]" onClick={() => setOffen(false)} />
+          <aside className="absolute inset-y-0 right-0 flex w-[86%] max-w-[380px] flex-col overflow-y-auto rounded-l-[30px] bg-pm-grund px-5 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[max(20px,env(safe-area-inset-top))] shadow-[-24px_0_60px_rgba(15,8,22,.22)]">
+            <div className="flex justify-end">
+              <button type="button" onClick={() => setOffen(false)} aria-label="Schließen" className={`${FOKUS} flex h-10 w-10 items-center justify-center rounded-full bg-white text-pm-ink`}>
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="mt-2 flex flex-col items-center text-center">
+              <img src="/marta-kapcio.jpg" alt="" className="h-[88px] w-[88px] rounded-full object-cover object-top shadow-[0_0_0_4px_#fff,0_10px_26px_rgba(28,28,28,.18)]" />
+              <p className="mt-4 text-[21px] font-semibold leading-tight tracking-[-0.02em] text-pm-ink">{BERATERIN}</p>
+              <p className="mt-0.5 text-[15px] text-pm-muted">{BERATERIN_ROLLE}</p>
+              <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-pm-mint px-3 py-1 text-[13.5px] font-medium text-pm-green-deep">
+                <span className="h-2 w-2 rounded-full bg-pm-green" aria-hidden="true" />{ERREICHBAR}
+              </span>
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-2">
+              <a href={TELEFON_HREF} aria-label={`${BERATERIN} anrufen: ${TELEFON}`} className={`${FOKUS} flex flex-col items-center gap-2 rounded-[18px] bg-white px-2 py-3.5 text-[14px] font-medium text-pm-ink shadow-[0_0_0_1px_rgba(28,28,28,.05)]`}>
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-pm-green text-white"><Phone className="h-5 w-5" aria-hidden="true" /></span>
+                Anrufen
+              </a>
+              <a href={WHATSAPP_HREF} target="_blank" rel="noreferrer" aria-label={`${BERATERIN} per WhatsApp schreiben`} className={`${FOKUS} flex flex-col items-center gap-2 rounded-[18px] bg-white px-2 py-3.5 text-[14px] font-medium text-pm-ink shadow-[0_0_0_1px_rgba(28,28,28,.05)]`}>
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-pm-whatsapp text-white"><WhatsAppIcon className="h-[22px] w-[22px]" /></span>
+                WhatsApp
+              </a>
+            </div>
+            <p className="mt-4 text-center text-[14px] text-pm-muted">{TELEFON}</p>
+          </aside>
+        </div>,
+        document.body,
+      )}
     </>
   );
 }
@@ -382,7 +429,7 @@ function AblaufMinimal() {
 export function EinstiegMinimal({
   anrede, lead, onBestpreis, heimEigenanteil, heimQuelle,
   laedt, zeilen, gehalteneEinladungen, vorschlaegeVorhanden, bereitsBearbeitet, formular, sterne, vorgemerkte,
-  onVervollstaendigen, onKostenAufgeklappt, onFaqGeoeffnet,
+  onVervollstaendigen, onKostenAufgeklappt, onFaqGeoeffnet, knopfTitel = FEST_TITEL,
 }: {
   /** Anrede für „Guten Tag, …“ (customerSalutation), ohne Anrede nur „Guten Tag“. */
   anrede: string | null;
@@ -405,7 +452,20 @@ export function EinstiegMinimal({
   onVervollstaendigen: () => void;
   onKostenAufgeklappt?: () => void;
   onFaqGeoeffnet?: (schluessel: string) => void;
+  /** Titel des festen Knopfs (Vorschau-Vergleich `?knopf=2`). */
+  knopfTitel?: string;
 }) {
+  // Formular „Pflegesituation“ in den oberen drei Vierteln des Bildes (oder schon darüber) → fester Knopf und Reiter weg.
+  const [formularImBild, setFormularImBild] = useState(false);
+  useEffect(() => {
+    const ziel = document.getElementById('patientendaten');
+    if (!ziel || typeof IntersectionObserver === 'undefined') return;
+    const beobachter = new IntersectionObserver(([e]) => {
+      setFormularImBild(e.isIntersecting || e.boundingClientRect.top < 0);
+    }, { rootMargin: '0px 0px -25% 0px' });
+    beobachter.observe(ziel);
+    return () => beobachter.disconnect();
+  }, []);
   const anzahl = zeilen.length;
   const leer = !laedt && anzahl === 0;
   const hinweis = (titel: string, text: string) => (
@@ -415,7 +475,9 @@ export function EinstiegMinimal({
     </div>
   );
   return (
-    <div className="bg-pm-grund" data-einstieg="minimal">
+    // `overflow-x-clip` (kein Scrollbereich, sticky bleibt): der halb eingeschobene Kontakt-Reiter ragt über den rechten
+    // Rand und darf keinen Querscroll erzeugen.
+    <div className="bg-pm-grund overflow-x-clip" data-einstieg="minimal">
       {/* Erster Teil: Gruß mit Sternen, Angebotskarte, Pflegekräfte, Rückruf und Nummer; der feste Knopf hängt am Ende dieses
           Teils und bleibt bis dorthin unten am Bildschirm stehen (sticky, ohne Skript: auch im Handyrahmen am Computer). */}
       {/* Seitenrand 12 px, unter 375 px 8 px (Android 360: mehr Platz für die Zeilen). */}
@@ -451,23 +513,27 @@ export function EinstiegMinimal({
           </section>
         )}
 
-        {/* Fester schmaler Knopf (Martin 08.11.: „den wir festmachen unten“). Sticky am Ende des ersten Teils: steht beim
-            Laden unten am Bildschirm, scrollt man bis hierher, bleibt er hier liegen und das Formular darunter ist frei. */}
-        <div
-          className="sticky bottom-0 z-20 -mx-3 max-[374px]:-mx-2 mt-3 bg-pm-grund/95 px-3 max-[374px]:px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)] backdrop-blur"
-          data-fester-knopf
-        >
-          <div className="flex items-center">
-          <button
-            type="button"
-            onClick={onVervollstaendigen}
-            className={`${FOKUS} block min-w-0 flex-1 rounded-[12px] bg-pm-coral px-3 py-2 text-center text-[15px] max-[374px]:text-[14px] font-bold leading-5 text-white transition-colors hover:bg-pm-coral-deep active:scale-[0.99]`}
+        {/* Fester Knopf (Martin 08.11.: „den wir festmachen unten“): Sticky-Anker ohne Höhe am Ende des ersten Teils, das
+            Band hängt nach oben daran. Sobald das Formular in den oberen drei Vierteln des Bildes steht, fährt es nach unten weg
+            (Martin: „Weiter, auch in der gleichen Farbe, sieht irgendwie komisch aus“ — zwei Koralle-Knöpfe übereinander). */}
+        <div className="sticky bottom-0 z-20 h-0" data-fester-knopf-anker>
+          <div
+            className={`absolute bottom-0 -left-3 -right-3 max-[374px]:-left-2 max-[374px]:-right-2 bg-pm-grund/95 px-3 max-[374px]:px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)] backdrop-blur transition-[transform,opacity] duration-300 motion-reduce:transition-none ${
+              formularImBild ? 'pointer-events-none translate-y-full opacity-0' : ''
+            }`}
+            aria-hidden={formularImBild || undefined}
+            data-fester-knopf
           >
-            <span className="block">{FEST_TITEL[0]}</span>
-            <span className="block">{FEST_TITEL[1]}</span>
-            <span className="mt-0.5 block text-[12px] font-medium leading-4 opacity-90">{FEST_ZEILE}</span>
-          </button>
-          <KontaktKnopf />
+            <button
+              type="button"
+              onClick={onVervollstaendigen}
+              tabIndex={formularImBild ? -1 : 0}
+              className={`${FOKUS} block w-full rounded-[12px] bg-pm-coral px-4 py-2.5 text-center text-white transition-colors hover:bg-pm-coral-deep active:scale-[0.99]`}
+            >
+              <span className="block text-[16px] font-bold leading-5">{knopfTitel}</span>
+              <span className="mt-0.5 block text-[12.5px] font-medium leading-4 opacity-90">{FEST_ZEILE}</span>
+            </button>
+            <KontaktReiter verborgen={formularImBild} />
           </div>
         </div>
       </div>
