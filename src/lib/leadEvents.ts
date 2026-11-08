@@ -55,6 +55,9 @@ export const MESSPUNKTE = [
   'portal_fehler',            // JS-Fehler {art, name, text} (ohne Werte, fehlerKurz)
   'portal_ladefehler',        // Laden gescheitert {quelle}
   'pflegekraefte_geladen',    // erste Liste {anzahl, dauer_ms, vor_speichern}
+  // Pflegekräfte zuerst (Registry #145, Martin 03.11.): Vormerken vor dem Speichern, Einladen danach.
+  'einladung_vorgemerkt',     // „Einladen" vor dem Speichern → Pflegekraft vorgemerkt {caregiver_id}, je Pflegekraft einmal
+  'einladung_nach_speichern', // nach dem ersten Speichern automatisch eingeladen {anzahl: versucht, ok: davon eingeladen}
 ] as const;
 export type Messpunkt = typeof MESSPUNKTE[number];
 
@@ -65,7 +68,11 @@ export type EinladenQuelle = 'karte' | 'interesse' | 'profil';
 /** Welcher Weg ins Formular führte (Registry #132): Kasten über den Pflegekräften, Pop-up „Warum erst die
  *  Pflegesituation?", Karte einer Pflegekraft, „So geht es weiter", schwebende Frage, Mail-Link `goto=anfragen`,
  *  „Stand heute" nach dem Absenden. */
-export type FormularQuelle = 'kasten' | 'warum' | 'karte' | 'schritte' | 'frage' | 'mail' | 'stand';
+export type FormularQuelle = 'kasten' | 'warum' | 'karte' | 'schritte' | 'frage' | 'mail' | 'stand'
+  // Registry #145: Knopf im Fenster „{Name} einladen" (Pflegekräfte zuerst).
+  | 'einladen_fenster'
+  // Registry #147: Hauptknopf „Angaben vervollständigen und Bewerbungen erhalten" im ersten Bild (Minimal-Einstieg).
+  | 'hauptknopf';
 
 // Mini-Snapshot der Nurse-Daten, die wir brauchen um eine declined-from-
 // Interest Pflegekraft im bearbeitet-Bereich als virtuelle MatchCard zu
@@ -172,6 +179,8 @@ export interface LeadEventMetadata {
   text?: string;
   quelle_laden?: 'lead' | 'sitzung' | 'abgelaufen' | 'kunde' | 'pflegekraefte';
   anzahl?: number;
+  // einladung_nach_speichern (Registry #145): wie viele der versuchten Einladungen angekommen sind (Zahl, kein Name).
+  ok?: number;
 }
 
 // Session-level dedupe so a re-render or repeated save doesn't spam the
@@ -240,6 +249,8 @@ function dedupeKey(token: string, event: LeadEvent, metadata?: LeadEventMetadata
   if (event === 'portal_verlassen') return `${token}:${event}:${metadata?.art ?? ''}:${metadata?.schritt ?? ''}:${metadata?.formular_offen ? 1 : 0}`;
   if (event === 'portal_fehler') return `${token}:${event}:${metadata?.art ?? ''}:${metadata?.name ?? ''}:${metadata?.text ?? ''}`;
   if (event === 'portal_ladefehler') return `${token}:${event}:${metadata?.quelle_laden ?? ''}`;
+  // Pflegekräfte zuerst (Registry #145): Vormerken je Pflegekraft einmal; das Einladen nach dem Speichern einmal je Sitzung.
+  if (event === 'einladung_vorgemerkt') return `${token}:${event}:${metadata?.caregiver_id ?? ''}`;
   return `${token}:${event}`;
 }
 

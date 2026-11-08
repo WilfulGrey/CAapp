@@ -20,26 +20,9 @@ export function meldeFeldAufgeklappt(auf: boolean) {
   document.dispatchEvent(new CustomEvent<boolean>(FELD_AUFGEKLAPPT, { detail: auf }));
 }
 
-export function FormNav({
-  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, zurueckAlsLink, ruhig = false, stand75b8df8 = false,
-}: {
-  /** Rückbau Registry #122: vor dem ersten Speichern der Hauptknopf wie im Stand 75b8df8 (ohne die
-   *  späteren Klassen `px-2 whitespace-nowrap`). Sonst unverändert. */
-  stand75b8df8?: boolean;
-  /** Kompakt-Einstieg (Runde 15): im Hinweis-Kasten mit 24 px Innenabstand — Leiste bündig bis an den
-   *  Rand (-mx-6), Hauptknopf in 600 wie alle Knöpfe dort. Sonst unverändert. */
-  ruhig?: boolean;
-  onZurueck?: () => void;
-  /** Letzter Schritt: Hauptknopf allein über die volle Breite, „Zurück" als Textlink
-   *  darunter (Martin 25.09.: „Bewerbungen anfragen" passte neben „Zurück" nicht). */
-  zurueckAlsLink?: string;
-  onWeiter: () => void;
-  weiterText: string;
-  laedt?: boolean;
-  ladeText?: string;
-  /** z. B. „Pflegegrad fehlt" — Tippen darauf springt zum Feld (Aufrufer) */
-  hinweis?: ReactNode;
-}) {
+/** `true`, solange die Tastatur offen ist oder ein Feld unter sich etwas aufgeklappt hat: Dann läuft eine Knopfleiste im
+ *  Fluss statt unten zu kleben (Begründung im Kopf dieser Datei). */
+export function useKnopfleisteImFluss() {
   const [tastatur, setTastatur] = useState(false);
   useEffect(() => {
     const istEingabe = (el: EventTarget | null) =>
@@ -68,19 +51,48 @@ export function FormNav({
     document.addEventListener(FELD_AUFGEKLAPPT, melden);
     return () => document.removeEventListener(FELD_AUFGEKLAPPT, melden);
   }, []);
-  const imFluss = tastatur || aufgeklappt > 0;
+  return tastatur || aufgeklappt > 0;
+}
+
+export function FormNav({
+  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, zurueckAlsLink, ruhig = false, stand75b8df8 = false, band = false,
+}: {
+  /** Minimal-Einstieg (Registry #147): Knopf fest UNTER dem Formular, klebt nie (Martin 08.11.: „den Button dann schon immer
+   *  unter dem Formular lassen und nicht mehr Flugding“), 52 px hoch mit 12 px Rundung wie der feste Knopf darüber. */
+  band?: boolean;
+  /** Rückbau Registry #122: vor dem ersten Speichern der Hauptknopf wie im Stand 75b8df8 (ohne die
+   *  späteren Klassen `px-2 whitespace-nowrap`). Sonst unverändert. */
+  stand75b8df8?: boolean;
+  /** Kompakt-Einstieg (Runde 15): im Hinweis-Kasten mit 24 px Innenabstand — Leiste bündig bis an den
+   *  Rand (-mx-6), Hauptknopf in 600 wie alle Knöpfe dort. Sonst unverändert. */
+  ruhig?: boolean;
+  onZurueck?: () => void;
+  /** Letzter Schritt: Hauptknopf allein über die volle Breite, „Zurück" als Textlink
+   *  darunter (Martin 25.09.: „Bewerbungen anfragen" passte neben „Zurück" nicht). */
+  zurueckAlsLink?: string;
+  onWeiter: () => void;
+  weiterText: string;
+  laedt?: boolean;
+  ladeText?: string;
+  /** z. B. „Pflegegrad fehlt" — Tippen darauf springt zum Feld (Aufrufer) */
+  hinweis?: ReactNode;
+}) {
+  const imFluss = useKnopfleisteImFluss();
 
   return (
     // data-knopfleiste: daran misst ein aufgeklapptes Feld, wie viel die Leiste unten verdeckt.
-    <div data-knopfleiste="" className={`${imFluss ? '' : 'sticky bottom-0'} z-10 ${ruhig ? '-mx-6 px-6' : '-mx-5 px-5'} pt-3.5 pb-[calc(16px+env(safe-area-inset-bottom))] bg-white border-t border-[#EFEBE4] rounded-b-card`}>
+    <div data-knopfleiste="" className={band
+      // Karte 16 px + Seitenrand 12 px (unter 375 px 8 px): das Band reicht bis an den Bildschirmrand wie der feste Knopf.
+      ? 'mt-1 pt-3 pb-4 border-t border-pm-line-soft'
+      : `${imFluss ? '' : 'sticky bottom-0'} z-10 ${ruhig ? '-mx-6 px-6' : '-mx-5 px-5'} pt-3.5 pb-[calc(16px+env(safe-area-inset-bottom))] bg-white border-t border-[#EFEBE4] rounded-b-card`}>
       {hinweis && <div className="mb-2.5 text-center text-[13.5px] text-pm-error-ink">{hinweis}</div>}
       <div className={onZurueck && !zurueckAlsLink ? 'grid grid-cols-[auto_1fr] gap-2.5' : ''}>
         {onZurueck && !zurueckAlsLink && (
-          <Button variante="sekundaer" onClick={onZurueck} className="px-5 font-semibold text-[16px]">
+          <Button variante="sekundaer" onClick={onZurueck} className={band ? '!min-h-[52px] !rounded-[12px] px-5 font-semibold text-[16px]' : 'px-5 font-semibold text-[16px]'}>
             Zurück
           </Button>
         )}
-        <Button data-mess="weiter" onClick={onWeiter} laedt={laedt} ladeText={ladeText} breit className={stand75b8df8 ? undefined : `px-2 whitespace-nowrap${ruhig ? ' !font-semibold' : ''}`}>
+        <Button data-mess="weiter" onClick={onWeiter} laedt={laedt} ladeText={ladeText} breit className={band ? '!min-h-[52px] !rounded-[12px] text-[16px] !font-bold' : stand75b8df8 ? undefined : `px-2 whitespace-nowrap${ruhig ? ' !font-semibold' : ''}`}>
           {weiterText}
         </Button>
       </div>

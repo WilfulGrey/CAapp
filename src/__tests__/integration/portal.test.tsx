@@ -324,12 +324,11 @@ describe('Portal integration: golden paths', () => {
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
 
-    // Rückbau Registry #122 (Stand 75b8df8): Das Formular steht vor dem Speichern offen auf der Seite, der letzte
-    // Knopf heißt „Speichern".
+    // Minimal-Einstieg (Registry #147): Knopf unter dem Formular, „Weiter →“ und im letzten Schritt „Bewerbungen erhalten“.
     for (let i = 0; i < 3; i++) {
       await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
     }
-    await user.click(await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 }));
+    await user.click(await screen.findByRole('button', { name: /^Bewerbungen erhalten$/ }, { timeout: 5000 }));
     expect(await screen.findByText('Ihre Suche läuft', {}, { timeout: 5000 })).toBeInTheDocument();
 
     // Fassung 33: Angaben im Bereich „Angebot und Pflegesituation" öffnen und eine Angabe ändern.
@@ -442,10 +441,12 @@ describe('Portal integration: golden paths', () => {
 
   // ─── Startseiten-Punkte + Sprunglink goto=anfragen (Martin 26.09.) ───────
 
-  it('vor dem Speichern (Rückbau Registry #122): Kostenkarte mit den vier Haken aus Stand 75b8df8, nicht den Startseiten-Punkten', async () => {
+  // Seit Registry #145 steht der Stand 75b8df8 hinter `?einstieg=alt`; die vier Punkte der neuen Kostenkarte (2×2) prüft
+  // integration/pflegekraefteZuerst.test.tsx.
+  it('vor dem Speichern (Rückbau Registry #122, ?einstieg=alt): Kostenkarte mit den vier Haken aus Stand 75b8df8, nicht den Startseiten-Punkten', async () => {
     server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
     localStorage.removeItem(`patient_${TEST_LEAD_TOKEN}`);
-    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    setLocation(`?token=${TEST_LEAD_TOKEN}&einstieg=alt`);
     render(<CustomerPortalPage />);
     expect(await screen.findByText('Erst auswählen, dann buchen', {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText('Täglich kündbar')).toBeInTheDocument();
@@ -473,8 +474,9 @@ describe('Portal integration: golden paths', () => {
       render(<CustomerPortalPage />);
       await waitFor(() => expect(gescrollt()).toContain('patientendaten'), { timeout: 5000 });
       expect(laedtBeimSprung).toEqual([false]);
-      // Stand 75b8df8: Abschnittskopf „Pflegesituation · Unvollständig", das Formular steht offen darunter.
-      expect(screen.getByRole('heading', { level: 2, name: 'Pflegesituation' })).toBeInTheDocument();
+      // Abschnittskopf „Pflegesituation · Unvollständig", das Formular steht offen darunter (im Minimal-Einstieg, Registry #147,
+      // heißt der Titel „Pflegesituation vervollständigen“).
+      expect(screen.getByRole('heading', { level: 2, name: /^Pflegesituation( vervollständigen)?$/ })).toBeInTheDocument();
       expect(await screen.findByText(/Schritt 1 von 4/, {}, { timeout: 5000 })).toBeInTheDocument();
       // … und gesprungen wird genau einmal.
       await new Promise((r) => setTimeout(r, 300));
@@ -643,14 +645,12 @@ describe('Portal integration: golden paths', () => {
     render(<CustomerPortalPage />);
 
     // Durch die vier Schritte — der Entwurf ist vollständig, also lässt jeder
-    // „Weiter" durch; der Einsatzort fällt erst beim Speichern auf.
-    // Rückbau Registry #122: Das Formular steht vor dem Speichern offen, der letzte Knopf heißt „Speichern".
+    // Tipp durch; der Einsatzort fällt erst beim Absenden auf.
+    // Minimal-Einstieg (Registry #147): Knopf unter dem Formular, „Weiter →“ und im letzten Schritt „Bewerbungen erhalten“.
     for (let i = 0; i < 3; i++) {
-      const weiter = await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 });
-      await user.click(weiter);
+      await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
     }
-    const speichern = await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 });
-    await user.click(speichern);
+    await user.click(await screen.findByRole('button', { name: /^Bewerbungen erhalten$/ }, { timeout: 5000 }));
 
     // Der Kunde bekommt den Satz zu sehen — und zwar auf Schritt 3, wo das Feld
     // steht, nicht auf Schritt 4, wo er geklickt hat.
@@ -681,13 +681,14 @@ describe('Einstieg vor dem ersten Speichern wie Stand 75b8df8 (Rückbau Registry
   const text = (el: Element) => (el.textContent ?? '').replace(/ /g, ' ');
   const gescrollt = () => (Element.prototype.scrollIntoView as unknown as { mock: { contexts: Element[] } }).mock.contexts.map((e) => e.id);
 
-  it('Kopf wie heute (Sterne ohne Link), Kostenkarte, „Passende Pflegekräfte“ mit dem Kasten „Noch 2 Minuten bis zu Ihren Bewerbungen“, Karten mit „Einladen“ + Schloss, offenes Formular, „So geht es weiter“ und Marta wie damals, Häufige Fragen wie heute', async () => {
+  // Seit Registry #145 nur noch hinter `?einstieg=alt` (Rückweg und Vorher-Vergleich).
+  it('?einstieg=alt: Kopf wie heute (Sterne ohne Link), Kostenkarte, „Passende Pflegekräfte“ mit dem Kasten „Noch 2 Minuten bis zu Ihren Bewerbungen“, Karten mit „Einladen“ + Schloss, offenes Formular, „So geht es weiter“ und Marta wie damals, Häufige Fragen wie heute', async () => {
     server.use(
       ...ohneBewerbung(),
       http.get('https://primundus.de/api/bewertungen-stand', () => HttpResponse.json({ schnitt: '4,9', wert: 4.9, anzahl: 126 })),
     );
     localStorage.removeItem(`patient_${TEST_LEAD_TOKEN}`);
-    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    setLocation(`?token=${TEST_LEAD_TOKEN}&einstieg=alt`);
     render(<CustomerPortalPage />);
     // Kopf wie im Kompakt-Einstieg: Initialen, „Guten Tag, …“, „Ihr persönlicher Bereich“, Titel, Sternezeile.
     const h1 = await screen.findByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' }, { timeout: 5000 });
@@ -789,7 +790,8 @@ describe('Einstieg vor dem ersten Speichern wie Stand 75b8df8 (Rückbau Registry
       wohnungstyp: 'Einfamilienhaus', urbanisierung: 'Großstadt', startDate: '2099-12-01',
       wunschGeschlecht: 'Weiblich', fuehrerschein: 'Nein',
     }));
-    setLocation('?token=token-rueckbau');
+    // Stand 75b8df8 mit eigener Knopfleiste nur noch hinter `?einstieg=alt` (Standard ist seit #147 der Minimal-Einstieg).
+    setLocation('?token=token-rueckbau&einstieg=alt');
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     expect(await screen.findByText(/Schritt 1 von 4/, {}, { timeout: 5000 })).toBeInTheDocument();
@@ -823,12 +825,12 @@ describe('Einstieg vor dem ersten Speichern wie Stand 75b8df8 (Rückbau Registry
     expect(screen.queryAllByRole('button', { name: 'Einladen' }).some((b) => b.querySelector('svg.lucide-lock'))).toBe(false);
   }, 20_000);
 
-  it('„Einladen“ mit Schloss, „Warum? Mehr“ und „Einladen“ im Profil öffnen „Warum erst die Pflegesituation?“ — keine Einladung; der Knopf darin springt zum Formular', async () => {
+  it('?einstieg=alt: „Einladen“ mit Schloss, „Warum? Mehr“ und „Einladen“ im Profil öffnen „Warum erst die Pflegesituation?“ — keine Einladung; der Knopf darin springt zum Formular', async () => {
     (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
     let einladungen = 0;
     server.use(...ohneBewerbung({ inviteCaregiver: () => { einladungen += 1; return { SendInvitationCaregiver: true }; } }));
     localStorage.removeItem(`patient_${TEST_LEAD_TOKEN}`);
-    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    setLocation(`?token=${TEST_LEAD_TOKEN}&einstieg=alt`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
 

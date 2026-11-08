@@ -27,6 +27,8 @@ export default {
           mute: '#8B8B8B',
           taupe: { DEFAULT: '#8B7355', light: '#A89279', deep: '#7D6E5D', ink: '#6B5A44' },
           paper: '#F8F7F5',
+          // Seitengrund hinter weißen Karten (Minimal-Einstieg #147, Stil des CGA-Panels, Martin 08.11.2026)
+          grund: '#F2F1EE',
           shell: '#F2EDE6',
           line: { DEFAULT: '#E5E3DF', soft: '#F0EDE8' },
           chip: '#DDD5C8',

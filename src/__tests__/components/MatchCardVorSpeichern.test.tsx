@@ -72,4 +72,38 @@ describe('MatchCardVorSpeichern – Stand 75b8df8', () => {
     await userEvent.click(knopf);
     expect(onInviteConfirm).toHaveBeenCalledTimes(1);
   });
+
+  // Registry #145 (Pflegekräfte zuerst): vor dem Speichern „Einladen“ aktiv wie nach dem Speichern, ohne Schloss; der Tipp
+  // geht weiter nur an `onInvite` (das Portal öffnet „{Name} einladen“ und merkt vor). Vorgemerkt → „Vorgemerkt ✓“.
+  it('einladenAktiv: Koralle-„Einladen“ ohne Schloss, mind. 44 px; Tipp nur an onInvite, keine Einladung', async () => {
+    const onInvite = vi.fn(() => false);
+    const onInviteConfirm = vi.fn(async () => {});
+    render(<MatchCardVorSpeichern nurse={nurse} status="pending" profilFehlt einladenAktiv onNurseClick={() => {}} onInvite={onInvite} onInviteConfirm={onInviteConfirm} />);
+    const knopf = screen.getByRole('button', { name: 'Einladen' });
+    expect(knopf.querySelector('.lucide-lock')).toBeNull();
+    expect(knopf.querySelector('.lucide-user-plus')).not.toBeNull();
+    expect(knopf.className).toContain('bg-pm-coral');
+    expect(knopf.className).toContain('min-h-[44px]');
+    await userEvent.click(knopf);
+    expect(onInvite).toHaveBeenCalledTimes(1);
+    expect(onInviteConfirm).not.toHaveBeenCalled();
+  });
+
+  it('vorgemerkt: „Vorgemerkt ✓“ statt „Einladen“, tippbar (öffnet über onInvite das Fenster erneut), öffnet kein Profil', async () => {
+    const onInvite = vi.fn(() => false);
+    const onNurseClick = vi.fn();
+    render(<MatchCardVorSpeichern nurse={nurse} status="pending" profilFehlt einladenAktiv vorgemerkt onNurseClick={onNurseClick} onInvite={onInvite} />);
+    expect(screen.queryByRole('button', { name: 'Einladen' })).toBeNull();
+    const knopf = screen.getByRole('button', { name: 'Vorgemerkt ✓' });
+    expect(knopf.className).toContain('min-h-[44px]');
+    await userEvent.click(knopf);
+    expect(onInvite).toHaveBeenCalledTimes(1);
+    expect(onNurseClick).not.toHaveBeenCalled();
+  });
+
+  it('ohne einladenAktiv (Rückweg ?einstieg=alt) zählt `vorgemerkt` nicht: Schloss wie bisher', () => {
+    render(<MatchCardVorSpeichern nurse={nurse} status="pending" profilFehlt vorgemerkt onNurseClick={() => {}} onInvite={() => false} />);
+    expect(screen.getByRole('button', { name: 'Einladen' }).querySelector('.lucide-lock')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Vorgemerkt ✓' })).toBeNull();
+  });
 });

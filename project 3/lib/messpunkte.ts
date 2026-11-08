@@ -22,7 +22,7 @@
 //   formular_sichtbar       { schritt, vor_speichern }   erstes Feld des Patientenbogens zur Hälfte im Bild (Registry #132)
 //   feld_beruehrt           { schritt, feld, vor_speichern }   Feld auf Seite 1 oder 3 angetippt; `feld` = data-field-Schlüssel
 //   weiter_blockiert        { schritt, offen, vor_speichern }  „Weiter“/„Speichern“ mit offenen Pflichtfeldern (Schlüssel)
-//   zur_pflegesituation     { quelle: kasten|warum|karte|schritte|frage|mail|stand, vor_speichern }  Knopf ins Formular
+//   zur_pflegesituation     { quelle: kasten|warum|karte|schritte|frage|mail|stand|einladen_fenster|hauptknopf, vor_speichern }  Knopf ins Formular
 // Kernmessung (Registry #144, Martin 02.11.2026): zeigt, ob Kunden nicht tippen oder etwas bricht. Nur Klassen und Schlüssel.
 //   weiter_getippt          { schritt, tipp, vor_speichern }   Tipp auf „Weiter“/„Speichern“, vor jeder Prüfung; tipp = 1…5 je Schritt
 //   knopf_im_bild           { schritt, vor_speichern }         „Weiter“/„Speichern“ zur Hälfte im Bild
@@ -34,6 +34,12 @@
 //   portal_fehler           { art, name, text }                JS-Fehler; text ohne Adressen, Zahlen, Zitate (fehlerKurz)
 //   portal_ladefehler       { quelle_laden }                   lead|sitzung|abgelaufen|kunde|pflegekraefte
 //   pflegekraefte_geladen   { anzahl, dauer_ms, vor_speichern } erste Liste, dauer_ms ab Seitenstart
+// Pflegekräfte zuerst (Registry #145, Martin 03.11.2026): Vormerken vor dem Speichern, automatisches Einladen danach.
+//   einladung_vorgemerkt    { caregiver_id }                   „Einladen“ vor dem Speichern, Pflegekraft vorgemerkt
+//   einladung_nach_speichern { anzahl, ok }                     nach dem ersten Speichern: versucht / davon eingeladen
+// `zur_pflegesituation` kennt dazu die Quelle `einladen_fenster` (Knopf im Fenster „{Name} einladen“).
+// Minimal-Einstieg (Registry #147, Entwurf 07.11.2026): `zur_pflegesituation` mit Quelle `hauptknopf` (Knopf „Angaben
+// vervollständigen und Bewerbungen erhalten“ im ersten Bild). Kein neuer Messpunkt.
 // `portal_reopened` trägt zusätzlich geraet, browser, in_app, hoehe (Klassen, src/lib/messWerte.ts).
 // `vor_speichern` = die Pflegesituation wurde noch nie gespeichert (Portal: !patientSaved && !schonAbgesendet).
 export const MESSPUNKTE = [
@@ -59,6 +65,8 @@ export const MESSPUNKTE = [
   'portal_fehler',
   'portal_ladefehler',
   'pflegekraefte_geladen',
+  'einladung_vorgemerkt',
+  'einladung_nach_speichern',
 ] as const;
 
 export type Messpunkt = typeof MESSPUNKTE[number];

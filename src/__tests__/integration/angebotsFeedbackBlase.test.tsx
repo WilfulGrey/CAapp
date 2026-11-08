@@ -8,6 +8,10 @@
 // Rückbau Registry #122 (10.10.2026): Vor dem ersten Speichern zeigt das Portal wieder den Stand 75b8df8 — und dort war
 // die Frage wegen genau dieses Fehlers bei echten Kunden nie sichtbar. Damit Kunden erleben, was sie damals erlebt haben,
 // erscheint sie im Rückbau nicht. Mit `?einstieg=kompakt` (Kompakt-Einstieg #780, Vergleich/Rückweg) weiter wie bisher.
+// Registry #145 (03.11.2026): Ohne Schalter steht vor dem Speichern „Pflegekräfte zuerst“ — auch dort keine Frage; der
+// bisherige Stand 75b8df8 ist der Rückweg `?einstieg=alt`.
+// Registry #147 (07.11.2026, Entwurf): Ohne Schalter der Minimal-Einstieg, „Pflegekräfte zuerst“ hinter `?einstieg=zuerst`
+// — in beiden keine Frage.
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { server } from '../../../test/mocks/server';
@@ -58,7 +62,9 @@ describe('Schwebende Frage „Was sagen Sie zum Angebot?“ bei echten Kunden', 
   it.each([
     ['Kompakt-Einstieg per ?einstieg=kompakt', '&einstieg=kompakt', true],
     ['Kompakt-Einstieg im Angebots-Look (Fassung 30)', '&einstieg=kompakt&look=angebot', true],
-    ['Rückbau vor dem Speichern (Stand 75b8df8, Registry #122)', '', false],
+    ['Rückbau vor dem Speichern (Stand 75b8df8, Registry #122) per ?einstieg=alt', '&einstieg=alt', false],
+    ['Pflegekräfte zuerst vor dem Speichern (Registry #145) per ?einstieg=zuerst', '&einstieg=zuerst', false],
+    ['Minimal-Einstieg vor dem Speichern (Registry #147)', '', false],
   ] as const)('%s: der Beobachter hängt am Abschnitt Pflegesituation, sobald er nach dem Laden dasteht; nach 45 s im Bild erscheint die Frage nur, wenn sie soll', async (_name, look, erscheint) => {
     vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] });
     try {
@@ -89,8 +95,14 @@ describe('Schwebende Frage „Was sagen Sie zum Angebot?“ bei echten Kunden', 
       if (erscheint) {
         expect(await screen.findByText('Was sagen Sie zum Angebot?')).toBeInTheDocument();
       } else {
-        // Der Rückbau ist wirklich da (Kasten von 75b8df8) — und die Frage bleibt weg.
-        expect(await screen.findByText('Noch 2 Minuten bis zu Ihren Bewerbungen', {}, { timeout: 5000 })).toBeInTheDocument();
+        // Die Seite vor dem Speichern ist wirklich da (Kasten von 75b8df8, die Zeile von „Pflegekräfte zuerst“ bzw. die
+        // Unterzeile des festen Knopfs im Minimal-Einstieg) — und die Frage bleibt weg.
+        const kennung = look === '&einstieg=alt'
+          ? 'Noch 2 Minuten bis zu Ihren Bewerbungen'
+          : look === '&einstieg=zuerst'
+            ? 'Laden Sie ein, wer Ihnen gefällt. Dafür beschreiben Sie kurz die Pflegesituation.'
+            : '100% kostenfrei & unverbindlich';
+        expect(await screen.findByText(kennung, {}, { timeout: 5000 })).toBeInTheDocument();
         await new Promise((r) => setTimeout(r, 200));
         expect(screen.queryByText('Was sagen Sie zum Angebot?')).toBeNull();
       }
