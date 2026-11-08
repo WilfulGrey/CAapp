@@ -123,7 +123,10 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
       </p>
       {/* Zusatzkosten nah am Preis (Preisangaben; Martin 08.11.: „Ja, klein unter den Preis“), Wortlaut wie live in der
           Kostenkarte. */}
-      <p className="mt-1 text-[12.5px] leading-[1.4] text-pm-muted" data-preis-hinweis>Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).</p>
+      <p className="mt-1 text-[12.5px] leading-[1.4] text-pm-muted" data-preis-hinweis>
+        {/* „(125 € pro Fahrt)“ bricht nur als Ganzes um. */}
+        Zzgl. Kost und Logis sowie Reisekosten <span className="whitespace-nowrap">(125 € pro Fahrt).</span>
+      </p>
       {eigen && (
         <p className="mt-1.5 text-[14px] leading-[1.45] text-pm-muted" data-nach-zuschuessen>
           Nach Zuschüssen ca. {zahl(eigen.eigen)}
