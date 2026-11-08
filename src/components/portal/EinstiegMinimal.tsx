@@ -19,7 +19,7 @@
 // „wie auf dem ersten Bild“, immer mit Preis vor „Einladen“; der Hauptknopf schmal und fest unten, Wortlaut „Pflegesituation
 // vervollständigen und Bewerbungen erhalten“.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Info } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { formatEuro, type Lead } from '../../lib/supabase';
 import { eigenanteilAus } from '../../lib/angebotZuschuss';
@@ -36,12 +36,12 @@ export const ANGEBOT_TITEL = 'Ihr persönliches Angebot';
 /** Fester schmaler Knopf unten, zwei Zeilen (Martin: „Pflegesituation vervollständigen und Bewerbung erhalten. So müsste das
  *  doch sein.“; Mehrzahl wie im freigegebenen Hauptknopf vom 07.11.). */
 export const FEST_KNOPF = ['Pflegesituation vervollständigen', 'und Bewerbungen erhalten'] as const;
-/** Grüner Kasten in der Angebotskarte: die Bestpreisgarantie als erster von vier gleichwertigen Punkten (Martin: „Ist das
- *  unsere Bestpreisgarantie? Oder ist das nur ein Punkt davon?“ — die anderen drei gehören nicht zur Garantie), dazu die
- *  Punkte, die Hemmnisse nehmen (Martin: „Keine Vorauszahlung, keine Vermittlungsgebühr. Keine Mindestlaufzeit … oder
- *  keine Kündigungsfrist. Beides genügt.“; belegt: USP 4/5, Mustervertrag § 3 und § 4 „ab dem Tag der Ankunft“).
- *  „Mehr Infos“ unter der Garantie öffnet ihr Fenster. */
-export const GARANTIE_TITEL = 'Es gilt immer unsere Bestpreisgarantie';
+/** Grüner Kasten in der Angebotskarte: vier gleichwertige, kurze Punkte, die Bestpreisgarantie zuerst (Martin: „Ist das
+ *  unsere Bestpreisgarantie? Oder ist das nur ein Punkt davon?“ — die anderen drei gehören nicht zur Garantie; „Es gilt
+ *  immer unsere Bestpreisgarantie“ mit „Mehr Infos“ darunter war ihm zu kompliziert: „Ich will das clean haben“).
+ *  Hemmnis-Punkte nach Martin („Keine Vorauszahlung, keine Vermittlungsgebühr. Keine Mindestlaufzeit … Beides genügt.“;
+ *  belegt: USP 4/5, Mustervertrag § 3 und § 4 „ab dem Tag der Ankunft“). Tipp auf „Bestpreisgarantie“ öffnet ihr Fenster. */
+export const GARANTIE_TITEL = 'Bestpreisgarantie';
 export const GARANTIE_PUNKTE = ['Keine Vorauszahlung', 'Keine Vermittlungsgebühr', 'Keine Mindestlaufzeit'] as const;
 /** Vertrauen unten in der Angebotskarte (Martin: „seit 20 Jahren und 6 Jahre in Folge … Testsieger … die Sterne“): Wert
  *  groß, Beschriftung klein darunter, wie die Kennzahlen im CGA-Panel. Wortlaut „6× in Folge“ wie die Auszeichnungsseite. */
@@ -102,7 +102,6 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
   const brutto = kalk?.bruttopreis ?? 3050;
   const eigen = eigenanteilAus(kalk);
   const weniger = eigen ? heimEigenanteil - eigen.eigen : 0;
-  const zahl = (betrag: number) => <span className="whitespace-nowrap font-semibold text-pm-ink">{formatEuro(betrag)}</span>;
   return (
     <section className={`${KARTE} px-4 pb-4 pt-3.5`} aria-labelledby="angebot-titel" data-angebot-minimal>
       <div className="flex items-center justify-between gap-3">
@@ -121,41 +120,41 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
       <p className="mt-1 whitespace-nowrap text-[30px] font-bold leading-[1.1] tracking-[-0.02em] tabular-nums text-pm-ink">
         {formatEuro(brutto)} <span className="text-[15px] font-medium tracking-normal text-pm-muted">/ Monat</span>
       </p>
-      {/* Zusatzkosten nah am Preis (Preisangaben; Martin 08.11.: „Ja, klein unter den Preis“), Wortlaut wie live in der
-          Kostenkarte. */}
-      <p className="mt-1 text-[12.5px] leading-[1.4] text-pm-muted" data-preis-hinweis>
-        {/* „(125 € pro Fahrt)“ bricht nur als Ganzes um. */}
-        Zzgl. Kost und Logis sowie Reisekosten <span className="whitespace-nowrap">(125 € pro Fahrt).</span>
-      </p>
+      {/* Grün wie der Kasten der kurzen Angebotsmail (Martin 08.11.: „vorher schon besser mit dem Grün nach Zuschüssen“),
+          darunter klein der Pflegeheim-Vergleich. */}
       {eigen && (
-        <p className="mt-1.5 text-[14px] leading-[1.45] text-pm-muted" data-nach-zuschuessen>
-          Nach Zuschüssen ca. {zahl(eigen.eigen)}
-          {weniger > 0 && <>, rund {zahl(weniger)} weniger als im Pflegeheim</>}
-        </p>
+        <>
+          <p className="mt-1.5 text-[15px] font-semibold leading-snug text-pm-green" data-nach-zuschuessen>
+            Nach Zuschüssen <span className="whitespace-nowrap">ca. {formatEuro(eigen.eigen)} im Monat</span>
+          </p>
+          {weniger > 0 && (
+            <p className="mt-0.5 text-[13.5px] leading-snug text-pm-muted" data-heimvergleich>
+              rund {formatEuro(weniger)} weniger als im Pflegeheim
+            </p>
+          )}
+        </>
       )}
       {details && (
-        // Wortlaut der bisherigen Kostenkarte: erster Satz unter dem Preis (der zweite steht schon oben), dann die Aufstellung
-        // hinter „Alle Kosten im Überblick“.
+        // Wortlaut der bisherigen Kostenkarte: Satz unter dem Preis, dann die Aufstellung hinter „Alle Kosten im Überblick“.
         <div id="angebot-details" className="mt-3 border-t border-pm-line-soft pt-3" data-angebot-details>
-          <p className="text-[14px] leading-[1.5] text-pm-muted">Monatlich inkl. Steuern, Gebühren und Sozialabgaben.</p>
+          <p className="text-[14px] leading-[1.5] text-pm-muted">
+            Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).
+          </p>
           <KostenAufstellung lead={lead} heimEigenanteil={heimEigenanteil} heimQuelle={heimQuelle} siegel={false} />
         </div>
       )}
-      {/* Vier gleichwertige Punkte, der Garantie-Satz zuerst und halbfett, „Mehr Infos“ darunter. Unter 375 px etwas enger,
-          damit der Garantie-Satz einzeilig bleibt (Android 360). */}
-      <ul className="mt-3.5 grid gap-1.5 rounded-[14px] bg-pm-mint px-4 max-[374px]:px-3 py-3" data-garantie>
-        <li className="flex items-start gap-2 text-[14px] max-[374px]:text-[13.5px] leading-5 text-pm-green-deep">
-          <Check className="mt-[3px] h-3.5 w-3.5 flex-none" strokeWidth={3} aria-hidden="true" />
-          <span>
-            <span className="font-bold">{GARANTIE_TITEL}</span>
-            <button type="button" onClick={onBestpreis} className={`${FOKUS} mt-0.5 block rounded text-[13px] font-semibold leading-5 underline underline-offset-2`}>
-              Mehr Infos
-            </button>
-          </span>
+      {/* Vier gleichwertige Punkte untereinander, gleiche Schrift; „Bestpreisgarantie“ ist antippbar (kleines Info-Symbol). */}
+      <ul className="mt-3.5 grid gap-1.5 rounded-[14px] bg-pm-mint px-4 py-3" data-garantie>
+        <li className="flex items-center gap-2 text-[14.5px] leading-5 text-pm-green-deep">
+          <Check className="h-4 w-4 flex-none" strokeWidth={3} aria-hidden="true" />
+          <button type="button" onClick={onBestpreis} className={`${FOKUS} inline-flex items-center gap-1.5 rounded text-left`}>
+            {GARANTIE_TITEL}
+            <Info className="h-3.5 w-3.5 flex-none opacity-70" aria-label="Mehr Infos" />
+          </button>
         </li>
         {GARANTIE_PUNKTE.map((punkt) => (
-          <li key={punkt} className="flex items-start gap-2 text-[14px] leading-5 text-pm-green-deep">
-            <Check className="mt-[3px] h-3.5 w-3.5 flex-none" strokeWidth={3} aria-hidden="true" />{punkt}
+          <li key={punkt} className="flex items-center gap-2 text-[14.5px] leading-5 text-pm-green-deep">
+            <Check className="h-4 w-4 flex-none" strokeWidth={3} aria-hidden="true" />{punkt}
           </li>
         ))}
       </ul>

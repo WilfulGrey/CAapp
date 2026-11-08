@@ -43,7 +43,7 @@ describe('Messpunkte in der Vorschau (?preview=patient)', () => {
     // entfällt) und der feste Knopf, Profil über die Zeile.
     await screen.findByRole('button', { name: /^Pflegesituation vervollständigen/ }, { timeout: 5000 });
 
-    await user.click(screen.getByRole('button', { name: 'Mehr Infos' }));
+    await user.click(screen.getByRole('button', { name: /^Bestpreisgarantie/ }));
     await user.click(within(await screen.findByRole('dialog')).getAllByRole('button', { name: 'Schließen' })[0]);
     await user.click(screen.getByRole('button', { name: 'Details' }));
     await user.click(screen.getByRole('button', { name: 'Was brauche ich zu Hause?' }));

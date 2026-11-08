@@ -112,16 +112,16 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     const karte = document.querySelector('[data-angebot-minimal]') as HTMLElement;
     expect(within(karte).getByRole('heading', { level: 2, name: 'Ihr persönliches Angebot' })).toBeInTheDocument();
     expect(within(karte).getByText(/^2\.800 €/).textContent).toBe('2.800 € / Monat');
-    // Zusatzkosten klein direkt unter dem Preis (Martin 08.11.: „Ja, klein unter den Preis“).
-    expect(karte.querySelector('[data-preis-hinweis]')!.textContent).toBe('Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).');
+    // Kein Hinweis auf Zusatzkosten oben (Martin 08.11.: „Ich will das mit den Fahrtkosten da alles nicht haben“), er steht
+    // unter „Details“.
+    expect(karte.textContent).not.toMatch(/Reisekosten/);
     expect(karte.querySelector('[data-nach-zuschuessen]')).toBeNull();
     expect(karte.textContent).not.toMatch(/Eine Person|Pflegegrad 3/);
     expect(within(karte).getByRole('button', { name: 'Details' })).toHaveAttribute('aria-expanded', 'false');
-    // Vier gleichwertige Punkte, die Garantie zuerst mit „Mehr Infos“ (Martin: „Ist das unsere Bestpreisgarantie? Oder ist
-    // das nur ein Punkt davon?“); „Keine Kündigungsfrist“ entfällt („Beides genügt.“).
+    // Vier gleichwertige kurze Punkte, die Garantie zuerst und antippbar; „Keine Kündigungsfrist“ entfällt („Beides genügt.“).
     const garantie = karte.querySelector('[data-garantie]') as HTMLElement;
-    expect(within(garantie).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Es gilt immer unsere BestpreisgarantieMehr Infos', 'Keine Vorauszahlung', 'Keine Vermittlungsgebühr', 'Keine Mindestlaufzeit']);
-    expect(within(garantie).getByRole('button', { name: 'Mehr Infos' })).toBeInTheDocument();
+    expect(within(garantie).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Bestpreisgarantie', 'Keine Vorauszahlung', 'Keine Vermittlungsgebühr', 'Keine Mindestlaufzeit']);
+    expect(within(garantie).getByRole('button', { name: /^Bestpreisgarantie/ })).toBeInTheDocument();
 
     // Pflegekräfte: Abschnitt mit Anzahl, Zeilen „Vorname, Alter“, „N Jahre Erfahrung“, „Deutsch Gut“, rechts der Preis des
     // Kunden und „Einladen“ (Martin 08.11.: „immer den Preis darstellen … und dann einladen“), Empfehlung oben.
@@ -282,7 +282,7 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     await user.click(knopf);
     expect(knopf).toHaveAttribute('aria-expanded', 'true');
     const details = karte.querySelector('[data-angebot-details]') as HTMLElement;
-    expect(within(details).getByText('Monatlich inkl. Steuern, Gebühren und Sozialabgaben.')).toBeInTheDocument();
+    expect(within(details).getByText('Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).')).toBeInTheDocument();
     expect(within(details).getByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeInTheDocument();
     expect(within(details).getByRole('link', { name: /Mustervertrag als PDF herunterladen/ })).toBeInTheDocument();
     // Ohne Testsieger-Zeile (steht schon im Kopf und unten in der Karte).
@@ -507,9 +507,10 @@ describe('Angebotskarte mit Zuschüssen und Sternen (Fassung „CGA-Stil“, 08.
       formular={<div />} sterne={{ schnitt: '4,9', anzahl: 126, wert: 4.9 } as never} vorgemerkte={[]} onVervollstaendigen={() => {}}
     />,
   );
-  it('eine ruhige Zeile mit Eigenanteil und Pflegeheim-Vergleich; Sterne als erste Kennzahl', () => {
+  it('grüne Zeile mit dem Eigenanteil, darunter der Pflegeheim-Vergleich; Sterne als erste Kennzahl', () => {
     zeigen(3364);
-    expect(document.querySelector('[data-nach-zuschuessen]')!.textContent).toBe('Nach Zuschüssen ca. 1.622 €, rund 1.742 € weniger als im Pflegeheim');
+    expect(document.querySelector('[data-nach-zuschuessen]')!.textContent).toBe('Nach Zuschüssen ca. 1.622 € im Monat');
+    expect(document.querySelector('[data-heimvergleich]')!.textContent).toBe('rund 1.742 € weniger als im Pflegeheim');
     const vertrauen = document.querySelector('[data-vertrauen]') as HTMLElement;
     expect(vertrauen.className).toContain('grid-cols-3');
     expect(vertrauen.textContent).toBe('Bewertungen4,9126 BewertungenErfahrung20 JahreErfahrungTestsieger6× in FolgeTestsieger');
@@ -518,6 +519,7 @@ describe('Angebotskarte mit Zuschüssen und Sternen (Fassung „CGA-Stil“, 08.
   });
   it('ohne Vorteil gegenüber dem Heim kein Vergleich', () => {
     zeigen(1500);
-    expect(document.querySelector('[data-nach-zuschuessen]')!.textContent).toBe('Nach Zuschüssen ca. 1.622 €');
+    expect(document.querySelector('[data-nach-zuschuessen]')!.textContent).toBe('Nach Zuschüssen ca. 1.622 € im Monat');
+    expect(document.querySelector('[data-heimvergleich]')).toBeNull();
   });
 });
