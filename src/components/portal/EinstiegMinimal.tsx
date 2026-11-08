@@ -50,6 +50,8 @@ export const FEST_ZEILE = '100% kostenfrei & unverbindlich';
 export const FORMULAR_TITEL = 'Pflegesituation vervollständigen';
 export const FORMULAR_ZEILE = 'Danach können Sie Pflegekräfte einladen und bekommen Bewerbungen. Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten.';
 /** Panel der Ansprechpartnerin: Unterzeile wie im Marta-Kasten („Ihre Beraterin“). */
+/** Hinweis im Marta-Fenster und im Marta-Kasten außerhalb von 8–20 Uhr. */
+export const AUSSERHALB_ZEITEN = 'Außerhalb der Geschäftszeiten können Sie Marta per WhatsApp schreiben.';
 export const BERATERIN_ROLLE = 'Ihre Beraterin';
 /** Grüner Kasten in der Angebotskarte: vier gleichwertige, kurze Punkte, die Bestpreisgarantie zuerst (Martin: „Ist das
  *  unsere Bestpreisgarantie? Oder ist das nur ein Punkt davon?“ — die anderen drei gehören nicht zur Garantie; „Es gilt
@@ -383,18 +385,28 @@ function KontaktReiter({ eingeklappt, erreichbar, verborgen = false }: { eingekl
                 <span className={`h-2 w-2 rounded-full ${erreichbar ? 'bg-pm-green' : 'bg-pm-mute'}`} aria-hidden="true" />{ERREICHBAR}
               </span>
             </div>
-            {/* Außerhalb von 8–20 Uhr nur WhatsApp (Martin 08.11.: „danach blenden wir Anrufen aus … nur noch WhatsApp aktiv“). */}
-            <div className={`mt-6 grid ${erreichbar ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
-              {erreichbar && <a href={TELEFON_HREF} aria-label={`${BERATERIN} anrufen: ${TELEFON}`} className={`${FOKUS} flex flex-col items-center gap-2 rounded-[18px] bg-white px-2 py-3.5 text-[14px] font-medium text-pm-ink shadow-[0_0_0_1px_rgba(28,28,28,.05)]`}>
+            {/* Außerhalb von 8–20 Uhr ist Anrufen ausgegraut und nicht antippbar, WhatsApp bleibt (Martin 08.11.: „nicht den
+                Button wegnehmen, das sieht irgendwie komisch aus, sondern einfach nur rausgrauen“). */}
+            <div className="mt-6 grid grid-cols-2 gap-2">
+              {erreichbar ? <a href={TELEFON_HREF} aria-label={`${BERATERIN} anrufen: ${TELEFON}`} className={`${FOKUS} flex flex-col items-center gap-2 rounded-[18px] bg-white px-2 py-3.5 text-[14px] font-medium text-pm-ink shadow-[0_0_0_1px_rgba(28,28,28,.05)]`}>
                 <span className="flex h-11 w-11 items-center justify-center rounded-full bg-pm-green text-white"><Phone className="h-5 w-5" aria-hidden="true" /></span>
                 Anrufen
-              </a>}
+              </a> : (
+                <span aria-disabled="true" className="flex flex-col items-center gap-2 rounded-[18px] bg-white/60 px-2 py-3.5 text-[14px] font-medium text-pm-mute shadow-[0_0_0_1px_rgba(28,28,28,.05)]" data-anrufen-aus>
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-pm-line text-white"><Phone className="h-5 w-5" aria-hidden="true" /></span>
+                  Anrufen
+                </span>
+              )}
               <a href={WHATSAPP_HREF} target="_blank" rel="noreferrer" aria-label={`${BERATERIN} per WhatsApp schreiben`} className={`${FOKUS} flex flex-col items-center gap-2 rounded-[18px] bg-white px-2 py-3.5 text-[14px] font-medium text-pm-ink shadow-[0_0_0_1px_rgba(28,28,28,.05)]`}>
                 <span className="flex h-11 w-11 items-center justify-center rounded-full bg-pm-whatsapp text-white"><WhatsAppIcon className="h-[22px] w-[22px]" /></span>
                 WhatsApp
               </a>
             </div>
-            {erreichbar && <p className="mt-4 text-center text-[14px] text-pm-muted">{TELEFON}</p>}
+            {erreichbar
+              ? <p className="mt-4 text-center text-[14px] text-pm-muted">{TELEFON}</p>
+              // Wortlaut: Martin 08.11. („außerhalb der Geschäftszeiten senden Sie eine WhatsApp oder so“), OpenAI 08.11. ohne
+              // Antwortversprechen.
+              : <p className="mt-4 text-center text-[14px] leading-snug text-pm-muted">{AUSSERHALB_ZEITEN}</p>}
           </aside>
         </div>,
         document.body,
@@ -598,7 +610,7 @@ export function EinstiegMinimal({
           <FaqListe ruhig karte minimal onFrageGeoeffnet={onFaqGeoeffnet} />
         </div>
         <div className="pt-4" ref={martaKasten}>
-          <MartaBox sterne={sterne} erreichbar={erreichbar} />
+          <MartaBox sterne={sterne} erreichbar={erreichbar} hinweisAusserhalb={AUSSERHALB_ZEITEN} />
         </div>
       </div>
       {/* Martas Reiter: eigener Sticky-Anker über die ganze Seite (rechter Rand), im Formular eingeklappt, weg beim Marta-Kasten. */}

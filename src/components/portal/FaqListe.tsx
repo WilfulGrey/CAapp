@@ -89,7 +89,7 @@ const SICHTBAR = 4;
 /** Minimal-Einstieg (Registry #147, Martin 08.11.: „Ist das legal? Und warum ist Primundus günstiger als andere? … wegen keine
  *  Vermittler, Direktanbieter … in den sichtbaren Bereich“). Antwort aus freigegebenen Bausteinen: Website /24-stunden-pflege
  *  („Kein Vermittler dazwischen“), Ortsseiten („Primundus ist ein Direktanbieter: Die Betreuungskräfte sind bei uns angestellt“,
- *  Martin 24.09.), Bestpreisgarantie im Wortlaut GARANTIE_PORTAL. OpenAI 08.11. geprüft; Wortlaut-Freigabe Martin offen. */
+ *  Martin 24.09.), Bestpreisgarantie im Wortlaut GARANTIE_PORTAL. OpenAI 08.11. geprüft; Martin 08.11.: „Personal direkt bei Primundus angestellt … Super, das passt.“ */
 export const FAQ_GUENSTIGER = {
   q: 'Warum ist Primundus günstiger als andere?',
   a: `Weil kein Vermittler dazwischen steht: Primundus ist Direktanbieter, die Pflegekräfte sind bei Primundus angestellt. Eine Vermittlungsgebühr gibt es nicht. Dazu gilt unsere Bestpreisgarantie: ${GARANTIE_PORTAL.zusage}`,

@@ -520,7 +520,7 @@ describe('Angebotskarte mit Zuschüssen und Sternen (Fassung „CGA-Stil“, 08.
     expect(document.body.textContent).not.toMatch(/für eine Person|Zwei Personen|Pflegegrad 4/);
   });
   // Martin 08.11.: „in der Arbeitszeit … so einen grünen Punkt … danach blenden wir Anrufen aus … nur noch WhatsApp aktiv“.
-  it('Marta 8–20 Uhr: grüner Punkt, Anrufen und WhatsApp; danach grauer Punkt und nur WhatsApp (Fenster und Kasten unten)', async () => {
+  it('Marta 8–20 Uhr: grüner Punkt, Anrufen und WhatsApp; danach grauer Punkt, Anrufen ausgegraut, Hinweis auf WhatsApp (Fenster und Kasten unten)', async () => {
     uhrzeit('2026-11-09T21:15:00+01:00'); // Montag 21:15 deutscher Zeit
     const { unmount } = zeigen(3364);
     const reiter = document.querySelector('[data-kontakt-reiter]') as HTMLElement;
@@ -528,12 +528,17 @@ describe('Angebotskarte mit Zuschüssen und Sternen (Fassung „CGA-Stil“, 08.
     expect(reiter.querySelector('[data-erreichbar]')).toBeNull();
     await userEvent.setup().click(reiter);
     const panel = await screen.findByRole('dialog', { name: 'Marta Kapcio, Ihre Beraterin' });
+    // Anrufen bleibt sichtbar, ausgegraut und ohne Link (Martin 08.11.: „nicht den Button wegnehmen … einfach nur rausgrauen“).
     expect(within(panel).queryByRole('link', { name: /anrufen/ })).toBeNull();
+    expect(within(panel).getByText('Anrufen').closest('[data-anrufen-aus]')).toHaveAttribute('aria-disabled', 'true');
     expect(within(panel).queryByText('089 200 000 830')).toBeNull();
+    expect(within(panel).getByText('Außerhalb der Geschäftszeiten können Sie Marta per WhatsApp schreiben.')).toBeInTheDocument();
     expect(within(panel).getByRole('link', { name: /per WhatsApp schreiben$/ })).toBeInTheDocument();
     expect(within(panel).getByText('täglich 8–20 Uhr')).toBeInTheDocument();
     const kasten = screen.getByText('Noch Fragen?').parentElement as HTMLElement;
     expect(within(kasten).queryByRole('link', { name: /anrufen/ })).toBeNull();
+    expect(kasten.querySelector('[data-anrufen-aus]')).toHaveAttribute('aria-disabled', 'true');
+    expect(within(kasten).getByText('Außerhalb der Geschäftszeiten können Sie Marta per WhatsApp schreiben.')).toBeInTheDocument();
     expect(within(kasten).getByRole('link', { name: /per WhatsApp schreiben$/ })).toBeInTheDocument();
     unmount();
 
