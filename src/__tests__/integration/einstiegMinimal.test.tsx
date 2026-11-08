@@ -112,6 +112,8 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     const karte = document.querySelector('[data-angebot-minimal]') as HTMLElement;
     expect(within(karte).getByRole('heading', { level: 2, name: 'Ihr persönliches Angebot' })).toBeInTheDocument();
     expect(within(karte).getByText(/^2\.800 €/).textContent).toBe('2.800 € / Monat');
+    // Zusatzkosten klein direkt unter dem Preis (Martin 08.11.: „Ja, klein unter den Preis“).
+    expect(karte.querySelector('[data-preis-hinweis]')!.textContent).toBe('Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).');
     expect(karte.querySelector('[data-nach-zuschuessen]')).toBeNull();
     expect(karte.textContent).not.toMatch(/Eine Person|Pflegegrad 3/);
     expect(within(karte).getByRole('button', { name: 'Details' })).toHaveAttribute('aria-expanded', 'false');
@@ -280,7 +282,7 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     await user.click(knopf);
     expect(knopf).toHaveAttribute('aria-expanded', 'true');
     const details = karte.querySelector('[data-angebot-details]') as HTMLElement;
-    expect(within(details).getByText('Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).')).toBeInTheDocument();
+    expect(within(details).getByText('Monatlich inkl. Steuern, Gebühren und Sozialabgaben.')).toBeInTheDocument();
     expect(within(details).getByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeInTheDocument();
     expect(within(details).getByRole('link', { name: /Mustervertrag als PDF herunterladen/ })).toBeInTheDocument();
     // Ohne Testsieger-Zeile (steht schon im Kopf und unten in der Karte).

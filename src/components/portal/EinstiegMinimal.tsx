@@ -121,6 +121,9 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
       <p className="mt-1 whitespace-nowrap text-[30px] font-bold leading-[1.1] tracking-[-0.02em] tabular-nums text-pm-ink">
         {formatEuro(brutto)} <span className="text-[15px] font-medium tracking-normal text-pm-muted">/ Monat</span>
       </p>
+      {/* Zusatzkosten nah am Preis (Preisangaben; Martin 08.11.: „Ja, klein unter den Preis“), Wortlaut wie live in der
+          Kostenkarte. */}
+      <p className="mt-1 text-[12.5px] leading-[1.4] text-pm-muted" data-preis-hinweis>Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).</p>
       {eigen && (
         <p className="mt-1.5 text-[14px] leading-[1.45] text-pm-muted" data-nach-zuschuessen>
           Nach Zuschüssen ca. {zahl(eigen.eigen)}
@@ -128,11 +131,10 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
         </p>
       )}
       {details && (
-        // Wortlaut der bisherigen Kostenkarte: Satz unter dem Preis, dann die Aufstellung hinter „Alle Kosten im Überblick“.
+        // Wortlaut der bisherigen Kostenkarte: erster Satz unter dem Preis (der zweite steht schon oben), dann die Aufstellung
+        // hinter „Alle Kosten im Überblick“.
         <div id="angebot-details" className="mt-3 border-t border-pm-line-soft pt-3" data-angebot-details>
-          <p className="text-[14px] leading-[1.5] text-pm-muted">
-            Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).
-          </p>
+          <p className="text-[14px] leading-[1.5] text-pm-muted">Monatlich inkl. Steuern, Gebühren und Sozialabgaben.</p>
           <KostenAufstellung lead={lead} heimEigenanteil={heimEigenanteil} heimQuelle={heimQuelle} siegel={false} />
         </div>
       )}
