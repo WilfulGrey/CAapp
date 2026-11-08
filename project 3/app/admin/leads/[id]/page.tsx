@@ -1744,11 +1744,7 @@ export default function LeadDetailPage() {
                     portal_mail_fehler: { label: 'Portal-Mail nicht verarbeitbar', color: 'bg-red-500' },
                     portal_mail_uebersprungen: { label: 'Portal-Mail übersprungen (Schutzregel)', color: 'bg-gray-500' },
                   };
-                  // Registry #147: derselbe Rückruf-Eintrag kommt seit dem Minimal-Einstieg auch aus dem Kundenportal
-                  // (metadata.quelle = 'portal_einstieg'), sonst aus der Abschiedsmail (nachfass_3).
-                  const cfg = event.event_type === 'rueckruf_erbeten_mail' && event.metadata?.quelle === 'portal_einstieg'
-                    ? { label: '📞 Rückruf erbeten (Kundenportal)', color: 'bg-amber-500' }
-                    : eventLabels[event.event_type] ?? { label: event.event_type.replace(/_/g, ' '), color: 'bg-[#5C4A32]' };
+                  const cfg = eventLabels[event.event_type] ?? { label: event.event_type.replace(/_/g, ' '), color: 'bg-[#5C4A32]' };
                   // Seed-Events (Multi-Job-Erstscan, notify=false) haben NIE
                   // eine Mail ausgelöst — ohne Kennzeichnung denkt das Team
                   // bei Vorfällen wie 9239, die Kundin sei informiert worden.

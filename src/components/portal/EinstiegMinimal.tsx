@@ -5,9 +5,8 @@
 // „Einladen“ ist die Logik aus #145 unverändert (CustomerPortalPage: Fenster „{Name} einladen“, Vormerken, nach dem
 // ersten Speichern automatisch einladen).
 //
-// „Rückruf vereinbaren“ schickt mit `onRueckruf` die Bitte über `/api/rueckmeldung` (Aktion `rueckruf`, Quelle
-// `portal_einstieg`, Team-Mail an info@, src/lib/rueckruf.ts). Ohne `onRueckruf` (Vorschau, Lead ohne Rückrufnummer)
-// bleibt es ein Anruf-Link. Wortlaut von Erfolg und Fehler aus der Rückmeldeseite (project 3/app/rueckmeldung/page.tsx).
+// Kontakt unter den Pflegekräften: die Marta-Zeile des Portals (`MartaZeile`, runde Knöpfe Anrufen und WhatsApp), statt
+// „Rückruf vereinbaren“ (Martin 08.11.: „rückruf finde ich auch kacke - lieber anrufen oder schreiben? Auch optisch schön“).
 //
 // Rückweg: `?einstieg=zuerst` zeigt „Pflegekräfte zuerst“ (#145) unverändert, `?einstieg=alt` den Stand 75b8df8.
 //
@@ -18,24 +17,26 @@
 // „sehr vorteilhaft“ mit „keine Vermittlungsgebühr, täglich kündbar“, Sterne unter dem Gruß; die Pflegekräfte als Zeilen
 // „wie auf dem ersten Bild“, immer mit Preis vor „Einladen“; der Hauptknopf schmal und fest unten, Wortlaut „Pflegesituation
 // vervollständigen und Bewerbungen erhalten“.
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Check, ChevronDown, Info } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { formatEuro, type Lead } from '../../lib/supabase';
 import { eigenanteilAus } from '../../lib/angebotZuschuss';
-import { anzahlText, type SterneStand } from '../../lib/sterne';
-import { ERREICHBAR, TELEFON, TELEFON_HREF, WHATSAPP_HREF } from '../../lib/kontakt';
+import { anzahlText, sternFuellung, type SterneStand } from '../../lib/sterne';
+import { ERREICHBAR } from '../../lib/kontakt';
 import { initials } from './shared';
 import { SCHRITTE_STAND_75B8DF8 } from './EinstiegVorSpeichern';
 import { AbschnittPflegesituation, KostenAufstellung, type VorgemerkteKraft } from './EinstiegPflegekraefteZuerst';
 import { FaqListe } from './FaqListe';
-import { MartaBox } from './MartaBox';
+import { MartaBox, MartaZeile } from './MartaBox';
 
 // Wortlaut (Martin 08.11.2026, diktiert; Entwurf, Freigabe des Wortlauts offen). Tests prüfen genau diese Texte.
 export const ANGEBOT_TITEL = 'Ihr persönliches Angebot';
-/** Fester schmaler Knopf unten, zwei Zeilen (Martin: „Pflegesituation vervollständigen und Bewerbung erhalten. So müsste das
- *  doch sein.“; Mehrzahl wie im freigegebenen Hauptknopf vom 07.11.). */
-export const FEST_KNOPF = ['Pflegesituation vervollständigen', 'und Bewerbungen erhalten'] as const;
+/** Fester schmaler Knopf unten: kurzer Titel und Unterzeile (Martin 08.11.: „den button-text finde ich zu lang (auch fehlt
+ *  kostenlos und unverbindlich??“). Titel aus seinem Wortlaut, Unterzeile die freigegebene vom 07.11. (OpenAI schlug
+ *  „Bewerbungen freischalten“ vor, zu technisch). */
+export const FEST_TITEL = 'Bewerbungen erhalten';
+export const FEST_ZEILE = 'dauert etwa 2 Minuten · kostenlos und unverbindlich';
 /** Grüner Kasten in der Angebotskarte: vier gleichwertige, kurze Punkte, die Bestpreisgarantie zuerst (Martin: „Ist das
  *  unsere Bestpreisgarantie? Oder ist das nur ein Punkt davon?“ — die anderen drei gehören nicht zur Garantie; „Es gilt
  *  immer unsere Bestpreisgarantie“ mit „Mehr Infos“ darunter war ihm zu kompliziert: „Ich will das clean haben“).
@@ -49,15 +50,6 @@ export const VERTRAUEN = [['20 Jahre', 'Erfahrung'], ['6× in Folge', 'Testsiege
 /** Knopf der Zeile nach dem Tipp auf „Einladen“ (statt „Vorgemerkt“, Martin: „sieht natürlich komisch aus“). „Ausgewählt“
  *  statt „Eingeladen“ (OpenAI-Prüfung 08.11.): verschickt wird die Einladung erst nach dem Speichern der Pflegesituation. */
 export const AUSGEWAEHLT = 'Ausgewählt';
-export const RUECKRUF = 'Rückruf vereinbaren';
-// Rückruf erbeten: wörtlich die Rückmeldeseite (project 3/app/rueckmeldung/page.tsx, Zustand „rueckruf-ok“ Überschrift,
-// live seit Registry #72; die Team-Mail zitiert denselben Satz, project 3/lib/rueckmeldung.ts). Der Folgesatz der Seite
-// („Sie möchten nicht warten? Rufen Sie an: …“) entfällt, weil die Nummer direkt darunter steht.
-export const RUECKRUF_OK = 'Danke, Marta ruft Sie an.';
-// Fehler: wörtlich die Überschrift des Zustands „fehler“ derselben Seite (ohne Punkt wie dort). Der Knopf bleibt darunter
-// zum Wiederholen stehen, die Nummer darunter ebenfalls.
-export const RUECKRUF_FEHLER = 'Das hat nicht geklappt';
-
 // Wie in der Navigationsleiste: Tippfläche ≥ 44 px über ein unsichtbares ::before, die sichtbare Pille bleibt kleiner.
 const TIPPFLAECHE = "relative before:absolute before:-inset-y-1.5 before:-inset-x-1 before:content-['']";
 const FOKUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-taupe';
@@ -66,6 +58,7 @@ const FOKUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outli
 const PILLE = 'flex h-[34px] w-[88px] flex-none items-center justify-center rounded-[10px] font-semibold whitespace-nowrap';
 // Karte wie im CGA-Panel: weiß auf dem Seitengrund, ohne Rahmen und Schatten.
 const KARTE = 'rounded-card bg-white';
+const STERN = 'M10 1.6l2.47 5.2 5.7.72-4.2 3.93 1.08 5.64L10 14.3l-5.05 2.79 1.08-5.64-4.2-3.93 5.7-.72z';
 
 // ── Kopf rechts: „6× Testsieger / DIE WELT“ mit Siegel (statt „Hilfe“ in der Navigationsleiste) ──────────────────────────
 export function TestsiegerKopf() {
@@ -163,11 +156,20 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
         {sterne && (
           <div className="min-w-0">
             <dt className="sr-only">Bewertungen</dt>
-            <dd className="flex items-center gap-1 text-[15px] font-bold leading-5 text-pm-ink">
+            {/* „4,9“ und dahinter alle fünf Sterne (Martin 08.11.), anteilig gefüllt wie in der Bewertungszeile. */}
+            <dd className="flex items-center gap-1.5 text-[15px] font-bold leading-5 text-pm-ink">
               {sterne.schnitt}
-              <svg viewBox="0 0 20 20" width={15} height={15} className="flex-none" aria-hidden="true">
-                <path d="M10 1.6l2.47 5.2 5.7.72-4.2 3.93 1.08 5.64L10 14.3l-5.05 2.79 1.08-5.64-4.2-3.93 5.7-.72z" fill="#D4A843" />
-              </svg>
+              <span className="inline-flex gap-px" aria-hidden="true">
+                {[0, 1, 2, 3, 4].map((i) => {
+                  const fuellung = sternFuellung(sterne.wert, i);
+                  return (
+                    <svg key={i} viewBox="0 0 20 20" width={12} height={12} className="flex-none">
+                      <path d={STERN} fill="#E5E3DF" />
+                      {fuellung > 0 && <path d={STERN} fill="#D4A843" style={fuellung < 1 ? { clipPath: `inset(0 ${Math.round((1 - fuellung) * 100)}% 0 0)` } : undefined} />}
+                    </svg>
+                  );
+                })}
+              </span>
             </dd>
             <dd className="text-[12px] leading-4 text-pm-muted">{anzahlText(sterne.anzahl)}</dd>
           </div>
@@ -202,10 +204,13 @@ export function zeilenFakten(nurse: Pick<Nurse, 'experienceYears' | 'language'>)
 // einer eigenen Zeile; rechts der Preis (ohne „/ Monat“, Martin 08.11.) und darunter „Einladen“. Der Preis ist der des
 // Kunden: Die Liste zeigt nur Kräfte mit seiner Deutsch-Stufe (`matchesGermanyWish`, strikt), und die Stufe ist der einzige
 // Preisfaktor, der an der Kraft hängt (lib/preisJeKraft.ts im Zweig feat/portal-preis-bei-pflegekraeften).
-export function PflegekraftZeile({ nurse, preis, vorgemerkt, gesperrt, onNurseClick, onInvite, onInviteConfirm }: {
+export function PflegekraftZeile({ nurse, preis, preisUnten = false, vorgemerkt, gesperrt, onNurseClick, onInvite, onInviteConfirm }: {
   nurse: Nurse;
   /** Monatspreis des Kunden (`kalkulation.bruttopreis`); ohne Preis entfällt die Angabe. */
   preis?: number | null;
+  /** Vergleich 08.11. (`?zeile=b`): Preis als dritte Zeile unter den Angaben, „Einladen“ mittig rechts. Sonst Preis oben
+   *  rechts auf der Höhe des Namens, „Einladen“ darunter. */
+  preisUnten?: boolean;
   /** Registry #145: vorgemerkt → `AUSGEWAEHLT` mit Haken, bleibt tippbar und öffnet das Fenster erneut. */
   vorgemerkt: boolean;
   /** Eine Einladung läuft gerade (nach dem Speichern) → „Bitte warten…“ wie auf der Karte. */
@@ -226,9 +231,26 @@ export function PflegekraftZeile({ nurse, preis, vorgemerkt, gesperrt, onNurseCl
   // Foto auf heller Kreisfläche mit feinem Ring: freigestellte Fotos und Initialen wirken gleich groß und rund.
   // Größer als im ersten Bild (Martin: „die Karten schön ein bisschen größer auch mit den Bildern“).
   const foto = 'h-[60px] w-[60px] max-[374px]:h-14 max-[374px]:w-14 flex-none rounded-full ring-1 ring-pm-line';
+  const preisText = preis ? (
+    <span className="whitespace-nowrap text-[15px] font-semibold tabular-nums text-pm-ink" data-preis>{formatEuro(preis)}</span>
+  ) : null;
+  // „Einladen“ als helle Koralle-Pille (passt zum festen Knopf, kein Formular-Rahmen), „Ausgewählt“ in Mint.
+  const knopf = gesperrt ? (
+    <button type="button" disabled aria-disabled="true" className={`${PILLE} cursor-not-allowed bg-pm-grund text-[12px] text-pm-muted`}>
+      Bitte warten…
+    </button>
+  ) : vorgemerkt ? (
+    <button type="button" onClick={einladen} aria-label={`${AUSGEWAEHLT} ✓`} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} gap-0.5 bg-pm-mint text-[12px] text-pm-green-deep`}>
+      {AUSGEWAEHLT}<Check aria-hidden="true" className="h-3 w-3 flex-none" strokeWidth={3} />
+    </button>
+  ) : (
+    <button type="button" onClick={einladen} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} bg-pm-coral-tint text-[13.5px] text-pm-coral-ink hover:bg-pm-coral hover:text-white`}>
+      Einladen
+    </button>
+  );
   return (
     <li className="flex items-center gap-3 max-[374px]:gap-2.5 border-t border-pm-line-soft px-3.5 max-[374px]:px-3 py-3" data-pflegekraft-zeile={nurse.caregiverId} data-vorgemerkt={vorgemerkt || undefined}>
-      <button type="button" onClick={onNurseClick} className={`${FOKUS} flex min-w-0 flex-1 items-center gap-3 max-[374px]:gap-2.5 rounded-[12px] text-left`}>
+      <button type="button" onClick={onNurseClick} className={`${FOKUS} group flex min-w-0 flex-1 items-center gap-3 max-[374px]:gap-2.5 rounded-[12px] text-left`}>
         {nurse.image ? (
           <img src={nurse.image} alt="" className={`${foto} bg-pm-grund object-cover`} />
         ) : (
@@ -237,34 +259,23 @@ export function PflegekraftZeile({ nurse, preis, vorgemerkt, gesperrt, onNurseCl
           </span>
         )}
         <span className="min-w-0">
+          {/* Name unterstrichen: man sieht, dass sich das Profil öffnen lässt (Martin 08.11.). */}
           <span className="block text-[16.5px] font-semibold leading-[1.3] text-pm-ink">
-            {vorname}{nurse.age ? <span className="font-normal text-pm-muted">, {nurse.age}</span> : null}
+            <span className="underline decoration-pm-chip decoration-[1.5px] underline-offset-[3px] group-hover:decoration-pm-taupe">{vorname}</span>
+            {nurse.age ? <span className="font-normal text-pm-muted">, {nurse.age}</span> : null}
           </span>
           {fakten.map((teil) => (
             <span key={teil} className="block text-[13.5px] leading-[1.4] text-pm-muted">{teil}</span>
           ))}
+          {preisUnten && preisText && <span className="mt-0.5 block">{preisText}</span>}
         </span>
       </button>
-      <div className="flex flex-none flex-col items-end gap-1.5">
-        {preis ? (
-          <p className="whitespace-nowrap text-right leading-none" data-preis>
-            <span className="text-[15px] font-semibold tabular-nums text-pm-ink">{formatEuro(preis)}</span>
-          </p>
-        ) : null}
-        {gesperrt ? (
-          <button type="button" disabled aria-disabled="true" className={`${PILLE} cursor-not-allowed bg-pm-grund text-[12px] text-pm-muted`}>
-            Bitte warten…
-          </button>
-        ) : vorgemerkt ? (
-          <button type="button" onClick={einladen} aria-label={`${AUSGEWAEHLT} ✓`} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} gap-0.5 bg-pm-mint text-[12px] text-pm-green-deep`}>
-            {AUSGEWAEHLT}<Check aria-hidden="true" className="h-3 w-3 flex-none" strokeWidth={3} />
-          </button>
-        ) : (
-          <button type="button" onClick={einladen} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} border border-pm-line bg-white text-[13.5px] text-pm-ink hover:border-pm-taupe-light`}>
-            Einladen
-          </button>
-        )}
-      </div>
+      {preisUnten ? knopf : (
+        <div className="flex flex-none flex-col items-end gap-1.5">
+          {preisText}
+          {knopf}
+        </div>
+      )}
     </li>
   );
 }
@@ -284,64 +295,6 @@ function Platzhalterzeile() {
   );
 }
 const PLATZHALTER = 5;
-
-// ── „Rückruf vereinbaren“ ─────────────────────────────────────────────────────────────────────────────────────────────
-type RueckrufStand = 'bereit' | 'laeuft' | 'ok' | 'fehler';
-const RUECKRUF_KNOPF = `${FOKUS} flex min-h-[48px] w-full items-center justify-center rounded-[14px] border border-pm-line bg-white px-4 text-[15px] font-semibold text-pm-ink transition-colors hover:border-pm-taupe-light`;
-
-// Tastatur und Screenreader (Prüfung 07.11.): Während der Anfrage bleibt der Knopf fokussierbar (`aria-disabled` statt
-// `disabled`; ein gesperrter Knopf verliert den Fokus, er fiel auf den Seitenanfang). Der Statusbereich steht von Anfang an
-// leer im DOM und bekommt erst beim Erfolg den Dank (wie der Toast-Rahmen in #145): ein Bereich, der erst mit seinem Text
-// eingefügt wird, sagen Screenreader (vor allem VoiceOver auf iOS) unzuverlässig an. Weil der Knopf danach entfällt, geht
-// der Fokus auf den Dank an seiner Stelle. Die Fehlermeldung bleibt `role="alert"` über dem Knopf, der Fokus auf dem Knopf.
-function RueckrufKnopf({ onRueckruf }: { onRueckruf?: () => Promise<boolean> }) {
-  const [stand, setStand] = useState<RueckrufStand>('bereit');
-  const laeuft = useRef(false);
-  const dank = useRef<HTMLParagraphElement>(null);
-  useEffect(() => {
-    if (stand === 'ok') dank.current?.focus();
-  }, [stand]);
-  if (!onRueckruf) {
-    return <a href={TELEFON_HREF} className={RUECKRUF_KNOPF}>{RUECKRUF}</a>;
-  }
-  const anfordern = async () => {
-    if (laeuft.current) return; // Doppeltipp (und Tipp während der Anfrage): eine Anfrage
-    laeuft.current = true;
-    setStand('laeuft');
-    let ok = false;
-    try { ok = await onRueckruf(); } catch { ok = false; }
-    laeuft.current = false;
-    setStand(ok ? 'ok' : 'fehler');
-  };
-  const busy = stand === 'laeuft';
-  // EIN Element im Raster darüber: der leere Statusbereich nimmt so keinen Abstand ein, nichts verschiebt sich.
-  return (
-    <div data-rueckruf>
-      {stand === 'fehler' && (
-        <p role="alert" className="mb-2 text-center text-[13px] font-semibold leading-snug text-pm-error-ink">{RUECKRUF_FEHLER}</p>
-      )}
-      <div role="status">
-        {stand === 'ok' && (
-          // An der Stelle des Knopfs, gleich hoch (nichts springt).
-          <p ref={dank} tabIndex={-1} className={`${FOKUS} flex min-h-[48px] items-center justify-center rounded-[14px] bg-pm-mint px-4 text-center text-[15px] font-semibold text-pm-green-deep`}>
-            {RUECKRUF_OK}
-          </p>
-        )}
-      </div>
-      {stand !== 'ok' && (
-        <button
-          type="button"
-          onClick={anfordern}
-          aria-disabled={busy || undefined}
-          aria-busy={busy || undefined}
-          className={`${RUECKRUF_KNOPF} aria-disabled:cursor-wait aria-disabled:opacity-70`}
-        >
-          {RUECKRUF}
-        </button>
-      )}
-    </div>
-  );
-}
 
 // ── So geht es weiter ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Martin 08.11.: „der Ablauf deutlich schöner dargestellt … optisch ist das nicht schön“. Wie die Stufen im CGA-Panel:
@@ -381,7 +334,7 @@ function AblaufMinimal() {
 export function EinstiegMinimal({
   anrede, lead, onBestpreis, heimEigenanteil, heimQuelle,
   laedt, zeilen, gehalteneEinladungen, vorschlaegeVorhanden, bereitsBearbeitet, formular, sterne, vorgemerkte,
-  onVervollstaendigen, onRueckruf, onKostenAufgeklappt, onFaqGeoeffnet,
+  onVervollstaendigen, onKostenAufgeklappt, onFaqGeoeffnet,
 }: {
   /** Anrede für „Guten Tag, …“ (customerSalutation), ohne Anrede nur „Guten Tag“. */
   anrede: string | null;
@@ -402,9 +355,6 @@ export function EinstiegMinimal({
   vorgemerkte: VorgemerkteKraft[];
   /** Fester Knopf unten: ins Formular (CustomerPortalPage, Messpunkt `zur_pflegesituation` mit Quelle `hauptknopf`). */
   onVervollstaendigen: () => void;
-  /** „Rückruf vereinbaren“: Bitte ans Team senden; `true` = angekommen. Ohne (Vorschau, Lead ohne Rückrufnummer) bleibt
-   *  der Knopf ein Anruf-Link. */
-  onRueckruf?: () => Promise<boolean>;
   onKostenAufgeklappt?: () => void;
   onFaqGeoeffnet?: (schluessel: string) => void;
 }) {
@@ -453,19 +403,15 @@ export function EinstiegMinimal({
           </section>
         )}
 
-        <div className="grid gap-2.5 pt-4 pb-2" data-aktionen-minimal>
-          <RueckrufKnopf onRueckruf={onRueckruf} />
-          <p className="pt-0.5 text-center text-[12.5px] leading-[1.5] text-pm-muted">
-            oder anrufen, auch per{' '}
-            <a href={WHATSAPP_HREF} target="_blank" rel="noopener noreferrer" className="font-semibold text-pm-taupe-ink">WhatsApp</a>:<br />
-            <a href={TELEFON_HREF} className="font-semibold text-pm-taupe-ink">{TELEFON}</a> ({ERREICHBAR})
-          </p>
+        {/* Kontakt: die Marta-Zeile des Portals (Foto, Name, Zeiten, runde Knöpfe Anrufen und WhatsApp). */}
+        <div className={`${KARTE} mt-3 px-4 py-3.5`} data-kontakt-minimal>
+          <MartaZeile eng unterzeile={<>Ihre Beraterin · {ERREICHBAR}</>} />
         </div>
 
         {/* Fester schmaler Knopf (Martin 08.11.: „den wir festmachen unten“). Sticky am Ende des ersten Teils: steht beim
             Laden unten am Bildschirm, scrollt man bis hierher, bleibt er hier liegen und das Formular darunter ist frei. */}
         <div
-          className="sticky bottom-0 z-20 -mx-3 max-[374px]:-mx-2 mt-2 bg-pm-grund/95 px-3 max-[374px]:px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)] backdrop-blur"
+          className="sticky bottom-0 z-20 -mx-3 max-[374px]:-mx-2 mt-3 bg-pm-grund/95 px-3 max-[374px]:px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)] backdrop-blur"
           data-fester-knopf
         >
           <button
@@ -473,9 +419,8 @@ export function EinstiegMinimal({
             onClick={onVervollstaendigen}
             className={`${FOKUS} block w-full rounded-[12px] bg-pm-coral px-4 py-2 text-center text-[15px] font-bold leading-5 text-white transition-colors hover:bg-pm-coral-deep active:scale-[0.99]`}
           >
-            {/* Zwei feste Zeilen statt automatischem Umbruch: sonst stünde „und“ am Ende der ersten Zeile. */}
-            <span className="block">{FEST_KNOPF[0]}</span>
-            <span className="block">{FEST_KNOPF[1]}</span>
+            <span className="block">{FEST_TITEL}</span>
+            <span className="block text-[12px] max-[374px]:text-[11.5px] font-medium leading-4 opacity-90">{FEST_ZEILE}</span>
           </button>
         </div>
       </div>

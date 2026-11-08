@@ -1,11 +1,9 @@
 /** @vitest-environment jsdom */
 // Minimal-Einstieg vor dem ersten Speichern der Pflegesituation (Registry #147, Entwurf; Martin 07.11.2026 zum Mockup
 // „Minimal“: „Ja, alle drei“).
-//   - Reihenfolge im ersten Bild: Kopf mit Testsieger statt „Hilfe“ → „Guten Tag, …“ → kompakte Angebotskarte → „Passende
-//     Pflegekräfte“ mit Anzahl als Zeilen → Hauptknopf → „Rückruf vereinbaren“ (Knopf, mit Rückrufnummer im Lead) →
-//     Nummer und WhatsApp; darunter Pflegesituation mit Formular, Kostenkarte, So geht es weiter, Fragen, Marta
-//   - „Rückruf vereinbaren“ schickt die Bitte an /api/rueckmeldung (Quelle portal_einstieg) und zeigt danach wörtlich die
-//     Rückmeldeseite: „Danke, Marta ruft Sie an.“ bzw. „Das hat nicht geklappt“; ohne Rückrufnummer bleibt es ein tel:-Link
+//   - Reihenfolge: Kopf mit Testsieger statt „Hilfe“ → „Guten Tag, …“ → Angebotskarte → „Passende Pflegekräfte“ mit Anzahl
+//     als Zeilen → Marta-Zeile (Anrufen, WhatsApp) → fester Knopf; darunter Pflegesituation mit Formular, So geht es
+//     weiter, Fragen, Marta (Fassung „CGA-Stil“, Martin 08.11.)
 //   - Platzhalterzeilen ohne Text, solange die Liste lädt (Hauptknopf steht schon da)
 //   - „Einladen“ in der Zeile = Logik aus #145 (Fenster, Vormerken, nach dem Speichern automatisch einladen)
 //   - Messpunkte: fester Knopf als Quelle `hauptknopf`, „Details“ als `kosten_aufgeklappt`, Zeile wie die Karte (`karte`)
@@ -84,14 +82,14 @@ const vollerEntwurf = (token: string) => localStorage.setItem(`patient_${token}`
   wunschGeschlecht: 'Weiblich', fuehrerschein: 'Nein',
 }));
 type Meldung = { token?: string; event?: string; metadata?: Record<string, unknown>; notify?: boolean };
-const HAUPTKNOPF = /^Pflegesituation vervollständigen/;
+const HAUPTKNOPF = /^Bewerbungen erhalten/;
 const davor = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 const gescrollt = () => (Element.prototype.scrollIntoView as unknown as { mock: { contexts: Element[] } }).mock.contexts;
 const zeilen = () => [...document.querySelectorAll('[data-pflegekraft-zeile]')] as HTMLElement[];
 const zeileVon = (vorname: string) => zeilen().find((z) => z.textContent?.startsWith(`${vorname},`)) as HTMLElement;
 
 describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
-  it('Reihenfolge und Wortlaut: Kopf mit Testsieger, Gruß, Angebotskarte, Pflegekräfte als Zeilen mit Anzahl, Hauptknopf, Rückruf, Nummer; darunter Formular, Kosten, So geht es weiter, Fragen, Marta', async () => {
+  it('Reihenfolge und Wortlaut: Kopf mit Testsieger, Gruß, Angebotskarte, Pflegekräfte als Zeilen mit Anzahl, Kontakt, fester Knopf; darunter Formular, So geht es weiter, Fragen, Marta', async () => {
     server.use(...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
     window.history.replaceState({}, '', '/?token=token-mi-reihe');
     render(<CustomerPortalPage />);
@@ -143,18 +141,17 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(screen.queryByText('Unsere Empfehlung für Sie')).toBeNull();
     expect(document.querySelector('.rounded-card.cursor-pointer')).toBeNull();
 
-    // Fester Knopf unten (sticky am Ende des ersten Teils), zwei Zeilen; davor Rückruf (Knopf: der Lead hat eine
-    // Rückrufnummer) und Nummer/WhatsApp.
+    // Fester Knopf unten (sticky am Ende des ersten Teils) mit Unterzeile; davor die Marta-Zeile mit Anrufen und WhatsApp
+    // (statt „Rückruf vereinbaren“, Martin 08.11.).
     const haupt = screen.getByRole('button', { name: HAUPTKNOPF });
-    expect(haupt.textContent).toBe('Pflegesituation vervollständigenund Bewerbungen erhalten');
+    expect(haupt.textContent).toBe('Bewerbungen erhaltendauert etwa 2 Minuten · kostenlos und unverbindlich');
     expect(haupt.className).toContain('bg-pm-coral');
     expect(haupt.closest('[data-fester-knopf]')!.className).toContain('sticky bottom-0');
-    const rueckruf = screen.getByRole('button', { name: 'Rückruf vereinbaren' });
-    expect(screen.queryByRole('link', { name: 'Rückruf vereinbaren' })).toBeNull();
-    const zeileTel = screen.getByText(/^oder anrufen, auch per/);
-    expect(zeileTel.textContent).toBe('oder anrufen, auch per WhatsApp:089 200 000 830 (täglich 8–20 Uhr)');
-    expect(within(zeileTel).getByRole('link', { name: 'WhatsApp' }).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/4989200000830/);
-    expect(within(zeileTel).getByRole('link', { name: '089 200 000 830' })).toHaveAttribute('href', 'tel:+4989200000830');
+    expect(screen.queryByText('Rückruf vereinbaren')).toBeNull();
+    const kontakt = document.querySelector('[data-kontakt-minimal]') as HTMLElement;
+    expect(within(kontakt).getByText('Marta Kapcio')).toBeInTheDocument();
+    expect(within(kontakt).getByRole('link', { name: /anrufen: 089 200 000 830$/ })).toHaveAttribute('href', 'tel:+4989200000830');
+    expect(within(kontakt).getByRole('link', { name: /per WhatsApp schreiben$/ }).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/4989200000830/);
 
     // Darunter: Pflegesituation mit offenem Formular, So geht es weiter, Fragen, Marta. Keine Kostenkarte mehr (ihre
     // Aufstellung steht unter „Details“).
@@ -165,7 +162,7 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     const soGehts = screen.getByRole('heading', { level: 2, name: 'So geht es weiter' });
     const fragen = screen.getByRole('heading', { level: 2, name: 'Häufige Fragen' });
     const marta = screen.getByText('Noch Fragen?');
-    const reihe = [h1, karte, abschnitt, zweite, rueckruf, zeileTel, haupt, pflegesituation, schritt, soGehts, fragen, marta];
+    const reihe = [h1, karte, abschnitt, zweite, kontakt, haupt, pflegesituation, schritt, soGehts, fragen, marta];
     for (let i = 1; i < reihe.length; i++) expect(davor(reihe[i - 1], reihe[i])).toBe(true);
     // Wortlaut-Regeln: nie „Betreuungskräfte“, nie „vermitteln“.
     expect(document.body.textContent).not.toMatch(/Betreuungskräfte|vermitteln/);
@@ -326,108 +323,6 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(document.querySelector('[data-testsieger-kopf]')).toBeNull();
     expect(screen.getByRole('button', { name: 'Hilfe' })).toBeInTheDocument();
   }, 30_000);
-
-  it('„Rückruf vereinbaren“: genau ein POST mit Token und Quelle portal_einstieg, danach „Danke, Marta ruft Sie an.“ statt des Knopfs; Nummer bleibt', async () => {
-    const TOKEN = 'token-mi-rueckruf-ok';
-    const bitten: Record<string, unknown>[] = [];
-    let freigeben: () => void = () => {};
-    const freigabe = new Promise<void>((r) => { freigeben = r; });
-    server.use(
-      http.post('https://kostenrechner.primundus.de/api/rueckmeldung', async ({ request }) => {
-        bitten.push(await request.json() as Record<string, unknown>);
-        await freigabe;
-        return HttpResponse.json({ ok: true });
-      }),
-      ...lesen,
-      ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }),
-    );
-    window.history.replaceState({}, '', `/?token=${TOKEN}`);
-    const user = userEvent.setup();
-    render(<CustomerPortalPage />);
-    await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
-    const haupt = screen.getByRole('button', { name: HAUPTKNOPF });
-    const knopf = screen.getByRole('button', { name: 'Rückruf vereinbaren' });
-    // Der Statusbereich steht schon vor dem Tipp leer im DOM (ein erst mit Text eingefügter Bereich wird von Screenreadern
-    // unzuverlässig angesagt).
-    const aktionen = document.querySelector('[data-aktionen-minimal]') as HTMLElement;
-    const danke = within(aktionen).getByRole('status');
-    expect(danke.textContent).toBe('');
-
-    // Während der Anfrage gesperrt (aria-disabled, nicht disabled: der Fokus bleibt auf dem Knopf), ein Doppeltipp sendet
-    // nicht zweimal; die Beschriftung bleibt.
-    await user.click(knopf);
-    await waitFor(() => expect(knopf).toHaveAttribute('aria-disabled', 'true'));
-    expect(knopf).not.toBeDisabled();
-    expect(knopf).toHaveAttribute('aria-busy', 'true');
-    expect(document.activeElement).toBe(knopf);
-    expect(knopf.textContent).toBe('Rückruf vereinbaren');
-    await user.click(knopf);
-    freigeben();
-
-    // Derselbe Statusbereich bekommt den Dank; der Fokus geht auf den Dank an der Stelle des Knopfs (nicht auf die Seite).
-    await waitFor(() => expect(danke.textContent).toBe('Danke, Marta ruft Sie an.'));
-    expect(within(aktionen).getByRole('status')).toBe(danke);
-    expect(document.activeElement).toBe(within(danke).getByText('Danke, Marta ruft Sie an.'));
-    expect(screen.queryByRole('button', { name: 'Rückruf vereinbaren' })).toBeNull();
-    expect(bitten).toEqual([{ token: TOKEN, aktion: 'rueckruf', quelle: 'portal_einstieg' }]);
-    // Nummer und fester Knopf bleiben, in derselben Reihenfolge.
-    expect(screen.getByRole('button', { name: HAUPTKNOPF })).toBe(haupt);
-    const zeileTel = screen.getByText(/^oder anrufen, auch per/);
-    expect(davor(danke, zeileTel)).toBe(true);
-    expect(davor(zeileTel, haupt)).toBe(true);
-    expect(document.body.textContent).not.toMatch(/Betreuungskräfte|vermitteln/);
-  }, 20_000);
-
-  it('„Rückruf vereinbaren“ ohne Erfolg (502): „Das hat nicht geklappt“ über dem weiter tippbaren Knopf, zweiter Tipp sendet erneut', async () => {
-    let anzahl = 0;
-    server.use(
-      http.post('https://kostenrechner.primundus.de/api/rueckmeldung', () => {
-        anzahl += 1;
-        return anzahl === 1 ? HttpResponse.json({ error: 'Mail fehlgeschlagen' }, { status: 502 }) : HttpResponse.json({ ok: true });
-      }),
-      ...lesen,
-      ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }),
-    );
-    window.history.replaceState({}, '', '/?token=token-mi-rueckruf-fehler');
-    const user = userEvent.setup();
-    render(<CustomerPortalPage />);
-    await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
-
-    const erster = screen.getByRole('button', { name: 'Rückruf vereinbaren' });
-    await user.click(erster);
-    const aktionen = document.querySelector('[data-aktionen-minimal]') as HTMLElement;
-    const fehler = await within(aktionen).findByRole('alert');
-    expect(fehler.textContent).toBe('Das hat nicht geklappt');
-    const knopf = screen.getByRole('button', { name: 'Rückruf vereinbaren' });
-    // Derselbe Knopf, wieder frei und weiter fokussiert (Tastatur kann sofort wiederholen).
-    expect(knopf).toBe(erster);
-    expect(knopf).not.toHaveAttribute('aria-disabled');
-    expect(document.activeElement).toBe(knopf);
-    expect(davor(fehler, knopf)).toBe(true);
-    expect(screen.queryByText('Danke, Marta ruft Sie an.')).toBeNull();
-    expect(screen.getByText(/^oder anrufen, auch per/)).toBeInTheDocument();
-
-    await user.click(knopf);
-    const status = within(aktionen).getByRole('status');
-    await waitFor(() => expect(status.textContent).toBe('Danke, Marta ruft Sie an.'));
-    expect(anzahl).toBe(2);
-  }, 20_000);
-
-  it('Lead ohne Rückrufnummer: „Rückruf vereinbaren“ bleibt ein Anruf-Link, kein POST', async () => {
-    let bitten = 0;
-    server.use(
-      http.post('https://kostenrechner.primundus.de/api/rueckmeldung', () => { bitten += 1; return HttpResponse.json({ ok: true }); }),
-      ...lesen,
-      ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }),
-    );
-    window.history.replaceState({}, '', '/?token=token-mi-ohnetel');
-    render(<CustomerPortalPage />);
-    await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
-    const link = screen.getByRole('link', { name: 'Rückruf vereinbaren' });
-    expect(link).toHaveAttribute('href', 'tel:+4989200000830');
-    expect(screen.queryByRole('button', { name: 'Rückruf vereinbaren' })).toBeNull();
-    expect(bitten).toBe(0);
-  }, 20_000);
 
   it('?einstieg=zuerst zeigt „Pflegekräfte zuerst“ (#145) unverändert, ohne Minimal-Einstieg', async () => {
     server.use(...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
