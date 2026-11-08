@@ -409,7 +409,7 @@ describe('Leerzustände ohne Gedankenstrich (Registry #147)', () => {
     expect(within(karte).getByRole('heading', { level: 2 }).textContent).toBe('Ihr persönliches Angebot');
     expect(karte.querySelector('[data-nach-zuschuessen]')).toBeNull();
     const vertrauen = karte.querySelector('[data-vertrauen]') as HTMLElement;
-    expect(vertrauen.className).toContain('grid-cols-2');
+    expect(vertrauen.children).toHaveLength(2);
     expect(vertrauen.textContent).toBe('Erfahrung20 JahreErfahrungTestsieger6× in FolgeTestsieger');
   });
 });
@@ -438,7 +438,10 @@ describe('Angebotskarte mit Zuschüssen und Sternen (Fassung „CGA-Stil“, 08.
     expect(document.querySelector('[data-nach-zuschuessen]')!.textContent).toBe('Nach Zuschüssen ca. 1.622 € im Monat');
     expect(document.querySelector('[data-heimvergleich]')!.textContent).toBe('rund 1.742 € weniger als im Pflegeheim');
     const vertrauen = document.querySelector('[data-vertrauen]') as HTMLElement;
-    expect(vertrauen.className).toContain('grid-cols-3');
+    // Gleiche Abstände zwischen den Spalten, rechts frei für Martas Reiter (Martin 08.11.: „Abstand muss besser passen“).
+    expect(vertrauen.children).toHaveLength(3);
+    expect(vertrauen.className).toContain('justify-between');
+    expect(vertrauen.className).toContain('min-[360px]:pr-6');
     expect(vertrauen.textContent).toBe('Bewertungen4,9126 BewertungenErfahrung20 JahreErfahrungTestsieger6× in FolgeTestsieger');
     // Kein Satz mehr zu zwei Personen, keine Chips.
     expect(document.body.textContent).not.toMatch(/für eine Person|Zwei Personen|Pflegegrad 4/);

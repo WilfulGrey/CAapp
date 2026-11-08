@@ -166,8 +166,12 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
           </li>
         ))}
       </ul>
-      {/* Vertrauen: Sterne (ohne Stand fehlt die Spalte, kein Ersatzwert), 20 Jahre, 6× in Folge Testsieger. */}
-      <dl className={`mt-3.5 grid ${sterne ? 'grid-cols-3' : 'grid-cols-2'} gap-2 border-t border-pm-line-soft pt-3`} data-vertrauen>
+      {/* Vertrauen: Sterne (ohne Stand fehlt die Spalte, kein Ersatzwert), 20 Jahre, 6× in Folge Testsieger. Gleiche Abstände
+          zwischen den Spalten, Text linksbündig (Martin 08.11.: „der erste und zweite Punkt zu nah beieinander … linksbündig,
+          aber der Abstand muss besser passen“); vorher drei gleich breite Spalten, darin 16 px und 50 px Lücke. Rechts 24 px
+          frei: Martas Reiter steht in Ruhe 42 px in den Bildschirm hinein und lag auf iPhone 13 und Android 360 genau auf
+          „6× in Folge“ (gemessen 14 und 18 px verdeckt). Unter 360 px (iPhone SE) liegt er tiefer, dort kein Abstand. */}
+      <dl className="mt-3.5 flex justify-between gap-3 border-t border-pm-line-soft pt-3 min-[360px]:pr-6" data-vertrauen>
         {sterne && (
           <div className="min-w-0">
             <dt className="sr-only">Bewertungen</dt>
