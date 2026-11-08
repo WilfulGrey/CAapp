@@ -750,6 +750,11 @@ const CustomerPortalPage: FC = () => {
   const [einstiegZuerst] = useState(() => {
     try { return new URLSearchParams(window.location.search).get('einstieg') === 'zuerst'; } catch { return false; }
   });
+  // Registry #147, Fassung „CGA-Stil“ (08.11.2026, Entwurf): `?reihenfolge=mail` stellt im Minimal-Einstieg den Hauptknopf
+  // direkt unter die Angebotskarte (Reihenfolge der kurzen Angebotsmail), die Pflegekräfte danach. Nur zum Vergleich.
+  const [knopfUnterAngebot] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('reihenfolge') === 'mail'; } catch { return false; }
+  });
   // Registry #145, Nachbesserung 2: Vormerkungen gibt es nur im Modus „Pflegekräfte zuerst“ (ohne `?einstieg=alt` und ohne
   // `?einstieg=kompakt`) — nur dort werden sie geladen und nach dem ersten Speichern automatisch eingeladen.
   const modusPflegekraefteZuerst = !einstiegAlt && !einstiegKompakt;
@@ -4207,6 +4212,7 @@ const CustomerPortalPage: FC = () => {
               : undefined}
           onKostenAufgeklappt={() => messen('kosten_aufgeklappt')}
           onFaqGeoeffnet={messeFrage}
+          knopfUnterAngebot={knopfUnterAngebot}
         />
       ) : pflegekraefteZuerst ? (
         // Registry #145 (Martin 03.11.2026): vor dem ersten Speichern „Pflegekräfte zuerst" — Preis oben, sofort die

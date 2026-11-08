@@ -16,8 +16,7 @@ import { server } from '../../../test/mocks/server';
 import { http, HttpResponse } from 'msw';
 import { defaultHandlers, defaultLead, sampleCaregiver, sampleMatching, bridgeHandler } from '../../../test/fixtures/mamamia-mocks';
 import { vormerkSchluessel } from '../../lib/vormerkungen';
-import { EinstiegMinimal, angebotKurz, zeilenFakten } from '../../components/portal/EinstiegMinimal';
-import { angebotFuer } from '../../components/portal/KompaktEinstieg';
+import { EinstiegMinimal, zeilenFakten } from '../../components/portal/EinstiegMinimal';
 import type { Nurse } from '../../types';
 
 vi.mock('../../lib/supabase', async () => {
@@ -106,12 +105,14 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(within(kopf).getByAltText('Testsieger Die Welt')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hilfe' })).toBeNull();
 
-    // Kompakte Angebotskarte: „Ihr Angebot · eine Person, Pflegegrad 3“ (Mockup wörtlich), Preis, „/ Monat“, „Details ›“,
-    // drei Punkte.
+    // Angebotskarte wie der Kasten der kurzen Angebotsmail (#148, Fassung „CGA-Stil“ 08.11.): „Ihr Angebot“, Preis, „/ Monat“,
+    // Chips, „Details ›“, drei Punkte. Die grüne Zeile „Nach Zuschüssen …“ fehlt hier: Die Posten der Testkalkulation
+    // (2.800 − 347) passen nicht zum Eigenanteil 1.800, und dann steht lieber nichts als eine falsche Zahl.
     const karte = document.querySelector('[data-angebot-minimal]') as HTMLElement;
-    expect(within(karte).getByText('Ihr Angebot · eine Person, Pflegegrad 3')).toBeInTheDocument();
-    expect(karte.textContent).not.toContain('Ihr Angebot für');
+    expect(within(karte).getByRole('heading', { level: 2, name: 'Ihr Angebot' })).toBeInTheDocument();
     expect(within(karte).getByText(/^2\.800 €/).textContent).toBe('2.800 € / Monat');
+    expect(within(karte).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Eine Person', 'Pflegegrad 3']);
+    expect(karte.querySelector('[data-nach-zuschuessen]')).toBeNull();
     expect(within(karte).getByRole('button', { name: 'Details ›' })).toBeInTheDocument();
     expect(within(karte).getByText('Täglich kündbar · Keine Vermittlungsgebühr · Bestpreisgarantie')).toBeInTheDocument();
 
@@ -159,7 +160,7 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     // Wortlaut-Regeln: nie „Betreuungskräfte“, nie „vermitteln“.
     expect(document.body.textContent).not.toMatch(/Betreuungskräfte|vermitteln/);
     // Pille rechts in jedem Zustand gleich breit (die Zeile hält ihre Höhe, der Hauptknopf wandert nicht).
-    for (const z of zeilen()) expect(within(z).getByRole('button', { name: 'Einladen' }).className).toContain('w-[88px]');
+    for (const z of zeilen()) expect(within(z).getByRole('button', { name: 'Einladen' }).className).toContain('w-[84px]');
   }, 20_000);
 
   it('Platzhalterzeilen ohne Text, solange die Liste lädt; Hauptknopf steht schon da, danach die Zeilen mit Anzahl', async () => {
@@ -211,7 +212,7 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     const vorgemerkt = within(zeileVon('Emilia')).getByRole('button', { name: 'Vorgemerkt ✓' });
     // Gleich breite Pille wie „Einladen“: die Zeile wird mit der Vormerkung nicht höher.
-    expect(vorgemerkt.className).toContain('w-[88px]');
+    expect(vorgemerkt.className).toContain('w-[84px]');
     expect(zeileVon('Emilia')).toHaveAttribute('data-vorgemerkt', 'true');
     expect(within(zeileVon('Helena')).getByRole('button', { name: 'Einladen' })).toBeInTheDocument();
     expect(screen.getByText('Nach dem Speichern laden wir Emilia W. für Sie ein.')).toBeInTheDocument();
@@ -430,31 +431,6 @@ describe('zeilenFakten (Registry #147)', () => {
   });
 });
 
-describe('angebotKurz: Angebotszeile wie im Mockup (Registry #147)', () => {
-  it('„eine Person, Pflegegrad 3“ (Mockup), dieselben Wörter wie angebotFuer ohne „für“/„mit“; ohne Personenzahl null', () => {
-    expect(angebotKurz({ betreuung_fuer: '1-person', pflegegrad: 3 })).toBe('eine Person, Pflegegrad 3');
-    expect(angebotKurz({ betreuung_fuer: '1-person', pflegegrad: '3' })).toBe('eine Person, Pflegegrad 3');
-    expect(angebotKurz({ betreuung_fuer: 'ehepaar', pflegegrad: 4 })).toBe('zwei Personen, Pflegegrad 4');
-    expect(angebotKurz({ betreuung_fuer: '1-person', pflegegrad: 0 })).toBe('eine Person, ohne Pflegegrad');
-    expect(angebotKurz({ betreuung_fuer: '1-person' })).toBe('eine Person');
-    expect(angebotKurz({ pflegegrad: 3 })).toBeNull();
-    expect(angebotKurz(null)).toBeNull();
-  });
-  it('steht genau dann da, wenn auch angebotFuer etwas liefert (gleiche Angaben, kein zweiter Maßstab)', () => {
-    const faelle: (Record<string, unknown> | null)[] = [
-      null, {}, { pflegegrad: 2 }, { betreuung_fuer: 'egal', pflegegrad: 2 },
-      { betreuung_fuer: '1-person' }, { betreuung_fuer: '1-person', pflegegrad: 'x' },
-      { betreuung_fuer: 'ehepaar', pflegegrad: 0 }, { betreuung_fuer: 'ehepaar', pflegegrad: '5' },
-    ];
-    for (const fd of faelle) {
-      const lang = angebotFuer(fd);
-      const kurz = angebotKurz(fd);
-      expect(kurz === null).toBe(lang === null);
-      if (lang && kurz) expect(lang.replace(/^für /, '').replace(/ mit /, ', ').replace(/ ohne /, ', ohne ')).toBe(kurz);
-    }
-  });
-});
-
 describe('Leerzustände ohne Gedankenstrich (Registry #147)', () => {
   const leer = (gehalteneEinladungen: number) => render(
     <EinstiegMinimal
@@ -479,9 +455,36 @@ describe('Leerzustände ohne Gedankenstrich (Registry #147)', () => {
     );
     expect(document.querySelector('[data-einstieg="minimal"]')!.textContent).not.toContain('—');
   });
-  it('Angebotskarte ohne Angaben: nur „Ihr Angebot“', () => {
+  it('Angebotskarte ohne Lead: „Ihr Angebot“, Preis, keine Chips und keine Zeile „Nach Zuschüssen“', () => {
     leer(0);
     const karte = document.querySelector('[data-angebot-minimal]') as HTMLElement;
-    expect(karte.querySelector('p')!.textContent).toBe('Ihr Angebot');
+    expect(within(karte).getByRole('heading', { level: 2 }).textContent).toBe('Ihr Angebot');
+    expect(within(karte).queryAllByRole('listitem')).toHaveLength(0);
+    expect(karte.querySelector('[data-nach-zuschuessen]')).toBeNull();
+  });
+});
+
+describe('Reihenfolge wie in der Mail (`?reihenfolge=mail`, Vergleich 08.11.)', () => {
+  const zeigen = (knopfUnterAngebot: boolean) => render(
+    <EinstiegMinimal
+      anrede="Frau Testerin" lead={null} onBestpreis={() => {}} heimEigenanteil={0} heimQuelle=""
+      laedt={false} zeilen={[<li key="a" data-pflegekraft-zeile="1">Ewa</li>]} gehalteneEinladungen={0} vorschlaegeVorhanden
+      bereitsBearbeitet={null} formular={<div />} sterne={null} vorgemerkte={[]} onVervollstaendigen={() => {}}
+      knopfUnterAngebot={knopfUnterAngebot}
+    />,
+  );
+  const lage = (a: Element, b: Element) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING;
+  it('mit Schalter: Hauptknopf zwischen Angebotskarte und Pflegekräften, genau einmal', () => {
+    zeigen(true);
+    const knoepfe = screen.getAllByRole('button', { name: /^Angaben vervollständigen und Bewerbungen erhalten/ });
+    expect(knoepfe).toHaveLength(1);
+    expect(lage(document.querySelector('[data-angebot-minimal]')!, knoepfe[0])).toBeTruthy();
+    expect(lage(knoepfe[0], document.getElementById('pflegekraefte')!)).toBeTruthy();
+  });
+  it('ohne Schalter: Hauptknopf nach den Pflegekräften (freigegebene Reihenfolge)', () => {
+    zeigen(false);
+    const knoepfe = screen.getAllByRole('button', { name: /^Angaben vervollständigen und Bewerbungen erhalten/ });
+    expect(knoepfe).toHaveLength(1);
+    expect(lage(document.getElementById('pflegekraefte')!, knoepfe[0])).toBeTruthy();
   });
 });
