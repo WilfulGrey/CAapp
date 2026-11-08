@@ -40,10 +40,8 @@ import { WhatsAppIcon } from './WhatsAppIcon';
 export const ANGEBOT_TITEL = 'Ihr persönliches Angebot';
 /** Fester Knopf unten: eine Zeile Titel, darunter Martins Unterzeile (08.11.: „Pflegesituation vervollständigen &
  *  Bewerbungen erhalten - darunter: 100% kostenfrei & unverbindlich“, danach „definitiv zu langtextlich“). Kurz der Nutzen;
- *  „Pflegesituation vervollständigen“ steht als Titel direkt darunter am Formular. Vergleich `?knopf=2` (Vorschau): Titel
- *  „Pflegesituation vervollständigen“. */
+ *  „Pflegesituation vervollständigen“ steht als Titel direkt darunter am Formular. */
 export const FEST_TITEL = 'Bewerbungen erhalten';
-export const FEST_TITEL_2 = 'Pflegesituation vervollständigen';
 export const FEST_ZEILE = '100% kostenfrei & unverbindlich';
 /** Kopf des Formulars in der weißen Karte (Martin 08.11.: „was soll das heißen: Pflegesituation vervollständigen“); der Satz
  *  darunter ist der bisherige Satz des Abschnitts (Martins 60-Minuten-Satz). */
@@ -226,13 +224,10 @@ export function zeilenFakten(nurse: Pick<Nurse, 'experienceYears' | 'language'>)
 // einer eigenen Zeile; rechts der Preis (ohne „/ Monat“, Martin 08.11.) und darunter „Einladen“. Der Preis ist der des
 // Kunden: Die Liste zeigt nur Kräfte mit seiner Deutsch-Stufe (`matchesGermanyWish`, strikt), und die Stufe ist der einzige
 // Preisfaktor, der an der Kraft hängt (lib/preisJeKraft.ts im Zweig feat/portal-preis-bei-pflegekraeften).
-export function PflegekraftZeile({ nurse, preis, preisUnten = false, vorgemerkt, gesperrt, onNurseClick, onInvite, onInviteConfirm }: {
+export function PflegekraftZeile({ nurse, preis, vorgemerkt, gesperrt, onNurseClick, onInvite, onInviteConfirm }: {
   nurse: Nurse;
   /** Monatspreis des Kunden (`kalkulation.bruttopreis`); ohne Preis entfällt die Angabe. */
   preis?: number | null;
-  /** Vergleich 08.11. (`?zeile=b`): Preis als dritte Zeile unter den Angaben, „Einladen“ mittig rechts. Sonst Preis oben
-   *  rechts auf der Höhe des Namens, „Einladen“ darunter. */
-  preisUnten?: boolean;
   /** Registry #145: vorgemerkt → `EINGELADEN` mit Haken, bleibt tippbar und öffnet das Fenster erneut. */
   vorgemerkt: boolean;
   /** Eine Einladung läuft gerade (nach dem Speichern) → „Bitte warten…“ wie auf der Karte. */
@@ -290,15 +285,12 @@ export function PflegekraftZeile({ nurse, preis, preisUnten = false, vorgemerkt,
           {fakten.map((teil) => (
             <span key={teil} className="block text-[13.5px] leading-[1.4] text-pm-muted">{teil}</span>
           ))}
-          {preisUnten && preisText && <span className="mt-0.5 block">{preisText}</span>}
         </span>
       </button>
-      {preisUnten ? knopf : (
-        <div className="flex flex-none flex-col items-end gap-1.5">
-          {preisText}
-          {knopf}
-        </div>
-      )}
+      <div className="flex flex-none flex-col items-end gap-1.5">
+        {preisText}
+        {knopf}
+      </div>
     </li>
   );
 }
@@ -466,7 +458,7 @@ function AblaufMinimal({ onZumFormular }: { onZumFormular?: () => void }) {
 export function EinstiegMinimal({
   anrede, lead, onBestpreis, heimEigenanteil, heimQuelle,
   laedt, zeilen, gehalteneEinladungen, vorschlaegeVorhanden, bereitsBearbeitet, formular, sterne, vorgemerkte,
-  onVervollstaendigen, onAblaufZumFormular, onKostenAufgeklappt, onFaqGeoeffnet, knopfTitel = FEST_TITEL,
+  onVervollstaendigen, onAblaufZumFormular, onKostenAufgeklappt, onFaqGeoeffnet,
 }: {
   /** Anrede für „Guten Tag, …“ (customerSalutation), ohne Anrede nur „Guten Tag“. */
   anrede: string | null;
@@ -492,8 +484,6 @@ export function EinstiegMinimal({
   onAblaufZumFormular?: () => void;
   onKostenAufgeklappt?: () => void;
   onFaqGeoeffnet?: (schluessel: string) => void;
-  /** Titel des festen Knopfs (Vorschau-Vergleich `?knopf=2`). */
-  knopfTitel?: string;
 }) {
   // Der feste Knopf steht nur über Angebot und Pflegekräften (Martin 08.11.: „den wir festmachen unten“). Kommt das Formular
   // ins Bild, fährt er weg; im Formular steht dessen eigener Knopf fest UNTER dem Formular, nichts schwebt mehr darüber (Martin
@@ -588,7 +578,7 @@ export function EinstiegMinimal({
             >
               {/* Pfeil (Martin 08.11.: „wir lassen Bewerbungen erhalten. Und dann kommt so ein Pfeil dahin“). */}
               <span className="flex items-center justify-center gap-1.5 text-[16px] font-bold leading-5">
-                {knopfTitel}
+                {FEST_TITEL}
                 <ArrowRight className="h-[18px] w-[18px] flex-none" strokeWidth={2.5} aria-hidden="true" data-pfeil />
               </span>
               <span className="mt-0.5 block text-[12.5px] font-medium leading-4 opacity-90">{FEST_ZEILE}</span>
