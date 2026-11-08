@@ -320,6 +320,16 @@ przejścia** — klient nie czeka na maila.
 
 ### Empfehlung w Eingangsbestätigung (Bug #39, 2026-08-31)
 
+> **Stan od Registry #148 (2026-11-08, Martin: „genauso wie im Portal“):** Angebotsmail wygląda jak Minimal-Einstieg
+> portalu (#147): kompaktowa karta ceny („Ihr persönliches Angebot“, „Nach Zuschüssen“, porównanie z Pflegeheim,
+> Bestpreisgarantie + 3 punkty, Kennzahlen), potem do pięciu wierszy „Passende Pflegekräfte“ ze zdjęciem (CID),
+> imieniem, wiekiem, doświadczeniem, niemieckim, ceną i przyciskiem „Ansehen“ (`cg=<caregiverId>&m=eb` — otwiera profil
+> w portalu), link „Alle Pflegekräfte anzeigen“ (`goto=matches`), zdanie o portalu i JEDEN przycisk „Bewerbungen
+> erhalten →“ (`goto=anfragen&m=eb` — formularz). `empfehlungFuerAngebot` pobiera zdjęcia wszystkich widocznych
+> opiekunek, max 5 (`ANGEBOT_KRAEFTE_MAX`; polecona zawsze, reszta `fotoBudget` 300 KB / 1,2 MB, reszta = inicjały) i dokleja je jako `__inlineAttachments`; event
+> `empfehlung_in_angebotsmail` niesie `fotos_inline`. Brak Empfehlung ⇒ brak karty, przycisk zostaje. Sformułowania =
+> portal, pilnuje `src/__tests__/mails/angebotsmailWortlaut.test.ts`. Opisy wyglądu niżej są historyczne (#39, #117).
+
 Angebotsmail pokazuje **konkretną gematchowaną opiekunkę** zamiast zdania „w
 portalu czekają opiekunki". Kod:
 [empfehlung.ts](../project%203/supabase/functions/send-scheduled-emails/empfehlung.ts).

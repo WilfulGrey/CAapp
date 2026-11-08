@@ -1,6 +1,6 @@
 import { assertEquals, assertStringIncludes } from "https://deno.land/std@0.208.0/assert/mod.ts";
 import {
-  portalAngabenHinweisHtml,
+  portalAngabenAngenommen,
   portalHerkunft,
   portalIntroHtml,
   portalIntroText,
@@ -53,7 +53,7 @@ Deno.test("Betreff sagt dem Kaltkontakt, was ihn erwartet", () => {
 });
 
 Deno.test("Angaben-Hinweis sagt, dass wir Luecken angenommen haben", () => {
-  const h = portalAngabenHinweisHtml("Pflegehilfe");
+  const h = portalAngabenHinweisText("Pflegehilfe");
   assertStringIncludes(h, "angenommen");
   assertStringIncludes(h, "korrigieren");
 });
@@ -76,8 +76,8 @@ Deno.test("Portalname traegt kein TLD und wird nicht verlinkt", () => {
   for (const name of ["Pflegehilfe", "Pflegebund"]) {
     for (const html of [
       portalIntroHtml(name),
-      portalAngabenHinweisHtml(name, true),
-      portalAngabenHinweisHtml(name, false),
+      portalAngabenHinweisText(name, true),
+      portalAngabenHinweisText(name, false),
     ]) {
       assertStringIncludes(html, name);
       // Ausser den echten Portal-Links (href) darf keine Domain im Text stehen.
@@ -194,4 +194,25 @@ Deno.test("Hinweis nennt Annahmen nur, wenn welche noetig waren", () => {
     assertStringIncludes(t, "Pflegehilfe");
     assertStringIncludes(t, "korrigieren");
   }
+});
+
+/* Wortlaut wie bis Registry #148 live; einzige Aenderung (07.11.2026): der Gedankenstrich als Satzzeichen ist ein Punkt
+ * mit neuem Satz. Faerbung: fehlende Liste (Altbestand) = vorsichtiger Text, nur eine leere Liste = "uebernommen". */
+Deno.test("Hinweis: Wortlaut ohne Gedankenstrich, Faerbung nach angenommene_felder", () => {
+  assertEquals(
+    portalAngabenHinweisText("Pflegehilfe", true),
+    "Diese Angaben haben wir aus Ihrer Anfrage bei Pflegehilfe übernommen und dort, wo uns etwas fehlte, vorsichtig angenommen. Im Kundenportal können Sie alles in einer Minute korrigieren. Der Preis passt sich sofort an.",
+  );
+  assertEquals(
+    portalAngabenHinweisText("Pflegehilfe", false),
+    "Diese Angaben haben wir aus Ihrer Anfrage bei Pflegehilfe übernommen. Stimmt etwas nicht, können Sie es im Kundenportal in einer Minute korrigieren. Der Preis passt sich sofort an.",
+  );
+  for (const t of [portalAngabenHinweisText("Pflegebund", true), portalAngabenHinweisText("Pflegebund", false)]) {
+    assertEquals(/[—–]/.test(t), false);
+  }
+  assertEquals(portalAngabenAngenommen(undefined), true);
+  assertEquals(portalAngabenAngenommen(null), true);
+  assertEquals(portalAngabenAngenommen("betreuung_fuer"), true);
+  assertEquals(portalAngabenAngenommen(["betreuung_fuer"]), true);
+  assertEquals(portalAngabenAngenommen([]), false);
 });

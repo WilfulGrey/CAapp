@@ -713,6 +713,13 @@ roter Eintrag zu viel.
 aus `portal-lead.ts` mit dem *teureren* Wert: lieber ein Preis, der nach
 einer Korrektur fällt, als einer, der steigt. Was angenommen wurde, steht
 im Ereignislog und entscheidet, ob die Mail den Annahme-Hinweis zeigt.
+(Registry #148, Mail 1 wie das Portal: keine Angaben-Tabelle mehr; der
+Hinweis steht klein direkt unter dem Kasten „Ihr persönliches Angebot“ und
+über den passenden Pflegekräften, Wortlaut aus `herkunft.ts`, nur
+„… korrigieren. Der Preis passt sich sofort an.“ statt Gedankenstrich.
+Bedingungen unverändert: jeder eingekaufte Lead mit bekanntem Portal;
+„vorsichtig angenommen“, wenn `angenommene_felder` nicht leer ist oder
+fehlt, sonst „übernommen“. Rechner-Leads sehen ihn nie.)
 
 **Ein Portal darf das andere nicht aufhalten.** Fällt ein Postfach aus,
 laufen die übrigen weiter.

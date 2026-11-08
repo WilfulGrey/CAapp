@@ -153,7 +153,11 @@ So wissen Sie von Anfang an, was die Betreuung kostet und wer für Sie infrage k
 Angebot & passende Pflegekräfte ansehen: ${ctaUrl}`;
 }
 
-/* Hinweis ueber der Angaben-Tabelle — in zwei Faerbungen.
+/* Hinweis zu den Angaben — in zwei Faerbungen. Bis Registry #148 stand er
+ * ueber der Angaben-Tabelle, in Mail 1 steht er klein direkt unter dem
+ * Kasten "Ihr persoenliches Angebot" (kundenMails.ts angebotMail). Wortlaut wie bis
+ * #148 live, einzige Aenderung: der Gedankenstrich vor "der Preis passt sich
+ * sofort an" ist ein Punkt mit neuem Satz.
  *
  * Hat das Portal alles geliefert (bei Pflegehilfe der Normalfall: 9 von 9
  * Feldern), waere "wo uns etwas fehlte, haben wir angenommen" falsch und
@@ -163,12 +167,14 @@ Angebot & passende Pflegekräfte ansehen: ${ctaUrl}`;
  * Kunde, woher wir Dinge wissen, die er nie gesagt hat. Zugleich der beste
  * Grund, das Portal zu oeffnen — was wir angenommen haben, war bewusst der
  * teurere Wert, eine Korrektur senkt also den Preis. */
-export function portalAngabenHinweisHtml(portal: string, angenommen = true): string {
-  return `<p style="font-size:14px;line-height:1.7;color:#666;margin:0 0 10px;">${portalAngabenHinweisText(portal, angenommen)}</p>`;
-}
-
 export function portalAngabenHinweisText(portal: string, angenommen = true): string {
   return angenommen
-    ? `Diese Angaben haben wir aus Ihrer Anfrage bei ${portal} übernommen und dort, wo uns etwas fehlte, vorsichtig angenommen. Im Kundenportal können Sie alles in einer Minute korrigieren — der Preis passt sich sofort an.`
-    : `Diese Angaben haben wir aus Ihrer Anfrage bei ${portal} übernommen. Stimmt etwas nicht, können Sie es im Kundenportal in einer Minute korrigieren — der Preis passt sich sofort an.`;
+    ? `Diese Angaben haben wir aus Ihrer Anfrage bei ${portal} übernommen und dort, wo uns etwas fehlte, vorsichtig angenommen. Im Kundenportal können Sie alles in einer Minute korrigieren. Der Preis passt sich sofort an.`
+    : `Diese Angaben haben wir aus Ihrer Anfrage bei ${portal} übernommen. Stimmt etwas nicht, können Sie es im Kundenportal in einer Minute korrigieren. Der Preis passt sich sofort an.`;
+}
+
+/** Welche Faerbung: `kalkulation.angenommene_felder` (api/portal-lead). Fehlt die Liste (Altbestand), gilt der
+ *  vorsichtigere Text; nur eine leere Liste heisst "alles vom Portal". */
+export function portalAngabenAngenommen(felder: unknown): boolean {
+  return !Array.isArray(felder) || felder.length > 0;
 }
