@@ -1,20 +1,9 @@
 // Einstieg VOR dem ersten Speichern der Pflegesituation: „Minimal“ — Registry #147 (Entwurf, nicht live).
 //
 // Martin 07.11.2026 zum Mockup (seo-reports/analysen/vorschlag-minimal-2026-11-07/mockup/portal.html): „Ja, alle drei“.
-// Vorher (Abnahme 07.11.): auf dem iPhone 13 kam die erste Pflegekraft bei 1.426 px, das Formular bei 2.603 px. Jetzt
-// steht im ersten Bild: Kopf mit Logo und Testsieger (Navigationsleiste, `TestsiegerKopf`) → Gruß → kompakte
-// Angebotskarte („Details ›“ springt zur Kostenkarte unten und klappt „Alle Kosten im Überblick“ auf) → „Passende
-// Pflegekräfte“ als kompakte Zeilen mit „Einladen“ → direkt darunter der Hauptknopf ins Formular, „Rückruf vereinbaren“
-// und die Nummer. Darunter wie in „Pflegekräfte zuerst“ (#145): Pflegesituation mit offenem Formular, Kostenkarte, So
-// geht es weiter, Häufige Fragen, Marta.
+// Vorher (Abnahme 07.11.): auf dem iPhone 13 kam die erste Pflegekraft bei 1.426 px, das Formular bei 2.603 px.
 // „Einladen“ ist die Logik aus #145 unverändert (CustomerPortalPage: Fenster „{Name} einladen“, Vormerken, nach dem
-// ersten Speichern automatisch einladen). Alle sichtbaren Texte stammen aus dem Mockup oder stehen schon im Portal.
-//
-// Maße „kompakt“ (Variantenvergleich 07.11., bau/portal/varianten/kompakt_lage.json; gebaut und gemessen in
-// bau/portal/gebaut2_lage.json): alle Zeilen bleiben über dem Hauptknopf, der Platz kommt aus dichteren Abständen, damit
-// der Hauptknopf auch auf dem iPhone SE (375×553) im ersten Bild steht. Die Pille rechts hat in allen Zuständen dieselbe
-// Breite (`PILLE`): „Vorgemerkt ✓“ war ca. 35 px breiter als „Einladen“, die Fakten brachen daneben um und schoben den
-// Hauptknopf mit jeder Vormerkung nach unten.
+// ersten Speichern automatisch einladen).
 //
 // „Rückruf vereinbaren“ schickt mit `onRueckruf` die Bitte über `/api/rueckmeldung` (Aktion `rueckruf`, Quelle
 // `portal_einstieg`, Team-Mail an info@, src/lib/rueckruf.ts). Ohne `onRueckruf` (Vorschau, Lead ohne Rückrufnummer)
@@ -24,25 +13,42 @@
 //
 // Fassung „CGA-Stil“ (Martin 08.11.2026: „optisch … zu gedrungen und nicht clean genug … schau was wir gerade bei umbrella
 // bauen mit der app und cga“): weiße Karten ohne Rahmen auf `pm-grund`, Abschnittstitel in normaler Schreibung mit Zahl,
-// Zeilen mit Trennlinie, „Einladen“ als weißer Knopf mit Rand. Die Angebotskarte zeigt wie die kurze Angebotsmail (#148)
-// „Nach Zuschüssen ca. … € im Monat“ und die Chips (src/lib/angebotZuschuss.ts, Spiegel der Mail).
+// Zeilen mit Trennlinie, weiße Knöpfe mit Rand. Zweite Runde 08.11. (Martin, diktiert): oben ruhig und clean, „Ihr
+// persönliches Angebot“, ohne Chips, Zuschüsse und Pflegeheim-Vergleich in einer ruhigen Zeile, die Bestpreisgarantie
+// „sehr vorteilhaft“ mit „keine Vermittlungsgebühr, täglich kündbar“, Sterne unter dem Gruß; die Pflegekräfte als Zeilen
+// „wie auf dem ersten Bild“, immer mit Preis vor „Einladen“; der Hauptknopf schmal und fest unten, Wortlaut „Pflegesituation
+// vervollständigen und Bewerbungen erhalten“.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Check } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { formatEuro, type Lead } from '../../lib/supabase';
-import { angebotChips, eigenanteilAus, EHEPAAR_SATZ } from '../../lib/angebotZuschuss';
-import type { SterneStand } from '../../lib/sterne';
+import { eigenanteilAus } from '../../lib/angebotZuschuss';
+import { anzahlText, type SterneStand } from '../../lib/sterne';
 import { ERREICHBAR, TELEFON, TELEFON_HREF, WHATSAPP_HREF } from '../../lib/kontakt';
 import { initials } from './shared';
-import { SoGehtEsWeiterVorSpeichern } from './EinstiegVorSpeichern';
-import { AbschnittPflegesituation, KostenkarteKompakt, type VorgemerkteKraft } from './EinstiegPflegekraefteZuerst';
+import { SCHRITTE_STAND_75B8DF8 } from './EinstiegVorSpeichern';
+import { AbschnittPflegesituation, KostenAufstellung, type VorgemerkteKraft } from './EinstiegPflegekraefteZuerst';
 import { FaqListe } from './FaqListe';
 import { MartaBox } from './MartaBox';
 
-// Wortlaut aus dem freigegebenen Mockup (07.11.2026, OpenAI-geprüft). Tests prüfen genau diese Texte.
-export const HAUPTKNOPF = 'Angaben vervollständigen und Bewerbungen erhalten';
-export const HAUPTKNOPF_ZEILE = 'dauert etwa 2 Minuten · kostenlos und unverbindlich';
-export const ANGEBOT_PUNKTE = 'Täglich kündbar · Keine Vermittlungsgebühr · Bestpreisgarantie';
+// Wortlaut (Martin 08.11.2026, diktiert; Entwurf, Freigabe des Wortlauts offen). Tests prüfen genau diese Texte.
+export const ANGEBOT_TITEL = 'Ihr persönliches Angebot';
+/** Fester schmaler Knopf unten, zwei Zeilen (Martin: „Pflegesituation vervollständigen und Bewerbung erhalten. So müsste das
+ *  doch sein.“; Mehrzahl wie im freigegebenen Hauptknopf vom 07.11.). */
+export const FEST_KNOPF = ['Pflegesituation vervollständigen', 'und Bewerbungen erhalten'] as const;
+/** Grüner Kasten in der Angebotskarte: die Bestpreisgarantie als erster von vier gleichwertigen Punkten (Martin: „Ist das
+ *  unsere Bestpreisgarantie? Oder ist das nur ein Punkt davon?“ — die anderen drei gehören nicht zur Garantie), dazu die
+ *  Punkte, die Hemmnisse nehmen (Martin: „Keine Vorauszahlung, keine Vermittlungsgebühr. Keine Mindestlaufzeit … oder
+ *  keine Kündigungsfrist. Beides genügt.“; belegt: USP 4/5, Mustervertrag § 3 und § 4 „ab dem Tag der Ankunft“).
+ *  „Mehr Infos“ unter der Garantie öffnet ihr Fenster. */
+export const GARANTIE_TITEL = 'Es gilt immer unsere Bestpreisgarantie';
+export const GARANTIE_PUNKTE = ['Keine Vorauszahlung', 'Keine Vermittlungsgebühr', 'Keine Mindestlaufzeit'] as const;
+/** Vertrauen unten in der Angebotskarte (Martin: „seit 20 Jahren und 6 Jahre in Folge … Testsieger … die Sterne“): Wert
+ *  groß, Beschriftung klein darunter, wie die Kennzahlen im CGA-Panel. Wortlaut „6× in Folge“ wie die Auszeichnungsseite. */
+export const VERTRAUEN = [['20 Jahre', 'Erfahrung'], ['6× in Folge', 'Testsieger']] as const;
+/** Knopf der Zeile nach dem Tipp auf „Einladen“ (statt „Vorgemerkt“, Martin: „sieht natürlich komisch aus“). „Ausgewählt“
+ *  statt „Eingeladen“ (OpenAI-Prüfung 08.11.): verschickt wird die Einladung erst nach dem Speichern der Pflegesituation. */
+export const AUSGEWAEHLT = 'Ausgewählt';
 export const RUECKRUF = 'Rückruf vereinbaren';
 // Rückruf erbeten: wörtlich die Rückmeldeseite (project 3/app/rueckmeldung/page.tsx, Zustand „rueckruf-ok“ Überschrift,
 // live seit Registry #72; die Team-Mail zitiert denselben Satz, project 3/lib/rueckmeldung.ts). Der Folgesatz der Seite
@@ -55,12 +61,9 @@ export const RUECKRUF_FEHLER = 'Das hat nicht geklappt';
 // Wie in der Navigationsleiste: Tippfläche ≥ 44 px über ein unsichtbares ::before, die sichtbare Pille bleibt kleiner.
 const TIPPFLAECHE = "relative before:absolute before:-inset-y-1.5 before:-inset-x-1 before:content-['']";
 const FOKUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-taupe';
-// Knopf rechts in der Zeile: in allen Zuständen gleich breit und hoch (84 × 34 px), damit die Fakten links davon in jedem
-// Zustand dieselbe Breite haben und die Zeile ihre Höhe hält. 84 px: „Vorgemerkt“ mit Haken (11,5 px halbfett) passt hinein;
-// das Zeichen „✓“ mit Leerzeichen davor war ca. 6 px breiter und stieß an den Rand.
-const PILLE = 'flex h-[34px] w-[84px] flex-none items-center justify-center rounded-[10px] font-semibold whitespace-nowrap';
-// Unter 390 px und im Handyrahmen am Computer (ab md, innen 374 px) 36 px: Platz für die Fakten neben dem Knopf.
-const FOTO = 'h-10 w-10 max-[389px]:h-9 max-[389px]:w-9 md:h-9 md:w-9';
+// Knopf rechts in der Zeile: in allen Zuständen gleich breit und hoch (88 × 34 px), damit die Zeile ihre Höhe hält.
+// 88 px: „Ausgewählt“ mit Haken-Symbol (12 px halbfett, ca. 83 px) passt mit etwas Luft hinein.
+const PILLE = 'flex h-[34px] w-[88px] flex-none items-center justify-center rounded-[10px] font-semibold whitespace-nowrap';
 // Karte wie im CGA-Panel: weiß auf dem Seitengrund, ohne Rahmen und Schatten.
 const KARTE = 'rounded-card bg-white';
 
@@ -79,54 +82,108 @@ export function TestsiegerKopf() {
 }
 
 // ── Angebotskarte ────────────────────────────────────────────────────────────────────────────────────────────────────────
-// Aufbau wie der Kasten „IHR ANGEBOT“ der kurzen Angebotsmail (#148): „Ihr Angebot“, Preis „/ Monat“, grüne Zeile „Nach
-// Zuschüssen ca. … € im Monat“ (bei zwei Personen darunter der Satz der Mail), Chips. Dazu „Details ›“ und unten, abgesetzt
-// wie die Fußzeile einer Karte im CGA-Panel, die drei Punkte. Ohne belegten Eigenanteil fehlt die grüne Zeile, ohne Angaben
-// fehlen die Chips. Preis wie in der Kostenkarte darunter (`bruttopreis`, dort derselbe Ersatzwert).
-export function AngebotKarteMinimal({ lead, onDetails }: { lead: Lead | null; onDetails: () => void }) {
+// „Ihr persönliches Angebot“, Preis „/ Monat“, eine ruhige Zeile „Nach Zuschüssen ca. … €, rund … € weniger als im
+// Pflegeheim“ (Zuschüsse wie die kurze Angebotsmail #148, src/lib/angebotZuschuss.ts; Heim-Eigenanteil im 1. Jahr minus
+// Eigenanteil, Quelle in „Details ›“), darunter die Bestpreisgarantie als grüner Kasten. Ohne belegten Eigenanteil fehlt die
+// Zeile, den Vergleich gibt es nur, wenn wir günstiger sind. Preis wie in der Kostenkarte (`bruttopreis`, dort derselbe
+// Ersatzwert).
+export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne, onBestpreis, onKostenAufgeklappt }: {
+  lead: Lead | null;
+  heimEigenanteil: number;
+  heimQuelle: string;
+  sterne: SterneStand | null;
+  onBestpreis: () => void;
+  /** Messpunkt `kosten_aufgeklappt` (Registry #123) beim Öffnen von „Details“. */
+  onKostenAufgeklappt?: () => void;
+}) {
+  // „Details“ klappt die Kostenaufstellung hier in der Karte auf (statt der Kostenkarte unten, Martin 08.11.).
+  const [details, setDetails] = useState(false);
   const kalk = lead?.kalkulation;
   const brutto = kalk?.bruttopreis ?? 3050;
   const eigen = eigenanteilAus(kalk);
-  const chips = angebotChips(kalk?.formularDaten);
+  const weniger = eigen ? heimEigenanteil - eigen.eigen : 0;
+  const zahl = (betrag: number) => <span className="whitespace-nowrap font-semibold text-pm-ink">{formatEuro(betrag)}</span>;
   return (
-    <section className={`${KARTE} px-4 pb-3.5 pt-3.5`} aria-labelledby="angebot-titel" data-angebot-minimal>
+    <section className={`${KARTE} px-4 pb-4 pt-3.5`} aria-labelledby="angebot-titel" data-angebot-minimal>
       <div className="flex items-center justify-between gap-3">
-        <h2 id="angebot-titel" className="text-[13.5px] font-medium leading-5 text-pm-muted">Ihr Angebot</h2>
-        <button type="button" onClick={onDetails} className={`${TIPPFLAECHE} ${FOKUS} flex-none rounded-md text-[14px] font-semibold text-pm-taupe-ink`}>
-          Details ›
+        <h2 id="angebot-titel" className="text-[13.5px] font-medium leading-5 text-pm-muted">{ANGEBOT_TITEL}</h2>
+        <button
+          type="button"
+          onClick={() => { if (!details) onKostenAufgeklappt?.(); setDetails(!details); }}
+          aria-expanded={details}
+          aria-controls="angebot-details"
+          className={`${TIPPFLAECHE} ${FOKUS} flex flex-none items-center gap-0.5 rounded-md text-[14px] font-semibold text-pm-taupe-ink`}
+        >
+          Details
+          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${details ? 'rotate-180' : '-rotate-90'}`} aria-hidden="true" />
         </button>
       </div>
       <p className="mt-1 whitespace-nowrap text-[30px] font-bold leading-[1.1] tracking-[-0.02em] tabular-nums text-pm-ink">
         {formatEuro(brutto)} <span className="text-[15px] font-medium tracking-normal text-pm-muted">/ Monat</span>
       </p>
       {eigen && (
-        <>
-          <p className="mt-1.5 text-[15px] font-semibold leading-snug text-pm-green" data-nach-zuschuessen>
-            Nach Zuschüssen <span className="whitespace-nowrap">ca. {formatEuro(eigen.eigen)} im Monat</span>
+        <p className="mt-1.5 text-[14px] leading-[1.45] text-pm-muted" data-nach-zuschuessen>
+          Nach Zuschüssen ca. {zahl(eigen.eigen)}
+          {weniger > 0 && <>, rund {zahl(weniger)} weniger als im Pflegeheim</>}
+        </p>
+      )}
+      {details && (
+        // Wortlaut der bisherigen Kostenkarte: Satz unter dem Preis, dann die Aufstellung hinter „Alle Kosten im Überblick“.
+        <div id="angebot-details" className="mt-3 border-t border-pm-line-soft pt-3" data-angebot-details>
+          <p className="text-[14px] leading-[1.5] text-pm-muted">
+            Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).
           </p>
-          {eigen.ehepaarSatz && <p className="mt-0.5 text-[13px] leading-snug text-pm-muted">{EHEPAAR_SATZ}</p>}
-        </>
+          <KostenAufstellung lead={lead} heimEigenanteil={heimEigenanteil} heimQuelle={heimQuelle} siegel={false} />
+        </div>
       )}
-      {chips.length > 0 && (
-        <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Ihre Angaben">
-          {chips.map((chip) => (
-            <li key={chip} className="rounded-full border border-pm-line px-2.5 py-[3px] text-[13px] leading-[1.3] text-pm-muted">{chip}</li>
-          ))}
-        </ul>
-      )}
-      <p className="mt-3.5 border-t border-pm-line-soft pt-3 text-[13px] leading-[1.4] text-pm-muted">{ANGEBOT_PUNKTE}</p>
+      {/* Vier gleichwertige Punkte, der Garantie-Satz zuerst und halbfett, „Mehr Infos“ darunter. Unter 375 px etwas enger,
+          damit der Garantie-Satz einzeilig bleibt (Android 360). */}
+      <ul className="mt-3.5 grid gap-1.5 rounded-[14px] bg-pm-mint px-4 max-[374px]:px-3 py-3" data-garantie>
+        <li className="flex items-start gap-2 text-[14px] max-[374px]:text-[13.5px] leading-5 text-pm-green-deep">
+          <Check className="mt-[3px] h-3.5 w-3.5 flex-none" strokeWidth={3} aria-hidden="true" />
+          <span>
+            <span className="font-bold">{GARANTIE_TITEL}</span>
+            <button type="button" onClick={onBestpreis} className={`${FOKUS} mt-0.5 block rounded text-[13px] font-semibold leading-5 underline underline-offset-2`}>
+              Mehr Infos
+            </button>
+          </span>
+        </li>
+        {GARANTIE_PUNKTE.map((punkt) => (
+          <li key={punkt} className="flex items-start gap-2 text-[14px] leading-5 text-pm-green-deep">
+            <Check className="mt-[3px] h-3.5 w-3.5 flex-none" strokeWidth={3} aria-hidden="true" />{punkt}
+          </li>
+        ))}
+      </ul>
+      {/* Vertrauen: Sterne (ohne Stand fehlt die Spalte, kein Ersatzwert), 20 Jahre, 6× in Folge Testsieger. */}
+      <dl className={`mt-3.5 grid ${sterne ? 'grid-cols-3' : 'grid-cols-2'} gap-2 border-t border-pm-line-soft pt-3`} data-vertrauen>
+        {sterne && (
+          <div className="min-w-0">
+            <dt className="sr-only">Bewertungen</dt>
+            <dd className="flex items-center gap-1 text-[15px] font-bold leading-5 text-pm-ink">
+              {sterne.schnitt}
+              <svg viewBox="0 0 20 20" width={15} height={15} className="flex-none" aria-hidden="true">
+                <path d="M10 1.6l2.47 5.2 5.7.72-4.2 3.93 1.08 5.64L10 14.3l-5.05 2.79 1.08-5.64-4.2-3.93 5.7-.72z" fill="#D4A843" />
+              </svg>
+            </dd>
+            <dd className="text-[12px] leading-4 text-pm-muted">{anzahlText(sterne.anzahl)}</dd>
+          </div>
+        )}
+        {VERTRAUEN.map(([wert, wort]) => (
+          <div key={wert} className="min-w-0">
+            <dt className="sr-only">{wort}</dt>
+            <dd className="text-[15px] font-bold leading-5 text-pm-ink">{wert}</dd>
+            <dd className="text-[12px] leading-4 text-pm-muted">{wort}</dd>
+          </div>
+        ))}
+      </dl>
     </section>
   );
 }
 
-// ── Eine Pflegekraft als kompakte Zeile ───────────────────────────────────────────────────────────────────────────────────
-/** Teile von „7 Jahre Erfahrung · Deutsch Gut“ — wie `kraftZeile` im Kostenrechner (lib/kraefte-vorschau.ts), Reihenfolge
- *  wie im Mockup; fehlende Angaben entfallen. Die Deutsch-Stufe steht wie auf der Pflegekraft-Karte vor dem Speichern
- *  („Deutsch ●●○ Gut“, `DeutschZeile` in MatchCardVorSpeichern.tsx, 1:1 aus der Karte im Stand 75b8df8) und im Profil
- *  (CustomerNurseModal: „Deutsch“ … „Grund“): der Wert aus `nurse.language.level` unverändert (Grund / Mittel / Gut).
- *  Ohne Balken als „Deutsch Grund / Mittel / Gut“ steht derselbe Wortlaut schon in den Nachfassmails an Kunden
- *  (project 3/supabase/functions/send-scheduled-emails/index.ts, `Deutsch ${deutschWort}` aus deutschStufe.ts; Martin
- *  19.08.2026: „Deutsch Mittel“). Das Mockup hatte nur „Deutsch gut“ (klein), für Mittel/Grund keinen Wortlaut. */
+// ── Eine Pflegekraft als Zeile ────────────────────────────────────────────────────────────────────────────────────────
+/** „12 Jahre Erfahrung“ und „Deutsch Gut“ — wie `kraftZeile` im Kostenrechner (lib/kraefte-vorschau.ts); fehlende Angaben
+ *  entfallen. Die Deutsch-Stufe ist der Wert aus `nurse.language.level` unverändert (Grund / Mittel / Gut), derselbe
+ *  Wortlaut steht in den Nachfassmails an Kunden (`Deutsch ${deutschWort}`, Martin 19.08.2026: „Deutsch Mittel“). */
 export function zeilenFakten(nurse: Pick<Nurse, 'experienceYears' | 'language'>): string[] {
   const teile: string[] = [];
   const jahre = nurse.experienceYears ?? 0;
@@ -136,9 +193,16 @@ export function zeilenFakten(nurse: Pick<Nurse, 'experienceYears' | 'language'>)
   return teile;
 }
 
-export function PflegekraftZeile({ nurse, vorgemerkt, gesperrt, onNurseClick, onInvite, onInviteConfirm }: {
+// Wie die Zeile im ersten Bild vom 08.11. (Martin: „die Pflegekräfte wie auf dem ersten Bild … aber ich würde hier immer
+// den Preis darstellen, also auch den Preis und dann einladen“): rundes Foto, Name und Alter, darunter die Angaben je in
+// einer eigenen Zeile; rechts der Preis (ohne „/ Monat“, Martin 08.11.) und darunter „Einladen“. Der Preis ist der des
+// Kunden: Die Liste zeigt nur Kräfte mit seiner Deutsch-Stufe (`matchesGermanyWish`, strikt), und die Stufe ist der einzige
+// Preisfaktor, der an der Kraft hängt (lib/preisJeKraft.ts im Zweig feat/portal-preis-bei-pflegekraeften).
+export function PflegekraftZeile({ nurse, preis, vorgemerkt, gesperrt, onNurseClick, onInvite, onInviteConfirm }: {
   nurse: Nurse;
-  /** Registry #145: vorgemerkt → „Vorgemerkt ✓“, bleibt tippbar und öffnet das Fenster erneut. */
+  /** Monatspreis des Kunden (`kalkulation.bruttopreis`); ohne Preis entfällt die Angabe. */
+  preis?: number | null;
+  /** Registry #145: vorgemerkt → `AUSGEWAEHLT` mit Haken, bleibt tippbar und öffnet das Fenster erneut. */
   vorgemerkt: boolean;
   /** Eine Einladung läuft gerade (nach dem Speichern) → „Bitte warten…“ wie auf der Karte. */
   gesperrt: boolean;
@@ -155,62 +219,63 @@ export function PflegekraftZeile({ nurse, vorgemerkt, gesperrt, onNurseClick, on
     // Nur nach dem Speichern erreichbar (dann steht diese Zeile nicht mehr da); Fehler meldet das Portal selbst.
     void onInviteConfirm?.().catch(() => {});
   };
+  // Foto auf heller Kreisfläche mit feinem Ring: freigestellte Fotos und Initialen wirken gleich groß und rund.
+  // Größer als im ersten Bild (Martin: „die Karten schön ein bisschen größer auch mit den Bildern“).
+  const foto = 'h-[60px] w-[60px] max-[374px]:h-14 max-[374px]:w-14 flex-none rounded-full ring-1 ring-pm-line';
   return (
-    <li className="flex items-center gap-2.5 max-[389px]:gap-2 md:gap-2 border-t border-pm-line-soft px-3 max-[374px]:px-2.5 py-2.5" data-pflegekraft-zeile={nurse.caregiverId} data-vorgemerkt={vorgemerkt || undefined}>
-      {/* Unter 390 px Foto 36 px und 8 px Abstand: Platz für die Fakten neben dem Knopf. */}
-      <button type="button" onClick={onNurseClick} className={`${FOKUS} flex min-w-0 flex-1 items-center gap-2.5 max-[389px]:gap-2 md:gap-2 rounded-[12px] text-left`}>
+    <li className="flex items-center gap-3 max-[374px]:gap-2.5 border-t border-pm-line-soft px-3.5 max-[374px]:px-3 py-3" data-pflegekraft-zeile={nurse.caregiverId} data-vorgemerkt={vorgemerkt || undefined}>
+      <button type="button" onClick={onNurseClick} className={`${FOKUS} flex min-w-0 flex-1 items-center gap-3 max-[374px]:gap-2.5 rounded-[12px] text-left`}>
         {nurse.image ? (
-          <img src={nurse.image} alt="" className={`${FOTO} flex-none rounded-full object-cover`} />
+          <img src={nurse.image} alt="" className={`${foto} bg-pm-grund object-cover`} />
         ) : (
-          <span aria-hidden="true" className={`flex ${FOTO} flex-none items-center justify-center rounded-full text-[14px] font-bold text-white`} style={{ backgroundColor: nurse.color }}>
+          <span aria-hidden="true" className={`${foto} flex items-center justify-center text-[15px] font-bold text-white`} style={{ backgroundColor: nurse.color }}>
             {initials(nurse.name).slice(0, 2)}
           </span>
         )}
         <span className="min-w-0">
-          <span className="block text-[15.5px] font-semibold leading-[1.3] text-pm-ink">{vorname}{nurse.age ? `, ${nurse.age}` : ''}</span>
-          {/* 12 px, unter 390 px und im Handyrahmen am Computer 11,5 px, ab 430 px 12,5 px: so bleibt „7 Jahre Erfahrung ·
-              Deutsch Grund“ auf 360/375/390 px neben dem Knopf einzeilig (unter 375 px mit schmalerem Seitenrand). Reicht die
-              Breite trotzdem nicht, bricht die Zeile nur hinter „·“, nie in einer Angabe, in jedem Zustand des Knopfs gleich. */}
-          {fakten.length > 0 && (
-            <span className="mt-px block text-[12px] max-[389px]:text-[11.5px] min-[430px]:text-[12.5px] md:text-[11.5px] leading-[1.3] text-pm-muted">
-              {fakten.map((teil, i) => (
-                <span key={teil}>{i > 0 && ' · '}<span className="whitespace-nowrap">{teil}</span></span>
-              ))}
-            </span>
-          )}
+          <span className="block text-[16.5px] font-semibold leading-[1.3] text-pm-ink">
+            {vorname}{nurse.age ? <span className="font-normal text-pm-muted">, {nurse.age}</span> : null}
+          </span>
+          {fakten.map((teil) => (
+            <span key={teil} className="block text-[13.5px] leading-[1.4] text-pm-muted">{teil}</span>
+          ))}
         </span>
       </button>
-      {gesperrt ? (
-        <button type="button" disabled aria-disabled="true" className={`${PILLE} cursor-not-allowed bg-pm-grund text-[12px] text-pm-muted`}>
-          Bitte warten…
-        </button>
-      ) : vorgemerkt ? (
-        // Name für Screenreader und Tests wie überall „Vorgemerkt ✓“ (#145); sichtbar Wort und Haken als Symbol.
-        <button type="button" onClick={einladen} aria-label="Vorgemerkt ✓" className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} gap-0.5 bg-pm-mint text-[11.5px] text-pm-green-deep`}>
-          Vorgemerkt<Check aria-hidden="true" className="h-3 w-3 flex-none" strokeWidth={3} />
-        </button>
-      ) : (
-        <button type="button" onClick={einladen} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} border border-pm-line bg-white text-[13.5px] text-pm-ink hover:border-pm-taupe-light`}>
-          Einladen
-        </button>
-      )}
+      <div className="flex flex-none flex-col items-end gap-1.5">
+        {preis ? (
+          <p className="whitespace-nowrap text-right leading-none" data-preis>
+            <span className="text-[15px] font-semibold tabular-nums text-pm-ink">{formatEuro(preis)}</span>
+          </p>
+        ) : null}
+        {gesperrt ? (
+          <button type="button" disabled aria-disabled="true" className={`${PILLE} cursor-not-allowed bg-pm-grund text-[12px] text-pm-muted`}>
+            Bitte warten…
+          </button>
+        ) : vorgemerkt ? (
+          <button type="button" onClick={einladen} aria-label={`${AUSGEWAEHLT} ✓`} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} gap-0.5 bg-pm-mint text-[12px] text-pm-green-deep`}>
+            {AUSGEWAEHLT}<Check aria-hidden="true" className="h-3 w-3 flex-none" strokeWidth={3} />
+          </button>
+        ) : (
+          <button type="button" onClick={einladen} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} border border-pm-line bg-white text-[13.5px] text-pm-ink hover:border-pm-taupe-light`}>
+            Einladen
+          </button>
+        )}
+      </div>
     </li>
   );
 }
 
-// Platzhalter, solange die Liste lädt (beim Erstbesuch real 8–29 s, Abnahme 07.11.): gleiche Höhe wie eine Zeile, kein
-// Text, damit der Hauptknopf nicht springt und der erste Bildschirm nie leer ist.
+// Platzhalter, solange die Liste lädt (beim Erstbesuch real 8–29 s, Abnahme 07.11.): gleiche Form wie eine Zeile, kein
+// Text, damit der erste Bildschirm nie leer ist.
 function Platzhalterzeile() {
   return (
-    <li className="flex items-center gap-2.5 max-[389px]:gap-2 md:gap-2 border-t border-pm-line-soft px-3 max-[374px]:px-2.5 py-2.5" data-platzhalter>
-      <span className="flex min-w-0 flex-1 items-center gap-2.5 max-[389px]:gap-2 md:gap-2">
-        <span className={`${FOTO} flex-none animate-pulse rounded-full bg-pm-shell`} />
-        <span className="min-w-0 flex-1">
-          <span className="block h-[13px] w-24 animate-pulse rounded bg-pm-shell" />
-          <span className="mt-[7px] block h-[11px] w-40 max-w-full animate-pulse rounded bg-pm-line-soft" />
-        </span>
+    <li className="flex items-center gap-3 border-t border-pm-line-soft px-3.5 py-3" data-platzhalter>
+      <span className="h-[60px] w-[60px] flex-none animate-pulse rounded-full bg-pm-shell" />
+      <span className="min-w-0 flex-1">
+        <span className="block h-[14px] w-24 animate-pulse rounded bg-pm-shell" />
+        <span className="mt-[8px] block h-[11px] w-32 max-w-full animate-pulse rounded bg-pm-line-soft" />
       </span>
-      <span className="h-[34px] w-[84px] flex-none animate-pulse rounded-[10px] bg-pm-line-soft" />
+      <span className="h-[34px] w-[88px] flex-none animate-pulse rounded-[10px] bg-pm-line-soft" />
     </li>
   );
 }
@@ -274,11 +339,45 @@ function RueckrufKnopf({ onRueckruf }: { onRueckruf?: () => Promise<boolean> }) 
   );
 }
 
+// ── So geht es weiter ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Martin 08.11.: „der Ablauf deutlich schöner dargestellt … optisch ist das nicht schön“. Wie die Stufen im CGA-Panel:
+// weiße Karte, Punkte auf einer senkrechten Linie, der aktuelle Schritt hervorgehoben. Wortlaut der drei Schritte
+// unverändert (`SCHRITTE_STAND_75B8DF8`, Stand 75b8df8); vor dem Speichern ist Schritt 1 der aktuelle.
+function AblaufMinimal() {
+  return (
+    <section className={`${KARTE} px-4 pt-3.5 pb-2`} aria-labelledby="ablauf-titel" data-ablauf-minimal>
+      <h2 id="ablauf-titel" className="text-[16px] font-semibold leading-6 text-pm-ink">So geht es weiter</h2>
+      <ol className="mt-2">
+        {SCHRITTE_STAND_75B8DF8.map((schritt, i) => {
+          const jetzt = i === 0;
+          const letzter = i === SCHRITTE_STAND_75B8DF8.length - 1;
+          return (
+            <li key={schritt.titel} className="relative flex gap-3 pb-3" aria-current={jetzt ? 'step' : undefined}>
+              {!letzter && <span className="absolute left-[13px] top-8 bottom-0 w-px bg-pm-line" aria-hidden="true" />}
+              <span
+                className={`relative z-[1] mt-1 flex h-[27px] w-[27px] flex-none items-center justify-center rounded-full text-[13px] font-bold ${
+                  jetzt ? 'bg-pm-coral text-white' : 'border border-pm-line bg-white text-pm-muted'
+                }`}
+              >
+                {i + 1}
+              </span>
+              <div className={`min-w-0 flex-1 rounded-[12px] px-3 py-2 ${jetzt ? 'bg-pm-coral-tint' : ''}`}>
+                <p className="text-[15px] font-semibold leading-5 text-pm-ink">{schritt.titel}</p>
+                <p className="mt-0.5 text-[13.5px] leading-[1.45] text-pm-muted">{schritt.text}</p>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
 // ── Die Seite vor dem Speichern: Minimal ──────────────────────────────────────────────────────────────────────────────
 export function EinstiegMinimal({
   anrede, lead, onBestpreis, heimEigenanteil, heimQuelle,
   laedt, zeilen, gehalteneEinladungen, vorschlaegeVorhanden, bereitsBearbeitet, formular, sterne, vorgemerkte,
-  onVervollstaendigen, onRueckruf, onKostenAufgeklappt, onFaqGeoeffnet, knopfUnterAngebot = false,
+  onVervollstaendigen, onRueckruf, onKostenAufgeklappt, onFaqGeoeffnet,
 }: {
   /** Anrede für „Guten Tag, …“ (customerSalutation), ohne Anrede nur „Guten Tag“. */
   anrede: string | null;
@@ -297,60 +396,35 @@ export function EinstiegMinimal({
   formular: ReactNode;
   sterne: SterneStand | null;
   vorgemerkte: VorgemerkteKraft[];
-  /** Hauptknopf: ins Formular (CustomerPortalPage, Messpunkt `zur_pflegesituation` mit Quelle `hauptknopf`). */
+  /** Fester Knopf unten: ins Formular (CustomerPortalPage, Messpunkt `zur_pflegesituation` mit Quelle `hauptknopf`). */
   onVervollstaendigen: () => void;
   /** „Rückruf vereinbaren“: Bitte ans Team senden; `true` = angekommen. Ohne (Vorschau, Lead ohne Rückrufnummer) bleibt
    *  der Knopf ein Anruf-Link. */
   onRueckruf?: () => Promise<boolean>;
   onKostenAufgeklappt?: () => void;
   onFaqGeoeffnet?: (schluessel: string) => void;
-  /** `?reihenfolge=mail` (Vergleich 08.11.): Hauptknopf direkt unter der Angebotskarte wie in der Mail, dann die
-   *  Pflegekräfte, dann Rückruf und Nummer. Ohne: Pflegekräfte, dann alle Knöpfe (freigegebene Reihenfolge 07.11.). */
-  knopfUnterAngebot?: boolean;
 }) {
-  // „Details ›“: Kostenkarte aufklappen (Karte und „Alle Kosten im Überblick“), dann ohne Animation an den Anfang der
-  // Aufstellung — weich gescrollt bricht WebKit ab, sobald oberhalb Inhalt dazukommt (Registry #102).
-  const [kostenSignal, setKostenSignal] = useState(0);
-  const kosten = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!kostenSignal) return;
-    const t = setTimeout(() => {
-      const ziel = kosten.current?.querySelector('[data-kostenaufstellung]') ?? kosten.current;
-      ziel?.scrollIntoView({ block: 'start' });
-    }, 60);
-    return () => clearTimeout(t);
-  }, [kostenSignal]);
-  const zuDenKosten = () => {
-    onKostenAufgeklappt?.();
-    setKostenSignal((n) => n + 1);
-  };
-
   const anzahl = zeilen.length;
   const leer = !laedt && anzahl === 0;
-  const hauptknopf = (
-    <>
-      {/* `text-balance`: kein einzelnes „erhalten“ in Zeile 2 (430 px). Unter 390 px Unterzeile 12 px: „dauert etwa
-          2 Minuten · kostenlos und unverbindlich“ bleibt einzeilig (Android 360). */}
-      <button
-        type="button"
-        onClick={onVervollstaendigen}
-        className={`${FOKUS} block w-full rounded-[14px] bg-pm-coral px-4 max-[374px]:px-3 py-3 text-center text-[16px] font-bold leading-[1.25] text-balance text-white transition-colors hover:bg-pm-coral-deep active:scale-[0.99]`}
-      >
-        {HAUPTKNOPF}
-        <span className="mt-0.5 block text-[12.5px] max-[389px]:text-[12px] md:text-[12px] font-medium leading-[1.3] opacity-90">{HAUPTKNOPF_ZEILE}</span>
-      </button>
-    </>
+  const hinweis = (titel: string, text: string) => (
+    <div className="border-t border-pm-line-soft px-5 pt-4 pb-5 text-center">
+      <p className="text-[15px] font-semibold mb-1 text-pm-ink">{titel}</p>
+      <p className="text-[14px] leading-relaxed text-pm-muted">{text}</p>
+    </div>
   );
   return (
     <div className="bg-pm-grund" data-einstieg="minimal">
-      {/* Erster Bildschirm: Gruß, zwei weiße Karten (Angebot, Pflegekräfte), darunter die Knöpfe direkt auf dem Grund. */}
-      {/* Seitenrand 12 px, unter 375 px 8 px (Android 360: sonst brechen die Fakten der Pflegekräfte um). */}
-      <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2 pb-2">
+      {/* Erster Teil: Gruß mit Sternen, Angebotskarte, Pflegekräfte, Rückruf und Nummer; der feste Knopf hängt am Ende dieses
+          Teils und bleibt bis dorthin unten am Bildschirm stehen (sticky, ohne Skript: auch im Handyrahmen am Computer). */}
+      {/* Seitenrand 12 px, unter 375 px 8 px (Android 360: mehr Platz für die Zeilen). */}
+      <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2">
         <h1 className="px-1 pt-4 pb-3 text-[22px] font-semibold leading-[1.2] tracking-[-0.015em] text-pm-ink">
           Guten Tag{anrede ? `, ${anrede}` : ''}
         </h1>
-        <AngebotKarteMinimal lead={lead} onDetails={zuDenKosten} />
-        {knopfUnterAngebot && <div className="pt-3" data-hauptknopf-unter-angebot>{hauptknopf}</div>}
+        <AngebotKarteMinimal
+          lead={lead} heimEigenanteil={heimEigenanteil} heimQuelle={heimQuelle} sterne={sterne}
+          onBestpreis={onBestpreis} onKostenAufgeklappt={onKostenAufgeklappt}
+        />
 
         {/* id = Sprungziel des Mail-Deeplinks `goto=matches`. Ohne Vorschläge (und ohne Hinweis) entfällt der Abschnitt. */}
         {!(leer && gehalteneEinladungen === 0 && !vorschlaegeVorhanden) && (
@@ -368,26 +442,14 @@ export function EinstiegMinimal({
             ) : anzahl > 0 ? (
               <ul>{zeilen}</ul>
             ) : gehalteneEinladungen > 0 ? (
-              <div className="border-t border-pm-line-soft px-5 pt-4 pb-5 text-center">
-                <p className="text-[15px] font-semibold mb-1 text-pm-ink">Ihre Auswahl ist eingeladen</p>
-                <p className="text-[14px] leading-relaxed text-pm-muted">
-                  Die Pflegekräfte melden sich meist innerhalb von 1&ndash;2 Tagen. Sobald Rückmeldungen da sind, sehen Sie sie hier. Meldet sich niemand, schlagen wir Ihnen automatisch weitere Pflegekräfte vor.
-                </p>
-              </div>
+              hinweis('Ihre Auswahl ist eingeladen', 'Die Pflegekräfte melden sich meist innerhalb von 1–2 Tagen. Sobald Rückmeldungen da sind, sehen Sie sie hier. Meldet sich niemand, schlagen wir Ihnen automatisch weitere Pflegekräfte vor.')
             ) : (
-              <div className="border-t border-pm-line-soft px-5 pt-4 pb-5 text-center">
-                <p className="text-[15px] font-semibold mb-1 text-pm-ink">Alle aktuellen Vorschläge bearbeitet</p>
-                <p className="text-[14px] leading-relaxed text-pm-muted">
-                  Sie haben alle passenden Pflegekräfte durchgesehen. Wir schlagen Ihnen in Kürze weitere vor. Sie hören von uns.
-                </p>
-              </div>
+              hinweis('Alle aktuellen Vorschläge bearbeitet', 'Sie haben alle passenden Pflegekräfte durchgesehen. Wir schlagen Ihnen in Kürze weitere vor. Sie hören von uns.')
             )}
           </section>
         )}
 
-        {/* Direkt unter der Liste, nicht fest am Rand (Mockup). */}
-        <div className="grid gap-2.5 pt-4 pb-3" data-aktionen-minimal>
-          {!knopfUnterAngebot && hauptknopf}
+        <div className="grid gap-2.5 pt-4 pb-2" data-aktionen-minimal>
           <RueckrufKnopf onRueckruf={onRueckruf} />
           <p className="pt-0.5 text-center text-[12.5px] leading-[1.5] text-pm-muted">
             oder anrufen, auch per{' '}
@@ -395,29 +457,34 @@ export function EinstiegMinimal({
             <a href={TELEFON_HREF} className="font-semibold text-pm-taupe-ink">{TELEFON}</a> ({ERREICHBAR})
           </p>
         </div>
+
+        {/* Fester schmaler Knopf (Martin 08.11.: „den wir festmachen unten“). Sticky am Ende des ersten Teils: steht beim
+            Laden unten am Bildschirm, scrollt man bis hierher, bleibt er hier liegen und das Formular darunter ist frei. */}
+        <div
+          className="sticky bottom-0 z-20 -mx-3 max-[374px]:-mx-2 mt-2 bg-pm-grund/95 px-3 max-[374px]:px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)] backdrop-blur"
+          data-fester-knopf
+        >
+          <button
+            type="button"
+            onClick={onVervollstaendigen}
+            className={`${FOKUS} block w-full rounded-[12px] bg-pm-coral px-4 py-2 text-center text-[15px] font-bold leading-5 text-white transition-colors hover:bg-pm-coral-deep active:scale-[0.99]`}
+          >
+            {/* Zwei feste Zeilen statt automatischem Umbruch: sonst stünde „und“ am Ende der ersten Zeile. */}
+            <span className="block">{FEST_KNOPF[0]}</span>
+            <span className="block">{FEST_KNOPF[1]}</span>
+          </button>
+        </div>
       </div>
 
-      {/* Darunter wie in „Pflegekräfte zuerst“ (#145). */}
-      <div className="max-w-3xl mx-auto px-3.5 pb-4 space-y-4">
+      {/* Darunter wie in „Pflegekräfte zuerst“ (#145): Pflegesituation mit offenem Formular. */}
+      <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2 pb-4 space-y-4">
         {bereitsBearbeitet && <div className="pt-6">{bereitsBearbeitet}</div>}
         <AbschnittPflegesituation vorgemerkte={vorgemerkte} formular={formular} />
       </div>
 
-      <div ref={kosten}>
-        <KostenkarteKompakt
-          lead={lead}
-          onBestpreis={onBestpreis}
-          heimEigenanteil={heimEigenanteil}
-          heimQuelle={heimQuelle}
-          onKostenAufgeklappt={onKostenAufgeklappt}
-          aufklappen={kostenSignal}
-        />
-      </div>
-
-      <div className="max-w-3xl mx-auto px-3.5 pt-1 pb-6 space-y-4">
-        <div className="pt-6">
-          <SoGehtEsWeiterVorSpeichern />
-        </div>
+      {/* Die Kostenkarte entfällt hier: ihre Aufstellung steht unter „Details“ in der Angebotskarte (Martin 08.11.). */}
+      <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2 pt-2 pb-6 space-y-4">
+        <AblaufMinimal />
         <div className="pt-6">
           <FaqListe ruhig karte onFrageGeoeffnet={onFaqGeoeffnet} />
         </div>

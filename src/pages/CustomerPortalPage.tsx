@@ -445,15 +445,18 @@ const PREVIEW_SIGNED_FORM: ContractFormData = {
   signatur: 'Steffen Krumbholz',
 };
 
+// Deutsch-Stufe überall „Gut“ wie der Wunsch des Vorschau-Leads (sehr-gut): live zeigt die Liste nur Kräfte mit der
+// Wunsch-Stufe (`matchesGermanyWish`, strikt), und der Minimal-Einstieg zeigt bei jeder Kraft den Preis des Kunden
+// (Registry #147, 08.11.2026). Mit gemischten Stufen stünde in der Vorschau neben „Deutsch Grund“ der Preis für „Gut“.
 const PREVIEW_MATCHINGS: Array<{ nurse: Nurse; caregiverId: number }> = [
   { caregiverId: 999010, nurse: { caregiverId: 999010, name: 'Anna Nowak', age: 58, experience: '8 J. Erfahrung', experienceYears: 8, availability: 'sofort verfügbar', availableSoon: true, language: { level: 'Gut', bars: 3 }, color: '#8B7355', addedTime: 'heute', isLive: true, gender: 'female', image: 'https://i.pravatar.cc/200?img=44', history: { assignments: 22, avgDurationMonths: 3.1 } } },
   { caregiverId: 999011, nurse: { caregiverId: 999011, name: 'Ewa Lewandowski', age: 65, experience: '12 J. Erfahrung', experienceYears: 12, availability: 'verfügbar ab 02.06.', availableSoon: true, language: { level: 'Gut', bars: 3 }, color: '#A18973', addedTime: 'gestern', isLive: true, gender: 'female', image: 'https://i.pravatar.cc/200?img=49', history: { assignments: 35, avgDurationMonths: 3.6 } } },
-  { caregiverId: 999012, nurse: { caregiverId: 999012, name: 'Helena Wiśniewska', age: 54, experience: '4 J. Erfahrung', experienceYears: 4, availability: 'sofort verfügbar', availableSoon: true, language: { level: 'Mittel', bars: 2 }, color: '#B5A184', addedTime: 'vor 2 Tagen', isLive: true, gender: 'female', image: 'https://i.pravatar.cc/200?img=45', history: { assignments: 9, avgDurationMonths: 2.4 } } },
-  { caregiverId: 999013, nurse: { caregiverId: 999013, name: 'Pavel Kowalski', age: 61, experience: '7 J. Erfahrung', experienceYears: 7, availability: 'verfügbar ab 26.05.', availableSoon: true, language: { level: 'Grund', bars: 1 }, color: '#6B5444', addedTime: 'heute', isLive: true, gender: 'male', image: 'https://i.pravatar.cc/200?img=12', history: { assignments: 18, avgDurationMonths: 2.9 } } },
+  { caregiverId: 999012, nurse: { caregiverId: 999012, name: 'Helena Wiśniewska', age: 54, experience: '4 J. Erfahrung', experienceYears: 4, availability: 'sofort verfügbar', availableSoon: true, language: { level: 'Gut', bars: 3 }, color: '#B5A184', addedTime: 'vor 2 Tagen', isLive: true, gender: 'female', image: 'https://i.pravatar.cc/200?img=45', history: { assignments: 9, avgDurationMonths: 2.4 } } },
+  { caregiverId: 999013, nurse: { caregiverId: 999013, name: 'Pavel Kowalski', age: 61, experience: '7 J. Erfahrung', experienceYears: 7, availability: 'verfügbar ab 26.05.', availableSoon: true, language: { level: 'Gut', bars: 3 }, color: '#6B5444', addedTime: 'heute', isLive: true, gender: 'male', image: 'https://i.pravatar.cc/200?img=12', history: { assignments: 18, avgDurationMonths: 2.9 } } },
   // Fünfte Kraft nur in ?preview=patient (Kompakt-Einstieg, 03.10.): „5 passende Pflegekräfte" wie in
   // der Angebotsmail. Die übrigen Vorschau-Zustände bleiben bei vier und damit vergleichbar.
   ...(IS_PREVIEW_PATIENT
-    ? [{ caregiverId: 999014, nurse: { caregiverId: 999014, name: 'Irena Pawlak', age: 57, experience: '7 J. Erfahrung', experienceYears: 7, availability: 'sofort verfügbar', availableSoon: true, language: { level: 'Mittel', bars: 2 }, color: '#A18973', addedTime: 'heute', isLive: true, gender: 'female' as const, image: 'https://i.pravatar.cc/200?img=32', history: { assignments: 2, avgDurationMonths: 2.2 } } }]
+    ? [{ caregiverId: 999014, nurse: { caregiverId: 999014, name: 'Irena Pawlak', age: 57, experience: '7 J. Erfahrung', experienceYears: 7, availability: 'sofort verfügbar', availableSoon: true, language: { level: 'Gut', bars: 3 }, color: '#A18973', addedTime: 'heute', isLive: true, gender: 'female' as const, image: 'https://i.pravatar.cc/200?img=32', history: { assignments: 2, avgDurationMonths: 2.2 } } }]
     : []),
 ];
 
@@ -749,11 +752,6 @@ const CustomerPortalPage: FC = () => {
   // Minimal-Einstiegs — Vorher-Vergleich und Rückweg, kein Kunde bekommt den Schalter. Vormerken gilt in beiden.
   const [einstiegZuerst] = useState(() => {
     try { return new URLSearchParams(window.location.search).get('einstieg') === 'zuerst'; } catch { return false; }
-  });
-  // Registry #147, Fassung „CGA-Stil“ (08.11.2026, Entwurf): `?reihenfolge=mail` stellt im Minimal-Einstieg den Hauptknopf
-  // direkt unter die Angebotskarte (Reihenfolge der kurzen Angebotsmail), die Pflegekräfte danach. Nur zum Vergleich.
-  const [knopfUnterAngebot] = useState(() => {
-    try { return new URLSearchParams(window.location.search).get('reihenfolge') === 'mail'; } catch { return false; }
   });
   // Registry #145, Nachbesserung 2: Vormerkungen gibt es nur im Modus „Pflegekräfte zuerst“ (ohne `?einstieg=alt` und ohne
   // `?einstieg=kompakt`) — nur dort werden sie geladen und nach dem ersten Speichern automatisch eingeladen.
@@ -3855,6 +3853,7 @@ const CustomerPortalPage: FC = () => {
       onNurseClick={() => openNurseFromMatch(nurse, i)}
       onInvite={() => { messeEinladen(nurse, 'karte'); return canInviteNurse(i); }}
       onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
+      preis={lead?.kalkulation?.bruttopreis ?? null}
     />
   ));
 
@@ -4212,7 +4211,6 @@ const CustomerPortalPage: FC = () => {
               : undefined}
           onKostenAufgeklappt={() => messen('kosten_aufgeklappt')}
           onFaqGeoeffnet={messeFrage}
-          knopfUnterAngebot={knopfUnterAngebot}
         />
       ) : pflegekraefteZuerst ? (
         // Registry #145 (Martin 03.11.2026): vor dem ersten Speichern „Pflegekräfte zuerst" — Preis oben, sofort die

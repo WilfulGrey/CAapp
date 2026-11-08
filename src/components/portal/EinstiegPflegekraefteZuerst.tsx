@@ -69,15 +69,6 @@ export function KostenkarteKompakt({ lead, onBestpreis, heimEigenanteil, heimQue
   }, [aufklappen]);
   const offerExpanded = offerExpandedManual ?? true;
   const brutto = lead?.kalkulation?.bruttopreis ?? 3050;
-  const tagessatz = Math.round(brutto / 30);
-  // Heimvergleich wie bisher: Eigenanteil aus dem ANGEZEIGTEN Brutto minus Posten mit `in_kalkulation`; nur zeigen, wenn
-  // wir wirklich günstiger sind.
-  const zuschussPosten = (lead?.kalkulation?.['zuschüsse']?.items ?? [])
-    .filter(z => z.in_kalkulation && z.betrag_monatlich > 0);
-  const eigenanteil = zuschussPosten.length > 0
-    ? Math.max(0, brutto - zuschussPosten.reduce((a, z) => a + z.betrag_monatlich, 0))
-    : null;
-  const heimErsparnis = eigenanteil !== null ? heimEigenanteil - eigenanteil : 0;
   return (
     <div className="max-w-3xl mx-auto px-3.5 pt-7">
       <Card className="relative px-5 pt-3 pb-4 shadow-lift">
@@ -149,103 +140,128 @@ export function KostenkarteKompakt({ lead, onBestpreis, heimEigenanteil, heimQue
               <ChevronDown className={`w-5 h-5 text-pm-taupe transition-transform duration-200 ${costsExpanded ? 'rotate-180' : ''}`} />
             </button>
 
-            {costsExpanded && (<>
-              {/* Oben im Aufklapper (Martin 03.11.): was bisher unter den vier Punkten stand, Wortlaut unverändert. */}
-              <p className="mt-1 text-[14.5px] leading-[1.5] text-pm-muted">
-                Kosten erst, wenn die Pflegekraft da ist.
-              </p>
-
-              {eigenanteil !== null && heimErsparnis > 0 && (
-                <div className="mt-3 pt-3 border-t border-pm-line-soft">
-                  <p className="text-[14.5px] leading-[1.5] text-pm-ink">
-                    Zuhause statt Pflegeheim: rund <b className="text-pm-green-deep">{formatEuro(heimErsparnis)} weniger</b> im Monat.
-                  </p>
-                  <p className="mt-1 text-[13px] leading-snug text-pm-muted">
-                    Heim-Eigenanteil im 1. Jahr {formatEuro(heimEigenanteil)}, bei Ihnen nach Zuschüssen etwa {formatEuro(eigenanteil)}. Quelle: {heimQuelle}.
-                  </p>
-                </div>
-              )}
-
-              <div className="mt-3 pt-3 border-t border-pm-line-soft flex items-center gap-3">
-                <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-11 w-auto flex-shrink-0 object-contain" />
-                <p className="text-[13.5px] leading-snug text-pm-muted">
-                  <b className="text-[15px] text-pm-ink">6× Testsieger DIE&nbsp;WELT</b><br/>20&nbsp;Jahre Erfahrung · 60.000+ Einsätze
-                </p>
-              </div>
-
-              <div className="mt-3 rounded-[16px] bg-pm-paper px-4 py-3.5 space-y-3">
-                {[
-                  { label: 'Betreuung', value: `${formatEuro(brutto)} / Monat`, note: '' },
-                  { label: 'Entspricht', value: `${formatEuro(tagessatz)} / Tag`, note: 'tagesgenau abgerechnet' },
-                  { label: 'Reisekosten', value: '125 € pro Strecke', note: '' },
-                  { label: 'Kost & Logis', value: 'stellt der Haushalt', note: '' },
-                  ...(zeigtSommerzuschlag()
-                    ? [{ label: 'Sommerzuschlag', value: '6,67 € / Tag', note: 'Juli + August' }]
-                    : []),
-                ].map((row, i) => (
-                  <div key={i} className="flex items-baseline justify-between gap-4">
-                    <span className="text-[15px] flex-shrink-0 text-pm-muted">{row.label}</span>
-                    <span className="text-right">
-                      <span className="block text-[15px] tabular-nums text-pm-ink">{row.value}</span>
-                      {row.note && <span className="block text-[13px] mt-0.5 text-pm-muted">{row.note}</span>}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {eigenanteil !== null && (
-                <div className="mt-2.5 rounded-[16px] bg-pm-paper px-4 py-3.5">
-                  <p className={`${EYEBROW} mb-3`}>Was bleibt für Sie übrig</p>
-                  <div className="space-y-3">
-                    <div className="flex items-baseline justify-between gap-4">
-                      <span className="text-[15px] flex-shrink-0 text-pm-muted">Betreuung</span>
-                      <span className="text-[15px] tabular-nums text-pm-ink">{formatEuro(brutto)}</span>
-                    </div>
-                    {zuschussPosten.map((z, i) => (
-                      <div key={i} className="flex items-baseline justify-between gap-4">
-                        <span className="text-[15px] min-w-0 text-pm-muted">
-                          {z.label.replace(/\s*\([^)]*\)\s*$/, '')}
-                          {(z.hinweis || z.name === 'steuervorteil') && (
-                            <span className="block text-[13px] mt-0.5 leading-snug">
-                              {z.hinweis ?? 'Setzt voraus, dass entsprechend Steuern anfallen.'}
-                            </span>
-                          )}
-                        </span>
-                        <span className="text-[15px] tabular-nums whitespace-nowrap flex-shrink-0 text-pm-ink">
-                          − {formatEuro(z.betrag_monatlich)}
-                        </span>
-                      </div>
-                    ))}
-                    <div className="flex items-baseline justify-between gap-4 pt-3 border-t border-pm-line">
-                      <span className="text-[15px] font-semibold flex-shrink-0 text-pm-ink">Ihr Eigenanteil</span>
-                      <span className="text-[17px] font-bold tabular-nums text-pm-ink">{formatEuro(eigenanteil)}</span>
-                    </div>
-                  </div>
-                  <p className="text-[13px] leading-snug mt-3 text-pm-muted">
-                    Pflegegeld, Entlastungsbudget und Steuervorteil sind Leistungen
-                    Dritter mit eigenen Voraussetzungen — die Beträge sind eine
-                    Orientierung, keine Zusage. Jahresbeträge sind auf den Monat umgelegt.
-                  </p>
-                </div>
-              )}
-
-              <a
-                href="/primundus-mustervertrag.pdf"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 flex min-h-[44px] items-center justify-center gap-1.5 text-[14px] text-pm-ink underline underline-offset-2"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
-                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><polyline points="9 15 12 18 15 15"/>
-                </svg>
-                Mustervertrag als PDF herunterladen
-              </a>
-            </>)}
+            {costsExpanded && <KostenAufstellung lead={lead} heimEigenanteil={heimEigenanteil} heimQuelle={heimQuelle} />}
           </>
         )}
       </Card>
     </div>
   );
+}
+
+// ── Aufstellung hinter „Alle Kosten im Überblick“ ───────────────────────────────────────────────────────────────────────
+// Eine Quelle für die Kostenkarte hier und für „Details“ in der Angebotskarte des Minimal-Einstiegs (Registry #147, Martin
+// 08.11.: „Ihre Betreuungskosten finde ich blöd. Das müssten doch die Details da oben sein, wenn ich sie öffne.“).
+// `siegel={false}`: ohne die Testsieger-Zeile (der Minimal-Einstieg zeigt sie schon im Kopf und in der Karte).
+export function KostenAufstellung({ lead, heimEigenanteil, heimQuelle, siegel = true }: {
+  lead: Lead | null;
+  heimEigenanteil: number;
+  heimQuelle: string;
+  siegel?: boolean;
+}) {
+  const brutto = lead?.kalkulation?.bruttopreis ?? 3050;
+  const tagessatz = Math.round(brutto / 30);
+  const zuschussPosten = (lead?.kalkulation?.['zuschüsse']?.items ?? [])
+    .filter(z => z.in_kalkulation && z.betrag_monatlich > 0);
+  const eigenanteil = zuschussPosten.length > 0
+    ? Math.max(0, brutto - zuschussPosten.reduce((a, z) => a + z.betrag_monatlich, 0))
+    : null;
+  // Heimvergleich: Eigenanteil aus dem ANGEZEIGTEN Brutto minus Posten mit `in_kalkulation`; nur zeigen, wenn wir
+  // wirklich günstiger sind.
+  const heimErsparnis = eigenanteil !== null ? heimEigenanteil - eigenanteil : 0;
+  return (<>
+      {/* Oben im Aufklapper (Martin 03.11.): was bisher unter den vier Punkten stand, Wortlaut unverändert. */}
+      <p className="mt-1 text-[14.5px] leading-[1.5] text-pm-muted">
+        Kosten erst, wenn die Pflegekraft da ist.
+      </p>
+
+      {eigenanteil !== null && heimErsparnis > 0 && (
+        <div className="mt-3 pt-3 border-t border-pm-line-soft">
+          <p className="text-[14.5px] leading-[1.5] text-pm-ink">
+            Zuhause statt Pflegeheim: rund <b className="text-pm-green-deep">{formatEuro(heimErsparnis)} weniger</b> im Monat.
+          </p>
+          <p className="mt-1 text-[13px] leading-snug text-pm-muted">
+            Heim-Eigenanteil im 1. Jahr {formatEuro(heimEigenanteil)}, bei Ihnen nach Zuschüssen etwa {formatEuro(eigenanteil)}. Quelle: {heimQuelle}.
+          </p>
+        </div>
+      )}
+
+      {siegel && (
+        <div className="mt-3 pt-3 border-t border-pm-line-soft flex items-center gap-3">
+          <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-11 w-auto flex-shrink-0 object-contain" />
+          <p className="text-[13.5px] leading-snug text-pm-muted">
+            <b className="text-[15px] text-pm-ink">6× Testsieger DIE&nbsp;WELT</b><br/>20&nbsp;Jahre Erfahrung · 60.000+ Einsätze
+          </p>
+        </div>
+      )}
+
+      <div className="mt-3 rounded-[16px] bg-pm-paper px-4 py-3.5 space-y-3">
+        {[
+          { label: 'Betreuung', value: `${formatEuro(brutto)} / Monat`, note: '' },
+          { label: 'Entspricht', value: `${formatEuro(tagessatz)} / Tag`, note: 'tagesgenau abgerechnet' },
+          { label: 'Reisekosten', value: '125 € pro Strecke', note: '' },
+          { label: 'Kost & Logis', value: 'stellt der Haushalt', note: '' },
+          ...(zeigtSommerzuschlag()
+            ? [{ label: 'Sommerzuschlag', value: '6,67 € / Tag', note: 'Juli + August' }]
+            : []),
+        ].map((row, i) => (
+          <div key={i} className="flex items-baseline justify-between gap-4">
+            <span className="text-[15px] flex-shrink-0 text-pm-muted">{row.label}</span>
+            <span className="text-right">
+              <span className="block text-[15px] tabular-nums text-pm-ink">{row.value}</span>
+              {row.note && <span className="block text-[13px] mt-0.5 text-pm-muted">{row.note}</span>}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {eigenanteil !== null && (
+        <div className="mt-2.5 rounded-[16px] bg-pm-paper px-4 py-3.5">
+          <p className={`${EYEBROW} mb-3`}>Was bleibt für Sie übrig</p>
+          <div className="space-y-3">
+            <div className="flex items-baseline justify-between gap-4">
+              <span className="text-[15px] flex-shrink-0 text-pm-muted">Betreuung</span>
+              <span className="text-[15px] tabular-nums text-pm-ink">{formatEuro(brutto)}</span>
+            </div>
+            {zuschussPosten.map((z, i) => (
+              <div key={i} className="flex items-baseline justify-between gap-4">
+                <span className="text-[15px] min-w-0 text-pm-muted">
+                  {z.label.replace(/\s*\([^)]*\)\s*$/, '')}
+                  {(z.hinweis || z.name === 'steuervorteil') && (
+                    <span className="block text-[13px] mt-0.5 leading-snug">
+                      {z.hinweis ?? 'Setzt voraus, dass entsprechend Steuern anfallen.'}
+                    </span>
+                  )}
+                </span>
+                <span className="text-[15px] tabular-nums whitespace-nowrap flex-shrink-0 text-pm-ink">
+                  − {formatEuro(z.betrag_monatlich)}
+                </span>
+              </div>
+            ))}
+            <div className="flex items-baseline justify-between gap-4 pt-3 border-t border-pm-line">
+              <span className="text-[15px] font-semibold flex-shrink-0 text-pm-ink">Ihr Eigenanteil</span>
+              <span className="text-[17px] font-bold tabular-nums text-pm-ink">{formatEuro(eigenanteil)}</span>
+            </div>
+          </div>
+          <p className="text-[13px] leading-snug mt-3 text-pm-muted">
+            Pflegegeld, Entlastungsbudget und Steuervorteil sind Leistungen
+            Dritter mit eigenen Voraussetzungen — die Beträge sind eine
+            Orientierung, keine Zusage. Jahresbeträge sind auf den Monat umgelegt.
+          </p>
+        </div>
+      )}
+
+      <a
+        href="/primundus-mustervertrag.pdf"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-2 flex min-h-[44px] items-center justify-center gap-1.5 text-[14px] text-pm-ink underline underline-offset-2"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><polyline points="9 15 12 18 15 15"/>
+        </svg>
+        Mustervertrag als PDF herunterladen
+      </a>
+</>);
 }
 
 // ── Fenster „{Name} einladen“ (Tipp auf „Einladen“ vor dem Speichern) ────────────────────────────────────────────────────

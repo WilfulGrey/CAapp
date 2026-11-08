@@ -96,12 +96,12 @@ describe('Schwebende Frage „Was sagen Sie zum Angebot?“ bei echten Kunden', 
         expect(await screen.findByText('Was sagen Sie zum Angebot?')).toBeInTheDocument();
       } else {
         // Die Seite vor dem Speichern ist wirklich da (Kasten von 75b8df8, die Zeile von „Pflegekräfte zuerst“ bzw. die
-        // Unterzeile des Hauptknopfs im Minimal-Einstieg) — und die Frage bleibt weg.
+        // zweite Zeile des festen Knopfs im Minimal-Einstieg) — und die Frage bleibt weg.
         const kennung = look === '&einstieg=alt'
           ? 'Noch 2 Minuten bis zu Ihren Bewerbungen'
           : look === '&einstieg=zuerst'
             ? 'Laden Sie ein, wer Ihnen gefällt. Dafür beschreiben Sie kurz die Pflegesituation.'
-            : 'dauert etwa 2 Minuten · kostenlos und unverbindlich';
+            : 'und Bewerbungen erhalten';
         expect(await screen.findByText(kennung, {}, { timeout: 5000 })).toBeInTheDocument();
         await new Promise((r) => setTimeout(r, 200));
         expect(screen.queryByText('Was sagen Sie zum Angebot?')).toBeNull();

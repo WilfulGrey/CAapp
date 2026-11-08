@@ -8,7 +8,7 @@
 //     Rückmeldeseite: „Danke, Marta ruft Sie an.“ bzw. „Das hat nicht geklappt“; ohne Rückrufnummer bleibt es ein tel:-Link
 //   - Platzhalterzeilen ohne Text, solange die Liste lädt (Hauptknopf steht schon da)
 //   - „Einladen“ in der Zeile = Logik aus #145 (Fenster, Vormerken, nach dem Speichern automatisch einladen)
-//   - Messpunkte: Hauptknopf als Quelle `hauptknopf`, „Details ›“ als `kosten_aufgeklappt`, Zeile wie die Karte (`karte`)
+//   - Messpunkte: fester Knopf als Quelle `hauptknopf`, „Details“ als `kosten_aufgeklappt`, Zeile wie die Karte (`karte`)
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -84,7 +84,7 @@ const vollerEntwurf = (token: string) => localStorage.setItem(`patient_${token}`
   wunschGeschlecht: 'Weiblich', fuehrerschein: 'Nein',
 }));
 type Meldung = { token?: string; event?: string; metadata?: Record<string, unknown>; notify?: boolean };
-const HAUPTKNOPF = /^Angaben vervollständigen und Bewerbungen erhalten/;
+const HAUPTKNOPF = /^Pflegesituation vervollständigen/;
 const davor = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 const gescrollt = () => (Element.prototype.scrollIntoView as unknown as { mock: { contexts: Element[] } }).mock.contexts;
 const zeilen = () => [...document.querySelectorAll('[data-pflegekraft-zeile]')] as HTMLElement[];
@@ -105,27 +105,32 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(within(kopf).getByAltText('Testsieger Die Welt')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hilfe' })).toBeNull();
 
-    // Angebotskarte wie der Kasten der kurzen Angebotsmail (#148, Fassung „CGA-Stil“ 08.11.): „Ihr Angebot“, Preis, „/ Monat“,
-    // Chips, „Details ›“, drei Punkte. Die grüne Zeile „Nach Zuschüssen …“ fehlt hier: Die Posten der Testkalkulation
-    // (2.800 − 347) passen nicht zum Eigenanteil 1.800, und dann steht lieber nichts als eine falsche Zahl.
+    // Angebotskarte (Fassung „CGA-Stil“, Martin 08.11.): „Ihr persönliches Angebot“, Preis, „Details“, Kasten
+    // Bestpreisgarantie mit vier Punkten, Vertrauen. Die Zeile „Nach Zuschüssen …“ fehlt hier: Die Posten der
+    // Testkalkulation (2.800 − 347) passen nicht zum Eigenanteil 1.800, und dann steht lieber nichts als eine falsche Zahl.
+    // Keine Chips mehr („Eine Person“, „Pflegegrad 3“).
     const karte = document.querySelector('[data-angebot-minimal]') as HTMLElement;
-    expect(within(karte).getByRole('heading', { level: 2, name: 'Ihr Angebot' })).toBeInTheDocument();
+    expect(within(karte).getByRole('heading', { level: 2, name: 'Ihr persönliches Angebot' })).toBeInTheDocument();
     expect(within(karte).getByText(/^2\.800 €/).textContent).toBe('2.800 € / Monat');
-    expect(within(karte).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Eine Person', 'Pflegegrad 3']);
     expect(karte.querySelector('[data-nach-zuschuessen]')).toBeNull();
-    expect(within(karte).getByRole('button', { name: 'Details ›' })).toBeInTheDocument();
-    expect(within(karte).getByText('Täglich kündbar · Keine Vermittlungsgebühr · Bestpreisgarantie')).toBeInTheDocument();
+    expect(karte.textContent).not.toMatch(/Eine Person|Pflegegrad 3/);
+    expect(within(karte).getByRole('button', { name: 'Details' })).toHaveAttribute('aria-expanded', 'false');
+    // Vier gleichwertige Punkte, die Garantie zuerst mit „Mehr Infos“ (Martin: „Ist das unsere Bestpreisgarantie? Oder ist
+    // das nur ein Punkt davon?“); „Keine Kündigungsfrist“ entfällt („Beides genügt.“).
+    const garantie = karte.querySelector('[data-garantie]') as HTMLElement;
+    expect(within(garantie).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Es gilt immer unsere BestpreisgarantieMehr Infos', 'Keine Vorauszahlung', 'Keine Vermittlungsgebühr', 'Keine Mindestlaufzeit']);
+    expect(within(garantie).getByRole('button', { name: 'Mehr Infos' })).toBeInTheDocument();
 
-    // Pflegekräfte: Abschnitt mit Anzahl, Zeilen „Vorname, Alter“ und „N Jahre Erfahrung · Deutsch Gut“ (Stufe wie auf der
-    // Karte vor dem Speichern), Empfehlung oben.
+    // Pflegekräfte: Abschnitt mit Anzahl, Zeilen „Vorname, Alter“, „N Jahre Erfahrung“, „Deutsch Gut“, rechts der Preis des
+    // Kunden und „Einladen“ (Martin 08.11.: „immer den Preis darstellen … und dann einladen“), Empfehlung oben.
     await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
     const abschnitt = document.getElementById('pflegekraefte')!;
     expect(within(abschnitt).getByRole('heading', { level: 2 }).textContent).toBe('Passende Pflegekräfte2');
     const [erste, zweite] = zeilen();
-    // Die Zeile bricht nur hinter „·“ (geschütztes Leerzeichen davor, jede Angabe ohne Umbruch).
-    expect(erste.textContent).toMatch(/^Helena, \d+5 Jahre Erfahrung\u00A0· Deutsch GutEinladen$/);
-    expect([...erste.querySelectorAll('.whitespace-nowrap')].map((e) => e.textContent)).toEqual(['5 Jahre Erfahrung', 'Deutsch Gut', 'Einladen']);
-    expect(zweite.textContent).toMatch(/^Emilia, \d+5 Jahre Erfahrung\u00A0· Deutsch GutEinladen$/);
+    // Preis ohne „/ Monat“ (Martin 08.11.).
+    expect(erste.textContent).toMatch(/^Helena, \d+5 Jahre ErfahrungDeutsch Gut2\.800 €Einladen$/);
+    expect(erste.querySelector('[data-preis]')!.textContent).toBe('2.800 €');
+    expect(zweite.textContent).toMatch(/^Emilia, \d+5 Jahre ErfahrungDeutsch Gut2\.800 €Einladen$/);
     // Rundes Foto wie heute (Name steht daneben, darum alt="").
     expect(erste.querySelector('img')).toHaveAttribute('src', 'https://example.test/avatar.jpg');
     expect(erste.querySelector('img')!.className).toContain('rounded-full');
@@ -136,10 +141,12 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(screen.queryByText('Unsere Empfehlung für Sie')).toBeNull();
     expect(document.querySelector('.rounded-card.cursor-pointer')).toBeNull();
 
-    // Hauptknopf mit Unterzeile, darunter Rückruf (Knopf: der Lead hat eine Rückrufnummer) und Nummer/WhatsApp.
+    // Fester Knopf unten (sticky am Ende des ersten Teils), zwei Zeilen; davor Rückruf (Knopf: der Lead hat eine
+    // Rückrufnummer) und Nummer/WhatsApp.
     const haupt = screen.getByRole('button', { name: HAUPTKNOPF });
-    expect(haupt.textContent).toBe('Angaben vervollständigen und Bewerbungen erhaltendauert etwa 2 Minuten · kostenlos und unverbindlich');
+    expect(haupt.textContent).toBe('Pflegesituation vervollständigenund Bewerbungen erhalten');
     expect(haupt.className).toContain('bg-pm-coral');
+    expect(haupt.closest('[data-fester-knopf]')!.className).toContain('sticky bottom-0');
     const rueckruf = screen.getByRole('button', { name: 'Rückruf vereinbaren' });
     expect(screen.queryByRole('link', { name: 'Rückruf vereinbaren' })).toBeNull();
     const zeileTel = screen.getByText(/^oder anrufen, auch per/);
@@ -147,20 +154,21 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(within(zeileTel).getByRole('link', { name: 'WhatsApp' }).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/4989200000830/);
     expect(within(zeileTel).getByRole('link', { name: '089 200 000 830' })).toHaveAttribute('href', 'tel:+4989200000830');
 
-    // Darunter: Pflegesituation mit offenem Formular, Kostenkarte, So geht es weiter, Fragen, Marta.
+    // Darunter: Pflegesituation mit offenem Formular, So geht es weiter, Fragen, Marta. Keine Kostenkarte mehr (ihre
+    // Aufstellung steht unter „Details“).
     const pflegesituation = document.getElementById('patientendaten')!;
     expect(within(pflegesituation).getByRole('heading', { level: 2, name: 'Pflegesituation' })).toBeInTheDocument();
     const schritt = screen.getByText(/Schritt 1 von 4/);
-    const kosten = screen.getByText('Ihre Betreuungskosten');
+    expect(screen.queryByText('Ihre Betreuungskosten')).toBeNull();
     const soGehts = screen.getByRole('heading', { level: 2, name: 'So geht es weiter' });
     const fragen = screen.getByRole('heading', { level: 2, name: 'Häufige Fragen' });
     const marta = screen.getByText('Noch Fragen?');
-    const reihe = [h1, karte, abschnitt, zweite, haupt, rueckruf, zeileTel, pflegesituation, schritt, kosten, soGehts, fragen, marta];
+    const reihe = [h1, karte, abschnitt, zweite, rueckruf, zeileTel, haupt, pflegesituation, schritt, soGehts, fragen, marta];
     for (let i = 1; i < reihe.length; i++) expect(davor(reihe[i - 1], reihe[i])).toBe(true);
     // Wortlaut-Regeln: nie „Betreuungskräfte“, nie „vermitteln“.
     expect(document.body.textContent).not.toMatch(/Betreuungskräfte|vermitteln/);
-    // Pille rechts in jedem Zustand gleich breit (die Zeile hält ihre Höhe, der Hauptknopf wandert nicht).
-    for (const z of zeilen()) expect(within(z).getByRole('button', { name: 'Einladen' }).className).toContain('w-[84px]');
+    // Knopf rechts in jedem Zustand gleich breit (die Zeile hält ihre Höhe).
+    for (const z of zeilen()) expect(within(z).getByRole('button', { name: 'Einladen' }).className).toContain('w-[88px]');
   }, 20_000);
 
   it('Platzhalterzeilen ohne Text, solange die Liste lädt; Hauptknopf steht schon da, danach die Zeilen mit Anzahl', async () => {
@@ -193,7 +201,7 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(within(document.getElementById('pflegekraefte')!).getByRole('heading', { level: 2 }).textContent).toBe('Passende Pflegekräfte2');
   }, 20_000);
 
-  it('„Einladen“ in der Zeile: Fenster „{Name} einladen“, „Vorgemerkt ✓“, Zeile über dem Formular, localStorage; Messpunkte wie bei der Karte', async () => {
+  it('„Einladen“ in der Zeile: Fenster „{Name} einladen“, „Ausgewählt ✓“, Zeile über dem Formular, localStorage; Messpunkte wie bei der Karte', async () => {
     let einladungen = 0;
     const meldungen: Meldung[] = [];
     server.use(
@@ -210,15 +218,18 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     const fenster = await screen.findByRole('dialog', { name: 'Emilia W. einladen' });
     await user.click(within(fenster).getByRole('button', { name: 'Später' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    const vorgemerkt = within(zeileVon('Emilia')).getByRole('button', { name: 'Vorgemerkt ✓' });
-    // Gleich breite Pille wie „Einladen“: die Zeile wird mit der Vormerkung nicht höher.
-    expect(vorgemerkt.className).toContain('w-[84px]');
+    // „Ausgewählt“ statt „Vorgemerkt“ (Martin 08.11.: „sieht natürlich komisch aus“); nicht „Eingeladen“, verschickt wird
+    // erst nach dem Speichern.
+    const vorgemerkt = within(zeileVon('Emilia')).getByRole('button', { name: 'Ausgewählt ✓' });
+    expect(vorgemerkt.textContent).toBe('Ausgewählt');
+    // Gleich breit wie „Einladen“: die Zeile wird mit der Vormerkung nicht höher.
+    expect(vorgemerkt.className).toContain('w-[88px]');
     expect(zeileVon('Emilia')).toHaveAttribute('data-vorgemerkt', 'true');
     expect(within(zeileVon('Helena')).getByRole('button', { name: 'Einladen' })).toBeInTheDocument();
     expect(screen.getByText('Nach dem Speichern laden wir Emilia W. für Sie ein.')).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem(vormerkSchluessel('token-mi-einladen'))!)).toEqual([50003]);
 
-    // „Vorgemerkt ✓“ öffnet das Fenster erneut; der Knopf darin springt zum Formular (Quelle einladen_fenster).
+    // „Ausgewählt ✓“ öffnet das Fenster erneut; der Knopf darin springt zum Formular (Quelle einladen_fenster).
     await user.click(vorgemerkt);
     await user.click(within(await screen.findByRole('dialog', { name: 'Emilia W. einladen' })).getByRole('button', { name: 'Pflegesituation vervollständigen' }));
     await waitFor(() => expect(gescrollt().map((e) => e.id)).toContain('patientendaten'));
@@ -246,12 +257,12 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     await waitFor(() => expect(meldungen.find((m) => m.event === 'zur_pflegesituation')?.metadata).toEqual({ quelle: 'hauptknopf', vor_speichern: true }));
     expect(meldungen.find((m) => m.event === 'zur_pflegesituation')?.notify).toBe(false);
 
-    await user.click(within(zeileVon('Helena')).getByText(/^Helena, \d+$/));
+    await user.click(within(zeileVon('Helena')).getByText((_, el) => el?.tagName === 'SPAN' && /^Helena, \d+$/.test(el.textContent ?? '')));
     await screen.findByRole('button', { name: 'Nein danke' }, { timeout: 5000 });
     await waitFor(() => expect(meldungen.find((m) => m.event === 'profil_geoeffnet')?.metadata).toEqual({ caregiver_id: 50002, quelle: 'karte', vor_speichern: true }));
   }, 20_000);
 
-  it('„Details ›“ klappt die Kostenkarte mit „Alle Kosten im Überblick“ auf und springt hin (Messpunkt kosten_aufgeklappt)', async () => {
+  it('„Details“ klappt die Kostenaufstellung in der Angebotskarte auf und wieder zu (Messpunkt kosten_aufgeklappt einmal je Öffnen)', async () => {
     const meldungen: Meldung[] = [];
     server.use(
       bridgeHandler((b) => { meldungen.push(b as Meldung); }),
@@ -262,15 +273,24 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
-    const kostenkarte = screen.getByText('Ihre Betreuungskosten').closest('.shadow-lift') as HTMLElement;
-    expect(within(kostenkarte).queryByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeNull();
+    const karte = document.querySelector('[data-angebot-minimal]') as HTMLElement;
+    const knopf = within(karte).getByRole('button', { name: 'Details' });
+    expect(within(karte).queryByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeNull();
 
-    await user.click(screen.getByRole('button', { name: 'Details ›' }));
-    expect(await within(kostenkarte).findByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeInTheDocument();
-    expect(within(kostenkarte).getByRole('button', { name: 'Weniger anzeigen' })).toBeInTheDocument();
-    // Gesprungen wird an den Anfang der Aufstellung („Weniger anzeigen“), nicht an den Preis.
-    await waitFor(() => expect(gescrollt().some((e) => e.textContent === 'Weniger anzeigen' && kostenkarte.contains(e))).toBe(true));
+    await user.click(knopf);
+    expect(knopf).toHaveAttribute('aria-expanded', 'true');
+    const details = karte.querySelector('[data-angebot-details]') as HTMLElement;
+    expect(within(details).getByText('Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).')).toBeInTheDocument();
+    expect(within(details).getByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeInTheDocument();
+    expect(within(details).getByRole('link', { name: /Mustervertrag als PDF herunterladen/ })).toBeInTheDocument();
+    // Ohne Testsieger-Zeile (steht schon im Kopf und unten in der Karte).
+    expect(within(details).queryByAltText('Testsieger Die Welt')).toBeNull();
     await waitFor(() => expect(meldungen.filter((m) => m.event === 'kosten_aufgeklappt')).toHaveLength(1));
+
+    await user.click(knopf);
+    expect(karte.querySelector('[data-angebot-details]')).toBeNull();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(meldungen.filter((m) => m.event === 'kosten_aufgeklappt')).toHaveLength(1);
   }, 20_000);
 
   it('nach dem ersten erfolgreichen Speichern: die in den Zeilen Vorgemerkten werden eingeladen (Logik #145), danach die Ansicht nach dem Speichern', async () => {
@@ -348,11 +368,11 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(document.activeElement).toBe(within(danke).getByText('Danke, Marta ruft Sie an.'));
     expect(screen.queryByRole('button', { name: 'Rückruf vereinbaren' })).toBeNull();
     expect(bitten).toEqual([{ token: TOKEN, aktion: 'rueckruf', quelle: 'portal_einstieg' }]);
-    // Hauptknopf und Nummer bleiben, in derselben Reihenfolge.
+    // Nummer und fester Knopf bleiben, in derselben Reihenfolge.
     expect(screen.getByRole('button', { name: HAUPTKNOPF })).toBe(haupt);
     const zeileTel = screen.getByText(/^oder anrufen, auch per/);
-    expect(davor(haupt, danke)).toBe(true);
     expect(davor(danke, zeileTel)).toBe(true);
+    expect(davor(zeileTel, haupt)).toBe(true);
     expect(document.body.textContent).not.toMatch(/Betreuungskräfte|vermitteln/);
   }, 20_000);
 
@@ -455,36 +475,47 @@ describe('Leerzustände ohne Gedankenstrich (Registry #147)', () => {
     );
     expect(document.querySelector('[data-einstieg="minimal"]')!.textContent).not.toContain('—');
   });
-  it('Angebotskarte ohne Lead: „Ihr Angebot“, Preis, keine Chips und keine Zeile „Nach Zuschüssen“', () => {
+  it('Angebotskarte ohne Lead und ohne Sterne: Titel, Preis, Garantie; keine Zeile „Nach Zuschüssen“, Vertrauen ohne Sterne', () => {
     leer(0);
     const karte = document.querySelector('[data-angebot-minimal]') as HTMLElement;
-    expect(within(karte).getByRole('heading', { level: 2 }).textContent).toBe('Ihr Angebot');
-    expect(within(karte).queryAllByRole('listitem')).toHaveLength(0);
+    expect(within(karte).getByRole('heading', { level: 2 }).textContent).toBe('Ihr persönliches Angebot');
     expect(karte.querySelector('[data-nach-zuschuessen]')).toBeNull();
+    const vertrauen = karte.querySelector('[data-vertrauen]') as HTMLElement;
+    expect(vertrauen.className).toContain('grid-cols-2');
+    expect(vertrauen.textContent).toBe('Erfahrung20 JahreErfahrungTestsieger6× in FolgeTestsieger');
   });
 });
 
-describe('Reihenfolge wie in der Mail (`?reihenfolge=mail`, Vergleich 08.11.)', () => {
-  const zeigen = (knopfUnterAngebot: boolean) => render(
+describe('Angebotskarte mit Zuschüssen und Sternen (Fassung „CGA-Stil“, 08.11.)', () => {
+  // Werte wie der Vorschau-Lead (PG 4, 3.050 €): Eigenanteil 3.050 − 800 − 295 − 333 = 1.622, Heim 3.364 − 1.622 = 1.742.
+  const lead = {
+    kalkulation: {
+      bruttopreis: 3050, eigenanteil: 1621.75, aufschluesselung: [], formularDaten: { pflegegrad: 4, betreuung_fuer: 'ehepaar' },
+      'zuschüsse': { gesamt: 1428.25, items: [
+        { name: 'pflegegeld', label: 'Pflegegeld', beschreibung: '', betrag_monatlich: 800, betrag_jaehrlich: 9600, typ: 'monatlich', hinweis: null, in_kalkulation: true },
+        { name: 'entlastungsbudget_neu', label: 'Entlastungsbudget', beschreibung: '', betrag_monatlich: 294.92, betrag_jaehrlich: 3539, typ: 'jaehrlich', hinweis: null, in_kalkulation: true },
+        { name: 'steuervorteil', label: 'Steuerliche Absetzbarkeit', beschreibung: '', betrag_monatlich: 333.33, betrag_jaehrlich: 4000, typ: 'jaehrlich', hinweis: null, in_kalkulation: true },
+      ] },
+    },
+  } as unknown as import('../../lib/supabase').Lead;
+  const zeigen = (heim: number) => render(
     <EinstiegMinimal
-      anrede="Frau Testerin" lead={null} onBestpreis={() => {}} heimEigenanteil={0} heimQuelle=""
-      laedt={false} zeilen={[<li key="a" data-pflegekraft-zeile="1">Ewa</li>]} gehalteneEinladungen={0} vorschlaegeVorhanden
-      bereitsBearbeitet={null} formular={<div />} sterne={null} vorgemerkte={[]} onVervollstaendigen={() => {}}
-      knopfUnterAngebot={knopfUnterAngebot}
+      anrede="Frau Müller" lead={lead} onBestpreis={() => {}} heimEigenanteil={heim} heimQuelle=""
+      laedt={false} zeilen={[]} gehalteneEinladungen={0} vorschlaegeVorhanden bereitsBearbeitet={null}
+      formular={<div />} sterne={{ schnitt: '4,9', anzahl: 126, wert: 4.9 } as never} vorgemerkte={[]} onVervollstaendigen={() => {}}
     />,
   );
-  const lage = (a: Element, b: Element) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING;
-  it('mit Schalter: Hauptknopf zwischen Angebotskarte und Pflegekräften, genau einmal', () => {
-    zeigen(true);
-    const knoepfe = screen.getAllByRole('button', { name: /^Angaben vervollständigen und Bewerbungen erhalten/ });
-    expect(knoepfe).toHaveLength(1);
-    expect(lage(document.querySelector('[data-angebot-minimal]')!, knoepfe[0])).toBeTruthy();
-    expect(lage(knoepfe[0], document.getElementById('pflegekraefte')!)).toBeTruthy();
+  it('eine ruhige Zeile mit Eigenanteil und Pflegeheim-Vergleich; Sterne als erste Kennzahl', () => {
+    zeigen(3364);
+    expect(document.querySelector('[data-nach-zuschuessen]')!.textContent).toBe('Nach Zuschüssen ca. 1.622 €, rund 1.742 € weniger als im Pflegeheim');
+    const vertrauen = document.querySelector('[data-vertrauen]') as HTMLElement;
+    expect(vertrauen.className).toContain('grid-cols-3');
+    expect(vertrauen.textContent).toBe('Bewertungen4,9126 BewertungenErfahrung20 JahreErfahrungTestsieger6× in FolgeTestsieger');
+    // Kein Satz mehr zu zwei Personen, keine Chips.
+    expect(document.body.textContent).not.toMatch(/für eine Person|Zwei Personen|Pflegegrad 4/);
   });
-  it('ohne Schalter: Hauptknopf nach den Pflegekräften (freigegebene Reihenfolge)', () => {
-    zeigen(false);
-    const knoepfe = screen.getAllByRole('button', { name: /^Angaben vervollständigen und Bewerbungen erhalten/ });
-    expect(knoepfe).toHaveLength(1);
-    expect(lage(document.getElementById('pflegekraefte')!, knoepfe[0])).toBeTruthy();
+  it('ohne Vorteil gegenüber dem Heim kein Vergleich', () => {
+    zeigen(1500);
+    expect(document.querySelector('[data-nach-zuschuessen]')!.textContent).toBe('Nach Zuschüssen ca. 1.622 €');
   });
 });

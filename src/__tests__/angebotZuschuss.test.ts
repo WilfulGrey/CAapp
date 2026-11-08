@@ -1,7 +1,7 @@
 // Angebotskarte im Minimal-Einstieg (Registry #147, Fassung „CGA-Stil“): dieselbe Zahl wie der Kasten „IHR ANGEBOT“ der
-// kurzen Angebotsmail (#148, send-scheduled-emails/kundenMails.ts `eigenanteilAus`/`angebotChips`).
+// kurzen Angebotsmail (#148, send-scheduled-emails/kundenMails.ts `eigenanteilAus`).
 import { describe, expect, it } from 'vitest';
-import { angebotChips, eigenanteilAus, EHEPAAR_SATZ } from '../lib/angebotZuschuss';
+import { eigenanteilAus } from '../lib/angebotZuschuss';
 import type { LeadKalkulation } from '../lib/supabase';
 
 const posten = (name: string, monat: number, drin = true) => ({
@@ -18,11 +18,8 @@ const kalk = (fd: Record<string, unknown>, extra: ReturnType<typeof posten>[] = 
 
 describe('eigenanteilAus (Spiegel der Mail)', () => {
   it('Preis minus die gerundeten Posten: 3.050 − 800 − 295 − 333 = 1.622', () => {
-    expect(eigenanteilAus(kalk({ betreuung_fuer: '1-person' }))).toEqual({ eigen: 1622, ehepaarSatz: false });
-  });
-  it('bei zwei Personen mit Pflegegeld der Satz der Mail', () => {
-    expect(eigenanteilAus(kalk({ betreuung_fuer: 'ehepaar' }))).toEqual({ eigen: 1622, ehepaarSatz: true });
-    expect(EHEPAAR_SATZ).toBe('Gerechnet ist mit den Zuschüssen für eine Person.');
+    expect(eigenanteilAus(kalk({ betreuung_fuer: '1-person' }))).toEqual({ eigen: 1622 });
+    expect(eigenanteilAus(kalk({ betreuung_fuer: 'ehepaar' }))).toEqual({ eigen: 1622 });
   });
   it('Posten ohne in_kalkulation zählen nicht', () => {
     expect(eigenanteilAus(kalk({}, [posten('verhinderungspflege', 300, false)]))?.eigen).toBe(1622);
@@ -32,15 +29,5 @@ describe('eigenanteilAus (Spiegel der Mail)', () => {
     expect(eigenanteilAus(kalk({}, [], 1600))).toBeNull();
     expect(eigenanteilAus({ ...kalk({}), 'zuschüsse': { gesamt: 0, items: [] } })).toBeNull();
     expect(eigenanteilAus(null)).toBeNull();
-  });
-});
-
-describe('angebotChips (Spiegel der Mail)', () => {
-  it('Personen und Pflegegrad 1–5; fehlt eine Angabe, fehlt der Chip', () => {
-    expect(angebotChips({ betreuung_fuer: '1-person', pflegegrad: 3 })).toEqual(['Eine Person', 'Pflegegrad 3']);
-    expect(angebotChips({ betreuung_fuer: 'ehepaar', pflegegrad: '4' })).toEqual(['Zwei Personen', 'Pflegegrad 4']);
-    expect(angebotChips({ betreuung_fuer: '1-person', pflegegrad: 0 })).toEqual(['Eine Person']);
-    expect(angebotChips({ pflegegrad: 2 })).toEqual(['Pflegegrad 2']);
-    expect(angebotChips(null)).toEqual([]);
   });
 });
