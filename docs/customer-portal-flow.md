@@ -326,7 +326,7 @@ przejścia** — klient nie czeka na maila.
 > imieniem, wiekiem, doświadczeniem, niemieckim, ceną i przyciskiem „Ansehen“ (`cg=<caregiverId>&m=eb` — otwiera profil
 > w portalu), link „Alle Pflegekräfte anzeigen“ (`goto=matches`), zdanie o portalu i JEDEN przycisk „Bewerbungen
 > erhalten →“ (`goto=anfragen&m=eb` — formularz). `empfehlungFuerAngebot` pobiera zdjęcia wszystkich widocznych
-> opiekunek (`fotoBudget` 300 KB / 1,2 MB, reszta = inicjały) i dokleja je jako `__inlineAttachments`; event
+> opiekunek, max 5 (`ANGEBOT_KRAEFTE_MAX`; polecona zawsze, reszta `fotoBudget` 300 KB / 1,2 MB, reszta = inicjały) i dokleja je jako `__inlineAttachments`; event
 > `empfehlung_in_angebotsmail` niesie `fotos_inline`. Brak Empfehlung ⇒ brak karty, przycisk zostaje. Sformułowania =
 > portal, pilnuje `src/__tests__/mails/angebotsmailWortlaut.test.ts`. Opisy wyglądu niżej są historyczne (#39, #117).
 

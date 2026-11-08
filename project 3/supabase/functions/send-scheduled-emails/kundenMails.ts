@@ -181,6 +181,8 @@ export const ALLE_KRAEFTE = "Alle Pflegekräfte anzeigen";
  *  beschreiben …“; Fassung OpenAI 08.11., ohne „nicht nur … sondern auch“, Handlung direkt vor dem Knopf). */
 export const PORTAL_ERKLAERUNG = "Im Kundenportal sehen Sie Ihr Angebot und passende Pflegekräfte. Beschreiben Sie einmal kurz die Pflegesituation, das dauert etwa 2\u00a0Minuten. Danach können sich Pflegekräfte direkt bei Ihnen bewerben. Erste Rückmeldungen kommen häufig innerhalb von 60\u00a0Minuten.";
 export const KNOPF_ZEILE = "100% kostenfrei &amp; unverbindlich";
+/** So viele Pflegekräfte zeigt die Mail höchstens; index.ts lädt nur für diese Fotos. */
+export const ANGEBOT_KRAEFTE_MAX = 5;
 const GOLD = "#D4A843";
 
 /** „1 Jahr Erfahrung" / „12 Jahre Erfahrung", „Deutsch Gut" — wie `zeilenFakten` im Portal. */
@@ -285,7 +287,7 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
   const brutto = typeof kalk.bruttopreis === "number" && kalk.bruttopreis > 0 ? kalk.bruttopreis : 0;
   const eigen = brutto ? eigenanteilAus(kalk) : null;
   const n = a.empfehlung ? Math.max(1, Math.min(5, a.empfehlung.sichtbar || 1)) : 0;
-  const kraefte = (a.empfehlung?.kraefte ?? []).slice(0, 5);
+  const kraefte = (a.empfehlung?.kraefte ?? []).slice(0, ANGEBOT_KRAEFTE_MAX);
   // „Bewerbungen erhalten" führt wie im Portal ins Formular; die Zeilen zu den Pflegekräften.
   const start = k.portal({ m: "eb", goto: "anfragen" });
   const zuKraeften = k.portal({ m: "eb", goto: "matches" });
@@ -322,7 +324,7 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
   const kasten = brutto
     ? `${ANGEBOT_TITEL.toUpperCase()}
 ${euro(brutto)} € / Monat
-${eigen ? `Nach Zuschüssen ca. ${euro(eigen.eigen)} € im Monat\n${heim ? `rund ${euro(heim)} € weniger als im Pflegeheim\n` : ""}` : ""}${GARANTIE_PUNKTE.map((p) => `✓ ${p}`).join("\n")}
+${eigen ? `Nach Zuschüssen ca. ${euro(eigen.eigen)} € im Monat\n${heim ? `rund ${euro(heim)} € weniger als im Pflegeheim\n` : ""}` : ""}${GARANTIE_PUNKTE.map((p, i) => `✓ ${p}${i === 0 ? `: ${BESTPREIS_URL}` : ""}`).join("\n")}
 ${k.bewertung ? `★★★★★ ${k.bewertung.schnitt} · ${k.bewertung.anzahl} Bewertungen · ` : ""}20 Jahre Erfahrung · 6× in Folge Testsieger
 
 `

@@ -41,6 +41,7 @@ import { sendezeitIso } from "./quietHours.ts";
 import type { BewerbungsAngebot } from "./mailBausteine.ts";
 import {
   type AngebotEingabe,
+  ANGEBOT_KRAEFTE_MAX,
   angebotMail,
   erinnerungMail,
   type KundenMail,
@@ -1118,8 +1119,10 @@ type InlineFoto = { filename: string; content: Uint8Array; contentType: string; 
 /** Empfehlung für die Angebotsmail mit den Fotos der sichtbaren Kräfte — Versand UND Testversand gehen denselben Weg (wie
  *  fuenfFuerNudge). Schreibt nichts; der lead_events-Eintrag bleibt beim Versand. Seit der Mail wie das Portal (Registry
  *  #148, Martin 08.11.2026: „genauso … wie im Portal … direkt die Pflegekräfte“) stehen die Kräfte wieder als Zeilen mit
- *  Foto in der Mail; Budget wie die Fünf-Liste der Nudge-Mail, was nicht passt, bekommt Initialen. */
+ *  Foto in der Mail. Fotos nur für die Kräfte, die die Mail zeigt (sonst stünden weitere als lose Anhänge darunter); wie bis
+ *  #148 das der empfohlenen Kraft immer, die übrigen im Budget der Fünf-Liste, was nicht passt, bekommt Initialen. */
 type AngebotEmpfehlung = { erg: EmpfehlungErgebnis; fotos: (InlineFoto | null)[] };
+const angebotKraefte = (erg: EmpfehlungErgebnis) => (erg.alle ?? [erg.empfehlung]).slice(0, ANGEBOT_KRAEFTE_MAX);
 async function empfehlungFuerAngebot(
   lead: Lead, supabaseUrl: string, key: string, darfOnboarden: boolean,
 ): Promise<AngebotEmpfehlung | null> {
@@ -1131,9 +1134,9 @@ async function empfehlungFuerAngebot(
     darfOnboarden,
   });
   if (!erg) return null;
-  const roh = await Promise.all((erg.alle ?? [erg.empfehlung]).map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
-  const darf = fotoBudget(roh.map((r) => r?.content.length ?? null));
-  return { erg, fotos: roh.map((r, i) => (r && darf[i]) ? r : null) };
+  const [erstes, ...roh] = await Promise.all(angebotKraefte(erg).map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
+  const darf = fotoBudget(roh.map((r) => r?.content.length ?? null), 300_000, 1_200_000 - (erstes?.content.length ?? 0));
+  return { erg, fotos: [erstes ?? null, ...roh.map((r, i) => (r && darf[i]) ? r : null)] };
 }
 
 /** Eingaben der Angebotsmail aus dem Lead. */
@@ -1149,7 +1152,7 @@ function angebotEingabe(lead: Lead, resubmit: boolean, empf: AngebotEmpfehlung |
     empfehlung: empf
       ? {
         sichtbar: empf.erg.sichtbarGesamt,
-        kraefte: (empf.erg.alle ?? [empf.erg.empfehlung]).map((e, i) => ({
+        kraefte: angebotKraefte(empf.erg).map((e, i) => ({
           caregiverId: e.caregiverId, vorname: e.vorname, alter: e.alter, erfahrungJahre: e.erfahrungJahre, deutschWort: e.deutschWort,
           cid: empf.fotos[i]?.cid ?? null,
         })),

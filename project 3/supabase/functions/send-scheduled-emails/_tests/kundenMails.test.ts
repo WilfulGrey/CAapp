@@ -159,7 +159,7 @@ Deno.test("01 Angebot (#148): Inhalt und Reihenfolge wie der freigegebene Entwur
   inFolge("Text", m.text, [
     "Guten Tag Frau Müller,\n\nvielen Dank für Ihre Anfrage. Hier ist Ihr Angebot zur 24-Stunden-Betreuung.\n\n",
     "IHR PERSÖNLICHES ANGEBOT\n3.050 € / Monat\nNach Zuschüssen ca. 1.823 € im Monat\nrund 1.541 € weniger als im Pflegeheim\n"
-      + "✓ Bestpreisgarantie\n✓ Keine Vorauszahlung\n✓ Keine Vermittlungsgebühr\n✓ Keine Mindestlaufzeit\n"
+      + `✓ Bestpreisgarantie: ${BESTPREIS_URL}\n✓ Keine Vorauszahlung\n✓ Keine Vermittlungsgebühr\n✓ Keine Mindestlaufzeit\n`
       + "★★★★★ 4,9 · 126 Bewertungen · 20 Jahre Erfahrung · 6× in Folge Testsieger\n\n",
     `PASSENDE PFLEGEKRÄFTE (2)\n- Maria, 58 · 12 Jahre Erfahrung · Deutsch Gut · 3.050 € · Ansehen: ${profil(11)}\n`
       + `- Ewa · 1 Jahr Erfahrung · 3.050 € · Ansehen: ${profil(22)}\nAlle Pflegekräfte anzeigen: ${ALLE}\n\n`,
