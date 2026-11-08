@@ -109,12 +109,7 @@ import {
 } from "./bewertungenStand.ts";
 // Martas Signaturkarte — eine Vorlage für alle Mails (Kopie von lib/marta-karte.ts).
 import { MARTA_KARTE_MOBIL_CSS, martaKarteHtml } from "./martaKarte.ts";
-import {
-  portalHerkunft,
-  portalAngabenHinweisHtml,
-  portalAngabenHinweisText,
-  PORTAL_BETREFF,
-} from "./herkunft.ts";
+import { portalHerkunft, PORTAL_BETREFF } from "./herkunft.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -1120,11 +1115,14 @@ async function zeileAbbrechen(
 
 type InlineFoto = { filename: string; content: Uint8Array; contentType: string; cid: string };
 
-/** Empfehlung für die Angebotsmail — Versand UND Testversand gehen denselben Weg (wie
- *  fuenfFuerNudge). Schreibt nichts; der lead_events-Eintrag bleibt beim Versand. */
+/** Empfehlung für die Angebotsmail mit den Fotos der sichtbaren Kräfte — Versand UND Testversand gehen denselben Weg (wie
+ *  fuenfFuerNudge). Schreibt nichts; der lead_events-Eintrag bleibt beim Versand. Seit der Mail wie das Portal (Registry
+ *  #148, Martin 08.11.2026: „genauso … wie im Portal … direkt die Pflegekräfte“) stehen die Kräfte wieder als Zeilen mit
+ *  Foto in der Mail; Budget wie die Fünf-Liste der Nudge-Mail, was nicht passt, bekommt Initialen. */
+type AngebotEmpfehlung = { erg: EmpfehlungErgebnis; fotos: (InlineFoto | null)[] };
 async function empfehlungFuerAngebot(
   lead: Lead, supabaseUrl: string, key: string, darfOnboarden: boolean,
-): Promise<{ erg: EmpfehlungErgebnis; inline: InlineFoto | null; weitere: (InlineFoto | null)[] } | null> {
+): Promise<AngebotEmpfehlung | null> {
   if (!lead.token) return null;
   const erg = await holeEmpfehlung({
     supabaseUrl, key, token: lead.token,
@@ -1133,48 +1131,30 @@ async function empfehlungFuerAngebot(
     darfOnboarden,
   });
   if (!erg) return null;
-  /* Fotos aller sichtbaren Kräfte (Martin 07.10.2026). Budget wie die Fünf-Liste der Nudge-Mail: die Empfehlung zuerst, was
-     nicht passt, bekommt die Initialen-Kachel. */
-  const [inline, ...roh] = await Promise.all((erg.alle ?? [erg.empfehlung]).map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
-  const darf = fotoBudget(roh.map((r) => r?.content.length ?? null), 300_000, 1_200_000 - (inline?.content.length ?? 0));
-  return { erg, inline, weitere: roh.map((r, i) => (r && darf[i]) ? r : null) };
-}
-
-/** „06.10.2026" (Berliner Zeit) — Datum der Kopfleiste „Ihr Angebot vom …" wie im Portal (lead.created_at). */
-function angebotsDatum(iso: string | null | undefined): string | null {
-  const d = new Date(iso ?? Date.now());
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin" });
+  const roh = await Promise.all((erg.alle ?? [erg.empfehlung]).map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
+  const darf = fotoBudget(roh.map((r) => r?.content.length ?? null));
+  return { erg, fotos: roh.map((r, i) => (r && darf[i]) ? r : null) };
 }
 
 /** Eingaben der Angebotsmail aus dem Lead. */
-function angebotEingabe(
-  lead: Lead, resubmit: boolean, empf: { erg: EmpfehlungErgebnis; inline: InlineFoto | null; weitere: (InlineFoto | null)[] } | null,
-): AngebotEingabe {
-  const herkunft = portalHerkunft(lead.source);
-  /* Welche Felder WIR gesetzt haben, legt api/portal-lead in der Kalkulation ab. Fehlt die
-     Liste (Altbestand), gilt der vorsichtigere Text. */
-  const felder = (lead.kalkulation as Record<string, unknown> | null)?.angenommene_felder;
-  const angenommen = !Array.isArray(felder) || felder.length > 0;
+function angebotEingabe(lead: Lead, resubmit: boolean, empf: AngebotEmpfehlung | null): AngebotEingabe {
   return {
     kalkulation: lead.kalkulation,
-    careStartTiming: ((lead as unknown as Record<string, unknown>).care_start_timing as string | null) ?? null,
-    herkunft,
+    herkunft: portalHerkunft(lead.source),
+    /* Welche Felder WIR gesetzt haben, legt api/portal-lead in der Kalkulation ab; die Mail wählt danach den Hinweis
+       (fehlt die Liste, gilt der vorsichtigere Text). */
+    angenommeneFelder: (lead.kalkulation as Record<string, unknown> | null)?.angenommene_felder,
     portalBetreff: PORTAL_BETREFF,
-    angabenHinweis: herkunft
-      ? { html: portalAngabenHinweisHtml(herkunft, angenommen), text: portalAngabenHinweisText(herkunft, angenommen) }
-      : null,
     resubmit,
     empfehlung: empf
       ? {
-        e: empf.erg.empfehlung, cid: empf.inline?.cid ?? null, sichtbar: empf.erg.sichtbarGesamt,
-        weitere: (empf.erg.alle ?? []).slice(1).map((e, i) => ({ e, cid: empf.weitere[i]?.cid ?? null })),
+        sichtbar: empf.erg.sichtbarGesamt,
+        kraefte: (empf.erg.alle ?? [empf.erg.empfehlung]).map((e, i) => ({
+          caregiverId: e.caregiverId, vorname: e.vorname, alter: e.alter, erfahrungJahre: e.erfahrungJahre, deutschWort: e.deutschWort,
+          cid: empf.fotos[i]?.cid ?? null,
+        })),
       }
       : null,
-    /* Erneute Anfrage = angepasstes Angebot von heute; sonst das Datum der Anfrage. */
-    datum: angebotsDatum(resubmit ? null : (lead as unknown as Record<string, string | null>).created_at),
-    /* Vorschlag B (07.10.2026): die weiteren Kräfte als kompakte Zeilen. */
-    weitereKompakt: true,
   };
 }
 
@@ -1758,7 +1738,6 @@ Deno.serve(async (req: Request) => {
       let demoEmpf: Awaited<ReturnType<typeof empfehlungFuerAngebot>> = null;
       if (demoTypen.includes("eingangsbestaetigung")) {
         demoEmpf = await empfehlungFuerAngebot(lead as Lead, supabaseUrl, supabaseServiceKey, Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0");
-        demoInline = demoEmpf?.inline ?? null;
       }
       /* Erinnerungen und „Reservierung abgelaufen" mit der letzten echten Bewerbung des Leads.
          Hat der Test-Lead keine, nimmt die Vorschau eine Beispiel-Pflegekraft und sagt das in der
@@ -1878,8 +1857,9 @@ Deno.serve(async (req: Request) => {
           const subject = item.subjectPrefix ? `${item.subjectPrefix}${m.subject}` : m.subject;
           const html = b ? m.html.replace('<div class="email-content">', `${bannerHtml(b)}<div class="email-content">`) : m.html;
           const text = b ? `(${b})\n\n${m.text}` : m.text;
-          const anhang = item.email_type === "eingangsbestaetigung" && demoInline
-            ? [demoInline, ...(demoEmpf?.weitere ?? []).filter((r): r is InlineFoto => r !== null)]
+          const angebotFotos = (demoEmpf?.fotos ?? []).filter((r): r is InlineFoto => r !== null);
+          const anhang = item.email_type === "eingangsbestaetigung" && angebotFotos.length
+            ? angebotFotos
             : item.email_type === "vermittler_angebot" && demoInline
             ? [demoInline]
             : item.email_type === "profil_nudge_1" && demoFuenf?.anhaenge.length
@@ -2272,20 +2252,20 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = "email_angebot_sent";
           eventTypeFailed = "email_angebot_failed";
         } else if (scheduledEmail.email_type === "eingangsbestaetigung") {
-          // Mail 1: Angebot, Knopf „Angebot & Pflegekräfte ansehen" unter dem Preis und unten (Registry #110, Martin 03.10.2026).
+          // Mail 1 wie das Portal (Registry #148, Martin 08.11.2026): Angebot kompakt, die passenden Pflegekräfte als Zeilen
+          // mit Foto und Preis, EIN Knopf „Bewerbungen erhalten →“.
           // Re-Submit: angepasster Betreff und Einstieg (Kunde hat das Formular nochmal
-          // abgeschickt). Eingekaufter Lead: eigener Betreff, Portalname im Einstieg, Hinweis
-          // über den Angaben — Herkunft schlägt Resubmit.
+          // abgeschickt). Eingekaufter Lead: eigener Betreff, Portalname im Einstieg, Hinweis zu den Angaben unter dem
+          // Kasten — Herkunft schlägt Resubmit.
           const isResubmit = await hasPreviousEingangsbestaetigungSent(supabase, scheduledEmail.lead_id);
-          /* Empfehlung: echte gematchte Pflegekraft (Martin 31.08.2026). Best-effort — fällt sie
-             aus, fehlt nur der Abschnitt, der Versand hängt nie davon ab. */
+          /* Empfehlung: echte gematchte Pflegekräfte (Martin 31.08.2026) als Zeilen mit Foto. Best-effort — fällt sie aus,
+             fehlt nur der Abschnitt, der Versand hängt nie davon ab. */
           const empf = await empfehlungFuerAngebot(
             lead as Lead, supabaseUrl, supabaseServiceKey, Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0",
           );
           if (empf) {
-            if (empf.inline) (scheduledEmail as any).__reminderInline = empf.inline;
-            const weitereFotos = empf.weitere.filter((r): r is InlineFoto => r !== null);
-            if (weitereFotos.length) (scheduledEmail as any).__inlineAttachments = weitereFotos;
+            const fotos = empf.fotos.filter((r): r is InlineFoto => r !== null);
+            if (fotos.length) (scheduledEmail as any).__inlineAttachments = fotos;
             await supabase.from("lead_events").insert({
               lead_id: scheduledEmail.lead_id,
               event_type: "empfehlung_in_angebotsmail",
@@ -2293,9 +2273,8 @@ Deno.serve(async (req: Request) => {
                 caregiver_id: empf.erg.empfehlung.caregiverId,
                 sichtbar_gesamt: empf.erg.sichtbarGesamt,
                 gruende: empf.erg.empfehlung.gruende,
-                foto: empf.inline ? "inline" : "initialen",
                 weitere_ids: (empf.erg.alle ?? []).slice(1).map((e) => e.caregiverId),
-                fotos_inline: (empf.inline ? 1 : 0) + empf.weitere.filter(Boolean).length,
+                fotos_inline: fotos.length,
               },
             });
           }
