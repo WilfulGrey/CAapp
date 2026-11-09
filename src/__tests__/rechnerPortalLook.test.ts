@@ -96,7 +96,8 @@ describe('Rechner wie das Portal (Registry #151)', () => {
     const siegel = funktion('SiegelSternePortal');
     expect(siegel).not.toMatch(/text-\[(12\.5|13|13\.5)px\]/);
     expect(siegel.match(/text-\[14px\]/g)).toHaveLength(4);
-    expect(funktion('KostenfreiZeile')).not.toMatch(/text-\[(12\.5|13|13\.5)px\]/);
+    // Beide Fassungen der Zeile (grau bei den Fragen, grün am Knopf) 14 px, keine andere Größe.
+    expect(funktion('KostenfreiZeile').match(/text-\[\d+(?:\.\d+)?px\]/g)).toEqual(['text-[14px]', 'text-[14px]']);
     // Kein Vorschau-Schalter mehr, die Entscheidung ist gefallen.
     expect(portal).not.toContain('get("frei")');
   });
