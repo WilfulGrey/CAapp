@@ -127,8 +127,8 @@ export const PREIS_SEITE = {
   // Eine Zeile neben den Fotos — „ab sofort verfügbar" sagte schon die Warteseite.
   unterKnopf: 'Passend zu Ihren Angaben',
   garantieMehr: 'Mehr Infos',
-  // Unter dem Knopf wie auf der Startseite (Martin 17.09.): die Hero-Punkte
-  // (lib/hero-punkte.ts) mit „Bestpreisgarantie · Mehr Infos" als viertem, die
+  // Unter dem Knopf wie damals auf der Startseite (Martin 17.09.): die Hero-Punkte
+  // (lib/hero-punkte.ts, HERO_PUNKTE) mit „Bestpreisgarantie · Mehr Infos" als viertem, die
   // Sterne-Zeile (lib/sterne-zeile.ts, live von primundus.de), darunter Marta.
   marta: MARTA_KARTE,
   /** Nur wenn zuhause günstiger ist als das Heim — sonst kein Satz (kein Schönrechnen). */

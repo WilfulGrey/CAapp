@@ -1293,26 +1293,16 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
             <span aria-hidden="true" className="text-[#3A6B42] text-[13px] leading-none">→</span>
           </button>
         </div>
-        {/* Die drei Punkte, die kein Wettbewerber so setzen kann (Martin
-            16.08.). "Keine Vermittlungsgebuehr" stand seit dem 16.08. in
-            JEDER Google-Anzeige, aber nirgends auf der Seite — der Klick
-            fuehrte auf ein Versprechen, das hier nicht wieder auftauchte.
-            Belege: marta 99-999 EUR Aufnahmegebuehr, Hausengel 220 EUR/Mo
-            Vermittlung, Dt. Seniorenbetreuung 280 EUR Pauschale; taeglich
-            kuendbar ist bei uns vertraglich hinterlegt (vertrag-content.ts
-            §3.3). Alle drei gehoeren zur selben Kategorie: nichts, worin man
-            haengenbleibt — die Startzeit ist bewusst NICHT dabei, sie ist
-            eine andere Aussage (Martin 16.08.). Am 14.09. kam sie trotzdem
-            als Punkt dazu; seit 17.09. steht „Anreise in 3 Tagen möglich"
-            in der Hero-Unterzeile (Martin: „aus den 5 Punkten rausnehmen und
-            im Hero machen statt kostenlos und unverbindlich").
-            "Kostenlos & unverbindlich" steht damit nicht mehr im Hero, nur
-            noch im Fuß des Kontaktschritts und im Schluss-Aufruf. */}
+        {/* Punkte unter dem Knopf: "Keine Vermittlungsgebuehr" steht in jeder
+            Google-Anzeige und muss hier wieder auftauchen (Martin 16.08.).
+            Die Startzeit steht seit 17.09. in der Hero-Unterzeile („Anreise in
+            3 Tagen möglich"), nicht als Punkt. Bis 09.11. standen hier
+            HERO_PUNKTE (mit „Kein Vertrag vor Ihrer Auswahl" und „Täglich
+            kündbar"), seit Registry #158 die Punkte des Portals. */}
         {/* Schriftgroesse: NIE kleiner als die Hero-Unterzeile ueber dem
-            Button (16px, app/page.tsx) — Martin 16.08. Diese drei Zeilen
-            sind der Message-Match zu den Anzeigen, nicht Kleingedrucktes. */}
-        {/* Einrueckung erst ab lg: auf 375px schob sie "Taeglich kuendbar,
-            taggenau abgerechnet" in eine zweite Zeile. */}
+            Button (16px, app/page.tsx) — Martin 16.08. Diese Zeilen
+            sind der Message-Match zu den Anzeigen, nicht Kleingedrucktes.
+            Einrueckung erst ab lg (auf 375px brach eine Zeile sonst um). */}
         {/* Registry #158 (Martin 09.11.): dieselben vier Punkte wie im Portal unter dem Preis, Bestpreisgarantie zuerst,
             grüne Haken wie dort (Koralle nur für Knöpfe, Farbregel 11.09.). */}
         <ul className="mt-5 flex flex-col gap-3 lg:pl-1.5">

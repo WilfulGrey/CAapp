@@ -5,7 +5,7 @@ import { HERO_PUNKTE } from '../lib/heroPunkte';
 import { HERO_PUNKTE as ORIGINAL, PORTAL_PUNKTE } from '../../project 3/lib/hero-punkte';
 import { GARANTIE_PUNKTE } from '../components/portal/EinstiegMinimal';
 
-describe('Vorteile im Portal = Kostenrechner-Startseite', () => {
+describe('Hero-Punkte: Spiegel und Startseite (Registry #158)', () => {
   it('gleicher Wortlaut, gleiche Reihenfolge (ältere Portal-Ansichten und /kalkulation)', () => {
     expect([...HERO_PUNKTE]).toEqual([...ORIGINAL]);
   });
@@ -21,5 +21,8 @@ describe('Vorteile im Portal = Kostenrechner-Startseite', () => {
     // Grüne Haken wie im Portal, Koralle bleibt den Knöpfen vorbehalten.
     expect(hero).not.toContain('text-[#E76F63]');
     expect((hero.match(/<HakenGruen \/>/g) || []).length).toBe(2);
+    const haken = formular.slice(formular.indexOf('function HakenGruen()'), formular.indexOf('// ─── Matching Animation Component'));
+    expect(haken).toContain('text-[#3D7A5C]');
+    expect(haken).not.toContain('#E76F63');
   });
 });
