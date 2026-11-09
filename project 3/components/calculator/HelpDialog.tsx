@@ -1,6 +1,7 @@
 "use client";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { KNOPF_ANGEBOT } from '@/components/calculator/FormularPortal';
 import { Phone, Calculator, Check } from "lucide-react";
 import Image from "next/image";
 import { openCalculator } from '@/lib/scroll-to-calculator';
@@ -99,7 +100,7 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
             className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#E76F63] hover:bg-[#D65E52] text-white font-semibold text-sm rounded-xl transition-all duration-200 shadow-md hover:shadow-lg"
           >
             <Calculator className="w-4 h-4" />
-            <span>Preis & Pflegekräfte ansehen</span>
+            <span>{KNOPF_ANGEBOT}</span>
           </a>
         </div>
       </DialogContent>

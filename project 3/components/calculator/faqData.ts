@@ -20,9 +20,26 @@ export const faqs: FAQItem[] = [
     question: "Wie schnell kann eine Betreuungskraft starten?",
     answer: "Eine Anreise ist schon in 3 Tagen möglich. Wann genau, richtet sich nach Ihrem Wunschtermin. Ist es dringend, rufen Sie uns an."
   },
+  // Registry #155 (Martin 09.11.2026: „Pass das mal alles an. Genau so“): drei Fragen aus dem Portal wörtlich
+  // (src/components/portal/FaqListe.tsx, FAQ und FAQ_GRUNDFRAGEN) statt der Erklärteile, die von der Startseite entfallen
+  // („Was ist 24-Stunden-Pflege?“, „Ist sie geeignet?“, „Rundum versorgt“). „Wie läuft die Betreuung ab?“ ersetzt „Was
+  // passiert, wenn die Betreuungskraft krank wird?“ mit „Unser Netzwerk umfasst tausende …“ (klang nach Vermittler,
+  // Zahl ohne Beleg; belegt ist Ersatz in der Regel innerhalb von 3 Tagen, Mustervertrag). Bei Änderung im Portal hier mit.
   {
-    question: "Was passiert, wenn die Betreuungskraft krank wird?",
-    answer: "Wir organisieren schnellstmöglich eine Ersatzkraft. Unser Netzwerk umfasst tausende geprüfte Betreuungskräfte, sodass wir in der Regel innerhalb kurzer Zeit Ersatz stellen können."
+    question: "Ist das legal?",
+    answer: "Ja, vollständig. Die Pflegekräfte sind sozialversicherungspflichtig bei uns angestellt und werden von uns nach Deutschland entsandt. Für jeden Einsatz liegt eine offizielle A1-Bescheinigung vor — der Nachweis der Sozialversicherungspflicht im Herkunftsland."
+  },
+  {
+    question: "Wie läuft die Betreuung ab?",
+    answer: "Die Pflegekraft wird in der Regel direkt zu Ihnen nach Hause gebracht und bleibt meist 6 bis 8 Wochen. Den Wechsel zur nächsten Pflegekraft organisieren wir. Fällt eine Pflegekraft aus oder passt die Zusammenarbeit nicht, sorgen wir schnellstmöglich für Ersatz, in der Regel innerhalb von 3 Tagen."
+  },
+  {
+    question: "Was übernimmt die Pflegekraft, was ein Pflegedienst?",
+    answer: "Die Pflegekraft wohnt während des Einsatzes mit im Haus und hilft bei der Körperpflege, beim Essen und Trinken, beim Aufstehen und Gehen, im Haushalt, beim Einkaufen und bei Spaziergängen. Medizinische Behandlungspflege wie Spritzen oder Wundversorgung übernimmt ein ambulanter Pflegedienst."
+  },
+  {
+    question: "Was brauche ich zu Hause?",
+    answer: "Ein eigenes, abschließbares Zimmer mit Bett für die Pflegekraft. Küche, Bad und ein Internetanschluss sollten vorhanden sein. Zimmer und Verpflegung stellen Sie, das ist mit „Kost und Logis“ im Angebot gemeint."
   },
   {
     question: "Kann ich die Betreuung jederzeit kündigen?",

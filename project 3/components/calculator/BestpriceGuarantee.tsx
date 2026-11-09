@@ -2,6 +2,7 @@
 
 import { GARANTIE } from "@/lib/kraefte-vorschau";
 import { GARANTIE_OEFFNEN_EVENT } from "@/components/calculator/BestpreisSiegelLink";
+import { TestsiegerKarte } from "@/components/calculator/TestsiegerSection";
 
 /**
  * Karte „100 % Sorgenfrei" mit der Bestpreisgarantie (Martin 12.09.2026).
@@ -19,6 +20,9 @@ import { GARANTIE_OEFFNEN_EVENT } from "@/components/calculator/BestpreisSiegelL
  *
  * `kompakt` = Desktop-Raster (halbe Breite): Siegel links, Text rechts,
  * feste Innenabstände und Schriftgrößen wie die Karte rechts daneben.
+ *
+ * Registry #155 (09.11.2026): Look wie Formular und Portal, weiße Karte ohne
+ * grünen Rahmen; Pille, Siegel und Wortlaut unverändert.
  */
 const PILLE = "100% Sorgenfrei";
 const LINK = "Was heißt vergleichbar? Mehr Infos";
@@ -28,7 +32,7 @@ export function BestpreisKarte({ kompakt = false }: { kompakt?: boolean }) {
 
   if (kompakt) {
     return (
-      <div className="bg-white border-2 border-[#1F8F5F] rounded-2xl p-8 relative">
+      <div className="bg-white rounded-[20px] p-8 relative">
         <div className="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#1F8F5F] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
           ★ {PILLE}
         </div>
@@ -65,7 +69,7 @@ export function BestpreisKarte({ kompakt = false }: { kompakt?: boolean }) {
   }
 
   return (
-    <div className="bg-white border-2 border-[#1F8F5F] rounded-2xl p-7 md:p-9 lg:p-10 relative">
+    <div className="bg-white rounded-[20px] p-7 md:p-9 lg:p-10 relative">
       <div className="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#1F8F5F] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
         ★ {PILLE}
       </div>
@@ -101,12 +105,18 @@ export function BestpreisKarte({ kompakt = false }: { kompakt?: boolean }) {
   );
 }
 
-/** Eigene Sektion (mobiler Block in app/page.tsx), Aufbau wie TestsiegerSection. */
+/** Garantie und Testsieger als ein Abschnitt (Anker #testsieger an der Testsieger-Karte, Registry #155): am Handy untereinander, ab lg
+ *  nebeneinander. Vorher zwei Quelltext-Stellen (mobiler Block und Desktop-Raster in app/page.tsx). */
 export function BestpriceGuarantee() {
   return (
-    <section className="py-14 px-5 bg-white">
-      <div className="max-w-[560px] md:max-w-[700px] lg:max-w-[1000px] mx-auto">
-        <BestpreisKarte />
+    <section className="px-5 py-12 md:py-16">
+      <div className="mx-auto grid max-w-[560px] gap-10 md:max-w-[700px] lg:max-w-[1100px] lg:grid-cols-2 lg:gap-8">
+        <div className="lg:hidden"><BestpreisKarte /></div>
+        {/* grid streckt die Karte auf die Höhe der Testsieger-Karte daneben. */}
+        <div className="hidden lg:grid"><BestpreisKarte kompakt /></div>
+        {/* Anker direkt an der Testsieger-Karte: das WELT-Siegel im Kopf („zur Original-Veröffentlichung“) springt am Handy
+            sonst auf die Garantie-Karte darüber. */}
+        <div id="testsieger" className="scroll-mt-28 lg:grid"><TestsiegerKarte /></div>
       </div>
     </section>
   );

@@ -1,11 +1,9 @@
-export function TestsiegerSection() {
+/** Testsieger-Karte (Registry #155: steht mit der Bestpreisgarantie im Abschnitt #testsieger, BestpriceGuarantee.tsx).
+ *  Die content-checkliste verlangt zur Auszeichnung einen Beleg-Link; das Original-PDF hängt in der Karte. Look wie Formular
+ *  und Portal: weiße Karte ohne goldenen Rahmen; Pille, Siegel und Wortlaut unverändert. */
+export function TestsiegerKarte() {
   return (
-    // id = Sprungziel des Siegels im mobilen Hero (app/page.tsx). Die
-    // content-checkliste verlangt zur Auszeichnung einen Beleg-Link; das
-    // Original-PDF haengt in dieser Sektion.
-    <section id="testsieger" className="scroll-mt-24 py-14 md:py-16 lg:py-20 px-5 bg-[#F8F7F5]">
-      <div className="max-w-[560px] md:max-w-[700px] lg:max-w-[1000px] mx-auto">
-        <div className="bg-white border-2 border-[#D4A843] rounded-2xl p-7 md:p-9 lg:p-10 relative">
+        <div className="bg-white rounded-[20px] p-7 md:p-9 lg:p-8 relative">
           <div className="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#D4A843] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
             ★ Testsieger · 6× in Folge
           </div>
@@ -66,7 +64,5 @@ export function TestsiegerSection() {
             </div>
           </div>
         </div>
-      </div>
-    </section>
   );
 }

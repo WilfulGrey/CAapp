@@ -231,6 +231,11 @@ export const SCHRANKE = {
  * Wortlaut nur mit Martins Freigabe ändern; nie „vermitteln" (eigenes
  * Personal), keine Prozentzahlen, keine erfundenen Zahlen.
  */
+/** EIN Knopftext für Startseite, Rechner und Bestpreis-Pop-up (Registry #155, Martin 09.11.2026: „ist der Button-Text dann
+ *  immer noch der richtige? … vereinheitlichen … mit dem Ziel, Patientenprofile zu erhalten … wobei natürlich der Preis auch
+ *  relevant ist“): „Angebot“ schließt den Preis ein und führt zum Portal; OpenAI 09.11. empfahl dieselbe Fassung. */
+export const KNOPF_ANGEBOT = 'Angebot & Pflegekräfte ansehen';
+
 export const GARANTIE = {
   wort: 'Bestpreisgarantie',
   /** Unterzeile im Kopf: „6× Preis-Leistungssieger · mit [Bestpreisgarantie]" */
@@ -260,8 +265,8 @@ export const GARANTIE = {
     'Schriftliches Angebot, nicht älter als 14 Tage',
   ],
   /** Knopf in Pop-up UND Seite, dieselben Worte wie der Hero-Knopf (Martin 13.09.:
-   *  „warum Verstanden statt Jetzt Preis berechnen?“). */
-  weiter: 'Preis & Pflegekräfte ansehen',
+   *  „warum Verstanden statt Jetzt Preis berechnen?“). Seit Registry #155 = KNOPF_ANGEBOT. */
+  weiter: KNOPF_ANGEBOT,
   sprechen: 'Lieber sprechen? 089 200 000 830',
 } as const;
 

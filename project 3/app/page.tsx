@@ -2,19 +2,14 @@ import Image from "next/image";
 import { Header } from "@/components/calculator/Header";
 import { TestimonialCard } from "@/components/calculator/TestimonialCard";
 import { HowItWorks } from "@/components/calculator/HowItWorks";
-import { BestpriceGuarantee, BestpreisKarte } from "@/components/calculator/BestpriceGuarantee";
-import { TestsiegerSection } from "@/components/calculator/TestsiegerSection";
+import { BestpriceGuarantee } from "@/components/calculator/BestpriceGuarantee";
 import { BestpreisSiegelLink } from "@/components/calculator/BestpreisSiegelLink";
 import { FAQSection } from "@/components/calculator/FAQSection";
 import { ComparisonSection } from "@/components/calculator/ComparisonSection";
 import { FinalCTA } from "@/components/calculator/FinalCTA";
 import { Footer } from "@/components/calculator/Footer";
-import { CareServicesSection } from "@/components/calculator/CareServicesSection";
 import { MultiStepForm } from "@/components/calculator/MultiStepForm";
-import { WhatIs24hCare } from "@/components/calculator/WhatIs24hCare";
-import { RequirementsSection } from "@/components/calculator/RequirementsSection";
 import { KeyBenefitsBar } from "@/components/calculator/KeyBenefitsBar";
-import { PersonalContact } from "@/components/calculator/PersonalContact";
 import { homePageGraph, jsonLdString } from "@/lib/seo-schema";
 import { BewertungsZeile } from "@/components/calculator/BewertungsZeile";
 import { ladeSterneStand } from "@/lib/sterne-zeile-laden";
@@ -318,103 +313,29 @@ export default async function HomePage() {
        </div>
       </div>
 
-      {/* Mobile-Reihenfolge nach dem Hero (Martin 16.08.): Ablauf direkt
-          unter "Bekannt aus", darunter Marta, dann erst der Vertrauensblock und
-          Testsieger. Der Ablauf beantwortet die naechste Frage, die sich
-          nach dem Versprechen stellt ("und wie laeuft das jetzt?"), Marta
-          gibt ihr ein Gesicht.
-          HowItWorks steht deshalb HIER fuer mobil und weiter unten in einem
-          `hidden lg:block`-Wrapper fuer Desktop — die Desktop-Reihenfolge
-          bleibt damit unveraendert. */}
-      <div className="lg:hidden">
+      {/* Registry #155 (Martin 09.11.2026: „Pass das mal alles an. Genau so“): unter dem Kopf im Look von Formular und Portal,
+          heller Grund, weiße Karten, EINE Reihenfolge für alle Breiten (vorher Ablauf und Karten doppelt im Quelltext, je nach
+          Breite versteckt). Entfallen: „Was ist 24-Stunden-Pflege?“, „Ist 24-Stunden-Pflege für Sie geeignet?“ (die Voraussetzung
+          „Grundmobilität“ widersprach Frage 4 mit „Bettlägerig“) und „Rundum versorgt“; ihr Kern steht in den Fragen. Die Anker
+          #ablauf, #kundenstimmen, #testsieger, #kostenvergleich bleiben (Sitelinks, Pria). */}
+      <div className="bg-[#F2F1EE]">
         <HowItWorks />
-        <section className="px-5 pb-12 bg-[#F8F7F5]">
-          <div className="mx-auto max-w-[520px]">
-            <PersonalContact />
+
+        <section id="kundenstimmen" className="scroll-mt-24 px-5 py-12 md:py-16">
+          <div className="mx-auto max-w-[560px] md:max-w-[900px] lg:max-w-[1100px]">
+            <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-2">Kundenstimmen</p>
+            <h2 className="text-[26px] md:text-[32px] lg:text-[38px] leading-[1.25] font-bold text-[#3D3D3D] mb-5">
+              Das sagen unsere Familien
+            </h2>
+            <TestimonialCard bewertung={bewertung} />
           </div>
         </section>
+
         <BestpriceGuarantee />
-        <TestsiegerSection />
+        <ComparisonSection />
+        <FAQSection />
+        <FinalCTA bewertung={bewertung} />
       </div>
-
-      {/* Desktop: Side-by-side */}
-      <section className="hidden lg:block py-14 px-5 bg-white">
-        <div className="max-w-[1216px] mx-auto">
-          <div className="grid grid-cols-2 gap-8">
-            {/* Linke Karte = Bestpreisgarantie (Martin 12.09.2026), dieselbe
-                Karte wie im mobilen Block — eine Quelle, kein Zweittext. */}
-            <BestpreisKarte kompakt />
-
-            <div className="bg-white border-2 border-[#D4A843] rounded-2xl p-8 relative">
-              <div className="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#D4A843] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
-                ★ Testsieger · 6× in Folge
-              </div>
-
-              <div className="flex items-center gap-8 mt-4">
-                <div className="w-40 h-40 flex items-center justify-center flex-shrink-0">
-                  <img
-                    src="/images/primundus_testsieger-2021.webp"
-                    alt="Testsieger DIE WELT"
-                    className="w-40 h-40 object-contain"
-                  />
-                </div>
-
-                {/* Wortlaut identisch zu TestsiegerSection.tsx (mit Martin
-                    2026-08-14 abgestimmt) — Eigenaussage statt Zitat. */}
-                <div className="flex-1">
-                  <h3 className="text-[22px] font-bold text-[#3D3D3D] mb-2">
-                    {/* Nur "6× Testsieger": die Pille ueber dem Kasten
-                    traegt bereits "Testsieger · 6× in Folge", und die
-                    Zeile darunter nennt DIE WELT und ServiceValue.
-                    Dreimal dasselbe untereinander liest sich wie ein
-                    Aufkleber (Martin 28.08.2026: "im Kasten mach
-                    6x Testsieger, damit sich das nicht doppelt"). */}
-                    6× Testsieger
-                  </h3>
-
-                  <p className="text-[14px] text-[#8A8279] mb-4">
-                    Nr. 1 der Pflegekräfte-Vermittler – ausgezeichnet in Deutschlands großer Service-Studie von DIE WELT und ServiceValue
-                  </p>
-
-                  <p className="text-[15px] text-[#5A5A5A] leading-relaxed">
-                    DIE WELT hat Primundus sechsmal in Folge ausgezeichnet: Primundus steht für die beste Kombination aus Preis, Qualität und Kundenservice.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Desktop behaelt den Ablauf an dieser Stelle; mobil steht er oben
-          direkt nach dem Hero (siehe lg:hidden-Block weiter oben). */}
-      <div className="hidden lg:block">
-        <HowItWorks />
-      </div>
-
-      <WhatIs24hCare />
-      <RequirementsSection />
-      <ComparisonSection />
-      <CareServicesSection />
-
-      <main className="w-full mx-auto px-5 max-w-[520px] md:max-w-[720px] lg:max-w-[900px] xl:max-w-[1000px]">
-        {/* Sprungziel der Sterne-Zeile im Hero (BewertungsZeile). */}
-        <div id="kundenstimmen" className="mt-12 mb-6 max-w-3xl mx-auto scroll-mt-24">
-          <p className="text-xs md:text-sm font-bold uppercase tracking-wider text-[#A89279] mb-2">
-            Kundenstimmen
-          </p>
-          <h2 className="text-[26px] md:text-[32px] lg:text-[36px] leading-[1.25] font-bold text-[#3D3D3D] mb-6">
-            Das sagen unsere Familien
-          </h2>
-        </div>
-
-        <div className="max-w-3xl mx-auto">
-          <TestimonialCard bewertung={bewertung} />
-        </div>
-      </main>
-
-      <FAQSection />
-      <FinalCTA />
       <Footer />
     </div>
   );

@@ -33,7 +33,9 @@ describe('Rechner wie das Portal (Registry #151)', () => {
   it('letzter Schritt: Titel, Satz und Knopf in Martins Wortlaut', () => {
     expect(portal).toContain('titel: "Ihr persönliches Angebot und Ihre Personalauswahl sind fertig"');
     expect(portal).toContain('text: "Geben Sie Ihre Kontaktdaten ein. Danach sehen Sie sofort Ihr Angebot und Ihre passende Pflegekräfte-Auswahl."');
-    expect(portal).toContain('knopf: "Angebot & Pflegekräfte ansehen →"');
+    expect(portal).toContain('export { KNOPF_ANGEBOT };');
+    expect(readFileSync(join(__dirname, '..', '..', 'project 3', 'lib/kraefte-vorschau.ts'), 'utf8')).toContain("export const KNOPF_ANGEBOT = 'Angebot & Pflegekräfte ansehen';");
+    expect(portal).toContain('knopf: `${KNOPF_ANGEBOT} →`,');
     expect(formular).toContain('<TitelPortal haken titel=');
   });
 
@@ -62,9 +64,10 @@ describe('Rechner wie das Portal (Registry #151)', () => {
     expect(portal).toContain('{ titel: "Auswählen und starten", text: "Sie wählen in Ruhe aus, erst danach schließen Sie den Vertrag. Wir übernehmen den Rest, Anreise schon ab 3\\u00a0Tagen möglich." }');
   });
 
-  it('Meinungen: die drei Stimmen des letzten Schritts aus lib/kundenstimmen.ts, mit Prüfhinweis im neuen Tab', () => {
+  it('Meinungen: die drei Stimmen des letzten Schritts aus lib/kundenstimmen.ts, ohne Link weg vom Formular', () => {
     expect(portal).toContain('export const MEINUNGEN = STIMMEN_LETZTER_SCHRITT;');
-    expect(portal).toContain('<a href={STIMMEN_PRUEF_LINK} target="_blank"');
+    // Martin 09.11.: „keinen Link … damit er da nicht wegspringt“.
+    expect(funktion('Meinungen')).not.toMatch(/<a\s/);
     // Inhalt und Herkunft der Stimmen prüft kundenstimmen.test.ts.
   });
 
@@ -76,6 +79,12 @@ describe('Rechner wie das Portal (Registry #151)', () => {
     expect(start).not.toMatch(/>[^<]*selben Werktag/);
     expect(start).not.toMatch(/>[^<]*Profil vervollständigen/);
     expect(funktion('AblaufNachAbsenden')).toContain('<AblaufSchritte />');
+  });
+
+  it('Blatt mit runder Kante oben statt Logo, mehr Weiß unter den Antworten (Martin 09.11.)', () => {
+    expect(funktion('KopfleistePortal')).not.toContain('primundus-logo');
+    expect(funktion('SheetGrundPortal')).toContain('rounded-t-[22px]');
+    expect(formular).toContain("portalLook && currentStep < totalSteps ? 'pb-12'");
   });
 
   it('der Haken am Titel bewegt sich nicht, wenn das Gerät reduzierte Bewegung wünscht', () => {

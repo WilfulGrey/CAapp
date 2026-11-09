@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { STIMMEN_LETZTER_SCHRITT, STIMMEN_PRUEF_LINK, STIMMEN_STARTSEITE } from '../../project 3/lib/kundenstimmen';
+import { STIMMEN_LETZTER_SCHRITT, STIMMEN_STARTSEITE } from '../../project 3/lib/kundenstimmen';
 
 const rechner = join(__dirname, '..', '..', 'project 3', 'components/calculator');
 const MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
@@ -38,15 +38,12 @@ describe('Kundenstimmen (Registry #153)', () => {
     for (const s of alle) expect(s.text, s.id).not.toMatch(/[Vv]ermittl/);
   });
 
-  it('der Prüfhinweis zeigt auf „So prüfen wir Bewertungen“', () => {
-    expect(STIMMEN_PRUEF_LINK).toBe('https://primundus.de/erfahrungen#pruefung');
-  });
-
   it('die Startseite zeigt die echten Stimmen mit Datum, die Platzhalter sind weg', () => {
     const karte = readFileSync(join(rechner, 'TestimonialCard.tsx'), 'utf8');
     expect(karte).toContain('STIMMEN_STARTSEITE.map(');
     expect(karte).toContain('{stimme.datum}');
-    expect(karte).toContain('href={STIMMEN_PRUEF_LINK} target="_blank"');
+    // Kein Link weg von der Seite (Martin 09.11.: „keinen Link … damit er da nicht wegspringt“).
+    expect(karte).not.toMatch(/<a\s/);
     for (const platzhalter of ['Helga M.', 'Stefan K.', 'Maria P.', 'Thomas W.', 'Julia B.', 'Robert L.', 'Vermittlung']) {
       expect(karte).not.toContain(platzhalter);
     }

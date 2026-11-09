@@ -1,7 +1,7 @@
 'use client';
 
 import { openCalculator } from '@/lib/scroll-to-calculator';
-import { AblaufSchritte, MINI_ABLAUF } from '@/components/calculator/FormularPortal';
+import { AblaufSchritte, KNOPF_ANGEBOT, MINI_ABLAUF } from '@/components/calculator/FormularPortal';
 
 /** Ablauf der Startseite (Registry #154, Martin 09.11.2026: „Ja, mach das mal … genau so“): wortgleich mit dem letzten
  *  Schritt des Formulars und dem Portal („So geht es weiter“, eine Quelle in FormularPortal.tsx). Vorher stand hier ein
@@ -9,7 +9,7 @@ import { AblaufSchritte, MINI_ABLAUF } from '@/components/calculator/FormularPor
  *  Überschrift und Knopf bleiben; Anker #ablauf bleibt (Sitelinks, Pria). */
 export function HowItWorks() {
   return (
-    <section id="ablauf" className="scroll-mt-20 py-14 md:py-16 lg:py-20 px-5 bg-[#F8F7F5]">
+    <section id="ablauf" className="scroll-mt-20 px-5 py-12 md:py-16">
       <div className="max-w-[560px] md:max-w-[900px] lg:max-w-[1100px] mx-auto">
         <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-2">
           So funktioniert's
@@ -36,7 +36,7 @@ export function HowItWorks() {
             onClick={() => openCalculator('ablauf')}
             className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 sm:px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
           >
-            Preis & Pflegekräfte ansehen
+            {KNOPF_ANGEBOT}
             <svg className="hidden sm:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
