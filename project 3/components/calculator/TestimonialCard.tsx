@@ -24,13 +24,15 @@ export function TestimonialCard({ bewertung }: { bewertung: SterneStand | null }
       )}
 
       {/* Registry #153 (Martin 09.11.: „passe die Bewertungen an. Benutze die von der Bewertungsseite“): echte Stimmen von
-          primundus.de/erfahrungen statt der sechs Platzhalter, wörtlich mit Name, Ort und Datum (lib/kundenstimmen.ts). */}
-      <div className="overflow-x-auto -mx-5 px-5 pb-2">
-        <div className="flex gap-4 min-w-max">
+          primundus.de/erfahrungen statt der sechs Platzhalter, wörtlich mit Name, Ort und Datum (lib/kundenstimmen.ts).
+          Registry #160: am Handy Laufband wie bisher, ab lg alle sechs Karten als Raster in drei Spalten (vorher am Computer
+          abgeschnitten und ohne Pfeile kaum zu bedienen). */}
+      <div className="overflow-x-auto -mx-5 px-5 pb-2 lg:overflow-visible lg:mx-0 lg:px-0">
+        <div className="flex gap-4 min-w-max lg:grid lg:grid-cols-3 lg:min-w-0">
           {STIMMEN_STARTSEITE.map((stimme) => (
             <div
               key={stimme.id}
-              className="bg-white rounded-[20px] p-5 w-[280px] flex-shrink-0"
+              className="bg-white rounded-[20px] p-5 w-[280px] flex-shrink-0 lg:w-auto"
             >
               <div className="flex items-start gap-3 mb-3">
                 <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-[#8B7355] to-[#7D6E5D] flex items-center justify-center text-white font-bold text-sm shadow-sm" aria-hidden="true">
@@ -38,8 +40,9 @@ export function TestimonialCard({ bewertung }: { bewertung: SterneStand | null }
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-0.5 mb-1" role="img" aria-label={`${stimme.sterne} von 5 Sternen`}>
+                    {/* Gold wie die Sternezeile darüber (SterneText) und die Meinungen im Formular, Registry #160. */}
                     {[...Array(stimme.sterne)].map((_, i) => (
-                      <Star key={i} className="w-3.5 h-3.5 fill-[#FBBC04] text-[#FBBC04]" aria-hidden="true" />
+                      <Star key={i} className="w-3.5 h-3.5 fill-[#D4A843] text-[#D4A843]" aria-hidden="true" />
                     ))}
                   </div>
                   <p className="text-[14px] text-[#8B8B8B] font-medium truncate">

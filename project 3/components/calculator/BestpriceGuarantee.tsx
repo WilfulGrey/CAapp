@@ -23,6 +23,9 @@ import { TestsiegerKarte } from "@/components/calculator/TestsiegerSection";
  *
  * Registry #155 (09.11.2026): Look wie Formular und Portal, weiße Karte ohne
  * grünen Rahmen; Pille, Siegel und Wortlaut unverändert.
+ * Registry #160 (Martin 09.11.: „Überschriften linksbündig“): am Handy alles
+ * linksbündig wie die übrigen Abschnitte, Pille an der linken Inhaltskante statt
+ * mittig, Text und Link in beiden Fassungen 16 px, Textgrau #6B6B6B (Portal).
  */
 const PILLE = "100% Sorgenfrei";
 const LINK = "Was heißt vergleichbar? Mehr Infos";
@@ -33,7 +36,7 @@ export function BestpreisKarte({ kompakt = false }: { kompakt?: boolean }) {
   if (kompakt) {
     return (
       <div className="bg-white rounded-[20px] p-8 relative">
-        <div className="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#1F8F5F] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
+        <div className="absolute top-[-14px] left-8 bg-[#1F8F5F] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
           ★ {PILLE}
         </div>
 
@@ -52,12 +55,12 @@ export function BestpreisKarte({ kompakt = false }: { kompakt?: boolean }) {
           <div className="flex-1">
             <h3 className="text-[22px] font-bold text-[#3D3D3D] mb-2">{GARANTIE.zusage}</h3>
 
-            <p className="text-[14px] text-[#8A8279] mb-4">{GARANTIE.warum}</p>
+            <p className="text-[16px] text-[#6B6B6B] mb-4">{GARANTIE.warum}</p>
 
             <button
               type="button"
               onClick={oeffnen}
-              className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-[#1E5C3A] hover:text-[#14532D] underline underline-offset-2 transition-colors"
+              className="inline-flex items-center gap-1.5 text-left text-[16px] font-semibold text-[#1E5C3A] hover:text-[#14532D] underline underline-offset-2 transition-colors"
               aria-haspopup="dialog"
             >
               {LINK}
@@ -70,11 +73,11 @@ export function BestpreisKarte({ kompakt = false }: { kompakt?: boolean }) {
 
   return (
     <div className="bg-white rounded-[20px] p-7 md:p-9 lg:p-10 relative">
-      <div className="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#1F8F5F] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
+      <div className="absolute top-[-14px] left-7 md:left-9 lg:left-10 bg-[#1F8F5F] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
         ★ {PILLE}
       </div>
 
-      <div className="flex flex-col items-center text-center mt-4">
+      <div className="flex flex-col items-start text-left mt-4">
         <button
           type="button"
           onClick={oeffnen}
@@ -89,12 +92,12 @@ export function BestpreisKarte({ kompakt = false }: { kompakt?: boolean }) {
         <div>
           <h3 className="text-[22px] font-bold text-[#3D3D3D] mb-2">{GARANTIE.zusage}</h3>
 
-          <p className="text-[16px] text-[#8A8279] mb-4">{GARANTIE.warum}</p>
+          <p className="text-[16px] text-[#6B6B6B] mb-4">{GARANTIE.warum}</p>
 
           <button
             type="button"
             onClick={oeffnen}
-            className="inline-flex items-center gap-1.5 text-[16px] font-semibold text-[#1E5C3A] hover:text-[#14532D] underline underline-offset-2 transition-colors"
+            className="inline-flex items-center gap-1.5 text-left text-[16px] font-semibold text-[#1E5C3A] hover:text-[#14532D] underline underline-offset-2 transition-colors"
             aria-haspopup="dialog"
           >
             {LINK}
@@ -110,7 +113,7 @@ export function BestpreisKarte({ kompakt = false }: { kompakt?: boolean }) {
 export function BestpriceGuarantee() {
   return (
     <section className="px-5 py-12 md:py-16">
-      <div className="mx-auto grid max-w-[560px] gap-10 md:max-w-[700px] lg:max-w-[1100px] lg:grid-cols-2 lg:gap-8">
+      <div className="mx-auto grid max-w-[560px] gap-10 md:max-w-[900px] lg:max-w-[1100px] lg:grid-cols-2 lg:gap-8">
         <div className="lg:hidden"><BestpreisKarte /></div>
         {/* grid streckt die Karte auf die Höhe der Testsieger-Karte daneben. */}
         <div className="hidden lg:grid"><BestpreisKarte kompakt /></div>

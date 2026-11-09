@@ -42,15 +42,13 @@ export function ComparisonSection() {
           Mit unserem Kostenrechner erhalten Sie eine individuelle Berechnung für Ihre Situation.
         </p>
 
-        <div className="mt-6 text-center">
+        {/* Knopf an der linken Kante, Form wie der Hero-Knopf (Registry #160). */}
+        <div className="mt-6">
           <button
             onClick={() => openCalculator('vergleich')}
-            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 sm:px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
+            className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl bg-[#E76F63] px-4 sm:px-8 py-[18px] text-[16px] min-[375px]:text-[17px] font-bold text-white shadow-[0_4px_14px_rgba(231,111,99,0.32)] transition-all duration-200 hover:bg-[#D65E52]"
           >
-            {KNOPF_ANGEBOT}
-            <svg className="hidden sm:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            {KNOPF_ANGEBOT}{"\u00a0"}→
           </button>
         </div>
       </div>
