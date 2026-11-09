@@ -1,8 +1,12 @@
 'use client';
 
-import { Clock, Check } from 'lucide-react';
 import { openCalculator } from '@/lib/scroll-to-calculator';
+import { AblaufSchritte, MINI_ABLAUF } from '@/components/calculator/FormularPortal';
 
+/** Ablauf der Startseite (Registry #154, Martin 09.11.2026: „Ja, mach das mal … genau so“): wortgleich mit dem letzten
+ *  Schritt des Formulars und dem Portal („So geht es weiter“, eine Quelle in FormularPortal.tsx). Vorher stand hier ein
+ *  eigener Ablauf mit „Bewerbungen am selben Werktag“ und „Profil vervollständigen“, also andere Zusagen als im Formular.
+ *  Überschrift und Knopf bleiben; Anker #ablauf bleibt (Sitelinks, Pria). */
 export function HowItWorks() {
   return (
     <section id="ablauf" className="scroll-mt-20 py-14 md:py-16 lg:py-20 px-5 bg-[#F8F7F5]">
@@ -10,90 +14,24 @@ export function HowItWorks() {
         <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-2">
           So funktioniert's
         </p>
-        <h2 className="text-[26px] md:text-[32px] lg:text-[38px] leading-[1.25] font-bold text-[#3D3D3D] mb-8 md:mb-10 lg:mb-12">
+        <h2 className="text-[26px] md:text-[32px] lg:text-[38px] leading-[1.25] font-bold text-[#3D3D3D] mb-3">
           In 2 Minuten zu Ihrem persönlichen Angebot
         </h2>
+        {/* Martins Mini-Ablauf (08.11.): nennt den Kontaktschritt, bevor jemand tippt (Lehre vom 23.09.). */}
+        <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-6 md:mb-8">{MINI_ABLAUF}</p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-6 lg:gap-10">
-          <div className="flex md:flex-col gap-5">
-            {/* items-start ab md: die Zahl stand sonst mittig ueber dem
-                    linksbuendigen Text (Martin 16.08.: "die Punkte 1,2,3
-                    muessen dann auch linksbuendig"). */}
-            <div className="flex flex-col items-center md:items-start flex-shrink-0">
-              <div className="w-12 h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-full bg-[#5C4033] text-white flex items-center justify-center font-bold text-lg md:text-xl lg:text-2xl">
-                1
-              </div>
-              <div className="w-0.5 flex-1 md:hidden bg-[#F0EBE3] mt-1.5"></div>
-            </div>
-            <div className="pt-0.5 md:pt-5 flex-1">
-              <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug">
-                Sofort Angebot und Pflegekräfte einsehen
-              </h3>
-              {/* 23.09.2026 (Martin „alles auf ja", Vorschlag aus der OpenAI-Prüfung): „für die Kopie des Angebots"
-                  klang vorgeschoben — die Kontaktdaten sind die Voraussetzung für Preis und Pflegekräfte, die Kopie per
-                  Mail ist ein Zusatz. Derselbe Satz steht auf primundus.de (Startseite, /24-stunden-pflege, /ablauf). */}
-              <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5">
-                Sie machen wenige preisrelevante Angaben und hinterlassen Ihre Kontaktdaten. Sofort danach sehen Sie Ihr Angebot samt Zuschüssen und Steuervorteilen sowie die passenden Pflegekräfte. Eine Kopie kommt zusätzlich per E-Mail.
-              </p>
-              <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
-                <Clock className="w-3.5 h-3.5" strokeWidth={2} />
-                Unter 2 Minuten
-              </span>
-            </div>
-          </div>
-
-          <div className="flex md:flex-col gap-5">
-            {/* items-start ab md: die Zahl stand sonst mittig ueber dem
-                    linksbuendigen Text (Martin 16.08.: "die Punkte 1,2,3
-                    muessen dann auch linksbuendig"). */}
-            <div className="flex flex-col items-center md:items-start flex-shrink-0">
-              <div className="w-12 h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-full bg-[#5C4033] text-white flex items-center justify-center font-bold text-lg md:text-xl lg:text-2xl">
-                2
-              </div>
-              <div className="w-0.5 flex-1 md:hidden bg-[#F0EBE3] mt-1.5"></div>
-            </div>
-            <div className="pt-0.5 md:pt-5 flex-1">
-              <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug">
-                Profil vervollständigen — Bewerbungen erhalten
-              </h3>
-              <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5">
-                Passt das für Sie, ergänzen Sie die Angaben zu Ihrem Angehörigen. Dann bewerben sich Pflegekräfte bei Ihnen — mit Foto, Erfahrung und Verfügbarkeit.
-              </p>
-              <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
-                <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
-                Bewerbungen am selben Werktag
-              </span>
-            </div>
-          </div>
-
-          <div className="flex md:flex-col gap-5">
-            {/* items-start ab md: die Zahl stand sonst mittig ueber dem
-                    linksbuendigen Text (Martin 16.08.: "die Punkte 1,2,3
-                    muessen dann auch linksbuendig"). */}
-            <div className="flex flex-col items-center md:items-start flex-shrink-0">
-              <div className="w-12 h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-full bg-[#5C4033] text-white flex items-center justify-center font-bold text-lg md:text-xl lg:text-2xl">
-                3
-              </div>
-            </div>
-            <div className="pt-0.5 md:pt-5 flex-1">
-              <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug">
-                Aussuchen — erst dann der Vertrag
-              </h3>
-              <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5">
-                Sie entscheiden, wer es wird. Erst nach Ihrer Auswahl kommt der Betreuungsvertrag — den{" "}
-                <a href="https://kundenportal.primundus.de/primundus-mustervertrag.pdf" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-[#3D3D3D]">Mustervertrag</a>{" "}
-                können Sie jederzeit vorher lesen. Danach reist Ihre Betreuungskraft an.
-              </p>
-              <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
-                <Clock className="w-3.5 h-3.5" strokeWidth={2} />
-                Anreise in 3 Tagen möglich
-              </span>
-            </div>
-          </div>
+        <div className="rounded-[20px] bg-white px-4 pt-4 pb-1 md:px-6 md:py-6">
+          <AblaufSchritte quer />
         </div>
+        {/* Der Satz zum Mustervertrag stand bisher in Schritt 3 („den Mustervertrag können Sie jederzeit vorher lesen“). */}
+        <p className="mt-3 text-[14px] text-[#5A5A5A]">
+          Den{" "}
+          <a href="https://kundenportal.primundus.de/primundus-mustervertrag.pdf" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-[#3D3D3D]">Mustervertrag</a>{" "}
+          können Sie jederzeit vorher lesen.
+        </p>
 
         {/* CTA Button */}
-        <div className="mt-10 md:mt-12 lg:mt-14 text-center">
+        <div className="mt-8 md:mt-10 text-center">
           <button
             onClick={() => openCalculator('ablauf')}
             className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 sm:px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
