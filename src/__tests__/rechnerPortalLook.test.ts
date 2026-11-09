@@ -62,15 +62,10 @@ describe('Rechner wie das Portal (Registry #151)', () => {
     expect(portal).toContain('{ titel: "Auswählen und starten", text: "Sie wählen in Ruhe aus, erst danach schließen Sie den Vertrag. Wir übernehmen den Rest, Anreise schon ab 3\\u00a0Tagen möglich." }');
   });
 
-  it('Meinungen: drei echte Stimmen mit Herkunft und Prüfhinweis, keine mit „Vermittlung“', () => {
-    const start = portal.indexOf('export const MEINUNGEN');
-    const liste = portal.slice(start, portal.indexOf('];', start));
-    expect(liste.match(/name: "/g)).toHaveLength(3);
-    for (const name of ['Florian D.', 'Anke H.', 'Claudia N.']) expect(liste).toContain(`name: "${name}"`);
-    expect(liste).not.toMatch(/[Vv]ermittl/);
-    expect(portal).toContain('const PRUEF_LINK = "https://primundus.de/erfahrungen#pruefung";');
-    // Neuer Tab: wer den Prüfhinweis öffnet, verliert seine Antworten nicht.
-    expect(funktion('Meinungen')).toContain('target="_blank"');
+  it('Meinungen: die drei Stimmen des letzten Schritts aus lib/kundenstimmen.ts, mit Prüfhinweis im neuen Tab', () => {
+    expect(portal).toContain('export const MEINUNGEN = STIMMEN_LETZTER_SCHRITT;');
+    expect(portal).toContain('<a href={STIMMEN_PRUEF_LINK} target="_blank"');
+    // Inhalt und Herkunft der Stimmen prüft kundenstimmen.test.ts.
   });
 
   it('der Haken am Titel bewegt sich nicht, wenn das Gerät reduzierte Bewegung wünscht', () => {
