@@ -325,7 +325,7 @@ export function VormerkZeile({ kraefte }: { kraefte: VorgemerkteKraft[] }) {
           </span>
         ))}
       </span>
-      <p className="min-w-0 text-[14.5px] leading-snug text-pm-ink">
+      <p className="min-w-0 text-[15.5px] leading-snug text-pm-ink">
         Nach dem Speichern laden wir {namenListe(kraefte.map((k) => k.name))} für Sie ein.
       </p>
     </div>

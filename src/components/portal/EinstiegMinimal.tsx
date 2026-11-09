@@ -70,7 +70,7 @@ const FOKUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outli
 // Knopf rechts in der Zeile: in allen Zuständen gleich breit und hoch, damit die Zeile ihre Höhe hält. 104 × 36 px (unter
 // 375 px 96 px): „Eingeladen“ mit Haken in 13 px passt mit Luft hinein (Martin 08.11.: „passender in den Button … macht die
 // Button-Tick größer von vornherein“); vorher 88 × 34 px mit 12 px Schrift.
-const PILLE = 'flex h-9 w-[104px] max-[374px]:w-24 flex-none items-center justify-center rounded-[10px] font-semibold whitespace-nowrap';
+const PILLE = 'flex h-10 w-[108px] max-[374px]:w-[104px] flex-none items-center justify-center rounded-[10px] font-semibold whitespace-nowrap';
 // Karte wie im CGA-Panel: weiß auf dem Seitengrund, ohne Rahmen und Schatten.
 const KARTE = 'rounded-card bg-white';
 const STERN = 'M10 1.6l2.47 5.2 5.7.72-4.2 3.93 1.08 5.64L10 14.3l-5.05 2.79 1.08-5.64-4.2-3.93 5.7-.72z';
@@ -129,13 +129,13 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
   return (
     <section className={`${KARTE} px-4 pb-4 pt-3.5`} aria-labelledby="angebot-titel" data-angebot-minimal>
       <div className="flex items-center justify-between gap-3">
-        <h2 id="angebot-titel" className="text-[13.5px] font-medium leading-5 text-pm-muted">{ANGEBOT_TITEL}</h2>
+        <h2 id="angebot-titel" className="text-[15px] font-medium leading-5 text-pm-muted">{ANGEBOT_TITEL}</h2>
         <button
           type="button"
           onClick={() => { if (!details) onKostenAufgeklappt?.(); setDetails(!details); }}
           aria-expanded={details}
           aria-controls="angebot-details"
-          className={`${TIPPFLAECHE} ${FOKUS} flex flex-none items-center gap-0.5 rounded-md text-[14px] font-semibold text-pm-taupe-ink`}
+          className={`${TIPPFLAECHE} ${FOKUS} flex flex-none items-center gap-0.5 rounded-md text-[15px] font-semibold text-pm-taupe-ink`}
         >
           Details
           <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${details ? 'rotate-180' : '-rotate-90'}`} aria-hidden="true" />
@@ -148,11 +148,11 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
           darunter klein der Pflegeheim-Vergleich. */}
       {eigen && (
         <>
-          <p className="mt-1.5 text-[15px] font-semibold leading-snug text-pm-green" data-nach-zuschuessen>
+          <p className="mt-1.5 text-[16.5px] font-semibold leading-snug text-pm-green" data-nach-zuschuessen>
             Nach Zuschüssen <span className="whitespace-nowrap">ca. {formatEuro(eigen.eigen)} im Monat</span>
           </p>
           {weniger > 0 && (
-            <p className="mt-0.5 text-[13.5px] leading-snug text-pm-muted" data-heimvergleich>
+            <p className="mt-0.5 text-[15px] leading-snug text-pm-muted" data-heimvergleich>
               rund {formatEuro(weniger)} weniger als im Pflegeheim
             </p>
           )}
@@ -169,7 +169,7 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
       )}
       {/* Vier gleichwertige Punkte untereinander, gleiche Schrift; „Bestpreisgarantie“ ist antippbar (kleines Info-Symbol). */}
       <ul className="mt-3.5 grid gap-1.5 rounded-[14px] bg-pm-mint px-4 py-3" data-garantie>
-        <li className="flex items-center gap-2 text-[14.5px] leading-5 text-pm-green-deep">
+        <li className="flex items-center gap-2 text-[16px] leading-[22px] text-pm-green-deep">
           <Check className="h-4 w-4 flex-none" strokeWidth={3} aria-hidden="true" />
           <button type="button" onClick={onBestpreis} className={`${FOKUS} inline-flex items-center gap-1.5 rounded text-left`}>
             {GARANTIE_TITEL}
@@ -177,7 +177,7 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
           </button>
         </li>
         {GARANTIE_PUNKTE.map((punkt) => (
-          <li key={punkt} className="flex items-center gap-2 text-[14.5px] leading-5 text-pm-green-deep">
+          <li key={punkt} className="flex items-center gap-2 text-[16px] leading-[22px] text-pm-green-deep">
             <Check className="h-4 w-4 flex-none" strokeWidth={3} aria-hidden="true" />{punkt}
           </li>
         ))}
@@ -192,18 +192,18 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
           <div className="min-w-0">
             <dt className="sr-only">Bewertungen</dt>
             {/* „4,9“ und dahinter alle fünf Sterne (Martin 08.11.), anteilig gefüllt wie in der Bewertungszeile. */}
-            <dd className="flex items-center gap-1.5 text-[15px] font-bold leading-5 text-pm-ink">
+            <dd className="flex items-center gap-1.5 text-[16.5px] font-bold leading-5 text-pm-ink">
               {sterne.schnitt}
               <FuenfSterne wert={sterne.wert} />
             </dd>
-            <dd className="text-[12px] leading-4 text-pm-muted">{anzahlText(sterne.anzahl)}</dd>
+            <dd className="mt-0.5 text-[13.5px] leading-4 text-pm-muted">{anzahlText(sterne.anzahl)}</dd>
           </div>
         )}
         {VERTRAUEN.map(([wert, wort]) => (
           <div key={wert} className="min-w-0">
             <dt className="sr-only">{wort}</dt>
-            <dd className="text-[15px] font-bold leading-5 text-pm-ink">{wert}</dd>
-            <dd className="text-[12px] leading-4 text-pm-muted">{wort}</dd>
+            <dd className="text-[16.5px] font-bold leading-5 text-pm-ink">{wert}</dd>
+            <dd className="mt-0.5 text-[13.5px] leading-4 text-pm-muted">{wort}</dd>
           </div>
         ))}
       </dl>
@@ -252,28 +252,28 @@ export function PflegekraftZeile({ nurse, preis, vorgemerkt, gesperrt, onNurseCl
   };
   // Foto auf heller Kreisfläche mit feinem Ring: freigestellte Fotos und Initialen wirken gleich groß und rund.
   // Größer als im ersten Bild (Martin: „die Karten schön ein bisschen größer auch mit den Bildern“).
-  const foto = 'h-[60px] w-[60px] max-[374px]:h-14 max-[374px]:w-14 flex-none rounded-full ring-1 ring-pm-line';
+  const foto = 'h-14 w-14 flex-none rounded-full ring-1 ring-pm-line';
   const preisText = preis ? (
-    <span className="whitespace-nowrap text-[15px] font-semibold tabular-nums text-pm-ink" data-preis>{formatEuro(preis)}</span>
+    <span className="whitespace-nowrap text-[16.5px] font-semibold tabular-nums text-pm-ink" data-preis>{formatEuro(preis)}</span>
   ) : null;
   // „Einladen“ grün umrandet (Martin 08.11.: die Koralle-Fläche „wirkt nicht passend zum rest und wirkt negativ“); Grün wie
   // die Zuschuss-Zeile und der Kasten, „Eingeladen“ dann grün gefüllt (Mint).
   const knopf = gesperrt ? (
-    <button type="button" disabled aria-disabled="true" className={`${PILLE} cursor-not-allowed bg-pm-grund text-[13px] text-pm-muted`}>
+    <button type="button" disabled aria-disabled="true" className={`${PILLE} cursor-not-allowed bg-pm-grund text-[14px] text-pm-muted`}>
       Bitte warten…
     </button>
   ) : vorgemerkt ? (
-    <button type="button" onClick={einladen} aria-label={`${EINGELADEN} ✓`} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} gap-1 bg-pm-mint text-[13px] text-pm-green-deep`}>
-      {EINGELADEN}<Check aria-hidden="true" className="h-3.5 w-3.5 flex-none" strokeWidth={3} />
+    <button type="button" onClick={einladen} aria-label={`${EINGELADEN} ✓`} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} gap-1 bg-pm-green text-[14.5px] text-white`}>
+      <Check aria-hidden="true" className="h-4 w-4 flex-none" strokeWidth={3} />{EINGELADEN}
     </button>
   ) : (
-    <button type="button" onClick={einladen} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} border-[1.5px] border-pm-green bg-white text-[14px] text-pm-green-deep hover:bg-pm-mint`}>
+    <button type="button" onClick={einladen} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} border-[1.5px] border-pm-green bg-white text-[15.5px] text-pm-green-deep hover:bg-pm-mint`}>
       Einladen
     </button>
   );
   return (
-    <li className="flex items-center gap-3 max-[374px]:gap-2.5 border-t border-pm-line-soft px-3.5 max-[374px]:px-3 py-3" data-pflegekraft-zeile={nurse.caregiverId} data-vorgemerkt={vorgemerkt || undefined}>
-      <button type="button" onClick={onNurseClick} className={`${FOKUS} group flex min-w-0 flex-1 items-center gap-3 max-[374px]:gap-2.5 rounded-[12px] text-left`}>
+    <li className={`flex items-center gap-2.5 border-t border-pm-line-soft px-3.5 max-[374px]:px-3 py-3.5 ${vorgemerkt ? 'bg-pm-mint/70' : ''}`} data-pflegekraft-zeile={nurse.caregiverId} data-vorgemerkt={vorgemerkt || undefined}>
+      <button type="button" onClick={onNurseClick} className={`${FOKUS} group flex min-w-0 flex-1 items-center gap-2.5 rounded-[12px] text-left`}>
         {nurse.image ? (
           <img src={nurse.image} alt="" className={`${foto} bg-pm-grund object-cover`} />
         ) : (
@@ -283,12 +283,12 @@ export function PflegekraftZeile({ nurse, preis, vorgemerkt, gesperrt, onNurseCl
         )}
         <span className="min-w-0">
           {/* Name unterstrichen: man sieht, dass sich das Profil öffnen lässt (Martin 08.11.). */}
-          <span className="block text-[16.5px] font-semibold leading-[1.3] text-pm-ink">
+          <span className="block text-[18px] font-semibold leading-[1.3] text-pm-ink">
             <span className="underline decoration-pm-chip decoration-[1.5px] underline-offset-[3px] group-hover:decoration-pm-taupe">{vorname}</span>
             {nurse.age ? <span className="font-normal text-pm-muted">, {nurse.age}</span> : null}
           </span>
           {fakten.map((teil) => (
-            <span key={teil} className="block text-[13.5px] leading-[1.4] text-pm-muted">{teil}</span>
+            <span key={teil} className="block text-[15px] leading-[1.4] text-pm-muted">{teil}</span>
           ))}
         </span>
       </button>
@@ -473,7 +473,7 @@ const ABLAUF_JETZT = 1;
 function AblaufMinimal({ onZumFormular }: { onZumFormular?: () => void }) {
   return (
     <section className={`${KARTE} px-4 pt-3.5 pb-2`} aria-labelledby="ablauf-titel" data-ablauf-minimal>
-      <h2 id="ablauf-titel" className="text-[16px] font-semibold leading-6 text-pm-ink">So geht es weiter</h2>
+      <h2 id="ablauf-titel" className="text-[18px] font-semibold leading-6 text-pm-ink">So geht es weiter</h2>
       <ol className="mt-2">
         {ABLAUF_MINIMAL.map((schritt, i) => {
           const erledigt = i === ABLAUF_ERLEDIGT;
@@ -495,15 +495,15 @@ function AblaufMinimal({ onZumFormular }: { onZumFormular?: () => void }) {
                 // in der Titelzeile, nichts verschiebt sich.
                 <button type="button" onClick={onZumFormular} className={`${FOKUS} block min-w-0 flex-1 rounded-[12px] bg-pm-coral-tint px-3 py-2 text-left hover:bg-pm-coral/15`} data-ablauf-link>
                   <span className="flex items-start justify-between gap-2">
-                    <span className="text-[15px] font-semibold leading-5 text-pm-ink">{schritt.titel}</span>
+                    <span className="text-[16.5px] font-semibold leading-[1.35] text-pm-ink">{schritt.titel}</span>
                     <ArrowUp className="mt-0.5 h-4 w-4 flex-none text-pm-coral-deep/70" strokeWidth={2.25} aria-hidden="true" />
                   </span>
-                  {schritt.text && <span className="mt-0.5 block text-[13.5px] leading-[1.45] text-pm-muted">{schritt.text}</span>}
+                  {schritt.text && <span className="mt-1 block text-[15px] leading-[1.45] text-pm-muted">{schritt.text}</span>}
                 </button>
               ) : (
                 <div className={`min-w-0 flex-1 rounded-[12px] px-3 py-2 ${jetzt ? 'bg-pm-coral-tint' : ''}`}>
-                  <p className={`text-[15px] font-semibold leading-5 ${erledigt ? 'text-pm-muted' : 'text-pm-ink'}`}>{schritt.titel}</p>
-                  {schritt.text && <p className="mt-0.5 text-[13.5px] leading-[1.45] text-pm-muted">{schritt.text}</p>}
+                  <p className={`text-[16.5px] font-semibold leading-[1.35] ${erledigt ? 'text-pm-muted' : 'text-pm-ink'}`}>{schritt.titel}</p>
+                  {schritt.text && <p className="mt-1 text-[15px] leading-[1.45] text-pm-muted">{schritt.text}</p>}
                 </div>
               )}
             </li>
@@ -600,7 +600,7 @@ export function EinstiegMinimal({
         {/* id = Sprungziel des Mail-Deeplinks `goto=matches`. Ohne Vorschläge (und ohne Hinweis) entfällt der Abschnitt. */}
         {!(leer && gehalteneEinladungen === 0 && !vorschlaegeVorhanden) && (
           <section id="pflegekraefte" style={{ scrollMarginTop: 96 }} aria-labelledby="pflegekraefte-titel" className={`${KARTE} mt-3 overflow-hidden`}>
-            <h2 id="pflegekraefte-titel" className="flex items-center gap-2 px-4 pt-3.5 pb-2.5 text-[16px] font-semibold leading-6 text-pm-ink">
+            <h2 id="pflegekraefte-titel" className="flex items-center gap-2 px-4 pt-3.5 pb-2.5 text-[18px] font-semibold leading-6 text-pm-ink">
               Passende Pflegekräfte
               {!laedt && anzahl > 0 && (
                 <span className="rounded-full bg-pm-grund px-2 py-px text-[13px] font-semibold leading-5 tabular-nums text-pm-muted">{anzahl}</span>
@@ -641,7 +641,7 @@ export function EinstiegMinimal({
                 {FEST_TITEL}
                 <ArrowRight className="h-[18px] w-[18px] flex-none" strokeWidth={2.5} aria-hidden="true" data-pfeil />
               </span>
-              <span className="mt-0.5 block text-[12.5px] font-medium leading-4 opacity-90">{FEST_ZEILE}</span>
+              <span className="mt-0.5 block text-[13.5px] font-medium leading-4 opacity-90">{FEST_ZEILE}</span>
             </button>
           </div>
         </div>

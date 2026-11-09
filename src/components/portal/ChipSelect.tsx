@@ -1,5 +1,6 @@
-import type { FC } from 'react';
+import { useContext, type FC } from 'react';
 import { Check } from 'lucide-react';
+import { FormLesbar } from '../ui/FormField';
 
 /**
  * Auswahl als antippbare Chips statt Dropdown (Martin, 11.08.: „wollen wir das
@@ -37,6 +38,18 @@ export function chipSpalten(beschriftungen: string[]): 1 | 2 | 3 {
   return 1;
 }
 
+/** Spalten in der lesbaren Fassung (Minimal-Einstieg, 16,5 px): drei kurze Antworten nebeneinander, vier als 2 × 2 auch
+ *  mit langen Wörtern (zwei Zeilen im Knopf statt vier ganzer Zeilen), fünf und mehr in zwei Spalten. Bei 360 px gemessen. */
+export function chipSpaltenLesbar(beschriftungen: string[]): 1 | 2 | 3 {
+  const n = beschriftungen.length;
+  const laengste = Math.max(0, ...beschriftungen.map(b => b.length));
+  if (n <= 2) return n === 2 && laengste <= 20 ? 2 : 1;
+  if (n === 3) return laengste <= 10 ? 3 : laengste <= 28 ? 2 : 1;
+  if (n === 4) return laengste <= 28 ? 2 : 1;
+  if (laengste <= 8) return 3;
+  return laengste <= 18 ? 2 : 1;
+}
+
 const SPALTEN_KLASSE = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' } as const;
 
 export const ChipSelect: FC<{
@@ -48,8 +61,9 @@ export const ChipSelect: FC<{
   /** Kürzere Anzeige je Wert, z. B. { 'Pflegegrad 1': '1' }. */
   labels?: Record<string, string>;
 }> = ({ value, onChange, options, invalid = false, labels }) => {
+  const lesbar = useContext(FormLesbar);
   const anzeige = (o: string) => labels?.[o] ?? o;
-  const spalten = chipSpalten(options.map(anzeige));
+  const spalten = (lesbar ? chipSpaltenLesbar : chipSpalten)(options.map(anzeige));
   // Unvollständige letzte Zeile: der letzte Chip füllt sie auf (7 Gewichte = 3 + 3 + 1 breit).
   const rest = options.length % spalten;
   return (
@@ -76,7 +90,7 @@ export const ChipSelect: FC<{
             }}
             style={letzter && rest ? { gridColumn: `span ${spalten - rest + 1}` } : undefined}
             className={
-              'relative min-h-[48px] rounded-[14px] border-[1.5px] px-2 py-1.5 text-[15.5px] leading-tight text-center ' +
+              (lesbar ? 'relative min-h-[52px] rounded-[14px] border-[1.5px] px-2 py-1.5 text-[16.5px] leading-tight text-center ' : 'relative min-h-[48px] rounded-[14px] border-[1.5px] px-2 py-1.5 text-[15.5px] leading-tight text-center ') +
               'flex items-center justify-center transition-colors ' +
               'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-taupe ' +
               (selected
