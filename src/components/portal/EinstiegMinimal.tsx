@@ -30,7 +30,6 @@ import { eigenanteilAus } from '../../lib/angebotZuschuss';
 import { anzahlText, ERFAHRUNGEN_URL, sternFuellung, type SterneStand } from '../../lib/sterne';
 import { BERATERIN, ERREICHBAR, TELEFON, TELEFON_HREF, WHATSAPP_HREF, istErreichbar } from '../../lib/kontakt';
 import { initials } from './shared';
-import { SCHRITTE_STAND_75B8DF8 } from './EinstiegVorSpeichern';
 import { AbschnittPflegesituation, KostenAufstellung, type VorgemerkteKraft } from './EinstiegPflegekraefteZuerst';
 import { FaqListe } from './FaqListe';
 import { MartaBox } from './MartaBox';
@@ -457,25 +456,38 @@ function KontaktReiter({ eingeklappt, erreichbar, sterne, verborgen = false }: {
 
 // ── So geht es weiter ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Martin 08.11.: „der Ablauf deutlich schöner dargestellt … optisch ist das nicht schön“. Wie die Stufen im CGA-Panel:
-// weiße Karte, Punkte auf einer senkrechten Linie, der aktuelle Schritt hervorgehoben. Wortlaut der drei Schritte
-// unverändert (`SCHRITTE_STAND_75B8DF8`, Stand 75b8df8); vor dem Speichern ist Schritt 1 der aktuelle.
+// weiße Karte, Punkte auf einer senkrechten Linie, der aktuelle Schritt hervorgehoben.
+// Registry #152 (Martin 09.11.: „wie wir das im Portal auch haben, also dass das alles gleich ist“): dieselben drei Schritte
+// wie unter dem letzten Schritt des Rechners (project 3/components/calculator/FormularPortal.tsx, ABLAUF_NACH_ABSENDEN, Registry
+// #151; der Rechner kann nicht aus src/ importieren, beide Stellen gleich halten). Hier ist Schritt 1 erledigt (der Kunde sieht
+// Angebot und Pflegekräfte), Schritt 2 der aktuelle und springt zum Formular. Der alte Wortlaut bleibt für `?einstieg=alt`
+// (EinstiegVorSpeichern.tsx, SCHRITTE_STAND_75B8DF8).
+export const ABLAUF_MINIMAL: readonly { titel: string; text?: string }[] = [
+  { titel: 'Angebot und passende Pflegekräfte sofort sehen, inklusive aller Zuschüsse' },
+  { titel: 'Bewerbungen innerhalb von 60\u00a0Minuten erhalten', text: 'Auf Wunsch: Pflegesituation kurz beschreiben, dann bewerben sich passende Pflegekräfte bei Ihnen.' },
+  { titel: 'Auswählen und starten', text: 'Sie wählen in Ruhe aus, erst danach schließen Sie den Vertrag. Wir übernehmen den Rest, Anreise schon ab 3\u00a0Tagen möglich.' },
+];
+const ABLAUF_ERLEDIGT = 0;
+const ABLAUF_JETZT = 1;
+
 function AblaufMinimal({ onZumFormular }: { onZumFormular?: () => void }) {
   return (
     <section className={`${KARTE} px-4 pt-3.5 pb-2`} aria-labelledby="ablauf-titel" data-ablauf-minimal>
       <h2 id="ablauf-titel" className="text-[16px] font-semibold leading-6 text-pm-ink">So geht es weiter</h2>
       <ol className="mt-2">
-        {SCHRITTE_STAND_75B8DF8.map((schritt, i) => {
-          const jetzt = i === 0;
-          const letzter = i === SCHRITTE_STAND_75B8DF8.length - 1;
+        {ABLAUF_MINIMAL.map((schritt, i) => {
+          const erledigt = i === ABLAUF_ERLEDIGT;
+          const jetzt = i === ABLAUF_JETZT;
+          const letzter = i === ABLAUF_MINIMAL.length - 1;
           return (
             <li key={schritt.titel} className="relative flex gap-3 pb-3" aria-current={jetzt ? 'step' : undefined}>
               {!letzter && <span className="absolute left-[13px] top-8 bottom-0 w-px bg-pm-line" aria-hidden="true" />}
               <span
                 className={`relative z-[1] mt-1 flex h-[27px] w-[27px] flex-none items-center justify-center rounded-full text-[13px] font-bold ${
-                  jetzt ? 'bg-pm-coral text-white' : 'border border-pm-line bg-white text-pm-muted'
+                  erledigt ? 'bg-pm-mint text-pm-green-deep' : jetzt ? 'bg-pm-coral text-white' : 'border border-pm-line bg-white text-pm-muted'
                 }`}
               >
-                {i + 1}
+                {erledigt ? <Check className="h-3.5 w-3.5" strokeWidth={3} aria-label="erledigt" /> : i + 1}
               </span>
               {jetzt && onZumFormular ? (
                 // Martin 08.11.: „wenn ich da draufklicke, dass ich nach oben springe. Nicht zu auffällig, aber schon ein Link …
@@ -486,12 +498,12 @@ function AblaufMinimal({ onZumFormular }: { onZumFormular?: () => void }) {
                     <span className="text-[15px] font-semibold leading-5 text-pm-ink">{schritt.titel}</span>
                     <ArrowUp className="mt-0.5 h-4 w-4 flex-none text-pm-coral-deep/70" strokeWidth={2.25} aria-hidden="true" />
                   </span>
-                  <span className="mt-0.5 block text-[13.5px] leading-[1.45] text-pm-muted">{schritt.text}</span>
+                  {schritt.text && <span className="mt-0.5 block text-[13.5px] leading-[1.45] text-pm-muted">{schritt.text}</span>}
                 </button>
               ) : (
                 <div className={`min-w-0 flex-1 rounded-[12px] px-3 py-2 ${jetzt ? 'bg-pm-coral-tint' : ''}`}>
-                  <p className="text-[15px] font-semibold leading-5 text-pm-ink">{schritt.titel}</p>
-                  <p className="mt-0.5 text-[13.5px] leading-[1.45] text-pm-muted">{schritt.text}</p>
+                  <p className={`text-[15px] font-semibold leading-5 ${erledigt ? 'text-pm-muted' : 'text-pm-ink'}`}>{schritt.titel}</p>
+                  {schritt.text && <p className="mt-0.5 text-[13.5px] leading-[1.45] text-pm-muted">{schritt.text}</p>}
                 </div>
               )}
             </li>
