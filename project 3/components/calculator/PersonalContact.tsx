@@ -23,6 +23,12 @@
  *   (Martin 16.08.: "warum ist der oberste Button jetzt schoen und die
  *   anderen noch alt und rund"). Die Form ist ein Seiten-Token, nicht Teil
  *   dieser Karte — das Portal faehrt weiter Pillen, bis es nachgezogen wird.
+ *
+ * `ohneRahmen` (Registry #160, nur der Schluss der Rechner-Startseite): weiße
+ * Karte ohne Rand und Schatten mit Radius 20 und Überschrift in #1C1C1C wie die
+ * übrigen Karten dort; ab md 32 px seitlich wie die Karte darüber (gleiche
+ * Innenkante). Der Standard bleibt unverändert (Rechner-Seiten, Kontakt-
+ * und Preisseite, Spiegel von BeratungCTA im Portal).
  */
 
 const PHONE_HREF = 'tel:+4989200000830';
@@ -31,10 +37,11 @@ const WHATSAPP_HREF = 'https://wa.me/4989200000830';
 export function PersonalContact({
   headline = 'Kann ich helfen?',
   body = 'Ich helfe Ihnen gerne weiter — schnell und unverbindlich.',
-}: { headline?: string; body?: string } = {}) {
+  ohneRahmen = false,
+}: { headline?: string; body?: string; ohneRahmen?: boolean } = {}) {
   return (
-    <div className="rounded-2xl border border-[#D4D4D8] bg-white p-4 shadow-sm">
-      <p className="text-[17px] font-bold text-[#3D2B1F] leading-tight mb-3">{headline}</p>
+    <div className={ohneRahmen ? 'rounded-[20px] bg-white p-4 md:px-8' : 'rounded-2xl border border-[#D4D4D8] bg-white p-4 shadow-sm'}>
+      <p className={`text-[17px] font-bold ${ohneRahmen ? 'text-[#1C1C1C]' : 'text-[#3D2B1F]'} leading-tight mb-3`}>{headline}</p>
       <div className="flex items-center gap-3 mb-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img

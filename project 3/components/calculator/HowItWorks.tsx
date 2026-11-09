@@ -10,7 +10,9 @@ import { AblaufSchritte, KNOPF_ANGEBOT, MINI_ABLAUF } from '@/components/calcula
 export function HowItWorks() {
   return (
     <section id="ablauf" className="scroll-mt-20 px-5 py-12 md:py-16">
-      <div className="max-w-[560px] md:max-w-[900px] lg:max-w-[1100px] mx-auto">
+      {/* Registry #160: Spalte wie Kopf und Hero (Tablet 560 px mittig, ab lg 1216 px = Innenbreite der Hero-Spalte), damit
+          H1, H2 und Knöpfe auf allen Breiten an einer linken Kante stehen. */}
+      <div className="max-w-[560px] lg:max-w-[1216px] mx-auto">
         <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-2">
           So funktioniert's
         </p>
@@ -20,7 +22,7 @@ export function HowItWorks() {
         {/* Martins Mini-Ablauf (08.11.): nennt den Kontaktschritt, bevor jemand tippt (Lehre vom 23.09.). */}
         <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-6 md:mb-8">{MINI_ABLAUF}</p>
 
-        <div className="rounded-[20px] bg-white px-4 pt-4 pb-1 md:px-6 md:py-6">
+        <div className="rounded-[20px] bg-white px-4 pt-4 pb-1 lg:px-6 lg:py-6">
           <AblaufSchritte quer />
         </div>
         {/* Der Satz zum Mustervertrag stand bisher in Schritt 3 („den Mustervertrag können Sie jederzeit vorher lesen“). */}
@@ -30,16 +32,15 @@ export function HowItWorks() {
           können Sie jederzeit vorher lesen.
         </p>
 
-        {/* CTA Button */}
-        <div className="mt-8 md:mt-10 text-center">
+        {/* Knopf an der linken Kante wie Überschrift und Karte (Martin 09.11.: „Überschriften linksbündig“); Form, Breite
+            (volle Spalte, höchstens 448 px wie max-w-md am Hero), Schrift, Schatten und Pfeil wie der Hero-Knopf
+            (MultiStepForm.tsx), Registry #160. */}
+        <div className="mt-8 md:mt-10">
           <button
             onClick={() => openCalculator('ablauf')}
-            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 sm:px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
+            className="inline-flex w-full max-w-md items-center justify-center rounded-xl bg-[#E76F63] px-4 py-[18px] text-[16px] min-[375px]:text-[17px] font-bold text-white shadow-[0_4px_14px_rgba(231,111,99,0.32)] transition-all duration-200 hover:bg-[#D65E52]"
           >
-            {KNOPF_ANGEBOT}
-            <svg className="hidden sm:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            {KNOPF_ANGEBOT}{"\u00a0"}→
           </button>
         </div>
       </div>
