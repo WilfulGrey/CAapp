@@ -4,6 +4,11 @@
 // Wird dort eine Bewertung zurückgezogen oder geändert, hier dasselbe tun (id = id der Quelle). Der Rechner kann die Liste
 // nicht zur Laufzeit laden (primundus.de liefert nur den Schnitt, /api/bewertungen-stand), daher die Kopie.
 
+/** Woher die gezeigten Stimmen stammen, Wortlaut von primundus.de/erfahrungen („Rückmeldungen direkt an Primundus“). Steht
+ *  unter jeder Stimmen-Liste des Rechners, ohne Link (§ 5b Abs. 3 UWG; Martin 09.11.2026: „bei Bewertungen schreiben wir den
+ *  vorgeschlagenen“, Registry #159). Gilt nur, solange hier ausschließlich Stimmen aus bewertungen-direkt.ts stehen. */
+export const HERKUNFT_STIMMEN = 'Diese Bewertungen haben uns Familien direkt geschickt.';
+
 export interface Kundenstimme {
   /** id in primundus-main lib/bewertungen-direkt.ts */
   id: string;

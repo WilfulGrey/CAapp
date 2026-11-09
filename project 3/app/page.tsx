@@ -250,8 +250,10 @@ export default async function HomePage() {
                   „100 % kostenfrei und unverbindlich" (Martin: „aus den 5
                   Punkten rausnehmen und im Hero machen statt kostenlos und
                   unverbindlich"). Wortlaut wie in Anzeigen und Ablauf-Plakette
-                  (seit 14.09.). Unverbindlich sagen konkreter die Punkte
-                  darunter („Kein Vertrag vor Ihrer Auswahl"). */}
+                  (seit 14.09.). Darunter stehen seit Registry #158 die Punkte
+                  des Portals (Keine Vorauszahlung / Keine Vermittlungsgebühr /
+                  Keine Mindestlaufzeit); „Kein Vertrag vor Ihrer Auswahl"
+                  ist dort entfallen (Martin 09.11.). */}
               <p className="mb-6 max-w-[520px] text-[16px] leading-relaxed text-[#5B5B5B] lg:text-[18px]">
                 Sehen Sie in 2 Minuten,{" "}
                 <span className="font-semibold text-[#3D3D3D]">was es kostet</span> und{" "}

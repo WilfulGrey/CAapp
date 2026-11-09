@@ -12,7 +12,7 @@ import { useFormTracking } from "@/hooks/use-form-tracking";
 import { deutschBalken, GANZ_SICHTBAR, GARANTIE, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { BestpreisDialog } from "@/components/calculator/BestpreisDialog";
 import { PreisSeite, type PreisDaten } from "@/components/calculator/PreisSeite";
-import { HERO_PUNKTE } from "@/lib/hero-punkte";
+import { PORTAL_PUNKTE } from "@/lib/hero-punkte";
 import type { SterneStand } from "@/lib/sterne-zeile";
 import { SterneText } from "@/components/calculator/BewertungsZeile";
 import { KontaktSeite, KONTAKT_FELD_ID, type KontaktFeld } from "@/components/calculator/KontaktSeite";
@@ -25,6 +25,15 @@ import { kontaktStandard, kontaktVariante, KNOPF_KONTAKT, STUFEN, STUFEN_FEHLER,
 import { antwortPortal, EinleitungPortal, FortschrittPortal, KNOPF_ANGEBOT, KONTAKT_FERTIG, KOPF_FRAGEN, KopfleistePortal, MINI_ABLAUF, PM, SCHATTEN_LIFT, SheetGrundPortal, TitelPortal, UnterDemFormularPortal, UnterDemKnopfPortal, UnterDemKontaktPortal, usePortalLook } from "@/components/calculator/FormularPortal";
 
 const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Grüner Haken der Punkte unter dem Hero-Knopf (wie im Portal, Registry #158). */
+function HakenGruen() {
+  return (
+    <svg className="h-[18px] w-[18px] flex-shrink-0 text-[#3D7A5C]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
 
 // ─── Matching Animation Component ────────────────────────────────────────────
 // Läuft zwischen letzter Frage (Step 8) und Kontaktformular (Step 9). 3 Schritte
@@ -1284,41 +1293,21 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
             <span aria-hidden="true" className="text-[#3A6B42] text-[13px] leading-none">→</span>
           </button>
         </div>
-        {/* Die drei Punkte, die kein Wettbewerber so setzen kann (Martin
-            16.08.). "Keine Vermittlungsgebuehr" stand seit dem 16.08. in
-            JEDER Google-Anzeige, aber nirgends auf der Seite — der Klick
-            fuehrte auf ein Versprechen, das hier nicht wieder auftauchte.
-            Belege: marta 99-999 EUR Aufnahmegebuehr, Hausengel 220 EUR/Mo
-            Vermittlung, Dt. Seniorenbetreuung 280 EUR Pauschale; taeglich
-            kuendbar ist bei uns vertraglich hinterlegt (vertrag-content.ts
-            §3.3). Alle drei gehoeren zur selben Kategorie: nichts, worin man
-            haengenbleibt — die Startzeit ist bewusst NICHT dabei, sie ist
-            eine andere Aussage (Martin 16.08.). Am 14.09. kam sie trotzdem
-            als Punkt dazu; seit 17.09. steht „Anreise in 3 Tagen möglich"
-            in der Hero-Unterzeile (Martin: „aus den 5 Punkten rausnehmen und
-            im Hero machen statt kostenlos und unverbindlich").
-            "Kostenlos & unverbindlich" steht damit nicht mehr im Hero, nur
-            noch im Fuß des Kontaktschritts und im Schluss-Aufruf. */}
+        {/* Punkte unter dem Knopf: "Keine Vermittlungsgebuehr" steht in jeder
+            Google-Anzeige und muss hier wieder auftauchen (Martin 16.08.).
+            Die Startzeit steht seit 17.09. in der Hero-Unterzeile („Anreise in
+            3 Tagen möglich"), nicht als Punkt. Bis 09.11. standen hier
+            HERO_PUNKTE (mit „Kein Vertrag vor Ihrer Auswahl" und „Täglich
+            kündbar"), seit Registry #158 die Punkte des Portals. */}
         {/* Schriftgroesse: NIE kleiner als die Hero-Unterzeile ueber dem
-            Button (16px, app/page.tsx) — Martin 16.08. Diese drei Zeilen
-            sind der Message-Match zu den Anzeigen, nicht Kleingedrucktes. */}
-        {/* Einrueckung erst ab lg: auf 375px schob sie "Taeglich kuendbar,
-            taggenau abgerechnet" in eine zweite Zeile. */}
+            Button (16px, app/page.tsx) — Martin 16.08. Diese Zeilen
+            sind der Message-Match zu den Anzeigen, nicht Kleingedrucktes.
+            Einrueckung erst ab lg (auf 375px brach eine Zeile sonst um). */}
+        {/* Registry #158 (Martin 09.11.): dieselben vier Punkte wie im Portal unter dem Preis, Bestpreisgarantie zuerst,
+            grüne Haken wie dort (Koralle nur für Knöpfe, Farbregel 11.09.). */}
         <ul className="mt-5 flex flex-col gap-3 lg:pl-1.5">
-          {HERO_PUNKTE.map((punkt) => (
-            <li key={punkt} className="flex items-center gap-2.5">
-              <svg className="h-[18px] w-[18px] flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              <span className="text-[16px] leading-snug text-[#3D3D3D]">{punkt}</span>
-            </li>
-          ))}
-          {/* 4. Punkt (Martin 12.09.): Text wie die drei anderen, dazu ein
-              Textlink, der das Pop-up öffnet. Das Siegel selbst steht im Hero-Bild. */}
           <li className="flex items-center gap-2.5">
-            <svg className="h-[18px] w-[18px] flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
+            <HakenGruen />
             <span className="text-[16px] leading-snug text-[#3D3D3D]">
               {GARANTIE.wort}{' '}
               <button
@@ -1332,6 +1321,12 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
               </button>
             </span>
           </li>
+          {PORTAL_PUNKTE.map((punkt) => (
+            <li key={punkt} className="flex items-center gap-2.5">
+              <HakenGruen />
+              <span className="text-[16px] leading-snug text-[#3D3D3D]">{punkt}</span>
+            </li>
+          ))}
         </ul>
         {/* Das Pop-up muss auch im Hero-Zweig im Baum stehen (eigener Return). */}
         <BestpreisDialog open={garantieOffen} onOpenChange={setGarantieOffen} onWeiter={weiterAusGarantie} />

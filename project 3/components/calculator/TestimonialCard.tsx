@@ -2,7 +2,7 @@
 
 import { Star } from "lucide-react";
 import { SterneText } from "@/components/calculator/BewertungsZeile";
-import { STIMMEN_STARTSEITE } from "@/lib/kundenstimmen";
+import { HERKUNFT_STIMMEN, STIMMEN_STARTSEITE } from "@/lib/kundenstimmen";
 import { anzahlText, type SterneStand } from "@/lib/sterne-zeile";
 
 /** „TR“ aus „Thomas R.“: Anfangsbuchstaben von Vor- und Nachname. */
@@ -55,8 +55,11 @@ export function TestimonialCard({ bewertung }: { bewertung: SterneStand | null }
           ))}
         </div>
       </div>
-      {/* Herkunft ohne Link (Martin 09.11.: „keinen Link … damit er da nicht wegspringt“). */}
-      {bewertung && <p className="mt-2 text-[13px] text-[#8B8B8B]">Auswahl aus {anzahlText(bewertung.anzahl)} auf primundus.de</p>}
+      {/* Herkunft ohne Link (Martin 09.11.: „keinen Link … damit er da nicht wegspringt“), immer sichtbar (§ 5b UWG, Registry
+          #159); erst die Herkunft der gezeigten Stimmen, dann die Auswahl aus allen. */}
+      <p className="mt-2 text-[13px] text-[#8B8B8B]">
+        {HERKUNFT_STIMMEN}{bewertung && <> Auswahl aus {anzahlText(bewertung.anzahl)} auf primundus.de.</>}
+      </p>
     </div>
   );
 }
