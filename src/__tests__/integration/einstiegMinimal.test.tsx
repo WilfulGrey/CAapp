@@ -298,10 +298,15 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     await waitFor(() => expect(meldungen.find((m) => m.event === 'zur_pflegesituation')?.metadata).toEqual({ quelle: 'hauptknopf', vor_speichern: true }));
     expect(meldungen.find((m) => m.event === 'zur_pflegesituation')?.notify).toBe(false);
 
-    // „Pflegesituation vervollständigen“ in „So geht es weiter“ springt ebenfalls zum Formular (Martin 08.11.), Quelle schritte.
+    // Der aktuelle Schritt in „So geht es weiter“ springt ebenfalls zum Formular (Martin 08.11.), Quelle schritte. Wortlaut
+    // gleich mit dem Rechner (Registry #152): Schritt 1 erledigt, Schritt 2 „Bewerbungen … erhalten“ ist der aktuelle.
     (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
+    const ablauf = document.querySelector('[data-ablauf-minimal]') as HTMLElement;
+    expect(within(ablauf).getByLabelText('erledigt')).toBeInTheDocument();
+    expect(ablauf.textContent).toContain('Angebot und passende Pflegekräfte sofort sehen, inklusive aller Zuschüsse');
+    expect(ablauf.textContent).toContain('Auswählen und startenSie wählen in Ruhe aus, erst danach schließen Sie den Vertrag. Wir übernehmen den Rest, Anreise schon ab 3\u00a0Tagen möglich.');
     const ablaufLink = document.querySelector('[data-ablauf-link]') as HTMLElement;
-    expect(ablaufLink.textContent).toBe('Pflegesituation vervollständigen2 Minuten. Vieles ist schon ausgefüllt.');
+    expect(ablaufLink.textContent).toBe('Bewerbungen innerhalb von 60\u00a0Minuten erhaltenAuf Wunsch: Pflegesituation kurz beschreiben, dann bewerben sich passende Pflegekräfte bei Ihnen.');
     await user.click(ablaufLink);
     await waitFor(() => expect(gescrollt().map((e) => e.id)).toContain('patientendaten'));
     await waitFor(() => expect(meldungen.filter((m) => m.event === 'zur_pflegesituation').map((m) => m.metadata?.quelle)).toEqual(['hauptknopf', 'schritte']));

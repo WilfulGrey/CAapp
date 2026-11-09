@@ -22,6 +22,7 @@ import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
 import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
 import { kontaktStandard, kontaktVariante, KNOPF_KONTAKT, STUFEN, STUFEN_FEHLER, type KontaktStufe, type KontaktVariante } from "@/lib/kontakt-stufen";
+import { antwortPortal, EinleitungPortal, FortschrittPortal, KONTAKT_FERTIG, KOPF_FRAGEN, KopfleistePortal, MINI_ABLAUF, PM, SCHATTEN_LIFT, TitelPortal, UnterDemFormularPortal, UnterDemKnopfPortal, UnterDemKontaktPortal, usePortalLook } from "@/components/calculator/FormularPortal";
 
 const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -45,7 +46,7 @@ function AntwortZeichen() {
   );
 }
 
-function MatchingAnimation({ onComplete, vorschau, kurz }: { onComplete: () => void; vorschau?: boolean; kurz?: boolean }) {
+function MatchingAnimation({ onComplete, vorschau, kurz, portal }: { onComplete: () => void; vorschau?: boolean; kurz?: boolean; portal?: boolean }) {
   const [activeStep, setActiveStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [done, setDone] = useState(false);
@@ -85,11 +86,20 @@ function MatchingAnimation({ onComplete, vorschau, kurz }: { onComplete: () => v
   }, []);
 
   return (
-    <div className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
+    <div className={portal ? 'bg-white rounded-[20px] overflow-hidden' : 'bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md'}
+      style={portal ? { boxShadow: SCHATTEN_LIFT } : undefined}>
+      {portal ? (
+        // Portal-Look (Registry #151): heller Kopf statt Koralle-Fläche.
+        <div className="px-4 pt-3.5 pb-3" style={{ backgroundColor: PM.coralTint }}>
+          <p className="text-[17px] font-semibold leading-6" style={{ color: PM.ink }}>{WARTE.titel}</p>
+          <p className="mt-0.5 text-[13.5px]" style={{ color: PM.body }}>{vorschau ? WARTE.text : 'Wir bereiten Ihr persönliches Angebot vor'}</p>
+        </div>
+      ) : (
       <div className="px-4 sm:px-8 py-5 border-b-2 border-[#E5E3DF]/50 bg-[#E76F63]">
         <p className="text-base font-bold uppercase tracking-wide text-white mb-1.5">{WARTE.titel}</p>
         <p className="text-sm text-white" style={{ opacity: 0.85 }}>{vorschau ? WARTE.text : 'Wir bereiten Ihr persönliches Angebot vor'}</p>
       </div>
+      )}
 
       {/* KEIN Fortschrittsbalken hier (Martin 17.08.: "mach die
           Schrittebalken im Formular nicht auch noch fuer diesen
@@ -177,6 +187,8 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
   const { state, updateState, calculate } = useCalculator();
   const [currentStep, setCurrentStep] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
+  // Rechner wie das Portal (Registry #151, components/calculator/FormularPortal.tsx); `?look=alt` zeigt den Stand davor.
+  const portalLook = usePortalLook();
   // Matching-Animation zwischen Step 8 (letzte Frage) und Step 9 (Kontakt).
   // Wenn aktiv, blendet das Step-Rendering aus und zeigt nur die Animation.
   const [showMatching, setShowMatching] = useState(false);
@@ -1069,7 +1081,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
   // sah aus wie ein Fehler und blieb auf dem Handy nach dem Tippen an der
   // nächsten Antwort hängen. Darüberfahren nur noch bei echter Maus
   // (hover:hover), gewählt = Braun mit Haken (AntwortZeichen).
-  const btnClass = (isSelected: boolean) =>
+  const btnClass = (isSelected: boolean) => portalLook ? antwortPortal(isSelected) :
     `group w-full relative rounded-xl px-4 py-3.5 border-[1.5px] shadow-[0_2px_6px_rgba(61,61,61,0.10)] transition-all duration-200 text-left ${
       isSelected
         ? 'ist-gewaehlt border-[#8B7355] bg-[#8B7355]/5 ring-1 ring-[#8B7355]/20'
@@ -1185,13 +1197,15 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
   if (showMatching) {
     return (
       <>
-      {fullscreen && <div className="fixed inset-0 bg-black/60 z-[80]" aria-hidden="true" />}
+      {fullscreen && <div className={`fixed inset-0 z-[80] ${portalLook ? '' : 'bg-black/60'}`} style={portalLook ? { backgroundColor: PM.grund } : undefined} aria-hidden="true" />}
       <div ref={formRef} id="calculator-form" className={outerClass}>
+        {portalLook && <KopfleistePortal />}
         <MatchingAnimation
           // Warte-Screen immer mit den drei Schritten aus WARTE („Preis
           // berechnet“ …) — auch ohne Karten-Seite (Martin 11.09.: Warten bleibt).
           vorschau
           kurz
+          portal={portalLook}
           onComplete={async () => {
             // Preis zuerst: auf die Kalkulation warten (läuft seit Beginn der
             // Warteseite, ca. 1 s). Ohne Preis → heutiger Weg, anonym gezählt.
@@ -1329,10 +1343,23 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
         Kontaktschritt (Schritt 9): Er hat kein X, der Tipp daneben bleibt dort
         der Ausgang wie bisher — jetzt über `schliessen`, also ohne Neustart;
         der Knopf öffnet wieder beim Kontaktschritt. */}
-    {fullscreen && <div className="fixed inset-0 bg-black/60 z-[80]" aria-hidden="true" onClick={currentStep === totalSteps ? schliessen : undefined} />}
+    {fullscreen && (portalLook
+      // Portal-Look: heller Seitengrund statt Abdunkeln; das X sitzt in der Kopfleiste (auch im Kontakt-Schritt).
+      ? <div className="fixed inset-0 z-[80]" style={{ backgroundColor: PM.grund }} aria-hidden="true" />
+      : <div className="fixed inset-0 bg-black/60 z-[80]" aria-hidden="true" onClick={currentStep === totalSteps ? schliessen : undefined} />)}
     <div ref={formRef} id="calculator-form" className={outerClass}>
       <div className="relative">
-      <div data-calculator-card className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
+      {portalLook && fullscreen && <KopfleistePortal onSchliessen={schliessen} />}
+      {/* Portal-Look: bei den Fragen die Einleitung mit Marta, im Kontakt-Schritt nur der Titel (wie pflege-helfer24 ohne Gesicht
+          am Schluss; so bleibt der Knopf auf dem iPhone SE im ersten Bild). */}
+      {portalLook && fullscreen && (currentStep < totalSteps
+        ? <EinleitungPortal titel={KOPF_FRAGEN} text={MINI_ABLAUF} />
+        : <TitelPortal haken titel={vorschauModus && !kontaktOffen ? kopfzeile().titel : preisModus && kontaktOffen && preisDaten ? KONTAKT_NACH_PREIS.kopf(preisDaten.bruttopreis) : KONTAKT_FERTIG.titel} />)}
+      <div data-calculator-card className={portalLook ? 'bg-white rounded-[20px] overflow-hidden ring-1 ring-[#E76F63]/20' : 'bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md'}
+        style={portalLook ? { boxShadow: SCHATTEN_LIFT } : undefined}>
+        {portalLook ? (
+          <FortschrittPortal schritt={currentStep} gesamt={totalSteps} onZurueck={currentStep > 1 ? handleBack : undefined} />
+        ) : (
         <div className={`relative px-4 sm:px-8 py-3 border-b-2 border-[#E5E3DF]/50 ${currentStep === totalSteps ? 'bg-[#22A06B]' : 'bg-[#E76F63]'}`}>
           {fullscreen && currentStep !== totalSteps && (
             <button
@@ -1384,6 +1411,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
             </p>
           )}
         </div>
+        )}
 
         {/* Bestpreisgarantie — Pop-up aus dem Kopf des Kontakt-Schritts (Martin 12.09.). */}
         <BestpreisDialog open={garantieOffen} onOpenChange={setGarantieOffen} onWeiter={weiterAusGarantie} />
@@ -1392,7 +1420,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
             Balken wirkte eng und anders als der Rest) — im eingebetteten
             Hero-Kasten (nicht fullscreen) bleibt Schritt 1 ohne, damit die
             Antworten über der Falz bleiben. */}
-        {(currentStep > 1 || (fullscreen && currentStep === 1)) && (
+        {!portalLook && (currentStep > 1 || (fullscreen && currentStep === 1)) && (
           <div className="px-3 sm:px-4 py-2 bg-[#F8F7F5]/50 border-b border-[#E5E3DF]/30">
             <div className="h-1.5 bg-[#E5E3DF] rounded-full overflow-hidden">
               <div
@@ -1403,8 +1431,9 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
           </div>
         )}
 
-        {currentStep >= 1 && currentStep <= 8 && (
-          <div className="flex justify-center pt-2 pb-0">
+        {/* Portal-Look: keine Pille, der Titel über der Karte sagt dasselbe. */}
+        {!portalLook && currentStep >= 1 && currentStep <= 8 && (
+          <div className={`flex pb-0 ${portalLook ? 'justify-start px-4 pt-3.5' : 'justify-center pt-2'}`}>
             <div className="inline-flex items-center gap-2 bg-[#F0F7F1] border border-[#A8D5B0] rounded-full pl-1.5 pr-3 py-1">
               {/* Eine Pille auf allen Fragen (Martin 11.09.: Schritt 1 mit
                   Bildern, Schritt 2 ohne — wirkte wie zwei Hinweise). */}
@@ -1421,7 +1450,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                   </span>
                 ))}
               </div>
-              <span className="text-[12px] text-[#3A6B42]">Passende Pflegekräfte sofort verfügbar</span>
+              <span className={`text-[12px] text-[#3A6B42]${portalLook ? ' whitespace-nowrap' : ''}`}>Passende Pflegekräfte sofort verfügbar</span>
             </div>
           </div>
         )}
@@ -1430,13 +1459,15 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
             im Titel-Block (getStepTitle); separate Pill ist redundant. */}
 
         {/* Registry #121: im Kontakt-Schritt rückt der Knopf an die Felder (36 → 16 px). */}
-        <div id="calc-step-content" className={`px-3 sm:px-6 lg:px-8 pt-3 ${fullscreen && currentStep === 1 ? 'pb-8' : currentStep === totalSteps && !stufenAktiv && !preisModus && (!ergebnisModus || kontaktOffen) ? 'pb-2' : 'pb-5'}`}>
+        <div id="calc-step-content" className={`${portalLook ? 'px-4' : 'px-3 sm:px-6 lg:px-8'} pt-3 ${fullscreen && currentStep === 1 ? 'pb-8' : currentStep === totalSteps && !stufenAktiv && !preisModus && (!ergebnisModus || kontaktOffen) ? 'pb-2' : 'pb-5'}`}>
           <div className="w-full">
             {/* Step 9: kleine grüne „fertig"-Pill über dem Titel, dann die
                 Frage als reguläre Step-Headline + Erklärung als italic
                 Subline (gleiches Muster wie die anderen Steps). */}
             {getStepTitle() && (
-              <h3 className="text-[20px] font-bold text-[#3D3D3D] mb-3 leading-snug min-h-[2.75rem] flex items-center justify-center text-center">
+              <h3 className={portalLook
+                ? 'text-[19px] font-semibold text-[#1C1C1C] mb-3 leading-snug tracking-[-0.01em]'
+                : 'text-[20px] font-bold text-[#3D3D3D] mb-3 leading-snug min-h-[2.75rem] flex items-center justify-center text-center'}>
                 {getStepTitle()}
               </h3>
             )}
@@ -1854,6 +1885,10 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                                 Fotos: neben „5 passende Profile“ sähen fünf Beispielgesichter wie
                                 genau diese fünf aus (OpenAI-Gegencheck). So stehen Knopf und Sterne
                                 auch auf dem iPhone SE (553 px) im ersten Bild. */}
+                            {/* Portal-Look: der Titel über der Karte sagt „fertig“, hier
+                                nur der Satz über die ganze Breite (KONTAKT_FERTIG), ohne Frage und
+                                Gesichter, sonst rutscht der Knopf auf dem iPhone SE unter die Falz. */}
+                            {portalLook ? <p className="text-[15px] leading-[1.35] text-[#2E2E2E]">{KONTAKT_FERTIG.text}</p> : <>
                             <p className="text-[20px] font-bold leading-tight text-[#1a1a1a] [text-wrap:balance]">{SCHRANKE.frage}</p>
                             <div className="mt-2.5 flex items-center gap-2.5">
                               <div className="flex flex-shrink-0" aria-hidden="true">
@@ -1866,6 +1901,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                               </div>
                               <p className="text-[14px] leading-[1.35] text-[#5A5A5A] [text-wrap:balance]">{SCHRANKE.lohn}</p>
                             </div>
+                            </>}
                           </>
                         )}
                       </div>
@@ -2035,7 +2071,9 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
         {/* Bottom-Button-Block: auf Step 1 komplett ausgeblendet (kein
             Zurück, Auto-Advance kümmert sich um Weiter), Steps 2-9 zeigen
             nur Zurück, Step 10 zeigt den Submit-Button mit Hinweis. */}
-        {currentStep > 1 && !(currentStep === totalSteps && ergebnisModus && !kontaktOffen) && !(currentStep === totalSteps && stufenAktiv) && !(currentStep === totalSteps && preisModus) && (
+        {currentStep > 1 && !(currentStep === totalSteps && ergebnisModus && !kontaktOffen) && !(currentStep === totalSteps && stufenAktiv) && !(currentStep === totalSteps && preisModus)
+          // Portal-Look: „Zurück“ steht im Kopf, hier nur noch der Absendeblock.
+          && !(portalLook && currentStep < totalSteps) && (
           // Nur-Zurück-Zeile eng an die Antworten (Martin 11.09.: „zurück hat
           // zu viel Luft"); der Absendeblock behält seinen Abstand.
           <div className={`px-3 sm:px-6 lg:px-8 bg-white ${currentStep === totalSteps && (!ergebnisModus || kontaktOffen) ? 'pt-2 pb-5' : 'pt-0 pb-3'}`}>
@@ -2063,13 +2101,15 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   ) : (
-                    <span className={vorschauModus ? 'whitespace-nowrap text-[15px]' : undefined}>{vorschauModus ? SCHRANKE.knopf : KNOPF_KONTAKT}</span>
+                    <span className={vorschauModus ? 'whitespace-nowrap text-[15px]' : undefined}>{vorschauModus ? SCHRANKE.knopf : portalLook ? KONTAKT_FERTIG.knopf : KNOPF_KONTAKT}</span>
                   )}
                 </button>
                 {/* Registry #121: Sterne direkt unter dem Knopf, damit Knopf, Gesichter
                     und Sterne als ein Paket im ersten Bild stehen (Martin 23.09.). Ohne
                     Stand keine Zeile; ohne Sprungziel, niemand soll den Schritt verlassen. */}
-                {bewertung && (
+                {/* Portal-Look: erst „100 % kostenfrei & unverbindlich“ (Martin 09.11.), dann die Kennzahlen mit den
+                    Sternen (UnterDemKnopfPortal). */}
+                {bewertung && !portalLook && (
                   <div className="mt-0.5 flex justify-center">
                     <span aria-label={`${bewertung.schnitt} von 5 Sternen`}><SterneText stand={bewertung} /></span>
                   </div>
@@ -2077,10 +2117,11 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                 {/* Registry #121 (Martin 10.10.: „prominenter, so wie das vorher da drunter
                     war"): Haken und Schrift wie der Punkt in der Leiste am Kartenfuß. */}
                 <div className="flex flex-col items-center gap-1">
+                  {portalLook ? <UnterDemKnopfPortal bewertung={bewertung} /> : (
                   <p className="flex items-center justify-center gap-1.5 text-xs">
                     <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" aria-hidden="true" />
                     <span className="text-[#3D3D3D] font-medium">{SCHRANKE.fussnote}</span>
-                  </p>
+                  </p>)}
                   <p className="text-center text-xs text-[#8B8B8B] leading-snug">
                     Mit dem Absenden stimmen Sie unserer{' '}
                     <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
@@ -2102,7 +2143,8 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
             )}
           </div>
         )}
-        {/* Trust-Punkte als angehängter Karten-Fuß (keine separate Box) */}
+        {/* Trust-Punkte als angehängter Karten-Fuß (keine separate Box); im Portal-Look nur im Kontakt-Schritt. */}
+        {!(portalLook && currentStep < totalSteps) && (
         <div className="border-t border-[#E5E3DF]/60 px-4 py-3.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs">
           <div className="flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
@@ -2124,7 +2166,11 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
             </div>
           )}
         </div>
+        )}
       </div>
+      {portalLook && fullscreen && (currentStep < totalSteps
+        ? <UnterDemFormularPortal bewertung={bewertung} />
+        : <UnterDemKontaktPortal bewertung={bewertung} />)}
       </div>
 
       {/* Mobile Contact - Below Form */}

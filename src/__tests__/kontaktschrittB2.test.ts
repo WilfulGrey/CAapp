@@ -84,8 +84,9 @@ describe('Kontakt-Schritt B2 (Registry #121)', () => {
     expect(knopfEnde).toBeGreaterThan(-1);
     expect(sterne).toBeGreaterThan(knopfEnde);
     expect(fussnote).toBeGreaterThan(sterne);
-    // Ohne Stand keine Zeile, nie eine feste Zahl.
-    expect(block).toContain('{bewertung && (');
+    // Ohne Stand keine Zeile, nie eine feste Zahl. Die Sternezeile gehört zum alten Look (`?look=alt`); im Portal-Look
+    // stehen die Sterne in den Kennzahlen unter „100 % kostenfrei“ (Registry #151, rechnerPortalLook.test.ts).
+    expect(block).toContain('{bewertung && !portalLook && (');
   });
 
   it('„100 % kostenfrei & unverbindlich“ steht mit Haken wie in der Leiste, die Leiste lässt den Punkt dann weg', () => {
