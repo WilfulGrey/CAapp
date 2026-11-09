@@ -34,7 +34,7 @@ describe('Startseite — kein schwebender WhatsApp-Knopf', () => {
     // Seit Registry #155 trägt der Abschluss Martas Kasten (PersonalContact) mit Anrufen und WhatsApp.
     const cta = readFileSync(join(WURZEL, 'components/calculator/FinalCTA.tsx'), 'utf8');
     const marta = readFileSync(join(WURZEL, 'components/calculator/PersonalContact.tsx'), 'utf8');
-    expect(cta, 'Martas Kasten im Abschluss-CTA fehlt — zu viel entfernt').toContain('<PersonalContact />');
+    expect(cta, 'Martas Kasten im Abschluss-CTA fehlt — zu viel entfernt').toContain('<PersonalContact headline=');
     expect(marta, 'WhatsApp-Link in Martas Kasten fehlt').toMatch(/wa\.me/);
   });
 });

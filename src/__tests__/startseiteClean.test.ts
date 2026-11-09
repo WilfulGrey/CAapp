@@ -31,7 +31,8 @@ describe('Rechner-Startseite (Registry #155)', () => {
   it('die Sprungziele der Sitelinks bleiben', () => {
     expect(lies('components/calculator/HowItWorks.tsx')).toContain('id="ablauf"');
     expect(seite).toContain('id="kundenstimmen"');
-    expect(lies('components/calculator/BestpriceGuarantee.tsx')).toContain('id="testsieger"');
+    // Anker an der Testsieger-Karte selbst (das WELT-Siegel im Kopf springt dorthin).
+    expect(lies('components/calculator/BestpriceGuarantee.tsx')).toContain('<div id="testsieger" className="scroll-mt-28 lg:grid"><TestsiegerKarte /></div>');
     expect(lies('components/calculator/ComparisonSection.tsx')).toContain('id="kostenvergleich"');
   });
 
@@ -55,12 +56,12 @@ describe('Rechner-Startseite (Registry #155)', () => {
       expect(t, datei).toContain('{KNOPF_ANGEBOT}');
       expect(t, datei).not.toMatch(/>\s*Preis & Pflegekräfte ansehen/);
     }
-    expect(lies('components/calculator/MultiStepForm.tsx')).toContain('{KNOPF_ANGEBOT} →');
+    expect(lies('components/calculator/MultiStepForm.tsx')).toContain('{KNOPF_ANGEBOT}{"\\u00a0"}→');
   });
 
   it('Schluss hell mit Knopf, „100 % kostenfrei“, Kennzahlen und Marta', () => {
     const s = lies('components/calculator/FinalCTA.tsx');
     expect(s).not.toContain('bg-[#8B7355]');
-    for (const t of ['<KostenfreiZeile />', '<KennzahlenZeile bewertung={bewertung} />', '<PersonalContact />', '{KOPF_FRAGEN}']) expect(s).toContain(t);
+    for (const t of ['<KostenfreiZeile />', '<KennzahlenZeile bewertung={bewertung} />', '<PersonalContact headline="Lieber direkt Kontakt aufnehmen?" body="" />', '{KOPF_FRAGEN}']) expect(s).toContain(t);
   });
 });

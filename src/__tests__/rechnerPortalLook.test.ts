@@ -33,7 +33,8 @@ describe('Rechner wie das Portal (Registry #151)', () => {
   it('letzter Schritt: Titel, Satz und Knopf in Martins Wortlaut', () => {
     expect(portal).toContain('titel: "Ihr persönliches Angebot und Ihre Personalauswahl sind fertig"');
     expect(portal).toContain('text: "Geben Sie Ihre Kontaktdaten ein. Danach sehen Sie sofort Ihr Angebot und Ihre passende Pflegekräfte-Auswahl."');
-    expect(portal).toContain('export const KNOPF_ANGEBOT = "Angebot & Pflegekräfte ansehen";');
+    expect(portal).toContain('export { KNOPF_ANGEBOT };');
+    expect(readFileSync(join(__dirname, '..', '..', 'project 3', 'lib/kraefte-vorschau.ts'), 'utf8')).toContain("export const KNOPF_ANGEBOT = 'Angebot & Pflegekräfte ansehen';");
     expect(portal).toContain('knopf: `${KNOPF_ANGEBOT} →`,');
     expect(formular).toContain('<TitelPortal haken titel=');
   });

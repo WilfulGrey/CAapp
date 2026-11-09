@@ -1241,9 +1241,10 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
             setWarmupAudience('direct');
             setFullscreen(true);
           }}
-          className="w-full rounded-xl bg-[#E76F63] px-4 py-[18px] text-[17px] font-bold text-white shadow-[0_4px_14px_rgba(231,111,99,0.32)] transition-all duration-200 hover:bg-[#D65E52]"
+          // Unter 375 px 16 px: sonst bricht „Angebot & Pflegekräfte ansehen →“ bei 360 px in zwei Zeilen um (Prüfung 09.11.).
+          className="w-full rounded-xl bg-[#E76F63] px-4 py-[18px] text-[16px] min-[375px]:text-[17px] font-bold text-white shadow-[0_4px_14px_rgba(231,111,99,0.32)] transition-all duration-200 hover:bg-[#D65E52]"
         >
-          {KNOPF_ANGEBOT} →
+          {KNOPF_ANGEBOT}{"\u00a0"}→
         </button>
         {/* Zaehler zentriert unter dem Button (Martin 16.08.) — er gehoert
             zum Button, nicht zur linksbuendigen Textspalte darueber. */}

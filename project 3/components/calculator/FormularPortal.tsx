@@ -8,7 +8,7 @@
 // drei Meinungen. Der Rechner kann nicht aus src/ importieren, daher die Werte hier.
 import { useEffect, useState } from "react";
 import { SterneText } from "@/components/calculator/BewertungsZeile";
-import { SCHRANKE } from "@/lib/kraefte-vorschau";
+import { KNOPF_ANGEBOT, SCHRANKE } from "@/lib/kraefte-vorschau";
 import { STIMMEN_LETZTER_SCHRITT } from "@/lib/kundenstimmen";
 import { anzahlText, sternFuellung, type SterneStand } from "@/lib/sterne-zeile";
 
@@ -28,10 +28,8 @@ export const MINI_ABLAUF = "Fragen beantworten, Kontaktdaten eingeben und sofort
  *  jetzt ansehen“ (06.06.) passend zum Mini-Ablauf; OpenAI 08.11. OK. Ersetzt Frage und Lohnzeile, damit der Knopf auf dem
  *  iPhone SE (553 px) trotz zweizeiligem Titel im ersten Bild bleibt. 09.11. ohne „unverbindliches“: steht direkt unter dem
  *  Knopf („100 % kostenfrei & unverbindlich“, OpenAI: doppelt), und der Satz bleibt auf dem iPhone SE dreizeilig. */
-/** EIN Knopftext für Startseite und Rechner (Registry #155, Martin 09.11.: „ist der Button-Text dann immer noch der richtige?
- *  … vereinheitlichen … mit dem Ziel, Patientenprofile zu erhalten … wobei natürlich der Preis auch relevant ist“): „Angebot“
- *  schließt den Preis ein und führt zum Portal; OpenAI 09.11. empfahl dieselbe Fassung vor „Preis & …“. */
-export const KNOPF_ANGEBOT = "Angebot & Pflegekräfte ansehen";
+/** Ein Knopftext für Startseite, Rechner und Pop-up, Quelle lib/kraefte-vorschau.ts (Registry #155). */
+export { KNOPF_ANGEBOT };
 
 export const KONTAKT_FERTIG = {
   titel: "Ihr persönliches Angebot und Ihre Personalauswahl sind fertig",

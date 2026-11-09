@@ -45,7 +45,7 @@ export function PersonalContact({
         />
         <p className="text-[15px] text-[#8B7355] font-medium leading-snug">Marta Kapcio<br />Ihre Beraterin</p>
       </div>
-      <p className="text-[16px] text-[#52525B] leading-relaxed mb-3.5">{body}</p>
+      {body && <p className="text-[16px] text-[#52525B] leading-relaxed mb-3.5">{body}</p>}
       <div className="flex gap-2">
         {/* Reihenfolge wie im Portal und wie im Footer: Anrufen, dann
             WhatsApp. Die Nummer selbst steht unten in der Kontaktbox —

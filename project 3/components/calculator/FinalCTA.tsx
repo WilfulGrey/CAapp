@@ -12,7 +12,7 @@ export function FinalCTA({ bewertung = null }: { bewertung?: SterneStand | null 
   return (
     <section className="px-5 pt-4 pb-14 md:pb-20">
       <div className="mx-auto grid max-w-[560px] gap-4 md:max-w-[640px]">
-        <div className="rounded-[20px] bg-white px-5 py-7 text-center md:px-8">
+        <div className="rounded-[20px] bg-white px-4 py-7 text-center md:px-8">
           <h2 className="text-[26px] md:text-[32px] leading-[1.25] font-bold text-[#3D3D3D] mb-6">{KOPF_FRAGEN}</h2>
           <button
             onClick={() => openCalculator('final_cta')}
@@ -28,7 +28,8 @@ export function FinalCTA({ bewertung = null }: { bewertung?: SterneStand | null 
             <KennzahlenZeile bewertung={bewertung} />
           </div>
         </div>
-        <PersonalContact />
+        {/* Überschrift wie im bisherigen Schluss; ohne Satz, sonst stünde „unverbindlich“ zweimal untereinander. */}
+        <PersonalContact headline="Lieber direkt Kontakt aufnehmen?" body="" />
       </div>
     </section>
   );

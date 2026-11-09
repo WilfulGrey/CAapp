@@ -105,15 +105,18 @@ export function BestpreisKarte({ kompakt = false }: { kompakt?: boolean }) {
   );
 }
 
-/** Garantie und Testsieger als ein Abschnitt (Anker #testsieger, Registry #155): am Handy untereinander, ab lg
+/** Garantie und Testsieger als ein Abschnitt (Anker #testsieger an der Testsieger-Karte, Registry #155): am Handy untereinander, ab lg
  *  nebeneinander. Vorher zwei Quelltext-Stellen (mobiler Block und Desktop-Raster in app/page.tsx). */
 export function BestpriceGuarantee() {
   return (
-    <section id="testsieger" className="scroll-mt-24 px-5 py-12 md:py-16">
+    <section className="px-5 py-12 md:py-16">
       <div className="mx-auto grid max-w-[560px] gap-10 md:max-w-[700px] lg:max-w-[1100px] lg:grid-cols-2 lg:gap-8">
         <div className="lg:hidden"><BestpreisKarte /></div>
-        <div className="hidden lg:block"><BestpreisKarte kompakt /></div>
-        <TestsiegerKarte />
+        {/* grid streckt die Karte auf die Höhe der Testsieger-Karte daneben. */}
+        <div className="hidden lg:grid"><BestpreisKarte kompakt /></div>
+        {/* Anker direkt an der Testsieger-Karte: das WELT-Siegel im Kopf („zur Original-Veröffentlichung“) springt am Handy
+            sonst auf die Garantie-Karte darüber. */}
+        <div id="testsieger" className="scroll-mt-28 lg:grid"><TestsiegerKarte /></div>
       </div>
     </section>
   );
