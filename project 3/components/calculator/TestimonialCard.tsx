@@ -25,14 +25,14 @@ export function TestimonialCard({ bewertung }: { bewertung: SterneStand | null }
 
       {/* Registry #153 (Martin 09.11.: „passe die Bewertungen an. Benutze die von der Bewertungsseite“): echte Stimmen von
           primundus.de/erfahrungen statt der sechs Platzhalter, wörtlich mit Name, Ort und Datum (lib/kundenstimmen.ts).
-          Registry #160: am Handy Laufband wie bisher, ab lg alle sechs Karten als Raster in drei Spalten (vorher am Computer
-          abgeschnitten und ohne Pfeile kaum zu bedienen). */}
-      <div className="overflow-x-auto -mx-5 px-5 pb-2 lg:overflow-visible lg:mx-0 lg:px-0">
-        <div className="flex gap-4 min-w-max lg:grid lg:grid-cols-3 lg:min-w-0">
+          Registry #160: am Handy Laufband wie bisher, ab md alle sechs Karten als Raster (Tablet zwei, Computer drei Spalten;
+          vorher am Computer abgeschnitten und ohne Pfeile kaum zu bedienen, am Tablet sah man in der 560-px-Spalte nur zwei). */}
+      <div className="overflow-x-auto -mx-5 px-5 pb-2 md:overflow-visible md:mx-0 md:px-0">
+        <div className="flex gap-4 min-w-max md:grid md:grid-cols-2 md:min-w-0 lg:grid-cols-3">
           {STIMMEN_STARTSEITE.map((stimme) => (
             <div
               key={stimme.id}
-              className="bg-white rounded-[20px] p-5 w-[280px] flex-shrink-0 lg:w-auto"
+              className="bg-white rounded-[20px] p-5 w-[280px] flex-shrink-0 md:w-auto"
             >
               <div className="flex items-start gap-3 mb-3">
                 <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-[#8B7355] to-[#7D6E5D] flex items-center justify-center text-white font-bold text-sm shadow-sm" aria-hidden="true">

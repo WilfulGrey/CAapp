@@ -167,11 +167,18 @@ describe('Rechner-Startseite: eine linke Kante (Registry #160)', () => {
     expect(lies('components/calculator/FormularPortal.tsx')).toMatch(/export function KostenfreiZeile[\s\S]{0,600}?justify-center/);
   });
 
-  it('Kundenstimmen: Sterne in Gold wie die Zeile darüber, ab lg Raster mit drei Spalten, am Handy Laufband', () => {
+  it('Kundenstimmen: Sterne in Gold wie die Zeile darüber, Raster ab md (Tablet 2, Computer 3 Spalten), am Handy Laufband', () => {
     expect(stimmen).toContain('fill-[#D4A843] text-[#D4A843]');
     expect(stimmen).not.toContain('#FBBC04');
     expect(stimmen).toContain('overflow-x-auto');
-    expect(stimmen).toContain('lg:grid lg:grid-cols-3');
+    expect(stimmen).toContain('md:grid md:grid-cols-2 md:min-w-0 lg:grid-cols-3');
+    expect(stimmen).toContain('md:w-auto');
+  });
+
+  it('Kostenvergleich: große Zahlen und Abstände erst ab lg, am Tablet bleibt „ab ca. 923 €“ einzeilig (Registry #160)', () => {
+    const vergleich = lies('components/calculator/ComparisonSection.tsx');
+    expect(vergleich).not.toContain('md:text-[34px]');
+    expect((vergleich.match(/lg:text-\[34px\]/g) || []).length).toBe(2);
   });
 
   it('Martas Kasten: ohne Rahmen nur im Schluss, der Standard der fünf Verwendungen bleibt', () => {

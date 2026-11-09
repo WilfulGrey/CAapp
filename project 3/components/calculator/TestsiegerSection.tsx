@@ -6,7 +6,7 @@
 export function TestsiegerKarte() {
   return (
         <div className="bg-white rounded-[20px] p-7 md:p-9 relative">
-          <div className="absolute top-[-14px] left-7 md:left-9 bg-[#D4A843] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
+          <div className="absolute top-[-14px] left-7 md:left-9 bg-[#D4A843] text-white px-4 min-[360px]:px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
             ★ Testsieger · 6× in Folge
           </div>
 

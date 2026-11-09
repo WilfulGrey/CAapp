@@ -18,15 +18,15 @@ export function ComparisonSection() {
           Die 24-Stunden-Betreuung zu Hause ist nicht nur persönlicher, sondern auch deutlich günstiger als ein Pflegeheimplatz.
         </p>
 
-        <div className="rounded-[20px] bg-white p-5 md:p-7">
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-8">
+        <div className="rounded-[20px] bg-white p-5 lg:p-7">
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:gap-8">
             <div>
               <dt className="text-[14px] leading-snug text-[#6B6B6B]"><span className="block text-[16px] font-semibold text-[#3D3D3D]">Pflegeheim</span>Durchschnittlicher Eigenanteil pro Monat</dt>
-              <dd className="mt-1.5 text-[26px] md:text-[34px] font-bold tabular-nums text-[#8B8B8B]">3.364 €</dd>
+              <dd className="mt-1.5 text-[26px] lg:text-[34px] font-bold tabular-nums text-[#8B8B8B]">3.364 €</dd>
             </div>
-            <div className="border-t border-[#F0EDE8] pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6 md:pl-8">
+            <div className="border-t border-[#F0EDE8] pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6 lg:pl-8">
               <dt className="text-[14px] leading-snug text-[#6B6B6B]"><span className="block text-[16px] font-semibold text-[#3D3D3D]">24h-Pflege zu Hause</span>Selbst zu tragen bei Pflegegrad 3</dt>
-              <dd className="mt-1.5 text-[26px] md:text-[34px] font-bold tabular-nums text-[#3D7A5C]">ab ca. 923 €</dd>
+              <dd className="mt-1.5 text-[26px] lg:text-[34px] font-bold tabular-nums text-[#3D7A5C]">ab ca. 923 €</dd>
             </div>
           </dl>
           {/* Wie primundus.de (17.09.2026): 2.150 € − 599 € Pflegegeld − 295 € Entlastungsbudget − 333 € Steuer = 923 €.
