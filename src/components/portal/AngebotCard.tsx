@@ -612,8 +612,9 @@ export const AngebotCard: FC<{
   };
 
   const inputCls =
-    'w-full min-h-[48px] rounded-[14px] border-[1.5px] border-pm-chip bg-white px-3.5 py-3 text-[16px] text-pm-ink ' +
-    'placeholder:text-pm-mute focus:outline-none focus:border-pm-taupe focus:ring-2 focus:ring-pm-taupe/15 transition-colors';
+    'w-full min-h-[48px] rounded-[14px] border-[1.5px] border-pm-chip bg-white px-3.5 py-3 text-pm-ink ' +
+    (schlicht ? 'text-[16.5px] placeholder:text-pm-muted ' : 'text-[16px] placeholder:text-pm-mute ') +
+    'focus:outline-none focus:border-pm-taupe focus:ring-2 focus:ring-pm-taupe/15 transition-colors';
   const inputFehlerCls = ' !border-pm-error';
 
   // Desktop: the phone-frame div (#portal-scroll-container) is the scroller.
@@ -778,16 +779,18 @@ export const AngebotCard: FC<{
   // Tippen erklärt, warum; vorher war das ein 14-px-Info-Knopf neben dem Label.
   // Minimal-Einstieg (Martin 09.11.2026: „zu klein und teilweise zu viel“): der feste Wert steht rechts in der Zeile der Frage,
   // ohne Kasten über die ganze Breite und ohne die Zeile „Aus Ihrem Kostenrechner übernommen“; der Tipp erklärt wie bisher.
-  const festHinweis = (key: string) => (priceInfo === key ? 'Diese Angabe bestimmt den Preis. Ändern kann sie Ihre Beraterin, dann schicken wir Ihnen ein neues Angebot.' : undefined);
+  const festHinweis = (key: string) => (priceInfo === key
+    ? 'Diese Angabe bestimmt den Preis. Ändern kann sie Ihre Beraterin, dann schicken wir Ihnen ein neues Angebot.'
+    : 'Aus Ihrem Kostenrechner übernommen');
   const festWert = (key: string, wert: ReactNode) => schlicht ? (
     <button
       type="button"
       onClick={() => setPriceInfo(priceInfo === key ? null : key)}
       aria-expanded={priceInfo === key}
-      className="ml-auto flex min-h-[44px] items-center gap-2 rounded-[12px] bg-pm-paper px-3 py-2 text-right text-[16.5px] font-medium text-pm-ink"
+      className="-my-2 flex min-h-[44px] items-center gap-2 text-left text-[17px] font-semibold text-pm-ink"
     >
       <span>{wert}</span>
-      <Lock className="w-4 h-4 flex-none text-pm-mute" aria-hidden="true" />
+      <Lock className="w-4 h-4 flex-none text-pm-muted" aria-hidden="true" />
     </button>
   ) : (
     <>
@@ -818,7 +821,7 @@ export const AngebotCard: FC<{
           {text.replace(/\D/g, '')}
         </span>
       )}
-      <p className="text-[16.5px] font-semibold text-pm-ink">{text}</p>
+      <p className="text-[18px] font-bold text-pm-ink">{text}</p>
     </div>
   ) : (
     <p className={`${EYEBROW} pt-6 [&+[data-field]]:border-t-0 [&+[data-field]]:pt-3`}>{text}</p>
@@ -967,8 +970,9 @@ export const AngebotCard: FC<{
           <div className={schlicht ? '-mx-4 mb-1 rounded-t-card bg-pm-coral-tint px-4 pt-4 pb-3.5' : ''}>
           {schlicht && kopf && (
             <div className="mb-3">
-              <h2 className="text-[19px] font-semibold leading-6 text-pm-ink">{kopf.titel}</h2>
-              <p className="mt-1 text-[15px] leading-[1.45] text-pm-body">{kopf.zeile}</p>
+              <h2 className="text-[20px] font-bold leading-[26px] text-pm-ink">{kopf.titel}</h2>
+              {/* Satz nur im ersten Schritt (Prüfung 09.11.: in größerer Schrift vier Zeilen auf jedem Schritt). */}
+              {step === 0 && <p className="mt-1 text-[15px] leading-[1.45] text-pm-body">{kopf.zeile}</p>}
             </div>
           )}
           <ProgressSteps
@@ -991,7 +995,7 @@ export const AngebotCard: FC<{
                 Geschlecht“). Die letzte Antwort führt von selbst weiter. ── */}
             {step === 0 && einstiegAktiv && (
               <>
-                <FormField feld="anzahl" label="Anzahl zu betreuender Personen" zeile={schlicht && 'frei'} hinweis={schlicht ? festHinweis('anzahl') : undefined}>
+                <FormField feld="anzahl" label="Anzahl zu betreuender Personen" hinweis={schlicht ? festHinweis('anzahl') : undefined}>
                   {festWert('anzahl', patient.anzahl === '2' ? '2 Personen' : '1 Person')}
                 </FormField>
                 {(zwei ? (['geschlecht', 'p2_geschlecht'] as const) : (['geschlecht'] as const)).map((k, i) => (
@@ -1009,7 +1013,7 @@ export const AngebotCard: FC<{
             {step === 0 && !einstiegAktiv && (
               <>
                 {!(schlicht && einstiegSeite) && (
-                <FormField feld="anzahl" label="Anzahl zu betreuender Personen" zeile={schlicht && 'frei'} hinweis={schlicht ? festHinweis('anzahl') : undefined}>
+                <FormField feld="anzahl" label="Anzahl zu betreuender Personen" hinweis={schlicht ? festHinweis('anzahl') : undefined}>
                   {festWert('anzahl', patient.anzahl === '2' ? '2 Personen' : '1 Person')}
                 </FormField>
                 )}
@@ -1074,7 +1078,7 @@ export const AngebotCard: FC<{
                 <FormField feld="mobilitaet" label="Mobilität" zeile={schlicht && 'frei'} hinweis={schlicht ? festHinweis('mobilitaet') : undefined}>
                   {festWert('mobilitaet', patient.mobilitaet)}
                 </FormField>
-                <FormField feld="heben" label="Heben erforderlich?" zeile={schlicht} pflicht fehler={fehlerFuer('heben')}>
+                <FormField feld="heben" label="Heben erforderlich?" pflicht fehler={fehlerFuer('heben')}>
                   <ChipSelect invalid={!!fehlerFuer('heben')} value={patient.heben} onChange={v => updatePatient(p=>({...p,heben:v}))}
                     options={['Ja','Nein']} />
                 </FormField>
@@ -1103,7 +1107,7 @@ export const AngebotCard: FC<{
                       <ChipSelect invalid={!!fehlerFuer('p2_mobilitaet')} value={patient.p2_mobilitaet} onChange={v => updatePatient(p=>({...p,p2_mobilitaet:v}))}
                         options={['Vollständig mobil','Am Gehstock','Rollatorfähig','Rollstuhlfähig','Bettlägerig']} />
                     </FormField>
-                    <FormField feld="p2_heben" label="Heben erforderlich?" zeile={schlicht} pflicht fehler={fehlerFuer('p2_heben')}>
+                    <FormField feld="p2_heben" label="Heben erforderlich?" pflicht fehler={fehlerFuer('p2_heben')}>
                       <ChipSelect invalid={!!fehlerFuer('p2_heben')} value={patient.p2_heben} onChange={v => updatePatient(p=>({...p,p2_heben:v}))}
                         options={['Ja','Nein']} />
                     </FormField>
@@ -1181,7 +1185,7 @@ export const AngebotCard: FC<{
                   {festWert('haushalt', patient.haushalt || <span className="text-pm-mute">Nicht angegeben</span>)}
                 </FormField>
                 )}
-                <FormField feld="familieNahe" label="Familie in der Nähe (bis 20 km)" zeile={schlicht}>
+                <FormField feld="familieNahe" label="Familie in der Nähe (bis 20 km)">
                   <ChipSelect value={patient.familieNahe} onChange={v => updatePatient(p=>({...p,familieNahe:v}))}
                     options={['Ja','Nein']} />
                 </FormField>
@@ -1204,11 +1208,11 @@ export const AngebotCard: FC<{
                   <ChipSelect value={patient.tiere} onChange={v => updatePatient(p=>({...p,tiere:v}))}
                     options={['Keine','Hund','Katze','Andere']} />
                 </FormField>
-                <FormField feld="badezimmer" label="Eigenes Badezimmer" zeile={schlicht}>
+                <FormField feld="badezimmer" label="Eigenes Badezimmer">
                   <ChipSelect value={patient.badezimmer} onChange={v => updatePatient(p=>({...p,badezimmer:v}))}
                     options={['Ja','Nein']} />
                 </FormField>
-                <FormField feld="internet" label="Internet vorhanden?" zeile={schlicht}>
+                <FormField feld="internet" label="Internet vorhanden?">
                   <ChipSelect value={patient.internet} onChange={v => updatePatient(p=>({...p,internet:v}))}
                     options={['Ja','Nein']} />
                 </FormField>
@@ -1221,7 +1225,8 @@ export const AngebotCard: FC<{
                     würde arglos bestätigt und der Job mit falschem Termin
                     angelegt. */}
                 {schlicht ? (
-                <FormField feld="startDate" label="Voraussichtliches Startdatum" pflicht fehler={fehlerFuer('startDate')}>
+                <FormField feld="startDate" label="Voraussichtliches Startdatum" pflicht fehler={fehlerFuer('startDate')}
+                  hinweis="Noch unklar? Eine grobe Schätzung reicht.">
                   <StartWahl
                     wert={startWahl}
                     invalid={!!fehlerFuer('startDate')}
@@ -1233,7 +1238,7 @@ export const AngebotCard: FC<{
                     datumFeld={
                       <DateField
                         value={patient.startDate}
-                        min={localTodayIso()}
+                        min={startDatumAus('sofort') ?? localTodayIso()}
                         invalid={!!fehlerFuer('startDate')}
                         onChange={iso => updatePatient(p => ({ ...p, startDate: iso }))}
                         onGeoeffnet={() => onMesspunkt?.('kalender_geoeffnet')}
@@ -1294,10 +1299,12 @@ export const AngebotCard: FC<{
                   <ChipSelect invalid={!!fehlerFuer('wunschGeschlecht')} value={patient.wunschGeschlecht} onChange={v => updatePatient(p=>({...p,wunschGeschlecht:v}))}
                     options={['Egal','Weiblich','Männlich']} />
                 </FormField>
+                {!(schlicht && !germanySkillLabel(mmCustomer?.customer_caregiver_wish?.germany_skill)) && (
                 <FormField feld="sprache" label="Sprachniveau" zeile={schlicht && 'frei'} hinweis={schlicht ? festHinweis('sprache') : undefined}>
                   {festWert('sprache', germanySkillLabel(mmCustomer?.customer_caregiver_wish?.germany_skill) || '—')}
                 </FormField>
-                <FormField feld="fuehrerschein" label="Führerschein erforderlich?" zeile={schlicht} pflicht fehler={fehlerFuer('fuehrerschein')}>
+                )}
+                <FormField feld="fuehrerschein" label="Führerschein erforderlich?" pflicht fehler={fehlerFuer('fuehrerschein')}>
                   <ChipSelect invalid={!!fehlerFuer('fuehrerschein')} value={patient.fuehrerschein}
                     onChange={v => updatePatient(p => ({ ...p, fuehrerschein: v, wunschGetriebe: v === 'Nein' ? '' : p.wunschGetriebe }))}
                     options={['Ja', 'Nein']} />
@@ -1377,6 +1384,8 @@ export const AngebotCard: FC<{
             ruhig={eingebettet}
             stand75b8df8={stand75b8df8}
             band={schlicht}
+            // Wortlaut der Unterzeile des festen Knopfs (EinstiegMinimal FEST_ZEILE), dort, wo der Kunde absendet.
+            unterzeile={schlicht && letzterSchritt && !nurAenderung ? '100% kostenfrei & unverbindlich' : undefined}
             // Minimal-Einstieg: „Zurück“ steht klein in der Schrittzeile, unter dem Formular nur der eine Knopf.
             onZurueck={!schlicht && step > 0 ? zurueck : undefined}
             onWeiter={einstiegAktiv ? einstiegWeiter : letzterSchritt ? () => { void speichern(); } : weiter}

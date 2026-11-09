@@ -70,7 +70,7 @@ const FOKUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outli
 // Knopf rechts in der Zeile: in allen Zuständen gleich breit und hoch, damit die Zeile ihre Höhe hält. 104 × 36 px (unter
 // 375 px 96 px): „Eingeladen“ mit Haken in 13 px passt mit Luft hinein (Martin 08.11.: „passender in den Button … macht die
 // Button-Tick größer von vornherein“); vorher 88 × 34 px mit 12 px Schrift.
-const PILLE = 'flex h-10 w-[108px] max-[374px]:w-[104px] flex-none items-center justify-center rounded-[10px] font-semibold whitespace-nowrap';
+const PILLE = 'flex h-11 w-[108px] max-[374px]:w-[104px] flex-none items-center justify-center rounded-[10px] font-semibold whitespace-nowrap';
 // Karte wie im CGA-Panel: weiß auf dem Seitengrund, ohne Rahmen und Schatten.
 const KARTE = 'rounded-card bg-white';
 const STERN = 'M10 1.6l2.47 5.2 5.7.72-4.2 3.93 1.08 5.64L10 14.3l-5.05 2.79 1.08-5.64-4.2-3.93 5.7-.72z';
@@ -148,7 +148,7 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
           darunter klein der Pflegeheim-Vergleich. */}
       {eigen && (
         <>
-          <p className="mt-1.5 text-[16.5px] font-semibold leading-snug text-pm-green" data-nach-zuschuessen>
+          <p className="mt-1 text-[16.5px] font-semibold leading-snug text-pm-green" data-nach-zuschuessen>
             Nach Zuschüssen <span className="whitespace-nowrap">ca. {formatEuro(eigen.eigen)} im Monat</span>
           </p>
           {weniger > 0 && (
@@ -168,7 +168,7 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
         </div>
       )}
       {/* Vier gleichwertige Punkte untereinander, gleiche Schrift; „Bestpreisgarantie“ ist antippbar (kleines Info-Symbol). */}
-      <ul className="mt-3.5 grid gap-1.5 rounded-[14px] bg-pm-mint px-4 py-3" data-garantie>
+      <ul className="mt-3 grid gap-1 rounded-[14px] bg-pm-mint px-4 py-2.5" data-garantie>
         <li className="flex items-center gap-2 text-[16px] leading-[22px] text-pm-green-deep">
           <Check className="h-4 w-4 flex-none" strokeWidth={3} aria-hidden="true" />
           <button type="button" onClick={onBestpreis} className={`${FOKUS} inline-flex items-center gap-1.5 rounded text-left`}>
@@ -187,7 +187,7 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
           aber der Abstand muss besser passen“); vorher drei gleich breite Spalten, darin 16 px und 50 px Lücke. Rechts 24 px
           frei: Martas Reiter steht in Ruhe 42 px in den Bildschirm hinein und lag auf iPhone 13 und Android 360 genau auf
           „6× in Folge“ (gemessen 14 und 18 px verdeckt). Unter 360 px (iPhone SE) liegt er tiefer, dort kein Abstand. */}
-      <dl className="mt-3.5 flex justify-between gap-3 border-t border-pm-line-soft pt-3 min-[360px]:pr-6" data-vertrauen>
+      <dl className="mt-3 flex justify-between gap-3 border-t border-pm-line-soft pt-2.5 min-[360px]:pr-6" data-vertrauen>
         {sterne && (
           <div className="min-w-0">
             <dt className="sr-only">Bewertungen</dt>
@@ -263,16 +263,16 @@ export function PflegekraftZeile({ nurse, preis, vorgemerkt, gesperrt, onNurseCl
       Bitte warten…
     </button>
   ) : vorgemerkt ? (
-    <button type="button" onClick={einladen} aria-label={`${EINGELADEN} ✓`} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} gap-1 bg-pm-green text-[14.5px] text-white`}>
+    <button type="button" onClick={einladen} aria-label={`${EINGELADEN} ✓`} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} gap-1 bg-pm-green text-[15px] text-white`}>
       <Check aria-hidden="true" className="h-4 w-4 flex-none" strokeWidth={3} />{EINGELADEN}
     </button>
   ) : (
-    <button type="button" onClick={einladen} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} border-[1.5px] border-pm-green bg-white text-[15.5px] text-pm-green-deep hover:bg-pm-mint`}>
+    <button type="button" onClick={einladen} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} border-2 border-pm-green bg-white text-[15.5px] text-pm-green-deep hover:bg-pm-mint`}>
       Einladen
     </button>
   );
   return (
-    <li className={`flex items-center gap-2.5 border-t border-pm-line-soft px-3.5 max-[374px]:px-3 py-3.5 ${vorgemerkt ? 'bg-pm-mint/70' : ''}`} data-pflegekraft-zeile={nurse.caregiverId} data-vorgemerkt={vorgemerkt || undefined}>
+    <li className={`flex items-center gap-2.5 border-t border-pm-line-soft px-3.5 max-[374px]:px-3 py-3 ${vorgemerkt ? "relative bg-pm-mint/70 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-pm-green before:content-['']" : ''}`} data-pflegekraft-zeile={nurse.caregiverId} data-vorgemerkt={vorgemerkt || undefined}>
       <button type="button" onClick={onNurseClick} className={`${FOKUS} group flex min-w-0 flex-1 items-center gap-2.5 rounded-[12px] text-left`}>
         {nurse.image ? (
           <img src={nurse.image} alt="" className={`${foto} bg-pm-grund object-cover`} />
@@ -589,7 +589,7 @@ export function EinstiegMinimal({
           am Bildschirm stehen (sticky, ohne Skript: auch im Handyrahmen am Computer). */}
       {/* Seitenrand 12 px, unter 375 px 8 px (Android 360: mehr Platz für die Zeilen). */}
       <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2">
-        <h1 className="px-1 pt-4 pb-3 text-[22px] font-semibold leading-[1.2] tracking-[-0.015em] text-pm-ink">
+        <h1 className="px-1 pt-3 pb-2.5 text-[22px] font-semibold leading-[1.2] tracking-[-0.015em] text-pm-ink">
           Guten Tag{anrede ? `, ${anrede}` : ''}
         </h1>
         <AngebotKarteMinimal

@@ -25,9 +25,9 @@ export function ProgressSteps({
             <button
               type="button"
               onClick={onZurueck}
-              className="-my-3 inline-flex min-h-[44px] flex-none items-center text-[14.5px] font-medium text-pm-muted underline decoration-pm-line underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-pm-taupe"
+              className="-my-3 inline-flex min-h-[44px] flex-none items-center gap-0.5 text-[16px] font-semibold text-pm-taupe-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-pm-taupe"
             >
-              Zurück
+              <span aria-hidden="true" className="text-[19px] leading-none">‹</span>Zurück
             </button>
           )}
         </div>

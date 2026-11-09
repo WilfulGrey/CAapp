@@ -9,7 +9,7 @@ export type StartWahlSchluessel = 'sofort' | 'eins_zwei' | 'zwei_vier' | 'datum'
 /** Tage ab heute: Beginn des Zeitraums (wird gespeichert) und Ende (nur Anzeige). */
 export const START_WAHL: readonly { key: StartWahlSchluessel; titel: string; von?: number; bis?: number; text?: string }[] = [
   { key: 'sofort', titel: 'Schnellstmöglich', von: 3, text: 'Anreise schon ab 3 Tagen möglich' },
-  { key: 'eins_zwei', titel: 'In 1–2 Wochen', von: 7, bis: 14 },
+  { key: 'eins_zwei', titel: 'In 1–2 Wochen', von: 7, bis: 13 },
   { key: 'zwei_vier', titel: 'In 2–4 Wochen', von: 14, bis: 28 },
   { key: 'datum', titel: 'Ab einem Datum' },
 ];
@@ -33,12 +33,12 @@ export function StartWahl({ wert, onWahl, datumFeld, invalid = false }: {
 }) {
   const heute = new Date();
   return (
-    <div className={`overflow-hidden rounded-[16px] border-[1.5px] ${invalid ? 'border-pm-error' : 'border-pm-chip'} bg-white`} role="radiogroup" data-start-wahl>
+    <div className={`overflow-hidden rounded-[16px] border-2 ${invalid ? 'border-pm-error' : 'border-pm-chip'} bg-white`} role="radiogroup" data-start-wahl>
       {START_WAHL.map((w, i) => {
         const an = wert === w.key;
         const zeit = w.text ?? (w.von != null && w.bis != null ? `${tagMonat(plusTage(heute, w.von))} bis ${tagMonat(plusTage(heute, w.bis))}` : null);
         return (
-          <div key={w.key} className={`${i > 0 ? 'border-t border-pm-line-soft' : ''} ${an ? 'bg-pm-taupe/[0.07]' : ''}`}>
+          <div key={w.key} className={`${i > 0 ? 'border-t border-pm-line-soft' : ''} ${an ? 'bg-pm-taupe/[0.18]' : ''}`}>
             <button
               type="button"
               role="radio"
@@ -46,8 +46,8 @@ export function StartWahl({ wert, onWahl, datumFeld, invalid = false }: {
               onClick={() => onWahl(w.key)}
               className="flex w-full min-h-[60px] items-center gap-3.5 px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pm-taupe"
             >
-              <span aria-hidden="true" className={`flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full border-2 ${an ? 'border-pm-taupe' : 'border-pm-chip'}`}>
-                {an && <span className="h-[11px] w-[11px] rounded-full bg-pm-taupe" />}
+              <span aria-hidden="true" className={`flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full border-2 bg-white ${an ? 'border-pm-taupe-ink' : 'border-pm-taupe'}`}>
+                {an && <span className="h-[11px] w-[11px] rounded-full bg-pm-taupe-ink" />}
               </span>
               <span className="min-w-0">
                 <span className={`block text-[16.5px] leading-snug text-pm-ink ${an ? 'font-bold' : 'font-semibold'}`}>{w.titel}</span>

@@ -44,7 +44,7 @@ export function chipSpaltenLesbar(beschriftungen: string[]): 1 | 2 | 3 {
   const n = beschriftungen.length;
   const laengste = Math.max(0, ...beschriftungen.map(b => b.length));
   if (n <= 2) return n === 2 && laengste <= 20 ? 2 : 1;
-  if (n === 3) return laengste <= 10 ? 3 : laengste <= 28 ? 2 : 1;
+  if (n === 3) return laengste <= 10 ? 3 : laengste <= 12 ? 2 : 1;
   if (n === 4) return laengste <= 28 ? 2 : 1;
   if (laengste <= 8) return 3;
   return laengste <= 18 ? 2 : 1;
@@ -90,17 +90,17 @@ export const ChipSelect: FC<{
             }}
             style={letzter && rest ? { gridColumn: `span ${spalten - rest + 1}` } : undefined}
             className={
-              (lesbar ? 'relative min-h-[52px] rounded-[14px] border-[1.5px] px-2 py-1.5 text-[16.5px] leading-tight text-center ' : 'relative min-h-[48px] rounded-[14px] border-[1.5px] px-2 py-1.5 text-[15.5px] leading-tight text-center ') +
+              (lesbar ? 'relative min-h-[52px] rounded-[14px] border-2 px-2 py-2 text-[16.5px] leading-[1.25] text-center ' : 'relative min-h-[48px] rounded-[14px] border-[1.5px] px-2 py-1.5 text-[15.5px] leading-tight text-center ') +
               'flex items-center justify-center transition-colors ' +
               'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-taupe ' +
               (selected
-                ? 'border-pm-taupe bg-pm-taupe/10 ring-2 ring-pm-taupe/25 text-pm-ink font-bold'
+                ? (lesbar ? 'border-pm-taupe-ink bg-pm-taupe/[0.18] text-pm-ink font-bold' : 'border-pm-taupe bg-pm-taupe/10 ring-2 ring-pm-taupe/25 text-pm-ink font-bold')
                 : `bg-white text-pm-body hover:border-pm-taupe-light ${invalid ? 'border-pm-error' : 'border-pm-chip'}`)
             }
           >
             {anzeige(o)}
             {selected && (
-              <span aria-hidden="true" className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-pm-taupe text-white ring-2 ring-white">
+              <span aria-hidden="true" className={`absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full ${lesbar ? 'bg-pm-taupe-ink' : 'bg-pm-taupe'} text-white ring-2 ring-white`}>
                 <Check className="h-3 w-3" strokeWidth={3.5} />
               </span>
             )}
