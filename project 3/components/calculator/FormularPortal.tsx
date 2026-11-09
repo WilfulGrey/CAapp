@@ -220,16 +220,17 @@ export const antwortPortal = (gewaehlt: boolean) =>
 
 /** Unten wie bei pflege-helfer24 nur Siegel und Sterne (Martin 08.11.: „Das ist wirklich clean. Und bei uns dann unten
  *  Siegel und Sterne“). Zwei getrennte Spalten mit Trennlinie, nie Sterne im Block des Testsiegers (Martin zu Fassung 20 und
- *  08.11.: „nicht die Sterne einfach bei den Testsieger reinpacken“). Ohne Bewertungsstand nur das Siegel. */
-export function SiegelSternePortal({ bewertung }: { bewertung: SterneStand | null }) {
+ *  08.11.: „nicht die Sterne einfach bei den Testsieger reinpacken“). Ohne Bewertungsstand nur das Siegel. Alle Texte in einer
+ *  Größe, 14 px wie „100 % kostenfrei“ darüber (Martin 09.11.: „der Text sollte quasi immer gleich groß sein“). */
+export function SiegelSternePortal({ bewertung, eingebettet = false }: { bewertung: SterneStand | null; eingebettet?: boolean }) {
   return (
-    <div className="mt-4 flex items-center justify-center gap-4 pb-2">
+    <div className={`flex items-center justify-center gap-4 ${eingebettet ? "" : "mt-4 pb-2"}`}>
       <div className="flex items-center gap-2.5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" className="h-12 w-auto rounded-[4px] object-contain" />
         <p className="leading-[1.25]">
           <b className="block text-[14px]" style={{ color: PM.ink }}>6× Testsieger</b>
-          <span className="text-[12.5px] font-bold" style={{ color: PM.taupe }}>DIE WELT</span>
+          <span className="text-[14px] font-bold" style={{ color: PM.taupe }}>DIE WELT</span>
         </p>
       </div>
       {bewertung && (
@@ -237,16 +238,22 @@ export function SiegelSternePortal({ bewertung }: { bewertung: SterneStand | nul
           <p className="whitespace-nowrap text-[14px] font-bold" style={{ color: PM.ink }}>
             {bewertung.schnitt} <span className="text-[12px] tracking-[1px]" style={{ color: "#D4A843" }} aria-hidden="true">★★★★★</span>
           </p>
-          <p className="text-[12.5px]" style={{ color: PM.muted }}>{bewertung.anzahl} Bewertungen</p>
+          <p className="text-[14px]" style={{ color: PM.muted }}>{bewertung.anzahl} Bewertungen</p>
         </div>
       )}
     </div>
   );
 }
 
-/** Unter dem Formular: Siegel und Sterne (Marta-Platz folgt aus der Recherche „Marta als zentrale Person“). */
+/** Unter dem Formular (Registry #157): zuerst „100 % kostenfrei“ in Grau, darunter Siegel und Sterne. Martin 09.11.: unter
+ *  dem Siegel in Grün „zu bunt, zu unruhig“, über der Karte „nicht schön“ → „als erstes unter das Formular“. */
 export function UnterDemFormularPortal({ bewertung }: { bewertung: SterneStand | null }) {
-  return <SiegelSternePortal bewertung={bewertung} />;
+  return (
+    <div className="mt-4 flex flex-col items-center gap-3.5 pb-2">
+      <KostenfreiZeile leise />
+      <SiegelSternePortal bewertung={bewertung} eingebettet />
+    </div>
+  );
 }
 
 // ── Letzter Schritt: Vertrauen unter dem Knopf (Mockup 09.11.) ─────────────────────────────────────────────────────────────
@@ -257,10 +264,12 @@ export function UnterDemFormularPortal({ bewertung }: { bewertung: SterneStand |
 // (AblaufMinimal), Meinungen wörtlich von primundus.de/erfahrungen; der Rechner kann nicht aus src/ importieren.
 
 /** „100 % kostenfrei & unverbindlich“ direkt unter dem Knopf (Martin 09.11.), Wortlaut des Rechners (SCHRANKE.fussnote). */
-export function KostenfreiZeile() {
+export function KostenfreiZeile({ leise = false }: { leise?: boolean } = {}) {
+  // `leise`: grau wie der Text daneben, nur der Haken grün (bei den Fragen; Martin 09.11.: „zu bunt, zu unruhig“).
   return (
-    <p className="flex items-center justify-center gap-1.5 text-[14px] font-semibold" style={{ color: PM.greenDeep }}>
-      <svg className="h-4 w-4 flex-none" viewBox="0 0 24 24" fill="none" stroke={PM.green} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+    <p className={`flex items-center justify-center gap-1.5 ${leise ? "text-[14px] font-medium" : "text-[14px] font-semibold"}`}
+      style={{ color: leise ? PM.muted : PM.greenDeep }}>
+      <svg className={`${leise ? "h-3.5 w-3.5" : "h-4 w-4"} flex-none`} viewBox="0 0 24 24" fill="none" stroke={PM.green} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
       {SCHRANKE.fussnote}
     </p>
   );

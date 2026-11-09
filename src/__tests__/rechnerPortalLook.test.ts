@@ -87,6 +87,20 @@ describe('Rechner wie das Portal (Registry #151)', () => {
     expect(formular).toContain("portalLook && currentStep < totalSteps ? 'pb-12'");
   });
 
+  it('unter den Fragen erst „100 % kostenfrei“ in Grau, dann Siegel und Sterne, alle Texte 14 px (Registry #157)', () => {
+    // Martin 09.11.: „als erstes unter das Formular“, „der Text sollte quasi immer gleich groß sein“.
+    const unten = funktion('UnterDemFormularPortal');
+    expect(unten.indexOf('<KostenfreiZeile leise />')).toBeGreaterThan(-1);
+    expect(unten.indexOf('<SiegelSternePortal bewertung={bewertung} eingebettet />')).toBeGreaterThan(unten.indexOf('<KostenfreiZeile leise />'));
+    expect(funktion('KostenfreiZeile')).toContain('color: leise ? PM.muted : PM.greenDeep');
+    const siegel = funktion('SiegelSternePortal');
+    expect(siegel).not.toMatch(/text-\[(12\.5|13|13\.5)px\]/);
+    expect(siegel.match(/text-\[14px\]/g)).toHaveLength(4);
+    expect(funktion('KostenfreiZeile')).not.toMatch(/text-\[(12\.5|13|13\.5)px\]/);
+    // Kein Vorschau-Schalter mehr, die Entscheidung ist gefallen.
+    expect(portal).not.toContain('get("frei")');
+  });
+
   it('der Haken am Titel bewegt sich nicht, wenn das Gerät reduzierte Bewegung wünscht', () => {
     expect(funktion('ErfolgsHaken')).toContain('@media (prefers-reduced-motion:reduce)');
   });
