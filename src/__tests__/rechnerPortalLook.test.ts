@@ -68,6 +68,16 @@ describe('Rechner wie das Portal (Registry #151)', () => {
     // Inhalt und Herkunft der Stimmen prüft kundenstimmen.test.ts.
   });
 
+  it('Startseite: der Ablauf ist derselbe wie im letzten Schritt (eine Quelle), Anker #ablauf bleibt (Registry #154)', () => {
+    const start = readFileSync(join(rechner, 'HowItWorks.tsx'), 'utf8');
+    expect(start).toContain('<AblaufSchritte quer />');
+    expect(start).toContain('{MINI_ABLAUF}');
+    expect(start).toContain('id="ablauf"');
+    expect(start).not.toMatch(/>[^<]*selben Werktag/);
+    expect(start).not.toMatch(/>[^<]*Profil vervollständigen/);
+    expect(funktion('AblaufNachAbsenden')).toContain('<AblaufSchritte />');
+  });
+
   it('der Haken am Titel bewegt sich nicht, wenn das Gerät reduzierte Bewegung wünscht', () => {
     expect(funktion('ErfolgsHaken')).toContain('@media (prefers-reduced-motion:reduce)');
   });

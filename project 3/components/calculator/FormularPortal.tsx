@@ -335,29 +335,39 @@ export const ABLAUF_NACH_ABSENDEN: readonly { titel: string; text?: string }[] =
 
 /** „So geht es weiter“ wie im Portal (AblaufMinimal): weiße Karte, Punkte auf einer senkrechten Linie, der nächste Schritt
  *  in Koralle-hell. Nicht antippbar. */
+/** Die drei Schritte als Liste: Punkte auf einer senkrechten Linie, Schritt 1 (der nächste) in Koralle-hell. `quer`: ab md
+ *  nebeneinander ohne Linie (Rechner-Startseite am Computer, Registry #154). Eine Quelle für den letzten Schritt und die
+ *  Startseite, damit beide nie auseinanderlaufen. */
+export function AblaufSchritte({ quer = false }: { quer?: boolean }) {
+  return (
+    <ol className={quer ? "md:grid md:grid-cols-3 md:gap-4" : undefined}>
+      {ABLAUF_NACH_ABSENDEN.map((schritt, i) => {
+        const naechster = i === 0;
+        const letzter = i === ABLAUF_NACH_ABSENDEN.length - 1;
+        return (
+          <li key={schritt.titel} className={`relative flex gap-3 pb-3 ${quer ? "md:flex-col md:gap-2.5 md:pb-0" : ""}`}>
+            {!letzter && <span className={`absolute left-[13px] top-8 bottom-0 w-px ${quer ? "md:hidden" : ""}`} style={{ backgroundColor: PM.line }} aria-hidden="true" />}
+            <span className="relative z-[1] mt-1 flex h-[27px] w-[27px] flex-none items-center justify-center rounded-full text-[13px] font-bold"
+              style={naechster ? { backgroundColor: PM.coral, color: "#fff" } : { border: `1px solid ${PM.line}`, backgroundColor: "#fff", color: PM.muted }}>
+              {i + 1}
+            </span>
+            {/* Koralle-hell als Klasse (#FDF0EE = PM.coralTint), damit es nebeneinander am Computer entfallen kann. */}
+            <div className={`min-w-0 flex-1 rounded-[12px] px-3 py-2 ${naechster ? "bg-[#FDF0EE]" : ""} ${quer ? "md:bg-transparent md:px-0 md:py-0" : ""}`}>
+              <p className={`text-[15px] font-semibold leading-5 ${quer ? "md:text-[17px] md:leading-6" : ""}`} style={{ color: PM.ink }}>{schritt.titel}</p>
+              {schritt.text && <p className={`mt-0.5 text-[13.5px] leading-[1.45] ${quer ? "md:text-[15px]" : ""}`} style={{ color: PM.muted }}>{schritt.text}</p>}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 function AblaufNachAbsenden() {
   return (
     <section className={`${KARTE} px-4 pt-3.5 pb-2`} aria-labelledby="ablauf-schluss-titel">
       <h2 id="ablauf-schluss-titel" className="text-[16px] font-semibold leading-6" style={{ color: PM.ink }}>So geht es weiter</h2>
-      <ol className="mt-2">
-        {ABLAUF_NACH_ABSENDEN.map((schritt, i) => {
-          const naechster = i === 0;
-          const letzter = i === ABLAUF_NACH_ABSENDEN.length - 1;
-          return (
-            <li key={schritt.titel} className="relative flex gap-3 pb-3">
-              {!letzter && <span className="absolute left-[13px] top-8 bottom-0 w-px" style={{ backgroundColor: PM.line }} aria-hidden="true" />}
-              <span className="relative z-[1] mt-1 flex h-[27px] w-[27px] flex-none items-center justify-center rounded-full text-[13px] font-bold"
-                style={naechster ? { backgroundColor: PM.coral, color: "#fff" } : { border: `1px solid ${PM.line}`, backgroundColor: "#fff", color: PM.muted }}>
-                {i + 1}
-              </span>
-              <div className="min-w-0 flex-1 rounded-[12px] px-3 py-2" style={naechster ? { backgroundColor: PM.coralTint } : undefined}>
-                <p className="text-[15px] font-semibold leading-5" style={{ color: PM.ink }}>{schritt.titel}</p>
-                {schritt.text && <p className="mt-0.5 text-[13.5px] leading-[1.45]" style={{ color: PM.muted }}>{schritt.text}</p>}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+      <div className="mt-2"><AblaufSchritte /></div>
     </section>
   );
 }
