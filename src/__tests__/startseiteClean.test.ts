@@ -66,7 +66,7 @@ describe('Rechner-Startseite (Registry #155)', () => {
   });
 });
 
-describe('Rechner-Startseite: eine linke Kante (Registry #160, ENTWURF)', () => {
+describe('Rechner-Startseite: eine linke Kante (Registry #160)', () => {
   // Martin 09.11.2026: „achte hier darauf, dass Überschriften linksbündig sind etc.“
   const ablauf = lies('components/calculator/HowItWorks.tsx');
   const vergleich = lies('components/calculator/ComparisonSection.tsx');
