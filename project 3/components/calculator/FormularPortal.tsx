@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { SterneText } from "@/components/calculator/BewertungsZeile";
 import { KNOPF_ANGEBOT, SCHRANKE } from "@/lib/kraefte-vorschau";
-import { STIMMEN_LETZTER_SCHRITT } from "@/lib/kundenstimmen";
+import { HERKUNFT_STIMMEN, STIMMEN_LETZTER_SCHRITT } from "@/lib/kundenstimmen";
 import { anzahlText, sternFuellung, type SterneStand } from "@/lib/sterne-zeile";
 
 /** Titel über den Fragen wie die Überschrift der Startseite (Registry #146 / PR #824, live H1 seit 02.11.): „Passende
@@ -339,12 +339,13 @@ function Meinungen({ bewertung }: { bewertung: SterneStand | null }) {
           </li>
         ))}
       </ul>
-      {/* Herkunft ohne Link (Martin 09.11.: „keinen Link … damit er da nicht wegspringt“). */}
-      {bewertung && (
-        <p className="mt-3 border-t pt-2.5 text-[12.5px]" style={{ color: PM.muted, borderColor: PM.lineSoft }}>
-          Auswahl aus {anzahlText(bewertung.anzahl)} auf primundus.de
-        </p>
-      )}
+      {/* Herkunft ohne Link (Martin 09.11.: „keinen Link … damit er da nicht wegspringt“). Woher die gezeigten Stimmen stammen,
+          steht immer da, auch ohne Bewertungsstand (§ 5b Abs. 3 UWG; Wortlaut von primundus.de/erfahrungen, Martin 09.11.:
+          „bei Bewertungen schreiben wir den vorgeschlagenen“, Registry #159). Erst die Herkunft, dann die Auswahl: „Diese“ meint
+          die gezeigten Stimmen, nicht alle 126 (darunter Google). */}
+      <p className="mt-3 border-t pt-2.5 text-[12.5px]" style={{ color: PM.muted, borderColor: PM.lineSoft }}>
+        {HERKUNFT_STIMMEN}{bewertung && <> Auswahl aus {anzahlText(bewertung.anzahl)} auf primundus.de.</>}
+      </p>
     </section>
   );
 }
