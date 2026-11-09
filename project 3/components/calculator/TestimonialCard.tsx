@@ -2,46 +2,13 @@
 
 import { Star } from "lucide-react";
 import { SterneText } from "@/components/calculator/BewertungsZeile";
-import type { SterneStand } from "@/lib/sterne-zeile";
+import { STIMMEN_PRUEF_LINK, STIMMEN_STARTSEITE } from "@/lib/kundenstimmen";
+import { anzahlText, type SterneStand } from "@/lib/sterne-zeile";
 
-const testimonials = [
-  {
-    initials: "HM",
-    name: "Helga M., Berlin",
-    text: "Dank der schnellen Kalkulation hatten wir endlich eine klare Übersicht über die Kosten meiner Mutter.",
-    rating: 5,
-  },
-  {
-    initials: "SK",
-    name: "Stefan K., München",
-    text: "Sehr professionell und zuverlässig. Die Vermittlung verlief reibungslos und wir sind sehr zufrieden.",
-    rating: 5,
-  },
-  {
-    initials: "MP",
-    name: "Maria P., Hamburg",
-    text: "Kompetente Beratung und faire Preise. Unser Vater fühlt sich bei der Pflegekraft sehr wohl.",
-    rating: 5,
-  },
-  {
-    initials: "TW",
-    name: "Thomas W., Frankfurt",
-    text: "Die Online-Berechnung hat uns sehr geholfen. Alles wurde transparent erklärt und schnell umgesetzt.",
-    rating: 5,
-  },
-  {
-    initials: "JB",
-    name: "Julia B., Köln",
-    text: "Hervorragender Service! Die Betreuungskraft ist liebevoll und kümmert sich aufmerksam um meine Mutter.",
-    rating: 5,
-  },
-  {
-    initials: "RL",
-    name: "Robert L., Stuttgart",
-    text: "Faire Konditionen und flexible Vertragsgestaltung. Wir sind rundum zufrieden mit der Betreuung.",
-    rating: 5,
-  },
-];
+/** „TR“ aus „Thomas R.“: Anfangsbuchstaben von Vor- und Nachname. */
+function initialen(name: string): string {
+  return name.split(/\s+/).map((teil) => teil.charAt(0)).join("").slice(0, 2).toUpperCase();
+}
 
 export function TestimonialCard({ bewertung }: { bewertung: SterneStand | null }) {
   return (
@@ -49,42 +16,50 @@ export function TestimonialCard({ bewertung }: { bewertung: SterneStand | null }
       {/* Kopfzeile seit 17.09.2026 dieselbe wie im Hero (Martin: „ja alles
           online"). Vorher stand hier fest „Google Bewertungen 4.8 von 5" —
           oben stand dann 4,9, und von den 126 Bewertungen kommen nur 6 von
-          Google. Ohne Stand keine Kopfzeile. Die Stimmen darunter bleiben. */}
+          Google. Ohne Stand keine Kopfzeile. */}
       {bewertung && (
         <div className="mb-4">
           <SterneText stand={bewertung} />
         </div>
       )}
 
+      {/* Registry #153 (Martin 09.11.: „passe die Bewertungen an. Benutze die von der Bewertungsseite“): echte Stimmen von
+          primundus.de/erfahrungen statt der sechs Platzhalter, wörtlich mit Name, Ort und Datum (lib/kundenstimmen.ts). */}
       <div className="overflow-x-auto -mx-5 px-5 pb-2">
         <div className="flex gap-4 min-w-max">
-          {testimonials.map((testimonial, index) => (
+          {STIMMEN_STARTSEITE.map((stimme) => (
             <div
-              key={index}
+              key={stimme.id}
               className="bg-white rounded-2xl p-5 shadow-sm border border-[#E5E3DF] hover:shadow-md transition-all duration-300 w-[280px] flex-shrink-0"
             >
               <div className="flex items-start gap-3 mb-3">
-                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-[#8B7355] to-[#7D6E5D] flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                  {testimonial.initials}
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-[#8B7355] to-[#7D6E5D] flex items-center justify-center text-white font-bold text-sm shadow-sm" aria-hidden="true">
+                  {initialen(stimme.name)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-0.5 mb-1">
-                    {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star key={i} className="w-3.5 h-3.5 fill-[#FBBC04] text-[#FBBC04]" />
+                  <div className="flex items-center gap-0.5 mb-1" role="img" aria-label={`${stimme.sterne} von 5 Sternen`}>
+                    {[...Array(stimme.sterne)].map((_, i) => (
+                      <Star key={i} className="w-3.5 h-3.5 fill-[#FBBC04] text-[#FBBC04]" aria-hidden="true" />
                     ))}
                   </div>
                   <p className="text-[14px] text-[#8B8B8B] font-medium truncate">
-                    {testimonial.name}
+                    {stimme.name}, {stimme.ort}
                   </p>
+                  <p className="text-[12.5px] text-[#8B8B8B]">{stimme.datum}</p>
                 </div>
               </div>
               <p className="text-[16px] text-[#3D3D3D] leading-relaxed">
-                „{testimonial.text}"
+                „{stimme.text}“
               </p>
             </div>
           ))}
         </div>
       </div>
+      {/* Herkunft und Prüfhinweis (§ 5b Abs. 3 UWG), Wortlaut wie im letzten Schritt des Rechners (Registry #151). */}
+      <p className="mt-2 text-[13px] text-[#8B8B8B]">
+        {bewertung && <>Auswahl aus {anzahlText(bewertung.anzahl)} auf primundus.de · </>}
+        <a href={STIMMEN_PRUEF_LINK} target="_blank" rel="noopener noreferrer" className="text-[#8B7355] underline underline-offset-2 hover:text-[#A68968]">So prüfen wir Bewertungen</a>
+      </p>
     </div>
   );
 }

@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { SterneText } from "@/components/calculator/BewertungsZeile";
 import { SCHRANKE } from "@/lib/kraefte-vorschau";
+import { STIMMEN_LETZTER_SCHRITT, STIMMEN_PRUEF_LINK } from "@/lib/kundenstimmen";
 import { anzahlText, sternFuellung, type SterneStand } from "@/lib/sterne-zeile";
 
 /** Titel über den Fragen wie die Überschrift der Startseite (Registry #146 / PR #824, live H1 seit 02.11.): „Passende
@@ -293,19 +294,10 @@ function KennzahlenZeile({ bewertung }: { bewertung: SterneStand | null }) {
   );
 }
 
-/** Drei Meinungen wörtlich von primundus.de/erfahrungen (Auswahl 09.11.2026, Recherche: je eine Sorge kurz vor den
- *  Kontaktdaten — was passiert danach, wer kommt, mit wem entscheide ich; keine mit „Vermittlung“, Rückruf oder Problemen).
- *  Quelle primundus-main/lib/bewertungen-direkt.ts (k-20250323-florian, k-20260221-anke, k-20260627-claudia), nie umformulieren.
- *  Vor einem Livegang aus derselben Quelle laden statt abzutippen, damit eine zurückgezogene Bewertung auch hier verschwindet. */
-export const MEINUNGEN: readonly { text: string; name: string; ort: string; datum: string; sterne: number }[] = [
-  { sterne: 5, name: "Florian D.", ort: "Braunschweig", datum: "23. März 2025", text: "Anfrage gestellt, Betreuungskräfte angesehen, entschieden. Ich hatte es mir wesentlich komplizierter vorgestellt." },
-  { sterne: 5, name: "Anke H.", ort: "Regensburg", datum: "21. Februar 2026", text: "Bei so einem persönlichen Thema möchte ich wissen, wer zu meiner Mutter kommt. Die Möglichkeit, die Betreuungskräfte vorher anzusehen, finde ich deshalb richtig." },
-  // Statt Elke B. („Sehr netter Kontakt …“): neben dem Telefonfeld lenkt Kontakt und Erreichbarkeit ab (OpenAI 09.11.).
-  { sterne: 5, name: "Claudia N.", ort: "Essen", datum: "27. Juni 2026", text: "Wir wohnen als Geschwister in verschiedenen Städten. Dadurch war es praktisch, dass wir uns die Profile alle ansehen und anschließend gemeinsam entscheiden konnten." },
-];
-/** Prüfhinweis zu den gezeigten Bewertungen (§ 5b Abs. 3 UWG): Wortlaut und Ziel wie auf primundus.de/erfahrungen. Neuer Tab,
- *  damit niemand seine Antworten verliert. */
-const PRUEF_LINK = "https://primundus.de/erfahrungen#pruefung";
+/** Drei Meinungen wörtlich von primundus.de/erfahrungen (Auswahl 09.11.2026: je eine Sorge kurz vor den Kontaktdaten,
+ *  was passiert danach, wer kommt, mit wem entscheide ich; keine mit „Vermittlung“, Rückruf oder Problemen). Die Liste
+ *  liegt seit Registry #153 mit den Stimmen der Startseite in lib/kundenstimmen.ts (eine Quelle für den Rechner). */
+export const MEINUNGEN = STIMMEN_LETZTER_SCHRITT;
 
 function Meinungen({ bewertung }: { bewertung: SterneStand | null }) {
   if (MEINUNGEN.length === 0) return null;
@@ -316,7 +308,7 @@ function Meinungen({ bewertung }: { bewertung: SterneStand | null }) {
       <h2 id="meinungen-titel" className="mb-2.5 text-[16px] font-semibold leading-6" style={{ color: PM.ink }}>Erfahrungen von Familien</h2>
       <ul className="divide-y" style={{ borderColor: PM.lineSoft }}>
         {MEINUNGEN.map((m) => (
-          <li key={m.name} className="py-2.5 first:pt-0 last:pb-0" style={{ borderColor: PM.lineSoft }}>
+          <li key={m.id} className="py-2.5 first:pt-0 last:pb-0" style={{ borderColor: PM.lineSoft }}>
             <FuenfSterne wert={m.sterne} />
             <p className="mt-1 text-[14.5px] leading-[1.45]" style={{ color: PM.body }}>„{m.text}“</p>
             <p className="mt-1 text-[12.5px]" style={{ color: PM.muted }}>{m.name}, {m.ort} · {m.datum}</p>
@@ -325,7 +317,7 @@ function Meinungen({ bewertung }: { bewertung: SterneStand | null }) {
       </ul>
       <p className="mt-3 border-t pt-2.5 text-[12.5px]" style={{ color: PM.muted, borderColor: PM.lineSoft }}>
         {bewertung && <>Auswahl aus {anzahlText(bewertung.anzahl)} auf primundus.de · </>}
-        <a href={PRUEF_LINK} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2" style={{ color: PM.taupe }}>So prüfen wir Bewertungen</a>
+        <a href={STIMMEN_PRUEF_LINK} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2" style={{ color: PM.taupe }}>So prüfen wir Bewertungen</a>
       </p>
     </section>
   );
