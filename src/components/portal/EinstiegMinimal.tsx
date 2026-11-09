@@ -66,6 +66,8 @@ export const VERTRAUEN = [['20 Jahre', 'Erfahrung'], ['6× in Folge', 'Testsiege
 export const EINGELADEN = 'Eingeladen';
 // Wie in der Navigationsleiste: Tippfläche ≥ 44 px über ein unsichtbares ::before, die sichtbare Pille bleibt kleiner.
 const TIPPFLAECHE = "relative before:absolute before:-inset-y-1.5 before:-inset-x-1 before:content-['']";
+// Für Textknöpfe in der Angebotskarte: unsichtbar bis 44 px hoch (Prüfung 09.11.2026: „Details“ und „Bestpreisgarantie“ lagen darunter).
+const TIPPFLAECHE_HOCH = "relative before:absolute before:-inset-y-[11px] before:-inset-x-1 before:content-['']";
 const FOKUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-taupe';
 // Knopf rechts in der Zeile: in allen Zuständen gleich breit und hoch, damit die Zeile ihre Höhe hält. 104 × 36 px (unter
 // 375 px 96 px): „Eingeladen“ mit Haken in 13 px passt mit Luft hinein (Martin 08.11.: „passender in den Button … macht die
@@ -135,7 +137,7 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
           onClick={() => { if (!details) onKostenAufgeklappt?.(); setDetails(!details); }}
           aria-expanded={details}
           aria-controls="angebot-details"
-          className={`${TIPPFLAECHE} ${FOKUS} flex flex-none items-center gap-0.5 rounded-md text-[15px] font-semibold text-pm-taupe-ink`}
+          className={`${TIPPFLAECHE_HOCH} ${FOKUS} flex flex-none items-center gap-0.5 rounded-md text-[15px] font-semibold text-pm-taupe-ink`}
         >
           Details
           <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${details ? 'rotate-180' : '-rotate-90'}`} aria-hidden="true" />
@@ -171,7 +173,7 @@ export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne,
       <ul className="mt-3 grid gap-1 rounded-[14px] bg-pm-mint px-4 py-2.5" data-garantie>
         <li className="flex items-center gap-2 text-[16px] leading-[22px] text-pm-green-deep">
           <Check className="h-4 w-4 flex-none" strokeWidth={3} aria-hidden="true" />
-          <button type="button" onClick={onBestpreis} className={`${FOKUS} inline-flex items-center gap-1.5 rounded text-left`}>
+          <button type="button" onClick={onBestpreis} className={`${TIPPFLAECHE_HOCH} ${FOKUS} inline-flex items-center gap-1.5 rounded text-left`}>
             {GARANTIE_TITEL}
             <Info className="h-3.5 w-3.5 flex-none opacity-70" aria-label="Mehr Infos" />
           </button>

@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { FormLesbar } from '../ui/FormField';
 import type { FC } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { meldeFeldAufgeklappt } from '../ui/FormNav';
@@ -159,6 +160,7 @@ export const DateField: FC<{
    *  `gewaehlt` = in diesem Öffnen wurde ein Tag gewählt. */
   onGeschlossen?: (gewaehlt: boolean) => void;
 }> = ({ value, onChange, min, invalid, placeholder = 'Datum wählen', onGeoeffnet, onGeschlossen }) => {
+  const lesbar = useContext(FormLesbar);
   const [open, setOpen] = useState(false);
   // Rückrufe ohne eigenen Zustand: immer die aktuellen nehmen, damit das Öffnen/Schließen unten nur an `open` hängt.
   const geoeffnetRef = useRef(onGeoeffnet);
@@ -301,9 +303,9 @@ export const DateField: FC<{
       <button
         type="button"
         onClick={toggle}
-        className={`w-full min-h-[48px] rounded-[14px] border-[1.5px] px-3.5 py-2.5 text-[16px] text-left bg-white flex items-center justify-between gap-2 focus:outline-none focus:border-pm-taupe focus:ring-2 focus:ring-pm-taupe/15 transition-colors ${invalid ? 'border-pm-error' : 'border-pm-chip'}`}
+        className={`w-full min-h-[48px] rounded-[14px] border-[1.5px] px-3.5 py-2.5 ${lesbar ? 'text-[16.5px]' : 'text-[16px]'} text-left bg-white flex items-center justify-between gap-2 focus:outline-none focus:border-pm-taupe focus:ring-2 focus:ring-pm-taupe/15 transition-colors ${invalid ? 'border-pm-error' : 'border-pm-chip'}`}
       >
-        <span className={display ? 'text-pm-ink' : 'text-pm-mute'}>{display || placeholder}</span>
+        <span className={display ? 'text-pm-ink' : lesbar ? 'text-pm-muted' : 'text-pm-mute'}>{display || placeholder}</span>
         <svg aria-hidden="true" className="w-5 h-5 text-pm-taupe flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
@@ -354,7 +356,7 @@ export const DateField: FC<{
                       : disabled
                         ? 'text-[#C9C4BC] cursor-default'
                         : 'text-pm-body hover:bg-pm-paper'
-                  }${isToday && !selected ? ' font-bold ring-1 ring-inset ring-pm-taupe/50' : ''}`}
+                  }${isToday && !selected && !disabled ? ' font-bold ring-1 ring-inset ring-pm-taupe/50' : ''}`}
                 >
                   {d}
                 </button>

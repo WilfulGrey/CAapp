@@ -574,7 +574,8 @@ export const AngebotCard: FC<{
     if (k === 'plz') return einsatzortFehler ?? undefined;
     if (!offen.includes(k)) return undefined;
     if (k === 'geburtsjahr' || k === 'p2_geburtsjahr') return 'Bitte ein Jahr zwischen 1920 und 2010 eintragen';
-    if (k === 'startDate') return 'Bitte ein Datum wählen. Eine Schätzung reicht.';
+    // Startwahl (Minimal-Einstieg): ohne Wahl wie bei allen Auswahlen, bei „Ab einem Datum“ ohne Tag wie bisher.
+    if (k === 'startDate') return schlicht && startWahl !== 'datum' ? 'Bitte eine Antwort wählen' : 'Bitte ein Datum wählen. Eine Schätzung reicht.';
     if (k === 'phone') {
       return patient.phone.trim() ? 'Die Nummer ist zu kurz oder zu lang. Bitte prüfen.' : 'Bitte eine Telefonnummer eintragen';
     }
@@ -586,7 +587,9 @@ export const AngebotCard: FC<{
   const navHinweis = (() => {
     if (!fehlerZeigen) return null;
     // Suchfehler beim Einsatzort sperrt nicht, soll aber gesehen werden.
-    if (offen.length === 0) return einsatzortFehler;
+    // Nur in Schritt 3, wo der Einsatzort steht (Prüfung 09.11.2026: nach einer Korrektur in Schritt 1 oder 2 stand hier der
+    // Postleitzahl-Hinweis, und Tippen darauf bewirkte nichts; so auch im Live-Stand).
+    if (offen.length === 0) return step === 2 ? einsatzortFehler : null;
     if (offen.length === 1 && offen[0] === 'plz' && einsatzortFehler) return einsatzortFehler;
     // Beim Ehepaar heißt Person 1 auch so — sonst stünde „Geschlecht,
     // Geschlecht (Person 2)" im Hinweis.
@@ -843,6 +846,13 @@ export const AngebotCard: FC<{
       className={inputCls + ' max-w-[160px] tabular-nums' + (fehlerFuer(k) ? inputFehlerCls : '')}
     />
   );
+
+  // Telefonfeld im Minimal-Einstieg: EINMAL beim ersten Anzeigen von Schritt 3 entscheiden, nicht bei jeder Eingabe (Prüfung
+  // 09.11.2026: sonst verschwand das Feld bei einer Anfrage ohne Nummer nach der 8. Ziffer mitten im Tippen). Wer es einmal
+  // gesehen hat, behält es bis zum Absenden.
+  const telefonFeld = useRef<boolean | null>(null);
+  if (step === 2 && telefonFeld.current === null) telefonFeld.current = !isPlausibleGermanPhone(patient.phone);
+  const telefonZeigen = !schlicht || telefonFeld.current !== false;
 
   const letzterSchritt = step === STEP_LABELS.length - 1;
   // Schon abgeschickt (lokal oder laut mamamia aktiv) → nur Angaben ändern: kein erneutes
@@ -1228,6 +1238,7 @@ export const AngebotCard: FC<{
                 <FormField feld="startDate" label="Voraussichtliches Startdatum" pflicht fehler={fehlerFuer('startDate')}
                   hinweis="Noch unklar? Eine grobe Schätzung reicht.">
                   <StartWahl
+                    name="Voraussichtliches Startdatum"
                     wert={startWahl}
                     invalid={!!fehlerFuer('startDate')}
                     onWahl={key => {
@@ -1273,7 +1284,7 @@ export const AngebotCard: FC<{
                     halbierte das die Tel-Quote (67 % → 34 %). */}
                 {/* Minimal-Einstieg (Martin 09.11.2026: „die telefonnummer würde ich rausnehmen, weil wir die doch schon haben“): das
                     Feld steht nur noch, wenn die Nummer fehlt oder nicht stimmt (seit 10.10. kam jede Anfrage mit Nummer). */}
-                {!(schlicht && isPlausibleGermanPhone(patient.phone)) && (
+                {telefonZeigen && (
                 <FormField feld="phone" label="Telefonnummer für Rückfragen" pflicht fehler={fehlerFuer('phone')}
                   // Martin 17.09.: nicht „bitte prüfen" — sagen, WANN wir anrufen.
                   hinweis="Nur bei Rückfragen oder wenn etwas dringend geklärt werden muss.">

@@ -160,6 +160,9 @@ describe('Messpunkte vor dem ersten Speichern (Rückbau, Registry #122/#123, ?ei
     await user.click(screen.getByRole('button', { name: 'Weiter →' }));
     await user.click(screen.getByRole('button', { name: 'Weiter →' }));
     await screen.findByText(/Schritt 3 von 4/);
+    // Minimal-Einstieg: Startwahl als Liste, der Kalender erscheint erst unter „Ab einem Datum“ (kalender_geoeffnet zählt
+    // seitdem nur noch Kunden, die ein festes Datum wollen).
+    await user.click(screen.getByRole('radio', { name: /Ab einem Datum/ }));
     const feld = screen.getByRole('button', { name: 'Datum wählen' });
     await user.click(feld);
     await user.click(feld);
