@@ -22,7 +22,7 @@ import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
 import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
 import { kontaktStandard, kontaktVariante, KNOPF_KONTAKT, STUFEN, STUFEN_FEHLER, type KontaktStufe, type KontaktVariante } from "@/lib/kontakt-stufen";
-import { antwortPortal, EinleitungPortal, FortschrittPortal, KONTAKT_FERTIG, KOPF_FRAGEN, KopfleistePortal, MINI_ABLAUF, PM, SCHATTEN_LIFT, TitelPortal, UnterDemFormularPortal, UnterDemKnopfPortal, UnterDemKontaktPortal, usePortalLook } from "@/components/calculator/FormularPortal";
+import { antwortPortal, EinleitungPortal, FortschrittPortal, KNOPF_ANGEBOT, KONTAKT_FERTIG, KOPF_FRAGEN, KopfleistePortal, MINI_ABLAUF, PM, SCHATTEN_LIFT, SheetGrundPortal, TitelPortal, UnterDemFormularPortal, UnterDemKnopfPortal, UnterDemKontaktPortal, usePortalLook } from "@/components/calculator/FormularPortal";
 
 const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -1181,7 +1181,10 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
   // Scrollbereich (max-h/overflow) fuer die laengeren Fragen. Damit ist
   // ueberhaupt kein Scrollen mehr noetig, weder beim Oeffnen noch beim
   // Fragenwechsel — das war der letzte verbliebene Sprung.
-  const outerClass = fullscreen
+  const outerClass = fullscreen && portalLook
+    // Portal-Look als Blatt ab 10 px unter der Oberkante (SheetGrundPortal): der Inhalt scrollt nur unterhalb der Kante.
+    ? "fixed inset-x-0 top-[10px] z-[90] mx-auto max-h-[calc(100dvh-10px)] w-full max-w-md overflow-y-auto overscroll-contain px-3 pt-1 pb-6 sm:max-w-[520px] sm:px-4"
+    : fullscreen
     // Breite bewusst GEDECKELT: die alten `sm:max-w-[95%] xl:max-w-[1800px]`
     // stammten aus der Zeit, als der Fragebogen auf dem Desktop inline in
     // einer schmalen Spalte stand und Vollbild ihn aufziehen sollte. Seit
@@ -1197,7 +1200,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
   if (showMatching) {
     return (
       <>
-      {fullscreen && <div className={`fixed inset-0 z-[80] ${portalLook ? '' : 'bg-black/60'}`} style={portalLook ? { backgroundColor: PM.grund } : undefined} aria-hidden="true" />}
+      {fullscreen && (portalLook ? <SheetGrundPortal /> : <div className="fixed inset-0 z-[80] bg-black/60" aria-hidden="true" />)}
       <div ref={formRef} id="calculator-form" className={outerClass}>
         {portalLook && <KopfleistePortal />}
         <MatchingAnimation
@@ -1240,7 +1243,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
           }}
           className="w-full rounded-xl bg-[#E76F63] px-4 py-[18px] text-[17px] font-bold text-white shadow-[0_4px_14px_rgba(231,111,99,0.32)] transition-all duration-200 hover:bg-[#D65E52]"
         >
-          Preis &amp; Pflegekräfte ansehen →
+          {KNOPF_ANGEBOT} →
         </button>
         {/* Zaehler zentriert unter dem Button (Martin 16.08.) — er gehoert
             zum Button, nicht zur linksbuendigen Textspalte darueber. */}
@@ -1345,7 +1348,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
         der Knopf öffnet wieder beim Kontaktschritt. */}
     {fullscreen && (portalLook
       // Portal-Look: heller Seitengrund statt Abdunkeln; das X sitzt in der Kopfleiste (auch im Kontakt-Schritt).
-      ? <div className="fixed inset-0 z-[80]" style={{ backgroundColor: PM.grund }} aria-hidden="true" />
+      ? <SheetGrundPortal />
       : <div className="fixed inset-0 bg-black/60 z-[80]" aria-hidden="true" onClick={currentStep === totalSteps ? schliessen : undefined} />)}
     <div ref={formRef} id="calculator-form" className={outerClass}>
       <div className="relative">
@@ -1459,7 +1462,8 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
             im Titel-Block (getStepTitle); separate Pill ist redundant. */}
 
         {/* Registry #121: im Kontakt-Schritt rückt der Knopf an die Felder (36 → 16 px). */}
-        <div id="calc-step-content" className={`${portalLook ? 'px-4' : 'px-3 sm:px-6 lg:px-8'} pt-3 ${fullscreen && currentStep === 1 ? 'pb-8' : currentStep === totalSteps && !stufenAktiv && !preisModus && (!ergebnisModus || kontaktOffen) ? 'pb-2' : 'pb-5'}`}>
+        {/* Portal-Look: bei den Fragen mehr Weiß unter den Antworten (Martin 09.11.: „das Weiße ein bisschen länger unten“). */}
+        <div id="calc-step-content" className={`${portalLook ? 'px-4' : 'px-3 sm:px-6 lg:px-8'} pt-3 ${portalLook && currentStep < totalSteps ? 'pb-12' : fullscreen && currentStep === 1 ? 'pb-8' : currentStep === totalSteps && !stufenAktiv && !preisModus && (!ergebnisModus || kontaktOffen) ? 'pb-2' : 'pb-5'}`}>
           <div className="w-full">
             {/* Step 9: kleine grüne „fertig"-Pill über dem Titel, dann die
                 Frage als reguläre Step-Headline + Erklärung als italic

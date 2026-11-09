@@ -31,7 +31,10 @@ describe('Startseite — kein schwebender WhatsApp-Knopf', () => {
 
   it('WhatsApp bleibt aber als Kontaktweg erhalten', () => {
     // Der Knopf sollte verschwinden, nicht der Kanal.
+    // Seit Registry #155 trägt der Abschluss Martas Kasten (PersonalContact) mit Anrufen und WhatsApp.
     const cta = readFileSync(join(WURZEL, 'components/calculator/FinalCTA.tsx'), 'utf8');
-    expect(cta, 'WhatsApp-Link im Abschluss-CTA fehlt — zu viel entfernt').toMatch(/wa\.me/);
+    const marta = readFileSync(join(WURZEL, 'components/calculator/PersonalContact.tsx'), 'utf8');
+    expect(cta, 'Martas Kasten im Abschluss-CTA fehlt — zu viel entfernt').toContain('<PersonalContact />');
+    expect(marta, 'WhatsApp-Link in Martas Kasten fehlt').toMatch(/wa\.me/);
   });
 });

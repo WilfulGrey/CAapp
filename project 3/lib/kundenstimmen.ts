@@ -38,6 +38,3 @@ export const STIMMEN_STARTSEITE = auswahl([
 
 /** Letzter Schritt des Rechners unter „So geht es weiter“ (Registry #151): je eine Sorge kurz vor den Kontaktdaten. */
 export const STIMMEN_LETZTER_SCHRITT = auswahl(["k-20250323-florian", "k-20260221-anke", "k-20260627-claudia"]);
-
-/** Prüfhinweis zu gezeigten Bewertungen (§ 5b Abs. 3 UWG), wie auf primundus.de/erfahrungen. */
-export const STIMMEN_PRUEF_LINK = "https://primundus.de/erfahrungen#pruefung";

@@ -3,86 +3,43 @@
 import { useState } from "react";
 import { faqs } from "./faqData";
 
+/** Häufige Fragen (Registry #155, Martin 09.11.2026: „Pass das mal alles an. Genau so“): Überschrift und Form wie die Fragen
+ *  im Portal: eine weiße Karte mit Zeilen und Trennlinien statt Einzelkästen; Überschrift wie bisher. Die Texte kommen aus faqData.ts (sichtbar und
+ *  FAQPage-Schema aus einer Quelle). */
 export function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
-  const toggleFAQ = (index: number) => {
-    setOpenIndex(openIndex === index ? null : index);
-  };
-
   return (
-    <section className="py-16 md:py-18 lg:py-20 px-5 bg-gradient-to-b from-white to-[#FAFAF9]">
-      <div className="max-w-[640px] md:max-w-[900px] lg:max-w-[1100px] mx-auto">
-        <div className="text-center mb-12">
-          <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-3">
-            Häufige Fragen
-          </p>
-          <h2 className="text-[32px] md:text-[36px] lg:text-[42px] leading-[1.2] font-bold text-[#3D3D3D] mb-4">
-            Noch Fragen? Hier sind Antworten.
-          </h2>
-          <p className="text-[16px] lg:text-[17px] text-[#6B6B6B] max-w-[480px] md:max-w-[600px] mx-auto">
-            Wir beantworten die wichtigsten Fragen zur 24-Stunden-Pflege
-          </p>
-        </div>
+    <section className="px-5 py-12 md:py-16">
+      <div className="mx-auto max-w-[560px] md:max-w-[760px]">
+        <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-2">Häufige Fragen</p>
+        <h2 className="text-[26px] md:text-[32px] lg:text-[38px] leading-[1.25] font-bold text-[#3D3D3D] mb-6 md:mb-8">
+          Noch Fragen? Hier sind Antworten.
+        </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 lg:gap-6">
-          {faqs.map((faq, index) => (
-            <div
-              key={index}
-              className="bg-white border border-[#E5E3DF] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300"
-            >
-              <button
-                onClick={() => toggleFAQ(index)}
-                className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-[#FAFAF9] transition-colors duration-200"
-              >
-                <span className="font-semibold text-[16px] text-[#3D3D3D] pr-4 leading-[1.4]">
-                  {faq.question}
-                </span>
-                <div className={`w-8 h-8 rounded-full bg-[#F5F3F0] flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
-                  openIndex === index ? "bg-[#8B7355] rotate-180" : ""
-                }`}>
-                  <svg
-                    className={`w-5 h-5 transition-colors duration-300 ${
-                      openIndex === index ? "text-white" : "text-[#8B7355]"
-                    }`}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
+        <ul className="rounded-[20px] bg-white px-4 md:px-6">
+          {faqs.map((faq, index) => {
+            const offen = openIndex === index;
+            return (
+              <li key={faq.question} className="border-b border-[#F0EDE8] last:border-b-0">
+                <button
+                  type="button"
+                  onClick={() => setOpenIndex(offen ? null : index)}
+                  aria-expanded={offen}
+                  className="flex w-full items-center justify-between gap-4 py-4 text-left"
+                >
+                  <span className="text-[16px] font-semibold leading-[1.4] text-[#1C1C1C]">{faq.question}</span>
+                  <svg className={`h-5 w-5 flex-none text-[#8B7355] transition-transform duration-200 ${offen ? "rotate-180" : ""}`}
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
-                </div>
-              </button>
-              <div
-                className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                  openIndex === index ? "max-h-[600px]" : "max-h-0"
-                }`}
-              >
-                <div className="px-6 pb-6 pt-2">
-                  <p className="text-[16px] leading-[1.7] text-[#5A5A5A]">
-                    {faq.answer}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-10 text-center">
-          <p className="text-[16px] text-[#6B6B6B] mb-4">
-            Weitere Fragen? Wir beraten Sie gerne persönlich.
-          </p>
-          <a
-            href="tel:+4989200000830"
-            className="inline-flex items-center gap-2 text-[#8B7355] font-semibold text-[16px] hover:text-[#6B5738] transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-            </svg>
-            Kostenlose Beratung: 089 200 000 830
-          </a>
-        </div>
+                </button>
+                {/* Zu, aber im HTML: das FAQ-Schema verlangt den Text sichtbar auf der Seite. */}
+                <p hidden={!offen} className="pb-4 text-[16px] leading-[1.6] text-[#5A5A5A]">{faq.answer}</p>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </section>
   );

@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { SterneText } from "@/components/calculator/BewertungsZeile";
 import { SCHRANKE } from "@/lib/kraefte-vorschau";
-import { STIMMEN_LETZTER_SCHRITT, STIMMEN_PRUEF_LINK } from "@/lib/kundenstimmen";
+import { STIMMEN_LETZTER_SCHRITT } from "@/lib/kundenstimmen";
 import { anzahlText, sternFuellung, type SterneStand } from "@/lib/sterne-zeile";
 
 /** Titel über den Fragen wie die Überschrift der Startseite (Registry #146 / PR #824, live H1 seit 02.11.): „Passende
@@ -28,10 +28,15 @@ export const MINI_ABLAUF = "Fragen beantworten, Kontaktdaten eingeben und sofort
  *  jetzt ansehen“ (06.06.) passend zum Mini-Ablauf; OpenAI 08.11. OK. Ersetzt Frage und Lohnzeile, damit der Knopf auf dem
  *  iPhone SE (553 px) trotz zweizeiligem Titel im ersten Bild bleibt. 09.11. ohne „unverbindliches“: steht direkt unter dem
  *  Knopf („100 % kostenfrei & unverbindlich“, OpenAI: doppelt), und der Satz bleibt auf dem iPhone SE dreizeilig. */
+/** EIN Knopftext für Startseite und Rechner (Registry #155, Martin 09.11.: „ist der Button-Text dann immer noch der richtige?
+ *  … vereinheitlichen … mit dem Ziel, Patientenprofile zu erhalten … wobei natürlich der Preis auch relevant ist“): „Angebot“
+ *  schließt den Preis ein und führt zum Portal; OpenAI 09.11. empfahl dieselbe Fassung vor „Preis & …“. */
+export const KNOPF_ANGEBOT = "Angebot & Pflegekräfte ansehen";
+
 export const KONTAKT_FERTIG = {
   titel: "Ihr persönliches Angebot und Ihre Personalauswahl sind fertig",
   text: "Geben Sie Ihre Kontaktdaten ein. Danach sehen Sie sofort Ihr Angebot und Ihre passende Pflegekräfte-Auswahl.",
-  knopf: "Angebot & Pflegekräfte ansehen →",
+  knopf: `${KNOPF_ANGEBOT} →`,
 };
 
 /** Der Rechner im Portal-Look ist Standard (Registry #151); `?look=alt` zeigt den Stand davor. Startwert `true`, damit die
@@ -180,10 +185,11 @@ function ZurueckKnopf({ onClick }: { onClick: () => void }) {
 /** Kopfleiste über der Karte: Logo links, Schließen rechts (wie die Navigationsleiste im Portal). */
 export function KopfleistePortal({ onSchliessen }: { onSchliessen?: () => void }) {
   return (
-    // Schmal gehalten: im Kontakt-Schritt muss der Knopf auf dem iPhone SE (553 px) über der Falz bleiben.
-    <div className="flex items-center justify-between px-1 pb-2">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/images/primundus-logo-transparent.png" alt="Primundus" className="h-[22px] w-auto" />
+    // Martin 09.11.: „das Logo muss da auch nicht rein. Es kann da schon so eine schöne Kante oben rein.“ Statt Logo der
+    // Griff des Blatts in der Mitte (SheetGrundPortal), rechts das X. Schmal gehalten: im Kontakt-Schritt muss der Knopf auf
+    // dem iPhone SE (553 px) über der Falz bleiben.
+    <div className="relative mb-1 flex h-9 items-center justify-end px-1">
+      <span className="absolute left-1/2 top-1/2 h-[5px] w-10 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ backgroundColor: PM.chip }} aria-hidden="true" />
       {onSchliessen && (
         <button type="button" onClick={onSchliessen} aria-label="Schließen"
           className="flex h-9 w-9 items-center justify-center rounded-full bg-white"
@@ -192,6 +198,17 @@ export function KopfleistePortal({ onSchliessen }: { onSchliessen?: () => void }
         </button>
       )}
     </div>
+  );
+}
+
+/** Hintergrund des Formulars als Blatt (Martin 09.11.: „eine schöne Kante oben“): oben 10 px abgedunkelte Startseite, darunter
+ *  der helle Grund mit runden oberen Ecken. Der Inhalt liegt in MultiStepForm ab derselben Kante (outerClass). */
+export function SheetGrundPortal() {
+  return (
+    <>
+      <div className="fixed inset-0 z-[80] bg-black/40" aria-hidden="true" />
+      <div className="fixed inset-x-0 bottom-0 top-[10px] z-[80] rounded-t-[22px]" style={{ backgroundColor: PM.grund, boxShadow: "0 -6px 24px rgba(28,28,28,.12)" }} aria-hidden="true" />
+    </>
   );
 }
 
@@ -270,7 +287,7 @@ function FuenfSterne({ wert, groesse = 12 }: { wert: number; groesse?: number })
 }
 
 /** Kennzahlen wie unten in der Angebotskarte des Portals: Sterne (ohne Stand fehlt die Spalte), 20 Jahre, 6× in Folge. */
-function KennzahlenZeile({ bewertung }: { bewertung: SterneStand | null }) {
+export function KennzahlenZeile({ bewertung }: { bewertung: SterneStand | null }) {
   return (
     <dl className="flex justify-between gap-3">
       {bewertung && (
@@ -315,10 +332,12 @@ function Meinungen({ bewertung }: { bewertung: SterneStand | null }) {
           </li>
         ))}
       </ul>
-      <p className="mt-3 border-t pt-2.5 text-[12.5px]" style={{ color: PM.muted, borderColor: PM.lineSoft }}>
-        {bewertung && <>Auswahl aus {anzahlText(bewertung.anzahl)} auf primundus.de · </>}
-        <a href={STIMMEN_PRUEF_LINK} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2" style={{ color: PM.taupe }}>So prüfen wir Bewertungen</a>
-      </p>
+      {/* Herkunft ohne Link (Martin 09.11.: „keinen Link … damit er da nicht wegspringt“). */}
+      {bewertung && (
+        <p className="mt-3 border-t pt-2.5 text-[12.5px]" style={{ color: PM.muted, borderColor: PM.lineSoft }}>
+          Auswahl aus {anzahlText(bewertung.anzahl)} auf primundus.de
+        </p>
+      )}
     </section>
   );
 }

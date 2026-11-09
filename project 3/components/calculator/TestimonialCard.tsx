@@ -2,7 +2,7 @@
 
 import { Star } from "lucide-react";
 import { SterneText } from "@/components/calculator/BewertungsZeile";
-import { STIMMEN_PRUEF_LINK, STIMMEN_STARTSEITE } from "@/lib/kundenstimmen";
+import { STIMMEN_STARTSEITE } from "@/lib/kundenstimmen";
 import { anzahlText, type SterneStand } from "@/lib/sterne-zeile";
 
 /** „TR“ aus „Thomas R.“: Anfangsbuchstaben von Vor- und Nachname. */
@@ -30,7 +30,7 @@ export function TestimonialCard({ bewertung }: { bewertung: SterneStand | null }
           {STIMMEN_STARTSEITE.map((stimme) => (
             <div
               key={stimme.id}
-              className="bg-white rounded-2xl p-5 shadow-sm border border-[#E5E3DF] hover:shadow-md transition-all duration-300 w-[280px] flex-shrink-0"
+              className="bg-white rounded-[20px] p-5 w-[280px] flex-shrink-0"
             >
               <div className="flex items-start gap-3 mb-3">
                 <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-[#8B7355] to-[#7D6E5D] flex items-center justify-center text-white font-bold text-sm shadow-sm" aria-hidden="true">
@@ -55,11 +55,8 @@ export function TestimonialCard({ bewertung }: { bewertung: SterneStand | null }
           ))}
         </div>
       </div>
-      {/* Herkunft und Prüfhinweis (§ 5b Abs. 3 UWG), Wortlaut wie im letzten Schritt des Rechners (Registry #151). */}
-      <p className="mt-2 text-[13px] text-[#8B8B8B]">
-        {bewertung && <>Auswahl aus {anzahlText(bewertung.anzahl)} auf primundus.de · </>}
-        <a href={STIMMEN_PRUEF_LINK} target="_blank" rel="noopener noreferrer" className="text-[#8B7355] underline underline-offset-2 hover:text-[#A68968]">So prüfen wir Bewertungen</a>
-      </p>
+      {/* Herkunft ohne Link (Martin 09.11.: „keinen Link … damit er da nicht wegspringt“). */}
+      {bewertung && <p className="mt-2 text-[13px] text-[#8B8B8B]">Auswahl aus {anzahlText(bewertung.anzahl)} auf primundus.de</p>}
     </div>
   );
 }

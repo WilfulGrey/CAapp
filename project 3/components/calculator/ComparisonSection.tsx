@@ -1,139 +1,53 @@
 'use client';
 
 import { openCalculator } from '@/lib/scroll-to-calculator';
+import { KNOPF_ANGEBOT } from '@/components/calculator/FormularPortal';
 
+/** Kostenvergleich (Anker #kostenvergleich, Sitelink). Registry #155 (Martin 09.11.2026: „Pass das mal alles an. Genau so“):
+ *  im Look von Formular und Portal eine weiße Karte mit den zwei Zahlen statt zweier Kästen mit Symbol-Listen. Wortlaut,
+ *  Zahlen und Hinweis unverändert; der Satz „deutlich günstiger als ein Pflegeheimplatz“ bleibt (Martin 24./26.10.). */
 export function ComparisonSection() {
   return (
-    <section id="kostenvergleich" className="bg-white py-16 md:py-20 scroll-mt-20">
-      <div className="w-full max-w-[520px] md:max-w-[720px] lg:max-w-[1080px] mx-auto px-5">
-        <div className="text-center mb-12">
-          <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-2">
-            Kostenvergleich
-          </p>
-          <h2 className="text-[26px] md:text-[32px] lg:text-[36px] leading-[1.25] font-bold text-[#3D3D3D] mb-4">
-            24h-Pflege vs. Pflegeheim
-          </h2>
-          <p className="text-[16px] md:text-[17px] text-[#5A5A5A] max-w-2xl mx-auto">
-            Die 24-Stunden-Betreuung zu Hause ist nicht nur persönlicher, sondern auch deutlich günstiger als ein Pflegeheimplatz.
+    <section id="kostenvergleich" className="scroll-mt-20 px-5 py-12 md:py-16">
+      <div className="mx-auto max-w-[560px] md:max-w-[900px] lg:max-w-[1100px]">
+        <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-2">Kostenvergleich</p>
+        <h2 className="text-[26px] md:text-[32px] lg:text-[38px] leading-[1.25] font-bold text-[#3D3D3D] mb-3">
+          24h-Pflege vs. Pflegeheim
+        </h2>
+        <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-6 md:mb-8">
+          Die 24-Stunden-Betreuung zu Hause ist nicht nur persönlicher, sondern auch deutlich günstiger als ein Pflegeheimplatz.
+        </p>
+
+        <div className="rounded-[20px] bg-white p-5 md:p-7">
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-8">
+            <div>
+              <dt className="text-[14px] leading-snug text-[#6B6B6B]"><span className="block text-[16px] font-semibold text-[#3D3D3D]">Pflegeheim</span>Durchschnittlicher Eigenanteil pro Monat</dt>
+              <dd className="mt-1.5 text-[26px] md:text-[34px] font-bold tabular-nums text-[#8B8B8B]">3.364 €</dd>
+            </div>
+            <div className="border-t border-[#F0EDE8] pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6 md:pl-8">
+              <dt className="text-[14px] leading-snug text-[#6B6B6B]"><span className="block text-[16px] font-semibold text-[#3D3D3D]">24h-Pflege zu Hause</span>Selbst zu tragen bei Pflegegrad 3</dt>
+              <dd className="mt-1.5 text-[26px] md:text-[34px] font-bold tabular-nums text-[#3D7A5C]">ab ca. 923 €</dd>
+            </div>
+          </dl>
+          {/* Wie primundus.de (17.09.2026): 2.150 € − 599 € Pflegegeld − 295 € Entlastungsbudget − 333 € Steuer = 923 €.
+              3.364 − 923 = 2.441 → „rund 2.440" beim Grundpreis, kein „bis zu" (§5-UWG-Angriffsfläche). */}
+          <p className="mt-4 border-t border-[#F0EDE8] pt-4 text-[16px] font-semibold text-[#2A5C3F]">
+            Beim Grundpreis rund 2.440 € weniger im Monat
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-          {/* Pflegeheim */}
-          <div className="bg-[#F8F7F5] rounded-2xl p-8 border-2 border-[#E5E3DF]">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-[#E5E3DF] rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-[#5A5A5A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-[#3D3D3D] mb-2">Pflegeheim</h3>
-            </div>
+        <p className="mt-3 text-[13px] leading-[1.5] text-[#6B6B6B]">
+          <strong className="font-semibold text-[#3D3D3D]">Hinweis:</strong> Pflegeheim: bundesweiter Durchschnitt (vdek, Stand 1. Juli 2026).
+          24-Stunden-Pflege: eine Person, nach Pflegegeld, Entlastungsbudget und Steuerermäßigung, zzgl. An- und Abreise.
+          Mit unserem Kostenrechner erhalten Sie eine individuelle Berechnung für Ihre Situation.
+        </p>
 
-            <div className="space-y-4 mb-6">
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-[#C85A54] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                <span className="text-[16px] text-[#5A5A5A]">Fremde Umgebung</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-[#C85A54] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                <span className="text-[16px] text-[#5A5A5A]">Geteiltes Zimmer möglich</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-[#C85A54] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                <span className="text-[16px] text-[#5A5A5A]">Feste Besuchszeiten</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-[#C85A54] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                <span className="text-[16px] text-[#5A5A5A]">Standardisierte Abläufe</span>
-              </div>
-            </div>
-
-            <div className="border-t-2 border-[#E5E3DF] pt-6">
-              <div className="text-center">
-                <p className="text-[15px] text-[#5A5A5A] mb-2">Durchschnittlicher Eigenanteil pro Monat:</p>
-                <p className="text-4xl font-bold text-[#C85A54]">3.364 €</p>
-              </div>
-            </div>
-          </div>
-
-          {/* 24h-Pflege */}
-          <div className="bg-[#E8EEF1] rounded-2xl p-8 border-2 border-[#708A95] relative">
-            <div className="absolute -top-3 right-6 bg-[#708A95] text-white text-xs font-bold px-4 py-1 rounded-full">
-              EMPFOHLEN
-            </div>
-
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-[#708A95] rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-[#708A95] mb-2">24h-Pflege zu Hause</h3>
-            </div>
-
-            <div className="space-y-4 mb-6">
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-[#708A95] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-[16px] text-[#3D3D3D]">Im gewohnten Zuhause bleiben</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-[#708A95] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-[16px] text-[#3D3D3D]">1:1-Betreuung, bei Bedarf auch nachts</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-[#708A95] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-[16px] text-[#3D3D3D]">Familie bleibt in der Nähe</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-[#708A95] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-[16px] text-[#3D3D3D]">Individuelle Tagesgestaltung</span>
-              </div>
-            </div>
-
-            <div className="border-t-2 border-[#708A95] pt-6">
-              <div className="text-center">
-                <p className="text-[15px] text-[#3D3D3D] mb-2">Selbst zu tragen bei Pflegegrad 3:</p>
-                <p className="text-4xl font-bold text-[#708A95]">ab ca. 923 €</p>
-                {/* Wie primundus.de (17.09.2026): 2.150 € − 599 € Pflegegeld − 295 € Entlastungsbudget
-                    − 333 € Steuer = 923 €. 3.364 − 923 = 2.441 → "rund 2.440" beim Grundpreis, kein
-                    "bis zu" (rechnerisch kein Höchstwert, §5-UWG-Angriffsfläche). */}
-                <p className="text-[16px] font-semibold text-[#708A95] mt-2">
-                  Beim Grundpreis rund 2.440 € weniger im Monat
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-8 text-center">
-          <p className="text-sm text-[#5A5A5A] max-w-2xl mx-auto mb-6">
-            <strong className="font-semibold text-[#3D3D3D]">Hinweis:</strong> Pflegeheim: bundesweiter Durchschnitt (vdek, Stand 1. Juli 2026).
-            24-Stunden-Pflege: eine Person, nach Pflegegeld, Entlastungsbudget und Steuerermäßigung, zzgl. An- und Abreise.
-            Mit unserem Kostenrechner erhalten Sie eine individuelle Berechnung für Ihre Situation.
-          </p>
-
+        <div className="mt-6 text-center">
           <button
             onClick={() => openCalculator('vergleich')}
             className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 sm:px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
           >
-            Preis & Pflegekräfte ansehen
+            {KNOPF_ANGEBOT}
             <svg className="hidden sm:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
