@@ -324,7 +324,7 @@ export default async function HomePage() {
         <HowItWorks />
 
         <section id="kundenstimmen" className="scroll-mt-24 px-5 py-12 md:py-16">
-          <div className="mx-auto max-w-[560px] md:max-w-[900px] lg:max-w-[1100px]">
+          <div className="mx-auto max-w-[560px] lg:max-w-[1216px]">
             <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-2">Kundenstimmen</p>
             <h2 className="text-[26px] md:text-[32px] lg:text-[38px] leading-[1.25] font-bold text-[#3D3D3D] mb-5">
               Das sagen unsere Familien

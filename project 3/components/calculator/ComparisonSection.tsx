@@ -9,7 +9,7 @@ import { KNOPF_ANGEBOT } from '@/components/calculator/FormularPortal';
 export function ComparisonSection() {
   return (
     <section id="kostenvergleich" className="scroll-mt-20 px-5 py-12 md:py-16">
-      <div className="mx-auto max-w-[560px] md:max-w-[900px] lg:max-w-[1100px]">
+      <div className="mx-auto max-w-[560px] lg:max-w-[1216px]">
         <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-2">Kostenvergleich</p>
         <h2 className="text-[26px] md:text-[32px] lg:text-[38px] leading-[1.25] font-bold text-[#3D3D3D] mb-3">
           24h-Pflege vs. Pflegeheim
@@ -42,11 +42,11 @@ export function ComparisonSection() {
           Mit unserem Kostenrechner erhalten Sie eine individuelle Berechnung für Ihre Situation.
         </p>
 
-        {/* Knopf an der linken Kante, Form wie der Hero-Knopf (Registry #160). */}
+        {/* Knopf an der linken Kante, Form und Breite wie der Hero-Knopf (Registry #160). */}
         <div className="mt-6">
           <button
             onClick={() => openCalculator('vergleich')}
-            className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl bg-[#E76F63] px-4 sm:px-8 py-[18px] text-[16px] min-[375px]:text-[17px] font-bold text-white shadow-[0_4px_14px_rgba(231,111,99,0.32)] transition-all duration-200 hover:bg-[#D65E52]"
+            className="inline-flex w-full max-w-md items-center justify-center rounded-xl bg-[#E76F63] px-4 py-[18px] text-[16px] min-[375px]:text-[17px] font-bold text-white shadow-[0_4px_14px_rgba(231,111,99,0.32)] transition-all duration-200 hover:bg-[#D65E52]"
           >
             {KNOPF_ANGEBOT}{"\u00a0"}→
           </button>

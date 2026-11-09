@@ -11,15 +11,15 @@ export function FAQSection() {
 
   return (
     <section className="px-5 py-12 md:py-16">
-      {/* Registry #160: Spalte wie die Abschnitte darüber (eine linke Kante, am Computer x=90), die Liste bleibt 760 px breit
-          (Lesebreite) und steht links. */}
-      <div className="mx-auto max-w-[560px] md:max-w-[900px] lg:max-w-[1100px]">
+      {/* Registry #160: Spalte wie die Abschnitte darüber (eine linke Kante mit H1 und Logo), die Liste bleibt schmal
+          (640 px = Lesebreite und Breite der Schluss-Karte darunter, rechte Kanten gleich) und steht links. */}
+      <div className="mx-auto max-w-[560px] lg:max-w-[1216px]">
         <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-2">Häufige Fragen</p>
         <h2 className="text-[26px] md:text-[32px] lg:text-[38px] leading-[1.25] font-bold text-[#3D3D3D] mb-6 md:mb-8">
           Noch Fragen? Hier sind Antworten.
         </h2>
 
-        <ul className="rounded-[20px] bg-white px-4 md:max-w-[760px] md:px-6">
+        <ul className="rounded-[20px] bg-white px-4 md:max-w-[640px] md:px-6">
           {faqs.map((faq, index) => {
             const offen = openIndex === index;
             return (

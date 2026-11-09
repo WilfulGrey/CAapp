@@ -1,15 +1,16 @@
 /** Testsieger-Karte (Registry #155: steht mit der Bestpreisgarantie im Abschnitt #testsieger, BestpriceGuarantee.tsx).
  *  Die content-checkliste verlangt zur Auszeichnung einen Beleg-Link; das Original-PDF hängt in der Karte. Look wie Formular
- *  und Portal: weiße Karte ohne goldenen Rahmen; Pille, Siegel und Wortlaut unverändert. Registry #160: am Handy linksbündig
- *  wie die übrigen Abschnitte, Pille an der linken Inhaltskante, Textgrau #6B6B6B wie im Portal. */
+ *  und Portal: weiße Karte ohne goldenen Rahmen; Pille, Siegel und Wortlaut unverändert. Registry #160: linksbündig wie die
+ *  übrigen Abschnitte, Pille an der linken Inhaltskante, Textgrau #6B6B6B wie im Portal; auch am Computer gestapelt (Siegel
+ *  über dem Titel) und mit denselben Innenabständen wie die Garantie-Karte daneben (eine Innenkante). */
 export function TestsiegerKarte() {
   return (
-        <div className="bg-white rounded-[20px] p-7 md:p-9 lg:p-8 relative">
-          <div className="absolute top-[-14px] left-7 md:left-9 lg:left-8 bg-[#D4A843] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
+        <div className="bg-white rounded-[20px] p-7 md:p-9 relative">
+          <div className="absolute top-[-14px] left-7 md:left-9 bg-[#D4A843] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
             ★ Testsieger · 6× in Folge
           </div>
 
-          <div className="flex flex-col lg:flex-row lg:items-center lg:gap-8 text-left mt-4">
+          <div className="flex flex-col text-left mt-4">
             {/* Badge + Beleg-Link zeigen auf die Original-Veröffentlichung
                 (DIE WELT / ServiceValue 10/2021, primundus.de Nr. 1 im
                 Ranking Pflegekräfte-Vermittler) — PDF liegt lokal unter
@@ -18,7 +19,7 @@ export function TestsiegerKarte() {
               href="/downloads/die-welt-service-champions-2021.pdf"
               target="_blank"
               rel="noopener"
-              className="w-40 h-40 mb-5 lg:mb-0 flex items-center justify-center flex-shrink-0"
+              className="w-40 h-40 mb-5 flex items-center justify-center flex-shrink-0"
               aria-label="Original-Veröffentlichung Service-Champions als PDF öffnen"
             >
               <img
