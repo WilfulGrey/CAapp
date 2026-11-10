@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { VorschlagText, enthaeltVorschlag, schalteVorschlag, VORSCHLAEGE } from '../../components/portal/VorschlagText';
+import { VorschlagText, enthaeltVorschlag, schalteVorschlag, passendeVorschlaege, VORSCHLAEGE } from '../../components/portal/VorschlagText';
 
 describe('schalteVorschlag', () => {
   it('hängt an und nimmt wieder heraus', () => {
@@ -20,8 +20,24 @@ describe('schalteVorschlag', () => {
     expect(enthaeltVorschlag('Körperpflege, kochen', 'Kochen')).toBe(true);
     expect(enthaeltVorschlag('Kochen am Wochenende', 'Kochen')).toBe(false);
   });
-  it('keine Beschriftung enthält ein Komma (sonst zerfiele sie beim Herausnehmen)', () => {
-    for (const liste of Object.values(VORSCHLAEGE)) for (const v of liste) expect(v).not.toContain(',');
+  it('erkennt Vorschläge auch nach Zeilenumbruch, Semikolon oder Punkt und nimmt nur sie heraus (Prüfung 10.11.)', () => {
+    expect(enthaeltVorschlag('Toilettengang\nTrinken geben', 'Toilettengang')).toBe(true);
+    expect(schalteVorschlag('Toilettengang\nTrinken geben', 'Toilettengang')).toBe('Trinken geben');
+    expect(schalteVorschlag('Kochen; Garten gießen', 'Kochen')).toBe('Garten gießen');
+    expect(enthaeltVorschlag('Körperpflege, Kochen.', 'Kochen')).toBe(true);
+    expect(schalteVorschlag('Körperpflege, Kochen.', 'Kochen')).toBe('Körperpflege');
+    // eigener Text bleibt Zeichen für Zeichen stehen (Zeilenumbrüche, doppelte Leerzeichen)
+    expect(schalteVorschlag('Garten  gießen\nBlumen, Kochen', 'Kochen')).toBe('Garten  gießen\nBlumen');
+    expect(schalteVorschlag('Kochen, Garten  gießen\nBlumen', 'Kochen')).toBe('Garten  gießen\nBlumen');
+    // nicht doppelt einfügen, wenn er nach einem Umbruch steht
+    expect(schalteVorschlag('Toilettengang\n', 'Toilettengang')).toBe('');
+  });
+  it('blendet unpassende Vorschläge aus, außer sie stehen schon im Text', () => {
+    expect(passendeVorschlaege(['zu Fuß', 'Auto'], '', ['Auto'])).toEqual(['zu Fuß']);
+    expect(passendeVorschlaege(['zu Fuß', 'Auto'], 'Auto', ['Auto'])).toEqual(['zu Fuß', 'Auto']);
+  });
+  it('keine Beschriftung enthält ein Trennzeichen (sonst zerfiele sie beim Herausnehmen)', () => {
+    for (const liste of Object.values(VORSCHLAEGE)) for (const v of liste) expect(v).not.toMatch(/[,;\n.]/);
   });
 });
 
