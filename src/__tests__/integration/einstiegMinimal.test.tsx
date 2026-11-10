@@ -427,7 +427,7 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(await screen.findByText(/Schritt 1 von 4/)).toBeInTheDocument();
     for (let i = 0; i < 3; i++) await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }));
     expect(await screen.findByText(/Schritt 4 von 4/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Weiter/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Weiter →/ })).toBeNull();
     await user.click(screen.getByRole('button', { name: /^Speichern$/ }));
 
     expect(await screen.findByText('Helena K. ist eingeladen.', {}, { timeout: 8000 })).toBeInTheDocument();

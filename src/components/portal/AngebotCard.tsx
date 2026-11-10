@@ -12,6 +12,7 @@ import { FormNav } from '../ui/FormNav';
 import { ProgressSteps } from '../ui/ProgressSteps';
 import { EYEBROW } from '../ui/SectionHeader';
 import { DateField, kalenderTag, localTodayIso } from './DateField';
+import { VorschlagText, VORSCHLAEGE } from './VorschlagText';
 import { StartWahl, startDatumAus, type StartWahlSchluessel } from './StartWahl';
 import { callMamamia } from '../../lib/mamamia/client';
 import { reportLeadEvent } from '../../lib/leadEvents';
@@ -1101,8 +1102,13 @@ export const AngebotCard: FC<{
                 </FormField>
                 {patient.nacht !== '' && patient.nacht !== 'Nein' && (
                   <FormField feld="nachtDetail" label="Was ist in der Nacht zu tun?">
+                    {schlicht ? (
+                      <VorschlagText wert={patient.nachtDetail} onWert={t => updatePatient(p => ({ ...p, nachtDetail: t }))}
+                      vorschlaege={VORSCHLAEGE.nacht} name="Was ist in der Nacht zu tun?" platzhalter="z. B. Toilettengang, Umlagern" feldKlasse={inputCls} />
+                    ) : (
                     <input value={patient.nachtDetail} onChange={set('nachtDetail')}
                       placeholder="z. B. Toilettengang, Umlagern" className={inputCls} />
+                    )}
                   </FormField>
                 )}
                 <FormField feld="inkontinenz" label="Inkontinenz">
@@ -1131,8 +1137,13 @@ export const AngebotCard: FC<{
                     </FormField>
                     {patient.p2_nacht !== '' && patient.p2_nacht !== 'Nein' && (
                       <FormField feld="p2_nachtDetail" label="Was ist in der Nacht zu tun?">
+                        {schlicht ? (
+                          <VorschlagText wert={patient.p2_nachtDetail} onWert={t => updatePatient(p => ({ ...p, p2_nachtDetail: t }))}
+                      vorschlaege={VORSCHLAEGE.nacht} name="Was ist in der Nacht zu tun? (Person 2)" platzhalter="z. B. Toilettengang, Umlagern" feldKlasse={inputCls} />
+                        ) : (
                         <input value={patient.p2_nachtDetail} onChange={set('p2_nachtDetail')}
                           placeholder="z. B. Toilettengang, Umlagern" className={inputCls} />
+                        )}
                       </FormField>
                     )}
                     <FormField feld="p2_inkontinenz" label="Inkontinenz">
@@ -1143,9 +1154,14 @@ export const AngebotCard: FC<{
                 )}
 
                 <FormField feld="diagnosen" label="Weitere Diagnosen">
+                  {schlicht ? (
+                    <VorschlagText wert={patient.diagnosen} onWert={t => updatePatient(p => ({ ...p, diagnosen: t }))}
+                      vorschlaege={VORSCHLAEGE.diagnosen} name="Weitere Diagnosen" platzhalter="z. B. Parkinson, Herzinsuffizienz, Diabetes" feldKlasse={inputCls} />
+                  ) : (
                   <textarea value={patient.diagnosen} onChange={set('diagnosen')}
                     placeholder="z. B. Parkinson, Herzinsuffizienz, Diabetes"
                     rows={2} className={`${inputCls} resize-none`} />
+                  )}
                 </FormField>
               </>
             )}
@@ -1331,9 +1347,16 @@ export const AngebotCard: FC<{
                     options={['Ja (nur Draußen)','Nein']} labels={{ 'Ja (nur Draußen)': 'Ja, nur draußen' }} />
                 </FormField>
                 <FormField feld="sonstigeWuensche" label="Sonstige Wünsche">
+                  {schlicht ? (
+                    <VorschlagText wert={patient.sonstigeWuensche} onWert={t => updatePatient(p => ({ ...p, sonstigeWuensche: t }))}
+                      // „Erfahrung mit Demenz“ nur, wenn bei einer Person Demenz angegeben ist.
+                      vorschlaege={VORSCHLAEGE.wuensche.filter(v => v !== 'Erfahrung mit Demenz' || [patient.demenz, patient.anzahl === '2' ? patient.p2_demenz : ''].some(d => d && d !== 'Nein'))}
+                      name="Sonstige Wünsche" platzhalter="z. B. Erfahrung mit Demenz, ruhige Person, tierlieb" feldKlasse={inputCls} />
+                  ) : (
                   <textarea value={patient.sonstigeWuensche} onChange={set('sonstigeWuensche')}
                     placeholder="z. B. Erfahrung mit Demenz, ruhige Person, tierlieb"
                     rows={2} className={`${inputCls} resize-none`} />
+                  )}
                 </FormField>
 
                 {/* SA-Gruppierung „Aufgaben & Pflegedienst" — Pflegedienst ist
@@ -1366,14 +1389,24 @@ export const AngebotCard: FC<{
                 </FormField>
                 {(patient.einkaeufe === 'Ja' || patient.einkaeufe === 'Gelegentlich') && (
                   <FormField feld="einkaeufeWie" label="Wie werden die Einkäufe erledigt?">
+                    {schlicht ? (
+                      <VorschlagText wert={patient.einkaeufeWie} onWert={t => updatePatient(p => ({ ...p, einkaeufeWie: t }))}
+                      vorschlaege={VORSCHLAEGE.einkaeufe} name="Wie werden die Einkäufe erledigt?" platzhalter="ÖPNV, zu Fuß, Fahrrad, Taxi, Auto" feldKlasse={inputCls} />
+                    ) : (
                     <input value={patient.einkaeufeWie} onChange={set('einkaeufeWie')}
                       placeholder="ÖPNV, zu Fuß, Fahrrad, Taxi, Auto" className={inputCls} />
+                    )}
                   </FormField>
                 )}
                 <FormField feld="aufgaben" label="Aufgaben der Pflegekraft">
+                  {schlicht ? (
+                    <VorschlagText wert={patient.aufgaben} onWert={t => updatePatient(p => ({ ...p, aufgaben: t }))}
+                      vorschlaege={VORSCHLAEGE.aufgaben} name="Aufgaben der Pflegekraft" platzhalter="z. B. Körperpflege, Mahlzeiten, Arztbegleitung, Einkäufe" feldKlasse={inputCls} />
+                  ) : (
                   <textarea value={patient.aufgaben} onChange={set('aufgaben')}
                     placeholder="z. B. Körperpflege, Mahlzeiten, Arztbegleitung, Einkäufe"
                     rows={3} className={`${inputCls} resize-none`} />
+                  )}
                 </FormField>
                 {/* Was das Absenden bedeutet, direkt über „Bewerbungen erhalten“: kostenlos,
                     unverbindlich, Vertrag erst mit Annahme und Unterschrift (Registry #109,
