@@ -109,7 +109,9 @@ export function VorschlagText({ wert, onWert, vorschlaege, name, feldKlasse, wei
         <textarea
           ref={feld}
           value={wert}
-          onChange={(e) => onWert(e.target.value)}
+          // Zeilenwechsel als Komma: Nach dem Absenden zeigt „Angaben ändern“ Nacht und Einkäufe in einem einzeiligen Feld,
+          // das Umbrüche wegwirft („ToilettengangTrinken geben“). Prüfung vor dem Live-Gang 10.11.2026.
+          onChange={(e) => onWert(e.target.value.replace(/[ \t]*\r?\n[\s]*/g, ', '))}
           aria-label={name}
           rows={1}
           className={`${feldKlasse} mt-2.5 resize-none overflow-hidden`}

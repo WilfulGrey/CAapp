@@ -70,6 +70,15 @@ describe('VorschlagText', () => {
     await userEvent.clear(feld);
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
+  it('Zeilenwechsel wird zum Komma (einzeilige Felder in „Angaben ändern“ würden ihn wegwerfen)', async () => {
+    render(<Rahmen />);
+    await userEvent.click(screen.getByRole('button', { name: 'Weiteres' }));
+    const feld = screen.getByRole('textbox');
+    await userEvent.type(feld, 'Toilettengang{Enter}Trinken geben');
+    expect(feld).toHaveValue('Toilettengang, Trinken geben');
+    await userEvent.click(screen.getByRole('button', { name: 'Kochen' }));
+    expect(feld).toHaveValue('Toilettengang, Trinken geben, Kochen');
+  });
   it('alter Freitext: Feld sofort sichtbar, passende Vorschläge gewählt', () => {
     render(<Rahmen start="Haushalt, Garten" />);
     expect(screen.getByRole('textbox')).toHaveValue('Haushalt, Garten');
