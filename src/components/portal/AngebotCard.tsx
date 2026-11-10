@@ -733,10 +733,15 @@ export const AngebotCard: FC<{
     // visible, gate stays closed until updateCustomer
     // resolves. On error: form re-opens, gate stays
     // closed, parent shows a toast.
+    // Startwahl (Martin 10.11.2026: „immer den ersten Wert“ ab heute): beim Speichern frisch rechnen, falls der Tab seit dem Tipp
+    // über Nacht offen war. Nach einem Neuladen steht die Wahl als „Ab einem Datum“ da, dann bleibt das gespeicherte Datum.
+    const frischerStart = startWahl && startWahl !== 'datum' ? startDatumAus(startWahl) : null;
+    const zuSpeichern = frischerStart && frischerStart !== patient.startDate ? { ...patient, startDate: frischerStart } : patient;
+    if (zuSpeichern !== patient) setPatient(zuSpeichern);
     if (mamamiaEnabled && onSaveToMamamia) {
       setIsSaving(true);
       try {
-        await onSaveToMamamia(patient);
+        await onSaveToMamamia(zuSpeichern);
         speicherAntwort('ok');
         setSaved(true);
         setPatientOpen(false);
