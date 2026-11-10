@@ -16,18 +16,18 @@ export function ProgressSteps({
     return (
       <div>
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[13.5px] text-pm-muted">
+          <p className="min-w-0 text-[14.5px] text-pm-muted">
             <span>Schritt {aktuell + 1} von {schritte.length}</span>
             <span aria-hidden="true"> · </span>
-            <b className="font-semibold text-pm-ink">{schritte[aktuell]}</b>
+            <b className="whitespace-nowrap font-semibold text-pm-ink">{schritte[aktuell]}</b>
           </p>
           {onZurueck && (
             <button
               type="button"
               onClick={onZurueck}
-              className="-my-3 inline-flex min-h-[44px] flex-none items-center text-[13.5px] font-medium text-pm-muted underline decoration-pm-line underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-pm-taupe"
+              className="-my-3 inline-flex min-h-[44px] flex-none items-center gap-0.5 text-[16px] font-semibold text-pm-taupe-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-pm-taupe"
             >
-              Zurück
+              <span aria-hidden="true" className="text-[19px] leading-none">‹</span>Zurück
             </button>
           )}
         </div>

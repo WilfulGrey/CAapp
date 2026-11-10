@@ -7,11 +7,13 @@ import {
 } from '../../lib/supabase';
 import { ChipSelect } from './ChipSelect';
 import { Card } from '../ui/Card';
-import { FormField } from '../ui/FormField';
+import { FormField, FormLesbar } from '../ui/FormField';
 import { FormNav } from '../ui/FormNav';
 import { ProgressSteps } from '../ui/ProgressSteps';
 import { EYEBROW } from '../ui/SectionHeader';
 import { DateField, kalenderTag, localTodayIso } from './DateField';
+import { VorschlagText, VORSCHLAEGE, passendeVorschlaege } from './VorschlagText';
+import { StartWahl, startDatumAus, type StartWahlSchluessel } from './StartWahl';
 import { callMamamia } from '../../lib/mamamia/client';
 import { reportLeadEvent } from '../../lib/leadEvents';
 import { neuBelegteFelder } from '../../lib/messWerte';
@@ -489,6 +491,9 @@ export const AngebotCard: FC<{
   // grau, und bei unvollständigem Schritt passierte schlicht NICHTS. Kein
   // Hinweis, welches Feld fehlt; auf Touch nicht einmal ein Hover, der die
   // Sperre andeutet. (Beim Prüfen bin ich zweimal selbst hängengeblieben.)
+  // Startwahl wie in der CG-App (StartWahl.tsx): ein schon gespeichertes Datum erscheint als „Ab einem Datum“.
+  const [startWahl, setStartWahl] = useState<StartWahlSchluessel | ''>(() => (patient.startDate ? 'datum' : ''));
+
   const FIELD_LABELS: Record<string, string> = {
     anzahl: 'Anzahl zu betreuender Personen',
     geschlecht: 'Geschlecht', p2_geschlecht: 'Geschlecht (Person 2)',
@@ -570,7 +575,8 @@ export const AngebotCard: FC<{
     if (k === 'plz') return einsatzortFehler ?? undefined;
     if (!offen.includes(k)) return undefined;
     if (k === 'geburtsjahr' || k === 'p2_geburtsjahr') return 'Bitte ein Jahr zwischen 1920 und 2010 eintragen';
-    if (k === 'startDate') return 'Bitte ein Datum wählen. Eine Schätzung reicht.';
+    // Startwahl (Minimal-Einstieg): ohne Wahl wie bei allen Auswahlen, bei „Ab einem Datum“ ohne Tag wie bisher.
+    if (k === 'startDate') return schlicht && startWahl !== 'datum' ? 'Bitte eine Antwort wählen' : 'Bitte ein Datum wählen. Eine Schätzung reicht.';
     if (k === 'phone') {
       return patient.phone.trim() ? 'Die Nummer ist zu kurz oder zu lang. Bitte prüfen.' : 'Bitte eine Telefonnummer eintragen';
     }
@@ -582,7 +588,9 @@ export const AngebotCard: FC<{
   const navHinweis = (() => {
     if (!fehlerZeigen) return null;
     // Suchfehler beim Einsatzort sperrt nicht, soll aber gesehen werden.
-    if (offen.length === 0) return einsatzortFehler;
+    // Nur in Schritt 3, wo der Einsatzort steht (Prüfung 09.11.2026: nach einer Korrektur in Schritt 1 oder 2 stand hier der
+    // Postleitzahl-Hinweis, und Tippen darauf bewirkte nichts; so auch im Live-Stand).
+    if (offen.length === 0) return step === 2 ? einsatzortFehler : null;
     if (offen.length === 1 && offen[0] === 'plz' && einsatzortFehler) return einsatzortFehler;
     // Beim Ehepaar heißt Person 1 auch so — sonst stünde „Geschlecht,
     // Geschlecht (Person 2)" im Hinweis.
@@ -608,8 +616,9 @@ export const AngebotCard: FC<{
   };
 
   const inputCls =
-    'w-full min-h-[48px] rounded-[14px] border-[1.5px] border-pm-chip bg-white px-3.5 py-3 text-[16px] text-pm-ink ' +
-    'placeholder:text-pm-mute focus:outline-none focus:border-pm-taupe focus:ring-2 focus:ring-pm-taupe/15 transition-colors';
+    'w-full min-h-[48px] rounded-[14px] border-[1.5px] border-pm-chip bg-white px-3.5 py-3 text-pm-ink ' +
+    (schlicht ? 'text-[16.5px] placeholder:text-pm-muted ' : 'text-[16px] placeholder:text-pm-mute ') +
+    'focus:outline-none focus:border-pm-taupe focus:ring-2 focus:ring-pm-taupe/15 transition-colors';
   const inputFehlerCls = ' !border-pm-error';
 
   // Desktop: the phone-frame div (#portal-scroll-container) is the scroller.
@@ -724,10 +733,15 @@ export const AngebotCard: FC<{
     // visible, gate stays closed until updateCustomer
     // resolves. On error: form re-opens, gate stays
     // closed, parent shows a toast.
+    // Startwahl (Martin 10.11.2026: „immer den ersten Wert“ ab heute): beim Speichern frisch rechnen, falls der Tab seit dem Tipp
+    // über Nacht offen war. Nach einem Neuladen steht die Wahl als „Ab einem Datum“ da, dann bleibt das gespeicherte Datum.
+    const frischerStart = startWahl && startWahl !== 'datum' ? startDatumAus(startWahl) : null;
+    const zuSpeichern = frischerStart && frischerStart !== patient.startDate ? { ...patient, startDate: frischerStart } : patient;
+    if (zuSpeichern !== patient) setPatient(zuSpeichern);
     if (mamamiaEnabled && onSaveToMamamia) {
       setIsSaving(true);
       try {
-        await onSaveToMamamia(patient);
+        await onSaveToMamamia(zuSpeichern);
         speicherAntwort('ok');
         setSaved(true);
         setPatientOpen(false);
@@ -772,7 +786,22 @@ export const AngebotCard: FC<{
 
   // Werte aus dem Kostenrechner (bestimmen den Preis) — fest, mit Schloss.
   // Tippen erklärt, warum; vorher war das ein 14-px-Info-Knopf neben dem Label.
-  const festWert = (key: string, wert: ReactNode) => (
+  // Minimal-Einstieg (Martin 09.11.2026: „zu klein und teilweise zu viel“): der feste Wert steht rechts in der Zeile der Frage,
+  // ohne Kasten über die ganze Breite und ohne die Zeile „Aus Ihrem Kostenrechner übernommen“; der Tipp erklärt wie bisher.
+  const festHinweis = (key: string) => (priceInfo === key
+    ? 'Diese Angabe bestimmt den Preis. Ändern kann sie Ihre Beraterin, dann schicken wir Ihnen ein neues Angebot.'
+    : 'Aus Ihrem Kostenrechner übernommen');
+  const festWert = (key: string, wert: ReactNode) => schlicht ? (
+    <button
+      type="button"
+      onClick={() => setPriceInfo(priceInfo === key ? null : key)}
+      aria-expanded={priceInfo === key}
+      className="-my-2 flex min-h-[44px] items-center gap-2 text-left text-[17px] font-semibold text-pm-ink"
+    >
+      <span>{wert}</span>
+      <Lock className="w-4 h-4 flex-none text-pm-muted" aria-hidden="true" />
+    </button>
+  ) : (
     <>
       <button
         type="button"
@@ -796,10 +825,12 @@ export const AngebotCard: FC<{
   // „Nachteinsätze“ zweimal): Band über die ganze Kartenbreite mit Nummer im Kreis statt der kleinen Überschrift.
   const personKopf = (text: string) => (schlicht ? (
     <div className="-mx-4 mt-4 flex items-center gap-2.5 border-y border-pm-line bg-pm-grund px-4 py-2.5 [&+[data-field]]:border-t-0" data-person-kopf>
-      <span aria-hidden="true" className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-pm-ink text-[12.5px] font-bold text-white">
-        {text.replace(/\D/g, '')}
-      </span>
-      <p className="text-[15.5px] font-semibold text-pm-ink">{text}</p>
+      {/\d/.test(text) && (
+        <span aria-hidden="true" className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-pm-ink text-[12.5px] font-bold text-white">
+          {text.replace(/\D/g, '')}
+        </span>
+      )}
+      <p className="text-[18px] font-bold text-pm-ink">{text}</p>
     </div>
   ) : (
     <p className={`${EYEBROW} pt-6 [&+[data-field]]:border-t-0 [&+[data-field]]:pt-3`}>{text}</p>
@@ -821,6 +852,13 @@ export const AngebotCard: FC<{
       className={inputCls + ' max-w-[160px] tabular-nums' + (fehlerFuer(k) ? inputFehlerCls : '')}
     />
   );
+
+  // Telefonfeld im Minimal-Einstieg: EINMAL beim ersten Anzeigen von Schritt 3 entscheiden, nicht bei jeder Eingabe (Prüfung
+  // 09.11.2026: sonst verschwand das Feld bei einer Anfrage ohne Nummer nach der 8. Ziffer mitten im Tippen). Wer es einmal
+  // gesehen hat, behält es bis zum Absenden.
+  const telefonFeld = useRef<boolean | null>(null);
+  if (step === 2 && telefonFeld.current === null) telefonFeld.current = !isPlausibleGermanPhone(patient.phone);
+  const telefonZeigen = !schlicht || telefonFeld.current !== false;
 
   const letzterSchritt = step === STEP_LABELS.length - 1;
   // Schon abgeschickt (lokal oder laut mamamia aktiv) → nur Angaben ändern: kein erneutes
@@ -948,8 +986,9 @@ export const AngebotCard: FC<{
           <div className={schlicht ? '-mx-4 mb-1 rounded-t-card bg-pm-coral-tint px-4 pt-4 pb-3.5' : ''}>
           {schlicht && kopf && (
             <div className="mb-3">
-              <h2 className="text-[17px] font-semibold leading-6 text-pm-ink">{kopf.titel}</h2>
-              <p className="mt-1 text-[13.5px] leading-[1.45] text-pm-body">{kopf.zeile}</p>
+              <h2 className="text-[20px] font-bold leading-[26px] text-pm-ink">{kopf.titel}</h2>
+              {/* Satz nur im ersten Schritt (Prüfung 09.11.: in größerer Schrift vier Zeilen auf jedem Schritt). */}
+              {step === 0 && <p className="mt-1 text-[15px] leading-[1.45] text-pm-body">{kopf.zeile}</p>}
             </div>
           )}
           <ProgressSteps
@@ -965,13 +1004,14 @@ export const AngebotCard: FC<{
           </div>
 
           {/* Minimal-Einstieg: Felder etwas enger (Martin 08.11.: „die Abstände … einen Tick verkleinern“), 14 statt 18 px. */}
+          <FormLesbar.Provider value={schlicht}>
           <div className={schlicht ? 'mt-2 [&_[data-field]]:pb-[14px] [&_[data-field]:not(:first-child)]:pt-[14px]' : 'mt-2'}>
             {/* ── Einstieg (Minimal), erste Hälfte von Schritt 1: Anzahl (fest, preisrelevant) und Geschlecht, Wortlaut wie bisher
                 (Martin 08.11.: „Personen … können wir nicht ändern. Weil das preisrelevant ist … dann fragst du noch ein
                 Geschlecht“). Die letzte Antwort führt von selbst weiter. ── */}
             {step === 0 && einstiegAktiv && (
               <>
-                <FormField feld="anzahl" label="Anzahl zu betreuender Personen">
+                <FormField feld="anzahl" label="Anzahl zu betreuender Personen" hinweis={schlicht ? festHinweis('anzahl') : undefined}>
                   {festWert('anzahl', patient.anzahl === '2' ? '2 Personen' : '1 Person')}
                 </FormField>
                 {(zwei ? (['geschlecht', 'p2_geschlecht'] as const) : (['geschlecht'] as const)).map((k, i) => (
@@ -989,7 +1029,7 @@ export const AngebotCard: FC<{
             {step === 0 && !einstiegAktiv && (
               <>
                 {!(schlicht && einstiegSeite) && (
-                <FormField feld="anzahl" label="Anzahl zu betreuender Personen">
+                <FormField feld="anzahl" label="Anzahl zu betreuender Personen" hinweis={schlicht ? festHinweis('anzahl') : undefined}>
                   {festWert('anzahl', patient.anzahl === '2' ? '2 Personen' : '1 Person')}
                 </FormField>
                 )}
@@ -1051,7 +1091,7 @@ export const AngebotCard: FC<{
             {step === 1 && (
               <>
                 {zwei && personKopf('Person 1')}
-                <FormField feld="mobilitaet" label="Mobilität">
+                <FormField feld="mobilitaet" label="Mobilität" zeile={schlicht && 'frei'} hinweis={schlicht ? festHinweis('mobilitaet') : undefined}>
                   {festWert('mobilitaet', patient.mobilitaet)}
                 </FormField>
                 <FormField feld="heben" label="Heben erforderlich?" pflicht fehler={fehlerFuer('heben')}>
@@ -1062,13 +1102,18 @@ export const AngebotCard: FC<{
                   <ChipSelect invalid={!!fehlerFuer('demenz')} value={patient.demenz} onChange={v => updatePatient(p=>({...p,demenz:v}))}
                     options={DEMENZ} />
                 </FormField>
-                <FormField feld="nacht" label="Nachteinsätze">
+                <FormField feld="nacht" label="Nachteinsätze" zeile={schlicht && 'frei'} hinweis={schlicht ? festHinweis('nacht') : undefined}>
                   {festWert('nacht', patient.nacht)}
                 </FormField>
                 {patient.nacht !== '' && patient.nacht !== 'Nein' && (
                   <FormField feld="nachtDetail" label="Was ist in der Nacht zu tun?">
+                    {schlicht ? (
+                      <VorschlagText wert={patient.nachtDetail} onWert={t => updatePatient(p => ({ ...p, nachtDetail: t }))}
+                      vorschlaege={VORSCHLAEGE.nacht} name="Was ist in der Nacht zu tun?" feldKlasse={inputCls} />
+                    ) : (
                     <input value={patient.nachtDetail} onChange={set('nachtDetail')}
                       placeholder="z. B. Toilettengang, Umlagern" className={inputCls} />
+                    )}
                   </FormField>
                 )}
                 <FormField feld="inkontinenz" label="Inkontinenz">
@@ -1097,8 +1142,13 @@ export const AngebotCard: FC<{
                     </FormField>
                     {patient.p2_nacht !== '' && patient.p2_nacht !== 'Nein' && (
                       <FormField feld="p2_nachtDetail" label="Was ist in der Nacht zu tun?">
+                        {schlicht ? (
+                          <VorschlagText wert={patient.p2_nachtDetail} onWert={t => updatePatient(p => ({ ...p, p2_nachtDetail: t }))}
+                      vorschlaege={VORSCHLAEGE.nacht} name="Was ist in der Nacht zu tun? (Person 2)" feldKlasse={inputCls} />
+                        ) : (
                         <input value={patient.p2_nachtDetail} onChange={set('p2_nachtDetail')}
                           placeholder="z. B. Toilettengang, Umlagern" className={inputCls} />
+                        )}
                       </FormField>
                     )}
                     <FormField feld="p2_inkontinenz" label="Inkontinenz">
@@ -1109,9 +1159,14 @@ export const AngebotCard: FC<{
                 )}
 
                 <FormField feld="diagnosen" label="Weitere Diagnosen">
+                  {schlicht ? (
+                    <VorschlagText wert={patient.diagnosen} onWert={t => updatePatient(p => ({ ...p, diagnosen: t }))}
+                      vorschlaege={VORSCHLAEGE.diagnosen} name="Weitere Diagnosen" feldKlasse={inputCls} />
+                  ) : (
                   <textarea value={patient.diagnosen} onChange={set('diagnosen')}
                     placeholder="z. B. Parkinson, Herzinsuffizienz, Diabetes"
                     rows={2} className={`${inputCls} resize-none`} />
+                  )}
                 </FormField>
               </>
             )}
@@ -1156,7 +1211,8 @@ export const AngebotCard: FC<{
                     )}
                   </div>
                 </FormField>
-                <FormField feld="haushalt" label="Weitere Personen im Haushalt">
+                {/* Bleibt auch im Minimal-Einstieg (Martin 10.11.2026: „preisrelevant und müssen bleiben“), dort wie „Anzahl“. */}
+                <FormField feld="haushalt" label="Weitere Personen im Haushalt" hinweis={schlicht ? festHinweis('haushalt') : undefined}>
                   {festWert('haushalt', patient.haushalt || <span className="text-pm-mute">Nicht angegeben</span>)}
                 </FormField>
                 <FormField feld="familieNahe" label="Familie in der Nähe (bis 20 km)">
@@ -1198,6 +1254,31 @@ export const AngebotCard: FC<{
                     Onboard-Wert ist eine Schätzung, und ein vorbelegtes Datum
                     würde arglos bestätigt und der Job mit falschem Termin
                     angelegt. */}
+                {schlicht ? (
+                <FormField feld="startDate" label="Voraussichtliches Startdatum" pflicht fehler={fehlerFuer('startDate')}
+                  hinweis="Noch unklar? Eine grobe Schätzung reicht.">
+                  <StartWahl
+                    name="Voraussichtliches Startdatum"
+                    wert={startWahl}
+                    invalid={!!fehlerFuer('startDate')}
+                    onWahl={key => {
+                      setStartWahl(key);
+                      // „Ab einem Datum“: Feld leeren, bis der Kunde einen Tag wählt (sonst bliebe der Tag der vorigen Wahl).
+                      updatePatient(p => ({ ...p, startDate: startDatumAus(key) ?? (key === 'datum' && startWahl === 'datum' ? p.startDate : '') }));
+                    }}
+                    datumFeld={
+                      <DateField
+                        value={patient.startDate}
+                        min={startDatumAus('sofort') ?? localTodayIso()}
+                        invalid={!!fehlerFuer('startDate')}
+                        onChange={iso => updatePatient(p => ({ ...p, startDate: iso }))}
+                        onGeoeffnet={() => onMesspunkt?.('kalender_geoeffnet')}
+                        onGeschlossen={(gewaehlt) => { if (!gewaehlt && !patient.startDate) onMesspunkt?.('kalender_zu_ohne_datum'); }}
+                      />
+                    }
+                  />
+                </FormField>
+                ) : (
                 <FormField feld="startDate" label="Voraussichtliches Startdatum" pflicht fehler={fehlerFuer('startDate')}
                   hinweis="Noch unklar? Eine grobe Schätzung reicht.">
                   <DateField
@@ -1209,6 +1290,7 @@ export const AngebotCard: FC<{
                     onGeschlossen={(gewaehlt) => { if (!gewaehlt && !patient.startDate) onMesspunkt?.('kalender_zu_ohne_datum'); }}
                   />
                 </FormField>
+                )}
                 {/* Rückrufnummer IMMER hier, neben dem Termin (Martin, 17.09.:
                     „dass die Telefonnummer immer dort steht, man kann sie
                     überprüfen, anpassen oder ergänzen — muss auf jeden Fall
@@ -1220,6 +1302,9 @@ export const AngebotCard: FC<{
                     und über lead-event zurück in leads.telefon — beide Wege
                     gab es schon. Nicht wieder nach Step 5 auslagern: 06.–14.06.
                     halbierte das die Tel-Quote (67 % → 34 %). */}
+                {/* Minimal-Einstieg (Martin 09.11.2026: „die telefonnummer würde ich rausnehmen, weil wir die doch schon haben“): das
+                    Feld steht nur noch, wenn die Nummer fehlt oder nicht stimmt (seit 10.10. kam jede Anfrage mit Nummer). */}
+                {telefonZeigen && (
                 <FormField feld="phone" label="Telefonnummer für Rückfragen" pflicht fehler={fehlerFuer('phone')}
                   // Martin 17.09.: nicht „bitte prüfen" — sagen, WANN wir anrufen.
                   hinweis="Nur bei Rückfragen oder wenn etwas dringend geklärt werden muss.">
@@ -1234,6 +1319,7 @@ export const AngebotCard: FC<{
                     className={inputCls + (fehlerFuer('phone') ? inputFehlerCls : '')}
                   />
                 </FormField>
+                )}
               </>
             )}
 
@@ -1244,9 +1330,11 @@ export const AngebotCard: FC<{
                   <ChipSelect invalid={!!fehlerFuer('wunschGeschlecht')} value={patient.wunschGeschlecht} onChange={v => updatePatient(p=>({...p,wunschGeschlecht:v}))}
                     options={['Egal','Weiblich','Männlich']} />
                 </FormField>
-                <FormField feld="sprache" label="Sprachniveau">
+                {!(schlicht && !germanySkillLabel(mmCustomer?.customer_caregiver_wish?.germany_skill)) && (
+                <FormField feld="sprache" label="Sprachniveau" zeile={schlicht && 'frei'} hinweis={schlicht ? festHinweis('sprache') : undefined}>
                   {festWert('sprache', germanySkillLabel(mmCustomer?.customer_caregiver_wish?.germany_skill) || '—')}
                 </FormField>
+                )}
                 <FormField feld="fuehrerschein" label="Führerschein erforderlich?" pflicht fehler={fehlerFuer('fuehrerschein')}>
                   <ChipSelect invalid={!!fehlerFuer('fuehrerschein')} value={patient.fuehrerschein}
                     onChange={v => updatePatient(p => ({ ...p, fuehrerschein: v, wunschGetriebe: v === 'Nein' ? '' : p.wunschGetriebe }))}
@@ -1264,9 +1352,19 @@ export const AngebotCard: FC<{
                     options={['Ja (nur Draußen)','Nein']} labels={{ 'Ja (nur Draußen)': 'Ja, nur draußen' }} />
                 </FormField>
                 <FormField feld="sonstigeWuensche" label="Sonstige Wünsche">
+                  {schlicht ? (
+                    <VorschlagText wert={patient.sonstigeWuensche} onWert={t => updatePatient(p => ({ ...p, sonstigeWuensche: t }))}
+                      // „Erfahrung mit Demenz“ nur bei Demenz, „tierlieb“ nur mit Haustieren (stehen sie schon im Text, bleiben sie zum Abwählen).
+                      vorschlaege={passendeVorschlaege(VORSCHLAEGE.wuensche, patient.sonstigeWuensche, [
+                        ...([patient.demenz, patient.anzahl === '2' ? patient.p2_demenz : ''].some(d => d && d !== 'Nein') ? [] : ['Erfahrung mit Demenz']),
+                        ...(patient.tiere === 'Keine' ? ['tierlieb'] : []),
+                      ])}
+                      name="Sonstige Wünsche" feldKlasse={inputCls} />
+                  ) : (
                   <textarea value={patient.sonstigeWuensche} onChange={set('sonstigeWuensche')}
                     placeholder="z. B. Erfahrung mit Demenz, ruhige Person, tierlieb"
                     rows={2} className={`${inputCls} resize-none`} />
+                  )}
                 </FormField>
 
                 {/* SA-Gruppierung „Aufgaben & Pflegedienst" — Pflegedienst ist
@@ -1299,14 +1397,24 @@ export const AngebotCard: FC<{
                 </FormField>
                 {(patient.einkaeufe === 'Ja' || patient.einkaeufe === 'Gelegentlich') && (
                   <FormField feld="einkaeufeWie" label="Wie werden die Einkäufe erledigt?">
+                    {schlicht ? (
+                      <VorschlagText wert={patient.einkaeufeWie} onWert={t => updatePatient(p => ({ ...p, einkaeufeWie: t }))}
+                      vorschlaege={passendeVorschlaege(VORSCHLAEGE.einkaeufe, patient.einkaeufeWie, patient.fuehrerschein === 'Nein' ? ['Auto'] : [])} name="Wie werden die Einkäufe erledigt?" feldKlasse={inputCls} />
+                    ) : (
                     <input value={patient.einkaeufeWie} onChange={set('einkaeufeWie')}
                       placeholder="ÖPNV, zu Fuß, Fahrrad, Taxi, Auto" className={inputCls} />
+                    )}
                   </FormField>
                 )}
                 <FormField feld="aufgaben" label="Aufgaben der Pflegekraft">
+                  {schlicht ? (
+                    <VorschlagText wert={patient.aufgaben} onWert={t => updatePatient(p => ({ ...p, aufgaben: t }))}
+                      vorschlaege={VORSCHLAEGE.aufgaben} name="Aufgaben der Pflegekraft" feldKlasse={inputCls} />
+                  ) : (
                   <textarea value={patient.aufgaben} onChange={set('aufgaben')}
                     placeholder="z. B. Körperpflege, Mahlzeiten, Arztbegleitung, Einkäufe"
                     rows={3} className={`${inputCls} resize-none`} />
+                  )}
                 </FormField>
                 {/* Was das Absenden bedeutet, direkt über „Bewerbungen erhalten“: kostenlos,
                     unverbindlich, Vertrag erst mit Annahme und Unterschrift (Registry #109,
@@ -1321,6 +1429,7 @@ export const AngebotCard: FC<{
               </>
             )}
           </div>
+          </FormLesbar.Provider>
 
           <FormNav
             ruhig={eingebettet}
@@ -1334,10 +1443,11 @@ export const AngebotCard: FC<{
             // Rückbau Registry #122: vor dem ersten Speichern wieder „Speichern", „Zurück" als Knopf daneben (Stand 75b8df8).
             // Minimal-Einstieg: im letzten Schritt „Bewerbungen erhalten“ (Martin 08.11.: „wozu brauche ich dann Bewerbungen
             // erhalten? … dann ist es vorbei“, also erst am Ende), davor „Weiter →“.
-            weiterText={letzterSchritt ? (nurAenderung ? 'Änderungen speichern' : stand75b8df8 && !schlicht ? 'Speichern' : 'Bewerbungen erhalten') : 'Weiter →'}
+            // Seit 10.11.2026 im Minimal-Einstieg nur „Speichern“ (Martin: „letzter Schritt Button nur: Speichern“).
+            weiterText={letzterSchritt ? (nurAenderung ? 'Änderungen speichern' : schlicht || stand75b8df8 ? 'Speichern' : 'Bewerbungen erhalten') : 'Weiter →'}
             zurueckAlsLink={letzterSchritt && !stand75b8df8 && !schlicht ? `Zurück zu Schritt ${step}` : undefined}
             laedt={isSaving}
-            ladeText={nurAenderung || (stand75b8df8 && !schlicht) ? 'Speichern…' : 'Wird gesendet…'}
+            ladeText={nurAenderung || schlicht || stand75b8df8 ? 'Speichern…' : 'Wird gesendet…'}
             hinweis={(einstiegAktiv ? einstiegHinweis : navHinweis) && (
               <button
                 type="button"
@@ -1353,7 +1463,7 @@ export const AngebotCard: FC<{
       {/* Unter der Karte statt in der mitlaufenden Leiste — dort kostete die
           zweite Zeile auf dem Handy Platz über dem Formular. */}
       {patientOpen && (
-        <p className="mt-3 text-center text-[13px] text-pm-muted">Ihre Eingaben bleiben auf diesem Gerät gespeichert.</p>
+        <p className={`mt-3 text-center ${schlicht ? 'text-[14.5px]' : 'text-[13px]'} text-pm-muted`}>Ihre Eingaben bleiben auf diesem Gerät gespeichert.</p>
       )}
     </div>
   );

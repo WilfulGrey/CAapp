@@ -312,7 +312,7 @@ export function EinladenSheetVorSpeichern({ offen, name, onClose, onVervollstaen
 // ── Zeile über dem Formular: wer nach dem Speichern eingeladen wird ──────────────────────────────────────────────────────
 export type VorgemerkteKraft = { caregiverId: number; name: string; image?: string; color: string; initialen: string };
 
-export function VormerkZeile({ kraefte }: { kraefte: VorgemerkteKraft[] }) {
+export function VormerkZeile({ kraefte, gross = false }: { kraefte: VorgemerkteKraft[]; gross?: boolean }) {
   if (kraefte.length === 0) return null;
   return (
     <div data-vormerk-zeile className="flex items-center gap-2.5 px-1 pt-3 pb-3">
@@ -325,7 +325,7 @@ export function VormerkZeile({ kraefte }: { kraefte: VorgemerkteKraft[] }) {
           </span>
         ))}
       </span>
-      <p className="min-w-0 text-[14.5px] leading-snug text-pm-ink">
+      <p className={`min-w-0 ${gross ? 'text-[15.5px]' : 'text-[14.5px]'} leading-snug text-pm-ink`}>
         Nach dem Speichern laden wir {namenListe(kraefte.map((k) => k.name))} für Sie ein.
       </p>
     </div>
@@ -342,7 +342,7 @@ export function AbschnittPflegesituation({ vorgemerkte, formular, schlicht = fal
     // Pflegekraft darüber (Martin 08.11.: „dann lande ich hier irgendwo beim Ablauf“).
     return (
       <div id="patientendaten" className="pt-5 scroll-mt-10">
-        <VormerkZeile kraefte={vorgemerkte} />
+        <VormerkZeile kraefte={vorgemerkte} gross />
         {formular}
       </div>
     );
