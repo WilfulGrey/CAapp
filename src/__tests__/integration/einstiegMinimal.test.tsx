@@ -417,8 +417,8 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     await user.click(within(zeileVon('Helena')).getByRole('button', { name: 'Einladen' }));
     await user.click(within(await screen.findByRole('dialog', { name: 'Helena K. einladen' })).getByRole('button', { name: 'Später' }));
     expect(eingeladen).toEqual([]);
-    // Knopf unter dem Formular: „Weiter →“ (mit „Zurück“ klein in der Schrittzeile), im letzten Schritt „Bewerbungen
-    // erhalten“ (Martin 08.11.: erst dann ist es „vorbei“), nicht „Speichern“.
+    // Knopf unter dem Formular: „Weiter →“ (mit „Zurück“ klein in der Schrittzeile), im letzten Schritt „Speichern“
+    // (Martin 10.11.2026: „letzter Schritt Button nur: Speichern“; vorher „Bewerbungen erhalten“).
     expect(screen.getByText(/Schritt 1 von 4/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Zurück' })).toBeNull();
     await user.click(screen.getByRole('button', { name: /^Weiter →$/ }));
@@ -427,8 +427,8 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(await screen.findByText(/Schritt 1 von 4/)).toBeInTheDocument();
     for (let i = 0; i < 3; i++) await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }));
     expect(await screen.findByText(/Schritt 4 von 4/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^(Weiter|Speichern)/ })).toBeNull();
-    await user.click(screen.getByRole('button', { name: /^Bewerbungen erhalten$/ }));
+    expect(screen.queryByRole('button', { name: /^Weiter/ })).toBeNull();
+    await user.click(screen.getByRole('button', { name: /^Speichern$/ }));
 
     expect(await screen.findByText('Helena K. ist eingeladen.', {}, { timeout: 8000 })).toBeInTheDocument();
     expect(eingeladen).toEqual([50002]);

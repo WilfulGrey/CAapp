@@ -55,10 +55,8 @@ export function useKnopfleisteImFluss() {
 }
 
 export function FormNav({
-  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, zurueckAlsLink, ruhig = false, stand75b8df8 = false, band = false, unterzeile,
+  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, zurueckAlsLink, ruhig = false, stand75b8df8 = false, band = false,
 }: {
-  /** Nur mit `band`: kleine Zeile unter dem Knopf, z. B. „100% kostenfrei & unverbindlich“ im letzten Schritt. */
-  unterzeile?: string;
   /** Minimal-Einstieg (Registry #147): Knopf fest UNTER dem Formular, klebt nie (Martin 08.11.: „den Button dann schon immer
    *  unter dem Formular lassen und nicht mehr Flugding“), 52 px hoch mit 12 px Rundung wie der feste Knopf darüber. */
   band?: boolean;
@@ -98,7 +96,6 @@ export function FormNav({
           {weiterText}
         </Button>
       </div>
-      {band && unterzeile && <p className="mt-2 text-center text-[14.5px] font-medium text-pm-muted">{unterzeile}</p>}
       {onZurueck && zurueckAlsLink && (
         <div className="mt-1 text-center">
           <Button variante="link" onClick={onZurueck} className="text-[15px]">{zurueckAlsLink}</Button>

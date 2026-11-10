@@ -265,8 +265,10 @@ export function PflegekraftZeile({ nurse, preis, vorgemerkt, gesperrt, onNurseCl
       Bitte warten…
     </button>
   ) : vorgemerkt ? (
-    <button type="button" onClick={einladen} aria-label={`${EINGELADEN} ✓`} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} gap-1 bg-pm-green text-[15px] text-white`}>
-      <Check aria-hidden="true" className="h-4 w-4 flex-none" strokeWidth={3} />{EINGELADEN}
+    // Martin 10.11.2026: „wenn eingeladen, dann kein button, sondern nur grün und text“ — ohne Fläche und Rahmen, rechtsbündig
+    // unter dem Preis; tippbar bleibt es (öffnet das Fenster erneut, Logik #145).
+    <button type="button" onClick={einladen} aria-label={`${EINGELADEN} ✓`} className={`${TIPPFLAECHE} ${FOKUS} flex h-11 w-[108px] max-[374px]:w-[104px] flex-none items-center justify-end gap-1 rounded-[10px] whitespace-nowrap text-[15.5px] font-bold text-pm-green-deep`}>
+      <Check aria-hidden="true" className="h-[18px] w-[18px] flex-none" strokeWidth={3} />{EINGELADEN}
     </button>
   ) : (
     <button type="button" onClick={einladen} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} border-2 border-pm-green bg-white text-[15.5px] text-pm-green-deep hover:bg-pm-mint`}>

@@ -1190,11 +1190,10 @@ export const AngebotCard: FC<{
                     )}
                   </div>
                 </FormField>
-                {!schlicht && (
-                <FormField feld="haushalt" label="Weitere Personen im Haushalt">
+                {/* Bleibt auch im Minimal-Einstieg (Martin 10.11.2026: „preisrelevant und müssen bleiben“), dort wie „Anzahl“. */}
+                <FormField feld="haushalt" label="Weitere Personen im Haushalt" hinweis={schlicht ? festHinweis('haushalt') : undefined}>
                   {festWert('haushalt', patient.haushalt || <span className="text-pm-mute">Nicht angegeben</span>)}
                 </FormField>
-                )}
                 <FormField feld="familieNahe" label="Familie in der Nähe (bis 20 km)">
                   <ChipSelect value={patient.familieNahe} onChange={v => updatePatient(p=>({...p,familieNahe:v}))}
                     options={['Ja','Nein']} />
@@ -1395,8 +1394,6 @@ export const AngebotCard: FC<{
             ruhig={eingebettet}
             stand75b8df8={stand75b8df8}
             band={schlicht}
-            // Wortlaut der Unterzeile des festen Knopfs (EinstiegMinimal FEST_ZEILE), dort, wo der Kunde absendet.
-            unterzeile={schlicht && letzterSchritt && !nurAenderung ? '100% kostenfrei & unverbindlich' : undefined}
             // Minimal-Einstieg: „Zurück“ steht klein in der Schrittzeile, unter dem Formular nur der eine Knopf.
             onZurueck={!schlicht && step > 0 ? zurueck : undefined}
             onWeiter={einstiegAktiv ? einstiegWeiter : letzterSchritt ? () => { void speichern(); } : weiter}
@@ -1405,10 +1402,11 @@ export const AngebotCard: FC<{
             // Rückbau Registry #122: vor dem ersten Speichern wieder „Speichern", „Zurück" als Knopf daneben (Stand 75b8df8).
             // Minimal-Einstieg: im letzten Schritt „Bewerbungen erhalten“ (Martin 08.11.: „wozu brauche ich dann Bewerbungen
             // erhalten? … dann ist es vorbei“, also erst am Ende), davor „Weiter →“.
-            weiterText={letzterSchritt ? (nurAenderung ? 'Änderungen speichern' : stand75b8df8 && !schlicht ? 'Speichern' : 'Bewerbungen erhalten') : 'Weiter →'}
+            // Seit 10.11.2026 im Minimal-Einstieg nur „Speichern“ (Martin: „letzter Schritt Button nur: Speichern“).
+            weiterText={letzterSchritt ? (nurAenderung ? 'Änderungen speichern' : schlicht || stand75b8df8 ? 'Speichern' : 'Bewerbungen erhalten') : 'Weiter →'}
             zurueckAlsLink={letzterSchritt && !stand75b8df8 && !schlicht ? `Zurück zu Schritt ${step}` : undefined}
             laedt={isSaving}
-            ladeText={nurAenderung || (stand75b8df8 && !schlicht) ? 'Speichern…' : 'Wird gesendet…'}
+            ladeText={nurAenderung || schlicht || stand75b8df8 ? 'Speichern…' : 'Wird gesendet…'}
             hinweis={(einstiegAktiv ? einstiegHinweis : navHinweis) && (
               <button
                 type="button"
