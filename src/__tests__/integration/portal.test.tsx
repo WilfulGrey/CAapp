@@ -293,7 +293,8 @@ describe('Portal integration: golden paths', () => {
     await new Promise((r) => setTimeout(r, 50));
     mo.disconnect();
 
-    expect(titel.some((t) => t.includes('Ihr persönliches Angebot') || t.includes('Ihr Angebot zur'))).toBe(false);
+    // „Ihr Preis für die …“ = Kopf des Minimal-Einstiegs seit 13.11.2026 (vorher „Ihr persönliches Angebot“).
+    expect(titel.some((t) => t.includes('Ihr persönliches Angebot') || t.includes('Ihr Preis für die') || t.includes('Ihr Angebot zur'))).toBe(false);
     expect(screen.getByRole('button', { name: /Ihre Pflegesituation.*Vollständig/ })).toBeInTheDocument();
   }, 15_000);
 
@@ -336,6 +337,7 @@ describe('Portal integration: golden paths', () => {
     await user.click(await screen.findByRole('button', { name: 'Männlich' }, { timeout: 5000 }));
     expect(screen.getByText('Ihre Suche läuft')).toBeInTheDocument();
     expect(screen.queryByText('Ihr persönliches Angebot')).toBeNull();
+    expect(screen.queryByRole('heading', { level: 1, name: /^Ihr Preis für die/ })).toBeNull();
     expect(screen.queryByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' })).toBeNull();
 
     // Letzter Schritt: nur noch „Änderungen speichern", kein zweites Anfragen (und nicht der Knopf von vor dem Speichern).
@@ -369,7 +371,7 @@ describe('Portal integration: golden paths', () => {
     mo.disconnect();
     // Der Ladebildschirm davor sagt „Gleich sehen Sie Ihr persönliches Angebot" — der zählt nicht.
     const kopfAngebot = (t: string) =>
-      (t.includes('Ihr persönliches Angebot') && !t.includes('Gleich sehen Sie')) || t.includes('Ihr Angebot zur');
+      (t.includes('Ihr persönliches Angebot') && !t.includes('Gleich sehen Sie')) || t.includes('Ihr Preis für die') || t.includes('Ihr Angebot zur');
     expect(titel.some(kopfAngebot)).toBe(false);
     // Auch der Kasten für Neukunden darf nicht kurz aufblitzen (Registry #102: `!schonAbgesendet`).
     expect(titel.some((t) => t.includes('Noch 2 Minuten bis zum Einladen'))).toBe(false);
@@ -458,7 +460,8 @@ describe('Portal integration: golden paths', () => {
 
   const gescrollt = () => (Element.prototype.scrollIntoView as unknown as { mock: { contexts: Element[] } }).mock.contexts.map((e) => e.id);
 
-  it('goto=anfragen, noch nicht abgesendet (Rückbau Registry #122): springt einmal zur Pflegesituation, erst wenn die Pflegekräfte stehen', async () => {
+  // Ohne Schalter läuft das seit Registry #147 im Minimal-Einstieg (bis #145 war der Standard der Rückbau #122).
+  it('goto=anfragen, noch nicht abgesendet (Minimal-Einstieg): springt einmal zur Pflegesituation, erst wenn die Pflegekräfte stehen', async () => {
     const sprung = Element.prototype.scrollIntoView as unknown as { mockClear: () => void; mockImplementation: (f: (this: Element) => void) => void };
     sprung.mockClear();
     // Beim Sprung festhalten, ob die Liste noch lädt: Die Karten stehen ÜBER dem Formular und würden es sonst nach dem
@@ -474,8 +477,8 @@ describe('Portal integration: golden paths', () => {
       render(<CustomerPortalPage />);
       await waitFor(() => expect(gescrollt()).toContain('patientendaten'), { timeout: 5000 });
       expect(laedtBeimSprung).toEqual([false]);
-      // Abschnittskopf „Pflegesituation · Unvollständig", das Formular steht offen darunter (im Minimal-Einstieg, Registry #147,
-      // heißt der Titel „Pflegesituation vervollständigen“).
+      // Titel „Pflegesituation vervollständigen“ über der Karte (Minimal-Einstieg; „Pflegesituation“ im Rückbau #122), das
+      // Formular steht offen darunter.
       expect(screen.getByRole('heading', { level: 2, name: /^Pflegesituation( vervollständigen)?$/ })).toBeInTheDocument();
       expect(await screen.findByText(/Schritt 1 von 4/, {}, { timeout: 5000 })).toBeInTheDocument();
       // … und gesprungen wird genau einmal.
@@ -702,8 +705,10 @@ describe('Einstieg vor dem ersten Speichern wie Stand 75b8df8 (Rückbau Registry
     expect(within(kopfOben).queryByRole('link')).toBeNull();
     expect(sterne.closest('a, button')).toBeNull();
     expect(sterne.innerHTML).not.toContain('underline');
-    // Nicht übernommen: Einleitung, Testsieger-Block und Angebotskarte des Kompakt-Einstiegs; der alte Kopf ist weg.
+    // Nicht übernommen: Einleitung, Testsieger-Block und Angebotskarte des Kompakt-Einstiegs; der alte Kopf ist weg. Auch der
+    // Kopf des Minimal-Einstiegs (13.11.2026) steht hier nicht.
     expect(screen.queryByText('Ihr persönliches Angebot')).toBeNull();
+    expect(document.querySelector('[data-kopf]')).toBeNull();
     expect(screen.queryByText(/^Gerne übernehmen wir/)).toBeNull();
     expect(screen.queryByText(/6× in Folge Testsieger/)).toBeNull();
     expect(screen.queryByText(/^Ihr Angebot vom /)).toBeNull();
