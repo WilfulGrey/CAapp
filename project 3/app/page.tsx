@@ -50,7 +50,7 @@ function WeihnachtsStern() {
 }
 
 // Text seit dem Abend des 24.10. (Martin nach OpenAI-Prüfung, „gesichert“ klang nach interner Planung): am Handy
-// „Betreuung über Weihnachten garantiert“, ab 768 px zusätzlich „, auch kurzfristig“. foto = Lage auf dem Hero-Foto
+// „Betreuung über Weihnachten möglich“ (Martin 13.11.2026, vorher „garantiert“), ab 768 px zusätzlich „, auch kurzfristig“. foto = Lage auf dem Hero-Foto
 // (< 1024 px), sonst unter der Kopfzeile (ab 1024 px). Endet am 26.12. um 24 Uhr (Berlin), die Seite rendert dynamisch.
 function WeihnachtsBand({ foto = false }: { foto?: boolean }) {
   if (!weihnachtsStoererAn()) return null;
@@ -70,7 +70,7 @@ function WeihnachtsBand({ foto = false }: { foto?: boolean }) {
       <p className="relative mx-auto flex max-w-[1256px] items-center justify-center gap-2 px-3 py-2.5 min-[375px]:px-3.5 md:gap-3.5 md:px-5 md:py-3">
         <WeihnachtsStern />
         <span className="whitespace-nowrap text-[14px] font-semibold leading-tight max-[374px]:text-[13px] min-[390px]:text-[14.5px] md:text-[16.5px]">
-          Betreuung über <strong className="font-extrabold text-[#D4A843]">Weihnachten</strong> garantiert
+          Betreuung über <strong className="font-extrabold text-[#D4A843]">Weihnachten</strong> möglich
           <span className="hidden md:inline">, auch kurzfristig</span>
         </span>
         <WeihnachtsStern />
