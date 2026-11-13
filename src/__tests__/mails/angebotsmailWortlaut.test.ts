@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as edge from '../../../project 3/supabase/functions/send-scheduled-emails/mailBausteine';
-import { ANGEBOT_TITEL, FEST_TITEL, FEST_ZEILE, GARANTIE_PUNKTE, GARANTIE_TITEL, VERTRAUEN } from '../../components/portal/EinstiegMinimal';
+import { ANGEBOT_TITEL, FEST_TITEL, FEST_ZEILE, GARANTIE_PUNKTE, GARANTIE_TITEL, KOPF_PUNKTE, KOPF_TITEL, LISTE_TITEL, VERTRAUEN } from '../../components/portal/EinstiegMinimal';
 import { ERREICHBAR, TELEFON, TELEFON_HREF, whatsappHref } from '../../lib/kontakt';
 
 // Die Angebotsmail sieht aus wie der Minimal-Einstieg des Portals (Registry #148, Martin 08.11.2026: „genauso wie im
@@ -10,6 +10,14 @@ import { ERREICHBAR, TELEFON, TELEFON_HREF, whatsappHref } from '../../lib/konta
 // Knopf „Bewerbungen erhalten“ mit Zeile darunter, Heim-Vergleich. Dieser Test hält Mail und Portal gleich; ändert sich
 // ein Wort im Portal, wird er rot, bis die Mail nachzieht. Gelesen wird der Quelltext der Mail, weil die Edge-Funktion
 // Deno-Module importiert.
+// BEWUSSTE ABWEICHUNGEN seit dem neuen Portal-Einstieg (13.11.2026): Die Mail ändert sich in diesem Schritt nicht und behält
+// die Wortlaute von vorher; offen bei Martin, ob sie nachzieht. Die Erwartungen an die Mail bleiben, der Test hält die
+// Abweichungen sichtbar. Wird die Mail angeglichen, hier auf die neuen Konstanten umstellen.
+// - Titel: Portal KOPF_TITEL („Ihr Preis für die Betreuung zu Hause“), Mail ANGEBOT_TITEL („Ihr persönliches Angebot“).
+// - Punkte: Portal KOPF_PUNKTE unter „Bestpreisgarantie“, Mail GARANTIE_PUNKTE.
+// - Liste: Portal LISTE_TITEL („Ihre Pflegekräfte-Auswahl“), Mail „Passende Pflegekräfte“.
+// - Knopf: Die Mail zeigt „Bewerbungen erhalten“ mit Zeile darunter (FEST_TITEL, FEST_ZEILE); im Portal gibt es den festen
+//   Knopf nicht mehr, die Konstanten stehen dort nur noch für diesen Test.
 
 const WURZEL = join(__dirname, '..', '..', '..');
 const MAIL = readFileSync(join(WURZEL, 'project 3/supabase/functions/send-scheduled-emails/kundenMails.ts'), 'utf8');
@@ -43,16 +51,28 @@ describe('Angebotsmail wie das Portal (Registry #148)', () => {
     expect(ANGEBOT).toContain(`Fragen? ${TELEFON}, ${ERREICHBAR}, auch per WhatsApp (\${WHATSAPP_HREF}).`);
   });
 
-  it('Angebotskarte: Titel, Bestpreisgarantie mit den Punkten und Kennzahlen wie im Portal', () => {
+  it('Angebotskarte: Kennzahlen wie im Portal; Titel, Punkte und Listen-Überschrift der Mail bewusst noch wie vor dem 13.11.2026 (Portal: KOPF_TITEL, KOPF_PUNKTE, LISTE_TITEL; offen bei Martin)', () => {
     expect(konst('ANGEBOT_TITEL')).toBe(ANGEBOT_TITEL);
+    // Gewollte Abweichung seit 13.11.2026 (siehe oben): Das Portal zeigt ANGEBOT_TITEL nicht mehr, sondern KOPF_TITEL.
+    expect(KOPF_TITEL).not.toBe(ANGEBOT_TITEL);
+    expect(EINSTIEG).not.toContain('{ANGEBOT_TITEL}');
+    expect(EINSTIEG).toContain('{KOPF_TITEL_ZEILEN[0]}');
     const punkte = ANGEBOT.match(/const GARANTIE_PUNKTE = (\[[^\]]+\]) as const;/);
     expect(punkte, 'GARANTIE_PUNKTE fehlt').not.toBeNull();
     expect(JSON.parse(punkte![1])).toEqual([GARANTIE_TITEL, ...GARANTIE_PUNKTE]);
+    // Gewollte Abweichung: Das Portal zeigt unter „Bestpreisgarantie“ KOPF_PUNKTE, die Mail weiter GARANTIE_PUNKTE.
+    expect([...KOPF_PUNKTE]).not.toEqual([...GARANTIE_PUNKTE]);
+    expect(EINSTIEG).toContain('KOPF_PUNKTE.map(');
+    expect(EINSTIEG).not.toContain('GARANTIE_PUNKTE.map(');
     for (const [wert, wort] of VERTRAUEN) {
       expect(ANGEBOT).toContain(`spalte("${wert}", "${wort}"`);
       expect(ANGEBOT).toContain(`${wert} ${wort}`);
     }
-    expect(EINSTIEG).toContain('Passende Pflegekräfte');
+    // Gewollte Abweichung: Die Liste heißt im Portal LISTE_TITEL, in der Mail weiter „Passende Pflegekräfte“. (Vorher stand hier
+    // `expect(EINSTIEG).toContain('Passende Pflegekräfte')`; das traf seit dem 13.11. nur noch Kommentare und einen Satz in
+    // „So geht es weiter“, nicht die Überschrift.)
+    expect(LISTE_TITEL).not.toBe('Passende Pflegekräfte');
+    expect(EINSTIEG).toContain('{LISTE_TITEL}');
     expect(ANGEBOT).toContain('Passende Pflegekräfte');
   });
 
@@ -64,9 +84,12 @@ describe('Angebotsmail wie das Portal (Registry #148)', () => {
     }
   });
 
-  it('Knopf „Bewerbungen erhalten“ mit Zeile darunter wie der feste Knopf im Portal', () => {
+  it('Knopf „Bewerbungen erhalten“ mit Zeile darunter: Mail behält den Wortlaut des früheren festen Knopfs (FEST_TITEL, FEST_ZEILE), im Portal gibt es diesen Knopf seit 13.11.2026 bewusst nicht mehr', () => {
     expect(konst('KNOPF_TITEL')).toBe(FEST_TITEL);
     expect(konst('KNOPF_ZEILE').replace(/&amp;/g, '&')).toBe(FEST_ZEILE);
+    // Gewollte Abweichung: Das Portal zeigt FEST_TITEL und FEST_ZEILE nirgends mehr an.
+    expect(EINSTIEG).not.toContain('{FEST_TITEL}');
+    expect(EINSTIEG).not.toContain('{FEST_ZEILE}');
   });
 
   it('Hinweis zu den Angaben eingekaufter Leads kommt aus herkunft.ts, ohne eigene Kopie in der Mail', () => {

@@ -2,7 +2,7 @@
 // Messpunkte (Registry #123) nie aus den Vorschau-Modi: `IS_PREVIEW_ANY` wird beim Laden des Moduls aus der Adresse
 // gelesen, darum steht sie VOR dem Import (vi.hoisted).
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../../../test/mocks/server';
 import { http, HttpResponse } from 'msw';
@@ -26,8 +26,11 @@ beforeAll(() => {
   }
 });
 
+const gescrollt = () => (Element.prototype.scrollIntoView as unknown as { mock: { contexts: Element[] } }).mock.contexts.map((e) => e.id);
+const sprungLeeren = () => (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
+
 describe('Messpunkte in der Vorschau (?preview=patient)', () => {
-  it('Bestpreis, Kosten, Frage, Einladen und Profil antippen — keine einzige Meldung an die Bridge', async () => {
+  it('Bestpreis, Kosten, Frage, „Pflegesituation vervollständigen“ in „So geht es weiter“, Profil und der Knopf darin antippen — keine einzige Meldung an die Bridge', async () => {
     const meldungen: unknown[] = [];
     server.use(
       bridgeHandler((b) => { meldungen.push(b); }),
@@ -38,21 +41,36 @@ describe('Messpunkte in der Vorschau (?preview=patient)', () => {
     );
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
-    // Seit Registry #145 „Pflegekräfte zuerst“: Einladen merkt vor und öffnet „{Name} einladen“ — auch das ohne Meldung.
-    // Seit Registry #147 Minimal-Einstieg: dazu „Details“ (klappt die Kosten in der Angebotskarte auf, die Kostenkarte unten
-    // entfällt) und der feste Knopf, Profil über die Zeile.
-    await screen.findByRole('button', { name: /^Bewerbungen erhalten/ }, { timeout: 5000 });
+    // Minimal-Einstieg vor dem Speichern (Registry #147, Stand 13.11.2026): „Details“ klappt die Kosten in der Preiskarte auf,
+    // „Bestpreisgarantie“ öffnet ihr Fenster. Kein fester Knopf und kein „Einladen“ mehr: Ins Formular führen der grüne Knopf in
+    // „So geht es weiter“ (Messpunkt zur_pflegesituation, Quelle schritte) und im Profil der Knopf „Pflegesituation
+    // vervollständigen“ (Quelle karte); das Profil öffnet die Zeile (profil_geoeffnet). Jeder dieser Wege muss in der Vorschau
+    // stumm bleiben. Dass der Sprung zum Formular wirklich lief, zeigt scrollIntoView auf #patientendaten: Der Messpunkt sitzt
+    // direkt davor (zurPflegesituationAus), ohne Sprung hätte der Test nichts geprüft.
+    const ablaufKnopf = await screen.findByRole('button', { name: 'Pflegesituation vervollständigen' }, { timeout: 5000 });
+    expect(ablaufKnopf).toHaveAttribute('data-ablauf-link');
 
     await user.click(screen.getByRole('button', { name: /^Bestpreisgarantie/ }));
     await user.click(within(await screen.findByRole('dialog')).getAllByRole('button', { name: 'Schließen' })[0]);
     await user.click(screen.getByRole('button', { name: 'Details' }));
     await user.click(screen.getByRole('button', { name: 'Was brauche ich zu Hause?' }));
-    await user.click(screen.getAllByRole('button', { name: 'Einladen' })[0]);
-    await user.click(within(await screen.findByRole('dialog', { name: /einladen$/ })).getByRole('button', { name: 'Später' }));
-    await user.click(screen.getByRole('button', { name: /^Bewerbungen erhalten/ }));
-    await user.click(screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === 'Anna, 58'));
 
-    await new Promise((r) => setTimeout(r, 50));
+    sprungLeeren();
+    await user.click(ablaufKnopf);
+    await waitFor(() => expect(gescrollt()).toContain('patientendaten'));
+
+    await user.click(await screen.findByText((_, el) => el?.tagName === 'SPAN' && el.textContent === 'Anna, 58'));
+    const zumFormular = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-profil-zum-formular]');
+      if (!el) throw new Error('Profilfenster ohne Knopf „Pflegesituation vervollständigen“');
+      return el;
+    }, { timeout: 5000 });
+    sprungLeeren();
+    await user.click(zumFormular);
+    await waitFor(() => expect(gescrollt()).toContain('patientendaten'));
+    expect(document.querySelector('[data-profil-zum-formular]')).toBeNull();
+
+    await new Promise((r) => setTimeout(r, 100));
     expect(meldungen).toEqual([]);
   }, 20_000);
 });

@@ -12,6 +12,8 @@
 // bisherige Stand 75b8df8 ist der Rückweg `?einstieg=alt`.
 // Registry #147 (07.11.2026, Entwurf): Ohne Schalter der Minimal-Einstieg, „Pflegekräfte zuerst“ hinter `?einstieg=zuerst`
 // — in beiden keine Frage.
+// 13.11.2026: Im Minimal-Einstieg gibt es keinen festen Knopf mehr; ins Formular führt vor dem Speichern der grüne Knopf
+// „Pflegesituation vervollständigen“ in „So geht es weiter“ (data-ablauf-link). Auch dort keine Frage.
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { server } from '../../../test/mocks/server';
@@ -95,14 +97,18 @@ describe('Schwebende Frage „Was sagen Sie zum Angebot?“ bei echten Kunden', 
       if (erscheint) {
         expect(await screen.findByText('Was sagen Sie zum Angebot?')).toBeInTheDocument();
       } else {
-        // Die Seite vor dem Speichern ist wirklich da (Kasten von 75b8df8, die Zeile von „Pflegekräfte zuerst“ bzw. die
-        // Unterzeile des festen Knopfs im Minimal-Einstieg) — und die Frage bleibt weg.
-        const kennung = look === '&einstieg=alt'
-          ? 'Noch 2 Minuten bis zu Ihren Bewerbungen'
-          : look === '&einstieg=zuerst'
-            ? 'Laden Sie ein, wer Ihnen gefällt. Dafür beschreiben Sie kurz die Pflegesituation.'
-            : '100% kostenfrei & unverbindlich';
-        expect(await screen.findByText(kennung, {}, { timeout: 5000 })).toBeInTheDocument();
+        // Die Seite vor dem Speichern ist wirklich da (Kasten von 75b8df8, die Zeile von „Pflegekräfte zuerst“ bzw. im
+        // Minimal-Einstieg der grüne Knopf in „So geht es weiter“, den es nur vor dem Speichern gibt) — und die Frage bleibt weg.
+        if (look === '') {
+          const knopf = await screen.findByRole('button', { name: 'Pflegesituation vervollständigen' }, { timeout: 5000 });
+          expect(knopf).toHaveAttribute('data-ablauf-link');
+          expect(knopf.closest('[data-ablauf-gute-phase]')).not.toBeNull();
+        } else {
+          const kennung = look === '&einstieg=alt'
+            ? 'Noch 2 Minuten bis zu Ihren Bewerbungen'
+            : 'Laden Sie ein, wer Ihnen gefällt. Dafür beschreiben Sie kurz die Pflegesituation.';
+          expect(await screen.findByText(kennung, {}, { timeout: 5000 })).toBeInTheDocument();
+        }
         await new Promise((r) => setTimeout(r, 200));
         expect(screen.queryByText('Was sagen Sie zum Angebot?')).toBeNull();
       }

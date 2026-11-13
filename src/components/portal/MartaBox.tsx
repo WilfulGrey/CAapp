@@ -92,11 +92,11 @@ export function MartaZeile({ unterzeile, className = '', eng = false, ohneAnrufe
  *  dass Marta mit denselben Knöpfen schon oben auf der Seite steht (Entscheidung 5 offen).
  *  `erreichbar` (Minimal-Einstieg, Registry #147): `false` = außerhalb von 8–20 Uhr, dann Anrufen ausgegraut und darunter
  *  `hinweisAusserhalb`. Ohne Angabe wie bisher. */
-export function MartaBox({ sterne, ohneVertrauen = false, nurVertrauen = false, erreichbar, hinweisAusserhalb }: { sterne: SterneStand | null; ohneVertrauen?: boolean; nurVertrauen?: boolean; erreichbar?: boolean; hinweisAusserhalb?: string }) {
+export function MartaBox({ sterne, ohneVertrauen = false, nurVertrauen = false, erreichbar, hinweisAusserhalb, titel = 'Noch Fragen?' }: { sterne: SterneStand | null; ohneVertrauen?: boolean; nurVertrauen?: boolean; erreichbar?: boolean; hinweisAusserhalb?: string; /** Überschrift (Standard „Noch Fragen?“). */ titel?: string }) {
   return (
     <div className="rounded-card bg-white border border-[#EFEBE4] p-[18px]">
       {!nurVertrauen && (<>
-      <p className="text-[15px] font-bold text-pm-ink">Noch Fragen?</p>
+      <p className="text-[15px] font-bold text-pm-ink">{titel}</p>
       <MartaZeile className="mt-3" unterzeile={<>Ihre Beraterin · {ERREICHBAR}</>} ohneAnrufen={erreichbar === false} />
       {erreichbar === false && hinweisAusserhalb && <p className="mt-2.5 text-[13.5px] leading-snug text-pm-muted">{hinweisAusserhalb}</p>}
       </>)}
