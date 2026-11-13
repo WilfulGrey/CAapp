@@ -96,9 +96,7 @@ export const FAQ_GUENSTIGER = {
 };
 const LEGAL = FAQ.find((x) => x.q === 'Ist das legal?')!;
 /** Minimal-Einstieg: „Ist das legal?“ und „Warum ist Primundus günstiger als andere?“ zuerst, dann die Liste „angebot“. */
-// 13.11.2026: ohne die zwei Fragen zum „Einladen“ (im Portal gibt es kein Einladen mehr, Martin 13.11.).
-const OHNE_EINLADEN = ['Was bedeutet „Einladen"?', 'Gehe ich mit dem Einladen einen Vertrag ein?'];
-export const FAQ_MINIMAL = [LEGAL, FAQ_GUENSTIGER, ...FAQ_ANGEBOT.filter((x) => x !== LEGAL && !OHNE_EINLADEN.includes(x.q))];
+export const FAQ_MINIMAL = [LEGAL, FAQ_GUENSTIGER, ...FAQ_ANGEBOT.filter((x) => x !== LEGAL)];
 const SICHTBAR_MINIMAL = 6;
 
 /** Kurzer, fester Schlüssel je Frage für den Messpunkt `faq_geoeffnet` (Registry #123) — unabhängig von der Reihenfolge

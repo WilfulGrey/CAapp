@@ -1,10 +1,9 @@
-// Einstieg VOR dem ersten Speichern der Pflegesituation: „Minimal“ — Registry #147 (live seit 08.11.2026), neu gefasst mit #162
-// (13.11.2026: Kopf, Liste ohne Preis und Einladen, Formular direkt unter der Liste, „So geht es weiter“ wie in der guten Phase).
+// Einstieg VOR dem ersten Speichern der Pflegesituation: „Minimal“ — Registry #147 (Entwurf, nicht live).
 //
 // Martin 07.11.2026 zum Mockup (seo-reports/analysen/vorschlag-minimal-2026-11-07/mockup/portal.html): „Ja, alle drei“.
 // Vorher (Abnahme 07.11.): auf dem iPhone 13 kam die erste Pflegekraft bei 1.426 px, das Formular bei 2.603 px.
-// Seit #162 gibt es vor dem Speichern kein „Einladen“ mehr (Martin 13.11.: „nicht mehr mit einladen … das brauchen wir nicht“);
-// die Logik aus #145 (Vormerken, nach dem ersten Speichern automatisch einladen) gilt nur noch für `?einstieg=zuerst`.
+// „Einladen“ ist die Logik aus #145 unverändert (CustomerPortalPage: Fenster „{Name} einladen“, Vormerken, nach dem
+// ersten Speichern automatisch einladen).
 //
 // Kontakt: Reiter am rechten Rand mit Martas Foto, wie die Ansprechpartnerin in der CG-App (umbrella/.notes/requests/
 // opiekomat-start/makieta-v59.html, `.edge` + `.drawer`): halb eingeschoben, beim Scrollen weiter weg, nach dem Scrollen
@@ -24,7 +23,7 @@
 // vervollständigen und Bewerbungen erhalten“.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUp, Check, ChevronDown, ChevronRight, Info, Phone, X } from 'lucide-react';
+import { ArrowRight, ArrowUp, Check, ChevronDown, Info, Phone, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { formatEuro, type Lead } from '../../lib/supabase';
 import { eigenanteilAus } from '../../lib/angebotZuschuss';
@@ -37,58 +36,27 @@ import { MartaBox } from './MartaBox';
 import { WhatsAppIcon } from './WhatsAppIcon';
 
 // Wortlaut (Martin 08.11.2026, diktiert; Entwurf, Freigabe des Wortlauts offen). Tests prüfen genau diese Texte.
-/** NUR NOCH MAIL. Titel der Angebotskarte bis 13.11.2026; das Portal zeigt ihn seit dem neuen Kopf (KopfBereich) nicht mehr,
- *  dort steht KOPF_TITEL. Die Konstante bleibt für den Gleichlauf mit der kurzen Angebotsmail (kundenMails.ts, ANGEBOT_TITEL,
- *  Test angebotsmailWortlaut), die sich mit diesem Schritt NICHT ändert. Offen bei Martin: Soll die Mail auch „Ihr Preis für
- *  die Betreuung zu Hause“ heißen? */
 export const ANGEBOT_TITEL = 'Ihr persönliches Angebot';
-/** Titel des Kopfs (h1), zwei feste Zeilen (Martin 13.11.2026: „Ihr persönliches Angebot muss halt eben mehr in den
- *  Vordergrund oder Ihr Preis für die Betreuung zu Hause. Finde ich gut.“). Fester Umbruch statt `text-wrap: balance`, weil
- *  iOS vor 17.4 das nicht kann (am Pro Max stand sonst „Ihr Preis für die Betreuung / zu Hause“); „zu Hause“ mit geschütztem
- *  Leerzeichen. */
-export const KOPF_TITEL_ZEILEN = ['Ihr Preis für die', 'Betreuung zu Hause'] as const;
-export const KOPF_TITEL = KOPF_TITEL_ZEILEN.join(' ');
-/** Überschrift der Liste (Martin 13.11.2026: „man soll sehen: Ihre Pflegekräfte-Auswahl“; vorher „Passende Pflegekräfte“). */
-export const LISTE_TITEL = 'Ihre Pflegekräfte-Auswahl';
-/** Überschrift im Kopf (Martin 13.11.2026: „Warum Primundus oder so?“; OpenAI-Runde über den ganzen Seitentext 13.11.). */
-export const WARUM_TITEL = 'Warum Primundus?';
-/** Unter der Listen-Überschrift (Martin 13.11.2026: „Es muss definitiv irgendwo stehen, diese Pflegekräfte sind verfügbar und
- *  passen zu ihrer Auswahl“). „Anfrage“ statt „Angaben“: im Portal filtert nur die Deutsch-Stufe. Nur über einer Liste mit Zeilen. */
-export const LISTE_ZEILE = 'Diese Pflegekräfte sind verfügbar und passen zu Ihrer Anfrage.';
-/** Titel des Marta-Kastens unter dem Formular (13.11.2026, Martin: „Anbieten von Beratung“). */
-export const MARTA_BERATUNG_TITEL = 'Lieber persönlich beraten lassen?';
-/** Kopf über der Formularkarte (13.11.2026, Martin: „ob das formular als popup kommen müsste und wenn nicht, dann besser
- *  sichtbar als formular“, „Titel nicht doppeln“, „Pflegesituation vervollständigen finde ich ganz gut … der Text … passt“):
- *  Formular offen direkt unter der Liste wie in der guten Phase, Titel und Satz auf dem Seitengrund über der Karte. */
-export function formularKopf(): { titel: string; zeile: string; aussen: boolean } {
-  return { titel: FORMULAR_TITEL, aussen: true, zeile: 'Beschreiben Sie kurz die Situation. So verstehen die Pflegekräfte, worauf es bei Ihnen ankommt, und können sich unverbindlich bewerben. Das dauert ca.\u00a02\u00a0Minuten.' };
-}
-/** Kein fester Knopf mehr (Martin 13.11.2026: „button nicht hier schon anzeigen, weil zu fordernd gleich mit bewerbungen zu
- *  kommen“). FEST_TITEL und FEST_ZEILE bleiben nur für den Gleichlauf mit dem Knopf der Angebotsmail (Test angebotsmailWortlaut). */
 /** Fester Knopf unten: eine Zeile Titel, darunter Martins Unterzeile (08.11.: „Pflegesituation vervollständigen &
  *  Bewerbungen erhalten - darunter: 100% kostenfrei & unverbindlich“, danach „definitiv zu langtextlich“). Kurz der Nutzen;
  *  „Pflegesituation vervollständigen“ steht als Titel direkt darunter am Formular. */
 export const FEST_TITEL = 'Bewerbungen erhalten';
 export const FEST_ZEILE = '100% kostenfrei & unverbindlich';
-/** Titel über dem Formular (Wortlaut bis 08.11. und seit 13.11.2026, Martin: „Pflegesituation vervollständigen, finde ich ganz
- *  gut“). */
+/** Kopf des Formulars in der weißen Karte (Martin 08.11.: „was soll das heißen: Pflegesituation vervollständigen“); der Satz
+ *  darunter ist der bisherige Satz des Abschnitts (Martins 60-Minuten-Satz). */
 export const FORMULAR_TITEL = 'Pflegesituation vervollständigen';
+export const FORMULAR_ZEILE = 'Danach können Sie Pflegekräfte einladen und bekommen Bewerbungen. Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten.';
 /** Panel der Ansprechpartnerin: Unterzeile wie im Marta-Kasten („Ihre Beraterin“). */
 /** Hinweis im Marta-Fenster und im Marta-Kasten außerhalb von 8–20 Uhr. */
 export const AUSSERHALB_ZEITEN = 'Außerhalb der Geschäftszeiten können Sie Marta per WhatsApp schreiben.';
 export const BERATERIN_ROLLE = 'Ihre Beraterin';
-/** Punkte mit grünem Haken in der Preiskarte des Kopfs (bis 13.11.2026 ein grüner Kasten, Martin 13.11.: „zu bunt“; die
- *  Angebotsmail zeigt sie weiter im Kasten): vier gleichwertige, kurze Punkte, die Bestpreisgarantie zuerst (Martin: „Ist das
+/** Grüner Kasten in der Angebotskarte: vier gleichwertige, kurze Punkte, die Bestpreisgarantie zuerst (Martin: „Ist das
  *  unsere Bestpreisgarantie? Oder ist das nur ein Punkt davon?“ — die anderen drei gehören nicht zur Garantie; „Es gilt
  *  immer unsere Bestpreisgarantie“ mit „Mehr Infos“ darunter war ihm zu kompliziert: „Ich will das clean haben“).
  *  Hemmnis-Punkte nach Martin („Keine Vorauszahlung, keine Vermittlungsgebühr. Keine Mindestlaufzeit … Beides genügt.“;
  *  belegt: USP 4/5, Mustervertrag § 3 und § 4 „ab dem Tag der Ankunft“). Tipp auf „Bestpreisgarantie“ öffnet ihr Fenster. */
 export const GARANTIE_TITEL = 'Bestpreisgarantie';
 export const GARANTIE_PUNKTE = ['Keine Vorauszahlung', 'Keine Vermittlungsgebühr', 'Keine Mindestlaufzeit'] as const;
-/** Punkte im Portal-Kopf unter „Bestpreisgarantie“ (Martin 13.11.2026, wörtlich: „Punkte ändern zu: Bestpreisgarantie, Keine
- *  Vermittlungsgebühren, Tägliche Kündigung, Taggenaue Abrechnung“). GARANTIE_PUNKTE bleibt für den Gleichlauf mit der
- *  Angebotsmail, die sich in diesem Schritt nicht ändert. */
-export const KOPF_PUNKTE = ['Keine Vermittlungsgebühren', 'Tägliche Kündigung', 'Taggenaue Abrechnung'] as const;
 /** Vertrauen unten in der Angebotskarte (Martin: „seit 20 Jahren und 6 Jahre in Folge … Testsieger … die Sterne“): Wert
  *  groß, Beschriftung klein darunter, wie die Kennzahlen im CGA-Panel. Wortlaut „6× in Folge“ wie die Auszeichnungsseite. */
 export const VERTRAUEN = [['20 Jahre', 'Erfahrung'], ['6× in Folge', 'Testsieger']] as const;
@@ -139,182 +107,109 @@ export function TestsiegerKopf() {
   );
 }
 
-// ── Kopfbereich: Gruß, Titel, Preiskarte ─────────────────────────────────────────────────────────────────────────────────
-// 13.11.2026. Ersetzt die große Überschrift „Guten Tag, …“ (22 px) und die Angebotskarte „Ihr
-// persönliches Angebot“ mit dem mintgrünen Kasten (Stand c4f80d3).
-//
-// Martin 13.11.2026 (Sprachnachricht): „Ich möchte das so ähnlich machen, wie es vorher war. Guten Tag, Frau Müller muss
-// kleiner. Ihr persönliches Angebot muss halt eben mehr in den Vordergrund oder Ihr Preis für die Betreuung zu Hause. Finde
-// ich gut. Dann das jetzige ist mir zu bunt … ein bisschen luftiger … nach Zuschüssen ca. 1620 im Monat. Das kann von mir
-// aus grün bleiben.“
-//
-// Wie Vorher (gute Phase, f062df3, live 12.09. bis 24.09.):
-// - Gruß klein und grau über dem Titel (Vorher „Guten Tag, Frau Müller.“ 15 px grau; hier ohne Punkt wie live), kein Heading.
-// - Titel groß und fett als h1, frei auf dem Seitengrund; darunter EINE Preiskarte mit dem Preis als Erstem.
-// - Punkte mit schlichtem grünem Haken in dunkler Schrift auf hellem Grund, darüber eine Trennlinie, viel Luft.
-// Anders als Vorher: kein Siegelbild der Bestpreisgarantie („zu bunt“, und es trug „6× Preis-Leistungssieger“ neben
-// „6× Testsieger DIE WELT“); die Garantie bleibt der antippbare Punkt mit Info-Symbol und öffnet ihr Fenster (onBestpreis,
-// kein Link nach außen).
-//
-// „zu bunt“: kein farbiger Kasten mehr. Farbe tragen nur die grüne Zeile „Nach Zuschüssen“ („kann von mir aus grün
-// bleiben“), die Haken und die Sterne; „Details“ und das Info-Symbol in pm-taupe-ink als Zeichen „antippbar“.
-// „luftiger“: ein Takt von 24 px (Karte oben und unten, über und unter beiden Trennlinien), 12 px zwischen den Haken. Gruß,
-// Titel, Preis und Punkte auf EINER linken Kante mit der Überschrift der Liste darunter (16 px Innenrand auf allen Breiten;
-// Prüfung Gestaltung 13.11.: mit 20 px stand der Kopf ab 390 px 4 px rechts von „Passende Pflegekräfte“). Auf allen Breiten
-// dieselbe Luft, nichts zusammengedrückt; kleiner wird unter 390 px nur, was sonst nicht nebeneinander passt (Kennzahlen,
-// unter 375 px die grüne Zeile, unter 360 px der Preis).
-// Fest: Punkte GARANTIE_TITEL + KOPF_PUNKTE (Martin 13.11.; GARANTIE_PUNKTE gilt nur noch für die Angebotsmail), Kostensatz und Aufstellung nur hinter
-// „Details“ („Ich will das clean haben. So clean wie möglich“), keine zusätzliche Zeile im Kopf; Kennzahlen wie live (ohne
-// Sterne-Stand keine Spalte, nie ein Ersatzwert; Sterne nie im selben Block wie das Testsieger-Siegel). Beträge wie bisher:
-// Preis `bruttopreis` (derselbe Ersatzwert wie die Kostenkarte), grüne Zeile über `eigenanteilAus` (wie die kurze
-// Angebotsmail #148), Heim-Vergleich = Heim-Eigenanteil im 1. Jahr minus Eigenanteil, nur wenn wir günstiger sind; ohne
-// belegten Eigenanteil fehlen beide Zeilen. Kennungen für Tests und Messung wie live: data-angebot-minimal (Preiskarte),
-// data-garantie (Punkte), id angebot-details / data-angebot-details (aufgeklappt).
-export function KopfBereich({ anrede, lead, heimEigenanteil, heimQuelle, sterne, onBestpreis, onKostenAufgeklappt }: {
-  /** Anrede für „Guten Tag, …“ (customerSalutation), ohne Anrede nur „Guten Tag“. */
-  anrede: string | null;
+// ── Angebotskarte ────────────────────────────────────────────────────────────────────────────────────────────────────────
+// „Ihr persönliches Angebot“, Preis „/ Monat“, eine ruhige Zeile „Nach Zuschüssen ca. … €, rund … € weniger als im
+// Pflegeheim“ (Zuschüsse wie die kurze Angebotsmail #148, src/lib/angebotZuschuss.ts; Heim-Eigenanteil im 1. Jahr minus
+// Eigenanteil, Quelle in „Details ›“), darunter die Bestpreisgarantie als grüner Kasten. Ohne belegten Eigenanteil fehlt die
+// Zeile, den Vergleich gibt es nur, wenn wir günstiger sind. Preis wie in der Kostenkarte (`bruttopreis`, dort derselbe
+// Ersatzwert).
+export function AngebotKarteMinimal({ lead, heimEigenanteil, heimQuelle, sterne, onBestpreis, onKostenAufgeklappt }: {
   lead: Lead | null;
   heimEigenanteil: number;
   heimQuelle: string;
   sterne: SterneStand | null;
-  /** Öffnet das Fenster der Bestpreisgarantie (BestpreisSheet, Messpunkt bestpreis_geoeffnet). */
   onBestpreis: () => void;
   /** Messpunkt `kosten_aufgeklappt` (Registry #123) beim Öffnen von „Details“. */
   onKostenAufgeklappt?: () => void;
 }) {
-  // „Details“ klappt Satz und Kostenaufstellung in der Preiskarte auf (statt der Kostenkarte unten, Martin 08.11.).
+  // „Details“ klappt die Kostenaufstellung hier in der Karte auf (statt der Kostenkarte unten, Martin 08.11.).
   const [details, setDetails] = useState(false);
   const kalk = lead?.kalkulation;
   const brutto = kalk?.bruttopreis ?? 3050;
   const eigen = eigenanteilAus(kalk);
   const weniger = eigen ? heimEigenanteil - eigen.eigen : 0;
-  const linie = 'border-t border-pm-line-soft';
-  // Martin 13.11.2026: „statt des Striches unter den Punkte würde ich vielleicht schreiben: Warum Primundus oder so?“; am Bild
-  // gewählt: Überschrift ÜBER den Punkten statt der Linie.
-  // Schrift in wenigen Stufen (Martin 13.11.: „zu viele schriften dort oder? geht es harmonischer“): groß nur Titel (28) und
-  // Preis (38) fett; die grüne Zeile halbfett; Kennzahl-Werte fett (Martin: „die unteren Punkte würde ich schon fett
-  // lassen“); Text 16 px normal dunkel wie die Punkte, auch der Heimvergleich (Martin: „den Text so lassen, wie bei
-  // Preisgarantie … dann haben wir nur dieses Grün und dann … wie die Punkte“); „Details“ in Taupe; klein 15 px grau
-  // (Gruß, „Warum Primundus?“, „/ Monat“, Beschriftung der Kennzahlen).
-  const warum = <h2 className="mt-8 text-[15px] font-normal leading-5 text-pm-muted" data-kopf-warum>{WARUM_TITEL}</h2>;
   return (
-    <div data-kopf>
-      {/* Gruß und Titel frei auf dem Seitengrund wie die Kopfzone Vorher; linke Kante = Inhalt der Karte. */}
-      <div className="px-4 pt-6 pb-4">
-        {/* Klein und grau (Martin 13.11.: „Guten Tag, Frau Müller muss kleiner“), kein Heading mehr. */}
-        <p className="text-[15px] leading-5 text-pm-muted" data-kopf-gruss>
-          Guten Tag{anrede ? `, ${anrede}` : ''}
-        </p>
-        {/* 28 px wie Vorher, das größte Wort der Seite nach dem Preis; zwei feste Zeilen (KOPF_TITEL_ZEILEN). */}
-        <h1 className="mt-2 text-[28px] font-bold leading-[1.15] tracking-[-0.02em] text-pm-ink" data-kopf-titel>
-          {KOPF_TITEL_ZEILEN[0]}{' '}<br />{KOPF_TITEL_ZEILEN[1]}
-        </h1>
+    <section className={`${KARTE} px-4 pb-4 pt-3.5`} aria-labelledby="angebot-titel" data-angebot-minimal>
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="angebot-titel" className="text-[15px] font-medium leading-5 text-pm-muted">{ANGEBOT_TITEL}</h2>
+        <button
+          type="button"
+          onClick={() => { if (!details) onKostenAufgeklappt?.(); setDetails(!details); }}
+          aria-expanded={details}
+          aria-controls="angebot-details"
+          className={`${TIPPFLAECHE_HOCH} ${FOKUS} flex flex-none items-center gap-0.5 rounded-md text-[15px] font-semibold text-pm-taupe-ink`}
+        >
+          Details
+          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${details ? 'rotate-180' : '-rotate-90'}`} aria-hidden="true" />
+        </button>
       </div>
-
-      {/* Ohne eigenen Namen: Die Karte hieß über aria-labelledby wie der Titel, Vorleseprogramme sagten ihn dann zweimal
-          (Prüfung Wortlaut 13.11.). */}
-      <section className={`${KARTE} px-4 py-6`} data-angebot-minimal>
-        {/* Preis groß, „Details“ klein rechts auf derselben Grundlinie: keine eigene Zeile dafür („so clean wie möglich“).
-            Unter 360 px 34 statt 38 px, sonst ragte „Details“ bei 320 px über den Rand (Prüfung Code 13.11.). „/ Monat“
-            sichtbar wie bisher; vorgelesen „pro Monat“ statt „Schrägstrich Monat“. */}
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="whitespace-nowrap text-[38px] font-bold leading-none tracking-[-0.025em] tabular-nums text-pm-ink max-[359px]:text-[34px]" data-kopf-preis>
-            {formatEuro(brutto)} <span className="text-[15px] font-normal tracking-normal text-pm-muted" aria-hidden="true">/ Monat</span>
-            <span className="sr-only">pro Monat</span>
+      <p className="mt-1 whitespace-nowrap text-[30px] font-bold leading-[1.1] tracking-[-0.02em] tabular-nums text-pm-ink">
+        {formatEuro(brutto)} <span className="text-[15px] font-medium tracking-normal text-pm-muted">/ Monat</span>
+      </p>
+      {/* Grün wie der Kasten der kurzen Angebotsmail (Martin 08.11.: „vorher schon besser mit dem Grün nach Zuschüssen“),
+          darunter klein der Pflegeheim-Vergleich. */}
+      {eigen && (
+        <>
+          <p className="mt-1 text-[16.5px] font-semibold leading-snug text-pm-green" data-nach-zuschuessen>
+            Nach Zuschüssen <span className="whitespace-nowrap">ca. {formatEuro(eigen.eigen)} im Monat</span>
           </p>
-          <button
-            type="button"
-            onClick={() => { if (!details) onKostenAufgeklappt?.(); setDetails(!details); }}
-            aria-expanded={details}
-            aria-controls="angebot-details"
-            className={`${TIPPFLAECHE_HOCH} ${FOKUS} flex flex-none items-center gap-0.5 rounded-md text-[16px] font-normal text-pm-taupe-ink`}
-            data-kopf-details
-          >
-            Details
-            <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${details ? 'rotate-180' : '-rotate-90'}`} aria-hidden="true" />
-          </button>
+          {weniger > 0 && (
+            <p className="mt-0.5 text-[15px] leading-snug text-pm-muted" data-heimvergleich>
+              rund {formatEuro(weniger)} weniger als im Pflegeheim
+            </p>
+          )}
+        </>
+      )}
+      {details && (
+        // Wortlaut der bisherigen Kostenkarte: Satz unter dem Preis, dann die Aufstellung hinter „Alle Kosten im Überblick“.
+        <div id="angebot-details" className="mt-3 border-t border-pm-line-soft pt-3" data-angebot-details>
+          <p className="text-[14px] leading-[1.5] text-pm-muted">
+            Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).
+          </p>
+          <KostenAufstellung lead={lead} heimEigenanteil={heimEigenanteil} heimQuelle={heimQuelle} siegel={false} />
         </div>
-        {/* Grün bleibt (Martin 13.11.: „Das kann von mir aus grün bleiben“), darunter grau der Pflegeheim-Vergleich. Unter
-            375 px 16 statt 16,5 px: Auf Android 360 brach die Zeile sonst in zwei Zeilen um (Aufnahme 13.11., wie live), und
-            der feste Knopf schnitt dann die Kennzahlen zwischen Wert und Beschriftung. */}
-        {eigen && (
-          <>
-            <p className="mt-2.5 text-[16px] font-semibold leading-[22px] text-pm-green" data-nach-zuschuessen>
-              Nach Zuschüssen <span className="whitespace-nowrap">ca. {formatEuro(eigen.eigen)} im Monat</span>
-            </p>
-            {weniger > 0 && (
-              <p className="mt-0.5 text-[16px] leading-[22px] text-pm-ink" data-heimvergleich>
-                rund {formatEuro(weniger)} weniger als im Pflegeheim
-              </p>
-            )}
-          </>
-        )}
-        {details && (
-          // Wortlaut wie bisher: Satz unter dem Preis, dann die Aufstellung (ohne Siegel, das steht schon oben).
-          <div id="angebot-details" className={`mt-6 ${linie} pt-5`} data-angebot-details>
-            <p className="text-[14px] leading-[1.5] text-pm-muted">
-              Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).
-            </p>
-            <KostenAufstellung lead={lead} heimEigenanteil={heimEigenanteil} heimQuelle={heimQuelle} siegel={false} />
+      )}
+      {/* Vier gleichwertige Punkte untereinander, gleiche Schrift; „Bestpreisgarantie“ ist antippbar (kleines Info-Symbol). */}
+      <ul className="mt-3 grid gap-1 rounded-[14px] bg-pm-mint px-4 py-2.5" data-garantie>
+        <li className="flex items-center gap-2 text-[16px] leading-[22px] text-pm-green-deep">
+          <Check className="h-4 w-4 flex-none" strokeWidth={3} aria-hidden="true" />
+          <button type="button" onClick={onBestpreis} className={`${TIPPFLAECHE_HOCH} ${FOKUS} inline-flex items-center gap-1.5 rounded text-left`}>
+            {GARANTIE_TITEL}
+            <Info className="h-3.5 w-3.5 flex-none opacity-70" aria-label="Mehr Infos" />
+          </button>
+        </li>
+        {GARANTIE_PUNKTE.map((punkt) => (
+          <li key={punkt} className="flex items-center gap-2 text-[16px] leading-[22px] text-pm-green-deep">
+            <Check className="h-4 w-4 flex-none" strokeWidth={3} aria-hidden="true" />{punkt}
+          </li>
+        ))}
+      </ul>
+      {/* Vertrauen: Sterne (ohne Stand fehlt die Spalte, kein Ersatzwert), 20 Jahre, 6× in Folge Testsieger. Gleiche Abstände
+          zwischen den Spalten, Text linksbündig (Martin 08.11.: „der erste und zweite Punkt zu nah beieinander … linksbündig,
+          aber der Abstand muss besser passen“); vorher drei gleich breite Spalten, darin 16 px und 50 px Lücke. Rechts 24 px
+          frei: Martas Reiter steht in Ruhe 42 px in den Bildschirm hinein und lag auf iPhone 13 und Android 360 genau auf
+          „6× in Folge“ (gemessen 14 und 18 px verdeckt). Unter 360 px (iPhone SE) liegt er tiefer, dort kein Abstand. */}
+      <dl className="mt-3 flex justify-between gap-3 border-t border-pm-line-soft pt-2.5 min-[360px]:pr-6" data-vertrauen>
+        {sterne && (
+          <div className="min-w-0">
+            <dt className="sr-only">Bewertungen</dt>
+            {/* „4,9“ und dahinter alle fünf Sterne (Martin 08.11.), anteilig gefüllt wie in der Bewertungszeile. */}
+            <dd className="flex items-center gap-1.5 text-[16.5px] font-bold leading-5 text-pm-ink">
+              {sterne.schnitt}
+              <FuenfSterne wert={sterne.wert} />
+            </dd>
+            <dd className="mt-0.5 text-[13.5px] leading-4 text-pm-muted">{anzahlText(sterne.anzahl)}</dd>
           </div>
         )}
-        {/* Vier gleichwertige Punkte wie Vorher: grüner Haken (18 px, gut lesbar), dunkle Schrift, kein Kasten (Martin 13.11.:
-            „das jetzige ist mir zu bunt“). „Bestpreisgarantie“ zuerst und antippbar; das Info-Symbol in der Farbe von
-            „Details“ zeigt, dass man tippen kann. */}
-        {warum}
-        <ul className="mt-4 grid gap-3" data-garantie data-kopf-garantie>
-          <li className="flex items-center gap-2.5 text-[16px] leading-[22px] text-pm-ink">
-            <Check className="h-[18px] w-[18px] flex-none text-pm-green" strokeWidth={2.75} aria-hidden="true" />
-            <button
-              type="button"
-              onClick={onBestpreis}
-              className={`${TIPPFLAECHE_HOCH} ${FOKUS} inline-flex items-center gap-1.5 rounded text-left`}
-              data-kopf-bestpreis
-            >
-              {GARANTIE_TITEL}
-              <Info className="h-[18px] w-[18px] flex-none text-pm-taupe-ink" aria-label="Mehr Infos" />
-            </button>
-          </li>
-          {KOPF_PUNKTE.map((punkt) => (
-            <li key={punkt} className="flex items-center gap-2.5 text-[16px] leading-[22px] text-pm-ink">
-              <Check className="h-[18px] w-[18px] flex-none text-pm-green" strokeWidth={2.75} aria-hidden="true" />{punkt}
-            </li>
-          ))}
-        </ul>
-        {/* Kennzahlen wie live: Sterne (ohne Stand fehlt die Spalte, kein Ersatzwert), 20 Jahre, 6× in Folge Testsieger; gleiche
-            Abstände zwischen den Spalten, Text linksbündig (Martin 08.11.: „der erste und zweite Punkt zu nah beieinander …
-            linksbündig, aber der Abstand muss besser passen“). Ab 360 px brechen Werte und Beschriftungen nicht um. Rechts 24 px
-            frei: Martas Reiter steht in Ruhe 42 px in den Bildschirm hinein und lag auf iPhone 13 und Android 360 genau auf „6×
-            in Folge“ (gemessen 14 und 18 px verdeckt). Unter 360 px liegt er tiefer, dort kein Abstand.
-            Prüfung 13.11.: Die Spalten schrumpfen nie unter ihren Text (kein min-w-0), sonst lief er bei 320 px in die Nachbar-
-            spalte („126 BewertungenErfahrung“). Unter 390 px eine Stufe kleiner (Beschriftung 14 px), damit zwischen den
-            Spalten Luft bleibt (Android 360 vorher 11 px, iPhone SE ohne Reserve); unter 360 px darf nur die kleine Beschriftung
-            umbrechen, die Werte bleiben einzeilig (bei 320 px bricht so nur „126 Bewertungen“, statt dass alle drei Spalten brechen).
-            Vorgelesen: „Bewertung: 4,9 von 5 Sternen, 126 Bewertungen“, „Erfahrung: 20 Jahre“, „Testsieger: 6× in Folge“ (die
-            sichtbare Beschriftung ist für Vorleseprogramme ausgeblendet, sie steht schon im dt). */}
-        <dl className={`mt-6 ${linie} pt-6 flex justify-between gap-3 whitespace-nowrap min-[360px]:pr-6`} data-vertrauen>
-          {sterne && (
-            <div>
-              <dt className="sr-only">Bewertung</dt>
-              {/* „4,9“ und dahinter alle fünf Sterne (Martin 08.11.), anteilig gefüllt wie in der Bewertungszeile. */}
-              <dd className="flex items-center gap-1.5 text-[16px] font-bold leading-[22px] text-pm-ink max-[389px]:text-[15px]">
-                <span>{sterne.schnitt}</span>
-                <span className="sr-only"> von 5 Sternen</span>
-                <FuenfSterne wert={sterne.wert} />
-              </dd>
-              <dd className="mt-0.5 text-[15px] leading-5 text-pm-muted max-[389px]:text-[14px] max-[359px]:whitespace-normal">{anzahlText(sterne.anzahl)}</dd>
-            </div>
-          )}
-          {VERTRAUEN.map(([wert, wort]) => (
-            <div key={wert}>
-              <dt className="sr-only">{wort}</dt>
-              <dd className="text-[16px] font-bold leading-[22px] text-pm-ink max-[389px]:text-[15px]">{wert}</dd>
-              <dd className="mt-0.5 text-[15px] leading-5 text-pm-muted max-[389px]:text-[14px] max-[359px]:whitespace-normal" aria-hidden="true">{wort}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-    </div>
+        {VERTRAUEN.map(([wert, wort]) => (
+          <div key={wert} className="min-w-0">
+            <dt className="sr-only">{wort}</dt>
+            <dd className="text-[16.5px] font-bold leading-5 text-pm-ink">{wert}</dd>
+            <dd className="mt-0.5 text-[13.5px] leading-4 text-pm-muted">{wort}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 
@@ -359,9 +254,7 @@ export function PflegekraftZeile({ nurse, preis, vorgemerkt, gesperrt, onNurseCl
   };
   // Foto auf heller Kreisfläche mit feinem Ring: freigestellte Fotos und Initialen wirken gleich groß und rund.
   // Größer als im ersten Bild (Martin: „die Karten schön ein bisschen größer auch mit den Bildern“).
-  // 13.11.2026 (Martin: „schöner präsentieren … nicht ganz so kompakt … der Preis würde ich da rausnehmen und
-  // einladen erstmal auch“): Foto 72 px, mehr Luft, ohne Preis und „Einladen“; die ganze Zeile öffnet das Profil (Pfeil rechts).
-  const foto = 'h-[72px] w-[72px] flex-none rounded-full ring-1 ring-pm-line';
+  const foto = 'h-14 w-14 flex-none rounded-full ring-1 ring-pm-line';
   const preisText = preis ? (
     <span className="whitespace-nowrap text-[16.5px] font-semibold tabular-nums text-pm-ink" data-preis>{formatEuro(preis)}</span>
   ) : null;
@@ -383,26 +276,30 @@ export function PflegekraftZeile({ nurse, preis, vorgemerkt, gesperrt, onNurseCl
     </button>
   );
   return (
-    <li className="border-t border-pm-line-soft" data-pflegekraft-zeile={nurse.caregiverId} data-vorgemerkt={vorgemerkt || undefined}>
-      <button type="button" onClick={onNurseClick} className={`${FOKUS} focus-visible:outline-offset-[-3px] group flex w-full items-center gap-4 px-4 py-4 text-left hover:bg-pm-paper`}>
+    <li className={`flex items-center gap-2.5 border-t border-pm-line-soft px-3.5 max-[374px]:px-3 py-3 ${vorgemerkt ? "relative bg-pm-mint/70 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-pm-green before:content-['']" : ''}`} data-pflegekraft-zeile={nurse.caregiverId} data-vorgemerkt={vorgemerkt || undefined}>
+      <button type="button" onClick={onNurseClick} className={`${FOKUS} group flex min-w-0 flex-1 items-center gap-2.5 rounded-[12px] text-left`}>
         {nurse.image ? (
           <img src={nurse.image} alt="" className={`${foto} bg-pm-grund object-cover`} />
         ) : (
-          <span aria-hidden="true" className={`${foto} flex items-center justify-center text-[18px] font-bold text-white`} style={{ backgroundColor: nurse.color }}>
+          <span aria-hidden="true" className={`${foto} flex items-center justify-center text-[15px] font-bold text-white`} style={{ backgroundColor: nurse.color }}>
             {initials(nurse.name).slice(0, 2)}
           </span>
         )}
-        <span className="min-w-0 flex-1">
-          <span className="block text-[18px] font-semibold leading-6 text-pm-ink">
-            {vorname}
+        <span className="min-w-0">
+          {/* Name unterstrichen: man sieht, dass sich das Profil öffnen lässt (Martin 08.11.). */}
+          <span className="block text-[18px] font-semibold leading-[1.3] text-pm-ink">
+            <span className="underline decoration-pm-chip decoration-[1.5px] underline-offset-[3px] group-hover:decoration-pm-taupe">{vorname}</span>
             {nurse.age ? <span className="font-normal text-pm-muted">, {nurse.age}</span> : null}
           </span>
           {fakten.map((teil) => (
-            <span key={teil} className="mt-0.5 block text-[16px] leading-[22px] text-pm-ink">{teil}</span>
+            <span key={teil} className="block text-[15px] leading-[1.4] text-pm-muted">{teil}</span>
           ))}
         </span>
-        <ChevronRight className="h-5 w-5 flex-none text-pm-muted" aria-hidden="true" />
       </button>
+      <div className="flex flex-none flex-col items-end gap-1.5">
+        {preisText}
+        {knopf}
+      </div>
     </li>
   );
 }
@@ -411,14 +308,13 @@ export function PflegekraftZeile({ nurse, preis, vorgemerkt, gesperrt, onNurseCl
 // Text, damit der erste Bildschirm nie leer ist.
 function Platzhalterzeile() {
   return (
-    <li className="flex items-center gap-4 border-t border-pm-line-soft px-4 py-4" data-platzhalter>
-      <span className="h-[72px] w-[72px] flex-none animate-pulse rounded-full bg-pm-shell" />
+    <li className="flex items-center gap-3 border-t border-pm-line-soft px-3.5 py-3" data-platzhalter>
+      <span className="h-[60px] w-[60px] flex-none animate-pulse rounded-full bg-pm-shell" />
       <span className="min-w-0 flex-1">
         <span className="block h-[14px] w-24 animate-pulse rounded bg-pm-shell" />
         <span className="mt-[8px] block h-[11px] w-32 max-w-full animate-pulse rounded bg-pm-line-soft" />
       </span>
-      {/* 13.11.2026: Platzhalter rechts wie der Pfeil der echten Zeilen, nicht mehr als Knopf („Einladen“ ist weg). */}
-      <span className="h-4 w-2.5 flex-none animate-pulse rounded bg-pm-line-soft" />
+      <span className="h-[34px] w-[88px] flex-none animate-pulse rounded-[10px] bg-pm-line-soft" />
     </li>
   );
 }
@@ -563,50 +459,56 @@ function KontaktReiter({ eingeklappt, erreichbar, sterne, verborgen = false }: {
 }
 
 // ── So geht es weiter ─────────────────────────────────────────────────────────────────────────────────────────────────
-// 13.11.2026 (Martin: „in der ersten Fassung hatten wir das mit einem grünen Button. Pflegesituation vervollständigen.
-// In der guten Phase … wollen wir das nicht auch noch überlegen?“): „So geht es weiter“ wie in der guten Phase (f062df3), unter dem
-// Formular: Schritt 1 grün hinterlegt mit grünem Knopf, der zum Formular hochspringt. Ohne „einladen“ (Martin 13.11.), Anreise wie
-// live („ab 3 Tagen“), „Vieles ist schon ausgefüllt“ ersetzt durch das, was stimmt; „Kostenrechner“ nie sichtbar (Martin 13.11.).
-// Weicht damit bewusst vom Ablauf unter dem letzten Schritt des Rechners ab (project 3/components/calculator/FormularPortal.tsx,
-// ABLAUF_NACH_ABSENDEN, Registry #151/#152), der bleibt vorerst.
-export const ABLAUF_GUTE_PHASE: readonly { titel: string; text: string }[] = [
-  // Martin 13.11.: „damit die Pflegekräfte wissen, worum es geht … das da auch nochmal mit aufnehmen“.
-  { titel: 'Pflegesituation vervollständigen', text: 'Beschreiben Sie kurz die Situation, damit die Pflegekräfte wissen, worauf es bei Ihnen ankommt. Das dauert ca.\u00a02\u00a0Minuten, einiges ist aus Ihren bisherigen Angaben schon übernommen.' },
-  // Martin 13.11.: „bei der Bewerbung … auch noch kostenfrei und unverbindlich … hinzuschreiben“.
-  { titel: 'Bewerbungen innerhalb von 60\u00a0Minuten erhalten', text: 'Passende Pflegekräfte bewerben sich bei Ihnen, mit Profil, Erfahrung und Anreisedatum. Für Sie kostenfrei und unverbindlich.' },
+// Martin 08.11.: „der Ablauf deutlich schöner dargestellt … optisch ist das nicht schön“. Wie die Stufen im CGA-Panel:
+// weiße Karte, Punkte auf einer senkrechten Linie, der aktuelle Schritt hervorgehoben.
+// Registry #152 (Martin 09.11.: „wie wir das im Portal auch haben, also dass das alles gleich ist“): dieselben drei Schritte
+// wie unter dem letzten Schritt des Rechners (project 3/components/calculator/FormularPortal.tsx, ABLAUF_NACH_ABSENDEN, Registry
+// #151; der Rechner kann nicht aus src/ importieren, beide Stellen gleich halten). Hier ist Schritt 1 erledigt (der Kunde sieht
+// Angebot und Pflegekräfte), Schritt 2 der aktuelle und springt zum Formular. Der alte Wortlaut bleibt für `?einstieg=alt`
+// (EinstiegVorSpeichern.tsx, SCHRITTE_STAND_75B8DF8).
+export const ABLAUF_MINIMAL: readonly { titel: string; text?: string }[] = [
+  { titel: 'Angebot und passende Pflegekräfte sofort sehen, inklusive aller Zuschüsse' },
+  { titel: 'Bewerbungen innerhalb von 60\u00a0Minuten erhalten', text: 'Auf Wunsch: Pflegesituation kurz beschreiben, dann bewerben sich passende Pflegekräfte bei Ihnen.' },
   { titel: 'Auswählen und starten', text: 'Sie wählen in Ruhe aus, erst danach schließen Sie den Vertrag. Wir übernehmen den Rest, Anreise schon ab 3\u00a0Tagen möglich.' },
 ];
+const ABLAUF_ERLEDIGT = 0;
+const ABLAUF_JETZT = 1;
 
-function AblaufGutePhase({ onZumFormular }: { onZumFormular?: () => void }) {
+function AblaufMinimal({ onZumFormular }: { onZumFormular?: () => void }) {
   return (
-    <section aria-labelledby="ablauf-titel" data-ablauf-gute-phase>
-      <h2 id="ablauf-titel" className="px-1 pb-3 text-[20px] font-bold leading-[26px] text-pm-ink">So geht es weiter</h2>
-      <ol className="overflow-hidden rounded-card border border-pm-line bg-white">
-        {ABLAUF_GUTE_PHASE.map((schritt, i) => {
-          const jetzt = i === 0;
+    <section className={`${KARTE} px-4 pt-3.5 pb-2`} aria-labelledby="ablauf-titel" data-ablauf-minimal>
+      <h2 id="ablauf-titel" className="text-[18px] font-semibold leading-6 text-pm-ink">So geht es weiter</h2>
+      <ol className="mt-2">
+        {ABLAUF_MINIMAL.map((schritt, i) => {
+          const erledigt = i === ABLAUF_ERLEDIGT;
+          const jetzt = i === ABLAUF_JETZT;
+          const letzter = i === ABLAUF_MINIMAL.length - 1;
           return (
-            <li key={schritt.titel} className={`px-4 py-4 ${jetzt ? 'bg-pm-mint' : 'border-t border-pm-line'}`} aria-current={jetzt ? 'step' : undefined}>
-              <div className="flex gap-3">
-                <span className={`mt-0.5 flex h-[27px] w-[27px] flex-none items-center justify-center rounded-full text-[13px] font-bold text-white ${jetzt ? 'bg-pm-green' : 'bg-pm-taupe-deep'}`}>
-                  {i + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className={`text-[16.5px] font-bold leading-[1.35] ${jetzt ? 'text-pm-green-deep' : 'text-pm-ink'}`}>{schritt.titel}</p>
-                  <p className={`mt-1 text-[15px] leading-[1.45] ${jetzt ? 'text-pm-body' : 'text-pm-muted'}`}>{schritt.text}</p>
-                </div>
-              </div>
-              {/* Knopf über die ganze Kastenbreite, damit „Pflegesituation vervollständigen“ auch auf dem iPhone SE in eine Zeile passt;
-                  unter 340 px (Anzeigezoom) etwas kleiner und ohne Pfeil, sonst ragt der Text über den Rand. */}
-              {jetzt && onZumFormular && (
-                <button
-                  type="button"
-                  onClick={onZumFormular}
-                  className={`${FOKUS} mt-3.5 flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[12px] bg-pm-green px-3 text-[16px] font-bold text-white hover:bg-pm-green-deep max-[339px]:text-[15px]`}
-                  data-ablauf-link
-                >
-                  <span className="whitespace-nowrap">Pflegesituation vervollständigen</span>
-                  <ArrowUp className="h-[18px] w-[18px] flex-none max-[339px]:hidden" strokeWidth={2.5} aria-hidden="true" />
+            <li key={schritt.titel} className="relative flex gap-3 pb-3" aria-current={jetzt ? 'step' : undefined}>
+              {!letzter && <span className="absolute left-[13px] top-8 bottom-0 w-px bg-pm-line" aria-hidden="true" />}
+              <span
+                className={`relative z-[1] mt-1 flex h-[27px] w-[27px] flex-none items-center justify-center rounded-full text-[13px] font-bold ${
+                  erledigt ? 'bg-pm-mint text-pm-green-deep' : jetzt ? 'bg-pm-coral text-white' : 'border border-pm-line bg-white text-pm-muted'
+                }`}
+              >
+                {erledigt ? <Check className="h-3.5 w-3.5" strokeWidth={3} aria-label="erledigt" /> : i + 1}
+              </span>
+              {jetzt && onZumFormular ? (
+                // Martin 08.11.: „wenn ich da draufklicke, dass ich nach oben springe. Nicht zu auffällig, aber schon ein Link …
+                // mit so einem Pfeil da auch rechts, ganz dezent. Darf nicht umspringen“: gleiche Fläche als Knopf, kleiner Pfeil
+                // in der Titelzeile, nichts verschiebt sich.
+                <button type="button" onClick={onZumFormular} className={`${FOKUS} block min-w-0 flex-1 rounded-[12px] bg-pm-coral-tint px-3 py-2 text-left hover:bg-pm-coral/15`} data-ablauf-link>
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="text-[16.5px] font-semibold leading-[1.35] text-pm-ink">{schritt.titel}</span>
+                    <ArrowUp className="mt-0.5 h-4 w-4 flex-none text-pm-coral-deep/70" strokeWidth={2.25} aria-hidden="true" />
+                  </span>
+                  {schritt.text && <span className="mt-1 block text-[15px] leading-[1.45] text-pm-muted">{schritt.text}</span>}
                 </button>
+              ) : (
+                <div className={`min-w-0 flex-1 rounded-[12px] px-3 py-2 ${jetzt ? 'bg-pm-coral-tint' : ''}`}>
+                  <p className={`text-[16.5px] font-semibold leading-[1.35] ${erledigt ? 'text-pm-muted' : 'text-pm-ink'}`}>{schritt.titel}</p>
+                  {schritt.text && <p className="mt-1 text-[15px] leading-[1.45] text-pm-muted">{schritt.text}</p>}
+                </div>
               )}
             </li>
           );
@@ -620,7 +522,7 @@ function AblaufGutePhase({ onZumFormular }: { onZumFormular?: () => void }) {
 export function EinstiegMinimal({
   anrede, lead, onBestpreis, heimEigenanteil, heimQuelle,
   laedt, zeilen, gehalteneEinladungen, vorschlaegeVorhanden, bereitsBearbeitet, formular, sterne, vorgemerkte,
-  onAblaufZumFormular, onKostenAufgeklappt, onFaqGeoeffnet,
+  onVervollstaendigen, onAblaufZumFormular, onKostenAufgeklappt, onFaqGeoeffnet,
 }: {
   /** Anrede für „Guten Tag, …“ (customerSalutation), ohne Anrede nur „Guten Tag“. */
   anrede: string | null;
@@ -639,13 +541,18 @@ export function EinstiegMinimal({
   formular: ReactNode;
   sterne: SterneStand | null;
   vorgemerkte: VorgemerkteKraft[];
+  /** Fester Knopf unten: ins Formular (CustomerPortalPage, Messpunkt `zur_pflegesituation` mit Quelle `hauptknopf`). */
+  onVervollstaendigen: () => void;
   /** „Pflegesituation vervollständigen“ in „So geht es weiter“: Sprung zum Formular (Messpunkt `zur_pflegesituation`, Quelle
    *  `schritte`). Ohne Rückruf bleibt der Schritt reiner Text. */
   onAblaufZumFormular?: () => void;
   onKostenAufgeklappt?: () => void;
   onFaqGeoeffnet?: (schluessel: string) => void;
 }) {
-  // Formular im Bild: Martas Reiter klappt dort ein (den festen Knopf, der hier früher wegfuhr, gibt es seit #162 nicht mehr).
+  // Der feste Knopf steht nur über Angebot und Pflegekräften (Martin 08.11.: „den wir festmachen unten“). Kommt das Formular
+  // ins Bild, fährt er weg; im Formular steht dessen eigener Knopf fest UNTER dem Formular, nichts schwebt mehr darüber (Martin
+  // 08.11. abends: „den Button dann schon immer unter dem Formular lassen und nicht mehr Flugding“; „wozu brauche ich dann
+  // Bewerbungen erhalten? … dann ist es vorbei“ → dort „Weiter →“, erst im letzten Schritt „Bewerbungen erhalten“).
   const [formularImBild, setFormularImBild] = useState(false);
   useEffect(() => {
     const ziel = document.getElementById('patientendaten');
@@ -682,12 +589,15 @@ export function EinstiegMinimal({
     // `overflow-x-clip` (kein Scrollbereich, sticky bleibt): der halb eingeschobene Kontakt-Reiter ragt über den rechten
     // Rand und darf keinen Querscroll erzeugen.
     <div className="bg-pm-grund overflow-x-clip" data-einstieg="minimal">
-      {/* Erster Teil: Gruß, Angebotskarte, Pflegekräfte. */}
+      {/* Erster Teil: Gruß, Angebotskarte, Pflegekräfte; der feste Knopf hängt am Ende dieses Teils und bleibt bis dorthin unten
+          am Bildschirm stehen (sticky, ohne Skript: auch im Handyrahmen am Computer). */}
       {/* Seitenrand 12 px, unter 375 px 8 px (Android 360: mehr Platz für die Zeilen). */}
       <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2">
-        {/* Kopf: Gruß klein, Titel groß, Preiskarte (Martin 13.11.2026; Begründung an KopfBereich). */}
-        <KopfBereich
-          anrede={anrede} lead={lead} heimEigenanteil={heimEigenanteil} heimQuelle={heimQuelle} sterne={sterne}
+        <h1 className="px-1 pt-3 pb-2.5 text-[22px] font-semibold leading-[1.2] tracking-[-0.015em] text-pm-ink">
+          Guten Tag{anrede ? `, ${anrede}` : ''}
+        </h1>
+        <AngebotKarteMinimal
+          lead={lead} heimEigenanteil={heimEigenanteil} heimQuelle={heimQuelle} sterne={sterne}
           onBestpreis={onBestpreis} onKostenAufgeklappt={onKostenAufgeklappt}
         />
 
@@ -695,12 +605,11 @@ export function EinstiegMinimal({
         {!(leer && gehalteneEinladungen === 0 && !vorschlaegeVorhanden) && (
           <section id="pflegekraefte" style={{ scrollMarginTop: 96 }} aria-labelledby="pflegekraefte-titel" className={`${KARTE} mt-3 overflow-hidden`}>
             <h2 id="pflegekraefte-titel" className="flex items-center gap-2 px-4 pt-3.5 pb-2.5 text-[18px] font-semibold leading-6 text-pm-ink">
-              {LISTE_TITEL}
+              Passende Pflegekräfte
               {!laedt && anzahl > 0 && (
                 <span className="rounded-full bg-pm-grund px-2 py-px text-[13px] font-semibold leading-5 tabular-nums text-pm-muted">{anzahl}</span>
               )}
             </h2>
-            {(laedt || anzahl > 0) && <p className="-mt-1 px-4 pb-3.5 text-[15px] leading-5 text-pm-muted" data-liste-zeile>{LISTE_ZEILE}</p>}
             {laedt ? (
               <ul aria-busy="true" aria-label="Wir laden Ihre Pflegekräfte …">
                 {Array.from({ length: PLATZHALTER }, (_, i) => <Platzhalterzeile key={i} />)}
@@ -715,22 +624,42 @@ export function EinstiegMinimal({
           </section>
         )}
 
+        {/* Fester Knopf: Sticky-Anker ohne Höhe am Ende des ersten Teils, das Band hängt nach oben daran. Sobald das Formular ins
+            Bild kommt, fährt es nach unten weg; dann gilt der Knopf unter dem Formular. */}
+        <div className="sticky bottom-0 z-20 h-0" data-fester-knopf-anker>
+          <div
+            className={`absolute bottom-0 -left-3 -right-3 max-[374px]:-left-2 max-[374px]:-right-2 bg-pm-grund/95 px-3 max-[374px]:px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_-14px_rgba(28,28,28,.35)] backdrop-blur transition-[transform,opacity] duration-300 motion-reduce:transition-none ${
+              formularImBild ? 'pointer-events-none translate-y-full opacity-0' : ''
+            }`}
+            aria-hidden={formularImBild || undefined}
+            data-fester-knopf
+          >
+            <button
+              type="button"
+              onClick={onVervollstaendigen}
+              tabIndex={formularImBild ? -1 : 0}
+              className={`${FOKUS} block w-full rounded-[12px] bg-pm-coral px-4 py-2.5 text-center text-white transition-colors hover:bg-pm-coral-deep active:scale-[0.99]`}
+            >
+              {/* Pfeil (Martin 08.11.: „wir lassen Bewerbungen erhalten. Und dann kommt so ein Pfeil dahin“). */}
+              <span className="flex items-center justify-center gap-1.5 text-[16px] font-bold leading-5">
+                {FEST_TITEL}
+                <ArrowRight className="h-[18px] w-[18px] flex-none" strokeWidth={2.5} aria-hidden="true" data-pfeil />
+              </span>
+              <span className="mt-0.5 block text-[13.5px] font-medium leading-4 opacity-90">{FEST_ZEILE}</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Pflegesituation mit offenem Formular direkt unter der Liste (13.11.2026). */}
+      {/* Pflegesituation mit offenem Formular (Logik wie „Pflegekräfte zuerst“, #145); der Knopf steht fest darunter. */}
       <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2 pb-4 space-y-4">
         {bereitsBearbeitet && <div className="pt-6">{bereitsBearbeitet}</div>}
         <AbschnittPflegesituation vorgemerkte={vorgemerkte} formular={formular} schlicht />
-        {/* Martin 13.11.2026: „einen Marta-Kasten … mit Anbieten von Beratung und dann Schreiben, Anrufen“ (Standard-Baustein
-            MartaBox, ohne Siegel und Sterne, die stehen schon im Kopf), darunter „So geht es weiter“ wie in der guten Phase. */}
-        <div className="pt-2" data-marta-beratung>
-          <MartaBox sterne={sterne} erreichbar={erreichbar} hinweisAusserhalb={AUSSERHALB_ZEITEN} ohneVertrauen titel={MARTA_BERATUNG_TITEL} />
-        </div>
-        <div className="pt-2"><AblaufGutePhase onZumFormular={onAblaufZumFormular} /></div>
       </div>
 
       {/* Die Kostenkarte entfällt hier: ihre Aufstellung steht unter „Details“ in der Angebotskarte (Martin 08.11.). */}
       <div className="max-w-3xl mx-auto px-3 max-[374px]:px-2 pt-2 pb-6 space-y-4">
+        <AblaufMinimal onZumFormular={onAblaufZumFormular} />
         <div className="pt-6">
           <FaqListe ruhig karte minimal onFrageGeoeffnet={onFaqGeoeffnet} />
         </div>

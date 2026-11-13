@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import type { ElementType, FC, ReactNode } from 'react';
-import { Check, Lock, Users } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 import {
   Lead,
   prefillPatientFromLead,
@@ -97,7 +97,7 @@ export const AngebotCard: FC<{
    *  (`kopf`), Fortschritt schlicht. Stellt die Seite `AussenKnopf` bereit, übernimmt ihr fester Knopf „Weiter“ und das
    *  Absenden („Zurück“ steht dann klein in der Schrittzeile); sonst Knopfleiste als Band. */
   schlicht?: boolean;
-  kopf?: { titel: string; zeile: string; aussen?: boolean };
+  kopf?: { titel: string; zeile: string };
   /** Unsichtbare Messpunkte des Patientenbogens: Kalender geöffnet / zu ohne Datum (Registry #123), Feld-Messung
    *  (Registry #132): erstes Feld im Bild, Feld auf Seite 1 oder 3 angetippt, „Weiter“ mit offenen Pflichtfeldern.
    *  Das Portal meldet sie nur für echte Leads; ohne Rückruf passiert nichts. */
@@ -261,10 +261,6 @@ export const AngebotCard: FC<{
   }, [gewaehlterStart]);
 
   const zwei = patient.anzahl === '2';
-  // 13.11.2026: Formularkopf über der Karte, Personenzahl oben in der Karte, weniger Linien (Martin: „das mit den Strichen wirkt
-  // so, als wäre das Formular noch unterteilt“). „Weiter“ und Fortschrittsbalken grün wie der Knopf in „So geht es weiter“
-  // (Martin auf „Soll der Button auch grün sein?“: „gefühlt würde ich das quasi gleich machen“), die Spur des Balkens beige.
-  const personenImKopf = schlicht && !!kopf?.aussen;
   // Minimal-Einstieg (Registry #147, Martin 08.11.: „beim ersten … deutlich kleiner machen, damit man sofort den Button sieht und
   // sieht, dass das jetzt weitergeht … vielleicht nur eine Frage dort. Und dann geht es halt eben zur nächsten und dann kommt
   // der Fragebogen“): erste Seite mit EINER Frage zum Antippen (Geschlecht der Person 1), ohne Schrittzeile; nach der Antwort
@@ -794,8 +790,7 @@ export const AngebotCard: FC<{
   // ohne Kasten über die ganze Breite und ohne die Zeile „Aus Ihrem Kostenrechner übernommen“; der Tipp erklärt wie bisher.
   const festHinweis = (key: string) => (priceInfo === key
     ? 'Diese Angabe bestimmt den Preis. Ändern kann sie Ihre Beraterin, dann schicken wir Ihnen ein neues Angebot.'
-    // 13.11.2026 (Martin: „Kein Mensch weiß, was ein Kostenrechner ist … aus Ihren Angaben … vorherigen Angaben übernommen“).
-    : 'Aus Ihren bisherigen Angaben übernommen');
+    : 'Aus Ihrem Kostenrechner übernommen');
   const festWert = (key: string, wert: ReactNode) => schlicht ? (
     <button
       type="button"
@@ -828,16 +823,7 @@ export const AngebotCard: FC<{
   // Zwischenkopf („Person 1"); das Feld direkt darunter braucht keine eigene Trennlinie.
   // Minimal-Einstieg (Martin 08.11.: „man erkennt kaum, wo Person 1 und Person 2 steht. Das muss deutlich markanter sein“; er las
   // „Nachteinsätze“ zweimal): Band über die ganze Kartenbreite mit Nummer im Kreis statt der kleinen Überschrift.
-  const personKopf = (text: string) => (personenImKopf ? (
-    <div className="mt-5 flex items-center gap-2.5 rounded-[12px] bg-pm-grund px-3 py-2.5" data-person-kopf>
-      {/\d/.test(text) && (
-        <span aria-hidden="true" className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-pm-ink text-[12.5px] font-bold text-white">
-          {text.replace(/\D/g, '')}
-        </span>
-      )}
-      <p className="text-[18px] font-bold text-pm-ink">{text}</p>
-    </div>
-  ) : schlicht ? (
+  const personKopf = (text: string) => (schlicht ? (
     <div className="-mx-4 mt-4 flex items-center gap-2.5 border-y border-pm-line bg-pm-grund px-4 py-2.5 [&+[data-field]]:border-t-0" data-person-kopf>
       {/\d/.test(text) && (
         <span aria-hidden="true" className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-pm-ink text-[12.5px] font-bold text-white">
@@ -992,36 +978,17 @@ export const AngebotCard: FC<{
   return (
     <div ref={patientFormRef} id="pflegesituation-formular" data-schritt={step} className="scroll-mt-16">
       {patientOpen && (
-        <>
-        {/* 13.11.2026 (Martin: „mit diesem riesigen Kopf sieht es nicht aus wie ein gut sichtbares, getrenntes Formular“, „Titel
-            nicht doppeln“): ein Titel und der Satz stehen über der Karte auf dem Seitengrund, wie in der guten Phase (f062df3);
-            die Karte selbst beginnt mit Rahmen und Schrittzeile. */}
-        {schlicht && kopf?.aussen && (
-          <div className="px-1 pb-3" data-formular-kopf-aussen>
-            <h2 className="text-[20px] font-bold leading-[26px] text-pm-ink">{kopf.titel}</h2>
-            {step === 0 && <p className="mt-1.5 text-[15px] leading-[1.45] text-pm-body">{kopf.zeile}</p>}
-          </div>
-        )}
-        <Rahmen className={schlicht ? (kopf?.aussen ? `rounded-card bg-white px-4 shadow-lift ring-[1.5px] ring-pm-taupe-light [&_[data-knopfleiste]]:border-t-0 [&_[data-mess=weiter]]:!bg-pm-green [&_[role=progressbar]>span]:!bg-pm-green [&_[role=progressbar]]:!bg-pm-chip` : 'rounded-card bg-white px-4 shadow-lift ring-1 ring-pm-coral/20') : eingebettet ? 'pt-4' : 'px-5 pt-5'}>
-          {/* Minimal-Einstieg: Kopf der Karte mit Personenzahl und Fortschritt auf pm-paper, Karte mit Schatten und Taupe-Rahmen
-              (bis 13.11.2026 Titel, Satz und Fortschritt auf hellem Koralle-Grund). Ohne `overflow-hidden`: der Kalender klappt
+        <Rahmen className={schlicht ? 'rounded-card bg-white px-4 shadow-lift ring-1 ring-pm-coral/20' : eingebettet ? 'pt-4' : 'px-5 pt-5'}>
+          {/* Minimal-Einstieg (Martin 08.11.: „das Formular geht ja unter, weil das alles weißer Hintergrund … das muss man
+              irgendwie schöner machen“): Kopf mit Titel, Satz und Fortschritt auf hellem Koralle-Grund (Farbe des Knopfs und
+              des aktuellen Schritts in „So geht es weiter“), Karte mit Schatten. Ohne `overflow-hidden`: der Kalender klappt
               über den Kartenrand. */}
-          <div className={schlicht ? (kopf?.aussen ? '-mx-4 rounded-t-card bg-pm-paper px-4 pt-3.5 pb-3.5' : '-mx-4 mb-1 rounded-t-card bg-pm-coral-tint px-4 pt-4 pb-3.5') : ''}>
-          {/* 13.11.2026 (Martin: „1 Person oder 2 ist eine wichtige Info, die gut sichtbar sein muss“): Personenzahl oben in
-              jeder Seite der Karte statt als Feld „Anzahl zu betreuender Personen“; Tippen erklärt wie bisher, warum sie fest ist. */}
-          {personenImKopf && (
-            <div className="mb-2.5" data-personenzahl>
-              <button
-                type="button"
-                onClick={() => setPriceInfo(priceInfo === 'anzahl' ? null : 'anzahl')}
-                aria-expanded={priceInfo === 'anzahl'}
-                className="-my-1.5 flex min-h-[44px] items-center gap-2.5 text-left"
-              >
-                <Users className="h-5 w-5 flex-none text-pm-taupe-ink" strokeWidth={2.25} aria-hidden="true" />
-                <span className="text-[17px] font-bold leading-6 text-pm-ink">Betreuung für {zwei ? '2\u00a0Personen' : '1\u00a0Person'}</span>
-                <Lock className="h-4 w-4 flex-none text-pm-muted" aria-hidden="true" />
-              </button>
-              {priceInfo === 'anzahl' && <p className="mt-1 text-[14px] leading-5 text-pm-muted">{festHinweis('anzahl')}</p>}
+          <div className={schlicht ? '-mx-4 mb-1 rounded-t-card bg-pm-coral-tint px-4 pt-4 pb-3.5' : ''}>
+          {schlicht && kopf && (
+            <div className="mb-3">
+              <h2 className="text-[20px] font-bold leading-[26px] text-pm-ink">{kopf.titel}</h2>
+              {/* Satz nur im ersten Schritt (Prüfung 09.11.: in größerer Schrift vier Zeilen auf jedem Schritt). */}
+              {step === 0 && <p className="mt-1 text-[15px] leading-[1.45] text-pm-body">{kopf.zeile}</p>}
             </div>
           )}
           <ProgressSteps
@@ -1038,17 +1005,15 @@ export const AngebotCard: FC<{
 
           {/* Minimal-Einstieg: Felder etwas enger (Martin 08.11.: „die Abstände … einen Tick verkleinern“), 14 statt 18 px. */}
           <FormLesbar.Provider value={schlicht}>
-          <div className={schlicht ? `mt-2 [&_[data-field]]:pb-[14px] [&_[data-field]:not(:first-child)]:pt-[14px]${personenImKopf ? ' mt-3 [&_[data-field]]:border-t-0 [&>[data-person-kopf]:first-child]:mt-0' : ''}` : 'mt-2'}>
+          <div className={schlicht ? 'mt-2 [&_[data-field]]:pb-[14px] [&_[data-field]:not(:first-child)]:pt-[14px]' : 'mt-2'}>
             {/* ── Einstieg (Minimal), erste Hälfte von Schritt 1: Anzahl (fest, preisrelevant) und Geschlecht, Wortlaut wie bisher
                 (Martin 08.11.: „Personen … können wir nicht ändern. Weil das preisrelevant ist … dann fragst du noch ein
                 Geschlecht“). Die letzte Antwort führt von selbst weiter. ── */}
             {step === 0 && einstiegAktiv && (
               <>
-                {!personenImKopf && (
                 <FormField feld="anzahl" label="Anzahl zu betreuender Personen" hinweis={schlicht ? festHinweis('anzahl') : undefined}>
                   {festWert('anzahl', patient.anzahl === '2' ? '2 Personen' : '1 Person')}
                 </FormField>
-                )}
                 {(zwei ? (['geschlecht', 'p2_geschlecht'] as const) : (['geschlecht'] as const)).map((k, i) => (
                   <Fragment key={k}>
                     {zwei && personKopf(`Person ${i + 1}`)}
@@ -1063,7 +1028,7 @@ export const AngebotCard: FC<{
             {/* ── Step 1: Zur Person ── */}
             {step === 0 && !einstiegAktiv && (
               <>
-                {!(schlicht && einstiegSeite) && !personenImKopf && (
+                {!(schlicht && einstiegSeite) && (
                 <FormField feld="anzahl" label="Anzahl zu betreuender Personen" hinweis={schlicht ? festHinweis('anzahl') : undefined}>
                   {festWert('anzahl', patient.anzahl === '2' ? '2 Personen' : '1 Person')}
                 </FormField>
@@ -1494,7 +1459,6 @@ export const AngebotCard: FC<{
             )}
           />
         </Rahmen>
-        </>
       )}
       {/* Unter der Karte statt in der mitlaufenden Leiste — dort kostete die
           zweite Zeile auf dem Handy Platz über dem Formular. */}
