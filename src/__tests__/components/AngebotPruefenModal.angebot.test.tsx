@@ -86,7 +86,7 @@ describe('Angebot prüfen, Schritt 1 (Martin 14.11.2026)', () => {
     expect(within(angebot()).getByText('für Anreise und Abreise').className).toContain('text-pm-muted');
     expect(wert('Reisetage')).toBe('voller Tagessatz');
     expect(wert('Feiertage')).toBe('doppelter Tagessatz');
-    expect(wert('Kündigung')).toBe('täglich kündbar');
+    expect(wert('Kündigung')).toBe('täglich möglich');
     // Oktober bis Dezember: kein Sommerzuschlag (Martin 09.09.2026).
     expect(within(angebot()).queryByText('Sommerzuschlag')).toBeNull();
   });

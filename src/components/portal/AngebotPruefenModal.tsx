@@ -491,7 +491,8 @@ export const AngebotPruefenModal: FC<{
     /* Sommerzuschlag nur, wenn der Einsatzzeitraum wirklich in Juli/August reicht (Martin, 09.09.2026). Berechnet wird er
        unveraendert, im Vertrag steht er weiterhin. */
     ...(zuschlagRelevance.hasSummer ? [{ label: 'Sommerzuschlag', wert: '6,67 € pro Tag', zusatz: 'im Juli und August' }] : []),
-    { label: 'Kündigung', wert: 'täglich kündbar' },
+    // OpenAI-Prüfung 14.11.2026: „Kündigung: täglich kündbar“ doppelt gemoppelt → „täglich möglich“.
+    { label: 'Kündigung', wert: 'täglich möglich' },
   ];
 
   const schritte: Schritt[] = contractOnly ? [2, 3] : [1, 2, 3];
