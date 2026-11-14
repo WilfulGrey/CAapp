@@ -62,6 +62,9 @@ export const LISTE_ZEILE = 'Diese Pflegekräfte sind verfügbar und passen zu Ih
 export const LISTE_UNVOLLSTAENDIG = 'Ihre Angaben sind noch unvollständig';
 export const LISTE_WARUM = 'Beschreiben Sie kurz die Pflegesituation. So verstehen die Pflegekräfte, worauf es bei Ihnen ankommt, und können sich unverbindlich bewerben. Das dauert ca. 2 Minuten.';
 export const LISTE_KNOPF = 'Pflegesituation vervollständigen';
+/** ENTWURF 14.11.2026 (Martin: „weitere PKs anzuzeigen mit Textlink unter der letzten“): Textlink unter der letzten Zeile,
+ *  höchstens zweimal, je 5 weitere; danach steht direkt unter der Liste nur noch der Kasten. */
+export const weitereText = (anzahl: number) => (anzahl === 1 ? '1 weitere Pflegekraft anzeigen' : `${anzahl} weitere Pflegekräfte anzeigen`);
 /** Titel des Marta-Kastens unter dem Formular (13.11.2026, Martin: „Anbieten von Beratung“). */
 export const MARTA_BERATUNG_TITEL = 'Lieber persönlich beraten lassen?';
 /** Kopf über der Formularkarte (13.11.2026, Martin: „ob das formular als popup kommen müsste und wenn nicht, dann besser
@@ -599,7 +602,7 @@ function AblaufGutePhase({ onZumFormular }: { onZumFormular?: () => void }) {
 export function EinstiegMinimal({
   anrede, lead, onBestpreis, heimEigenanteil, heimQuelle,
   laedt, zeilen, gehalteneEinladungen, vorschlaegeVorhanden, bereitsBearbeitet, formular, sterne, vorgemerkte,
-  onListeZumFormular, onAblaufZumFormular, onKostenAufgeklappt, onFaqGeoeffnet,
+  onListeZumFormular, onAblaufZumFormular, onKostenAufgeklappt, onFaqGeoeffnet, weitereAnzeigen,
 }: {
   /** Anrede für „Guten Tag, …“ (customerSalutation), ohne Anrede nur „Guten Tag“. */
   anrede: string | null;
@@ -621,6 +624,8 @@ export function EinstiegMinimal({
   /** Knopf im Kasten unter der Liste: Sprung zum Formular (Messpunkt `zur_pflegesituation`, Quelle `hauptknopf` wie der
    *  Knopf unter der Liste bis #162). */
   onListeZumFormular?: () => void;
+  /** ENTWURF 14.11.2026: Textlink „5 weitere Pflegekräfte anzeigen“ unter der letzten Zeile; null = kein Link mehr. */
+  weitereAnzeigen?: { anzahl: number; onClick: () => void } | null;
   /** „Pflegesituation vervollständigen“ in „So geht es weiter“: Sprung zum Formular (Messpunkt `zur_pflegesituation`, Quelle
    *  `schritte`). Ohne Rückruf bleibt der Schritt reiner Text. */
   onAblaufZumFormular?: () => void;
@@ -690,6 +695,18 @@ export function EinstiegMinimal({
             ) : anzahl > 0 ? (
               <>
                 <ul>{zeilen}</ul>
+                {/* ENTWURF 14.11.2026: Textlink unter der letzten Zeile, höchstens zweimal (danach null). */}
+                {weitereAnzeigen && (
+                  <button
+                    type="button"
+                    onClick={weitereAnzeigen.onClick}
+                    className={`${FOKUS} focus-visible:outline-offset-[-3px] flex min-h-[52px] w-full items-center justify-center gap-1.5 border-t border-pm-line-soft px-4 text-[16px] font-semibold text-pm-green-deep underline decoration-pm-green/40 underline-offset-4 hover:bg-pm-paper`}
+                    data-weitere-anzeigen
+                  >
+                    {weitereText(weitereAnzeigen.anzahl)}
+                    <ChevronDown className="h-[18px] w-[18px] flex-none" strokeWidth={2.5} aria-hidden="true" />
+                  </button>
+                )}
                 {/* Registry #163, 14.11.2026 (Martin: „Im Portal fehlt der Text und Button unter den PKs“): wie im Bild vom 13.11.
                     vormittags, Knopf grün über die ganze Breite, Pfeil nach unten (das Formular steht direkt darunter). */}
                 {onListeZumFormular && (

@@ -439,6 +439,15 @@ const PREVIEW_SIGNED_FORM: ContractFormData = {
 // Deutsch-Stufe überall „Gut“ wie der Wunsch des Vorschau-Leads (sehr-gut): live zeigt die Liste nur Kräfte mit der
 // Wunsch-Stufe (`matchesGermanyWish`, strikt), und der Minimal-Einstieg zeigt bei jeder Kraft den Preis des Kunden
 // (Registry #147, 08.11.2026). Mit gemischten Stufen stünde in der Vorschau neben „Deutsch Grund“ der Preis für „Gut“.
+const WEITERE_VORSCHAU: Array<{ nurse: Nurse; caregiverId: number }> = ([
+  ['Maria Zielińska', 52, 6, 'Mittel'], ['Barbara Wójcik', 60, 10, 'Gut'], ['Krystyna Mazur', 63, 14, 'Gut'], ['Jolanta Krawczyk', 49, 3, 'Mittel'], ['Teresa Kaczmarek', 58, 9, 'Gut'],
+  ['Danuta Piotrowska', 61, 11, 'Gut'], ['Elżbieta Grabowska', 55, 5, 'Mittel'], ['Agnieszka Nowicka', 47, 4, 'Gut'], ['Małgorzata Pawłowska', 59, 8, 'Gut'], ['Renata Michalska', 56, 7, 'Mittel'],
+  ['Halina Król', 64, 15, 'Gut'], ['Grażyna Wieczorek', 53, 6, 'Gut'], ['Beata Jabłońska', 50, 5, 'Mittel'], ['Dorota Majewska', 57, 9, 'Gut'], ['Iwona Olszewska', 62, 12, 'Gut'],
+] as const).map(([name, age, jahre, stufe], i) => ({ caregiverId: 999020 + i, nurse: {
+  caregiverId: 999020 + i, name, age, experience: `${jahre} J. Erfahrung`, experienceYears: jahre, availability: 'sofort verfügbar', availableSoon: true,
+  language: { level: stufe, bars: stufe === 'Gut' ? 3 : 2 }, color: ['#8B7355', '#A18973', '#B5A184', '#6B5444'][i % 4], addedTime: 'heute', isLive: true, gender: 'female' as const,
+  history: { assignments: 1 + (i % 4), avgDurationMonths: 2.5 },
+} }));
 const PREVIEW_MATCHINGS: Array<{ nurse: Nurse; caregiverId: number }> = [
   { caregiverId: 999010, nurse: { caregiverId: 999010, name: 'Anna Nowak', age: 58, experience: '8 J. Erfahrung', experienceYears: 8, availability: 'sofort verfügbar', availableSoon: true, language: { level: 'Gut', bars: 3 }, color: '#8B7355', addedTime: 'heute', isLive: true, gender: 'female', image: 'https://i.pravatar.cc/200?img=44', history: { assignments: 22, avgDurationMonths: 3.1 } } },
   { caregiverId: 999011, nurse: { caregiverId: 999011, name: 'Ewa Lewandowski', age: 65, experience: '12 J. Erfahrung', experienceYears: 12, availability: 'verfügbar ab 02.06.', availableSoon: true, language: { level: 'Gut', bars: 3 }, color: '#A18973', addedTime: 'gestern', isLive: true, gender: 'female', image: 'https://i.pravatar.cc/200?img=49', history: { assignments: 35, avgDurationMonths: 3.6 } } },
@@ -449,6 +458,8 @@ const PREVIEW_MATCHINGS: Array<{ nurse: Nurse; caregiverId: number }> = [
   ...(IS_PREVIEW_PATIENT
     ? [{ caregiverId: 999014, nurse: { caregiverId: 999014, name: 'Irena Pawlak', age: 57, experience: '7 J. Erfahrung', experienceYears: 7, availability: 'sofort verfügbar', availableSoon: true, language: { level: 'Gut', bars: 3 }, color: '#A18973', addedTime: 'heute', isLive: true, gender: 'female' as const, image: 'https://i.pravatar.cc/200?img=32', history: { assignments: 2, avgDurationMonths: 2.2 } } }]
     : []),
+  // Weitere Vorschau-Kräfte für „5 weitere Pflegekräfte anzeigen“ (Entwurf 14.11.2026), nur in ?preview=patient.
+  ...(IS_PREVIEW_PATIENT ? WEITERE_VORSCHAU : []),
 ];
 
 // Rekonstruiert eine Nurse aus einem gespeicherten CaregiverSnapshot (volle
@@ -813,6 +824,10 @@ const CustomerPortalPage: FC = () => {
   // Einladen je Pflegekraft, Fragen je Frage (Schlüssel in leadEvents.ts). Keine Personendaten in metadata.
   // `vor_speichern` = Pflegesituation noch nie gespeichert (weder in dieser Sitzung noch laut Lead oder mamamia).
   const vorSpeichern = !patientSaved && !schonAbgesendet;
+  // ENTWURF 14.11.2026 (Martin: „ermöglichen, weitere PKs anzuzeigen mit Textlink unter der letzten. Und spätestens nach 2 x
+  // dann bitte Angaben vervollständigen und Bewerbungen erhalten“): im Minimal-Einstieg vor dem Speichern bis zu zweimal je
+  // 5 weitere Zeilen.
+  const [weitereSeiten, setWeitereSeiten] = useState(0);
   const messen = (punkt: Messpunkt, metadata?: LeadEventMetadata) => {
     if (IS_PREVIEW_ANY) return;
     reportLeadEvent(lead?.token, punkt, metadata, false);
@@ -2520,7 +2535,13 @@ const CustomerPortalPage: FC = () => {
       && (statusOverrides.get(id) === 'invited' || interestStatusOverrides.get(id) === 'invited')).length;
     const heldInvites = (inviteRate?.used_24h ?? 0) + unbestaetigt;
     const visibleCount = Math.max(0, 5 - heldInvites);
-    const pendingNurses: VisibleNurse[] = allVisible.filter(({ status }) => status === 'pending').slice(0, visibleCount);
+    const allePending = allVisible.filter(({ status }) => status === 'pending');
+    const pendingNurses: VisibleNurse[] = allePending.slice(0, visibleCount);
+    // ENTWURF 14.11.2026: weitere Zeilen hängen hinten an; die Empfehlung wird nur unter den ersten gesucht, damit die oberen
+    // Zeilen beim Nachladen stehen bleiben.
+    const weitereSichtbar = minimalEinstieg && vorSpeichern ? Math.min(5 * weitereSeiten, Math.max(0, allePending.length - visibleCount)) : 0;
+    const weitere: VisibleNurse[] = allePending.slice(visibleCount, visibleCount + weitereSichtbar);
+    const nochWeitere = minimalEinstieg && vorSpeichern ? Math.max(0, allePending.length - visibleCount - weitereSichtbar) : 0;
     // Die Empfehlung (höchste Badge-Bewertung, Score = Erfahrungsjahre +
     // Einsätze) nach ganz oben ziehen — die anderen behalten ihre
     // Reihenfolge. So steht "Empfehlung des Beraters" immer zuoberst.
@@ -2531,10 +2552,10 @@ const CustomerPortalPage: FC = () => {
       const s = badgeScore(p.nurse);
       if (s > bestScore) { bestScore = s; bestIdx = idx; }
     });
-    const visibleNurses: VisibleNurse[] = bestIdx > 0
+    const visibleNurses: VisibleNurse[] = [...(bestIdx > 0
       ? [pendingNurses[bestIdx], ...pendingNurses.filter((_, idx) => idx !== bestIdx)]
-      : pendingNurses;
-    return { allVisible, heldInvites, visibleNurses };
+      : pendingNurses), ...weitere];
+    return { allVisible, heldInvites, visibleNurses, nochWeitere };
   })();
 
   // Registry #145, Nachbesserung 2: wer nach dem Speichern wirklich eingeladen wird — die Vorgemerkten, die als offene
@@ -4198,6 +4219,9 @@ const CustomerPortalPage: FC = () => {
           sterne={sterne}
           vorgemerkte={vorgemerkteKraefte}
           onListeZumFormular={zurPflegesituationAus('hauptknopf')}
+          weitereAnzeigen={weitereSeiten < 2 && pflegekraftAuswahl.nochWeitere > 0
+            ? { anzahl: Math.min(5, pflegekraftAuswahl.nochWeitere), onClick: () => setWeitereSeiten((s) => Math.min(2, s + 1)) }
+            : null}
           onAblaufZumFormular={zurPflegesituationAus('schritte')}
           onKostenAufgeklappt={() => messen('kosten_aufgeklappt')}
           onFaqGeoeffnet={messeFrage}
