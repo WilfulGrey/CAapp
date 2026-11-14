@@ -52,40 +52,7 @@ Deno.test("holeFuenf: liefert ALLE gewählten Kräfte in Portal-Reihenfolge, ohn
   assert(r, "Ergebnis fehlt");
   assertEquals(r.sichtbarGesamt, 3);
   assertEquals(r.fuenf.map((x) => x.caregiverId), [9, 5, 2]);
-  // getCustomer liest nur den Deutschwunsch bei mamamia (wie das Portal, Registry #166) — kein getCaregiver je Zeile.
-  assertEquals(rufe, ["onboard", "listMatchings", "getCustomer"], "kein getCaregiver je Zeile");
-});
-
-Deno.test("holeFuenf: Deutschwunsch bei mamamia gewinnt über den Rechnerwert — wie im Portal (Registry #166)", async () => {
-  const antwort = (action: string) => action === "getCustomer"
-    ? { data: { Customer: { customer_caregiver_wish: { germany_skill: "level_3" } } } }
-    : { data: { JobOfferMatchingsWithPagination: { data: [
-      cg({ id: 2, germany_skill: "level_2" }), cg({ id: 3, germany_skill: "level_3" }),
-    ] } } };
-  const r = await holeFuenf({
-    supabaseUrl: "https://s", key: "k", token: "t", jobOfferId: 1, now: JETZT,
-    formularDaten: { deutschkenntnisse: "kommunikativ" },
-    fetchFn: (url, init) => {
-      if (String(url).includes("onboard")) return Promise.resolve(Response.json({ session_token: "jwt", job_offer_id: 1 }));
-      return Promise.resolve(Response.json(antwort(JSON.parse(String((init as RequestInit).body)).action)));
-    },
-  });
-  assertEquals(r?.fuenf.map((x) => x.caregiverId), [3]);
-});
-
-Deno.test("holeFuenf: getCustomer scheitert → Rechnerwert gilt, Liste kommt trotzdem", async () => {
-  const r = await holeFuenf({
-    supabaseUrl: "https://s", key: "k", token: "t", jobOfferId: 1, now: JETZT,
-    formularDaten: { deutschkenntnisse: "kommunikativ" },
-    fetchFn: (url, init) => {
-      if (String(url).includes("onboard")) return Promise.resolve(Response.json({ session_token: "jwt", job_offer_id: 1 }));
-      if (JSON.parse(String((init as RequestInit).body)).action === "getCustomer") return Promise.resolve(new Response("x", { status: 502 }));
-      return Promise.resolve(Response.json({ data: { JobOfferMatchingsWithPagination: { data: [
-        cg({ id: 2, germany_skill: "level_2" }), cg({ id: 3, germany_skill: "level_3" }),
-      ] } } }));
-    },
-  });
-  assertEquals(r?.fuenf.map((x) => x.caregiverId), [2]);
+  assertEquals(rufe, ["onboard", "listMatchings"], "kein getCaregiver je Zeile");
 });
 
 Deno.test("holeFuenf: kein Token / keine Matches → null (Rückfall auf alten Text)", async () => {

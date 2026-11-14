@@ -351,8 +351,7 @@ send-scheduled-emails (email_type=eingangsbestaetigung)
         zwycięzcy zamiast tworzyć drugiego klienta (CLAUDE.md gotcha #14, #54)
       → { customer_id, job_offer_id, session_token }
   → POST /functions/v1/mamamia-proxy  X-Session-Token: <jwt>
-      { action: "listMatchings", variables: { limit: 1000 } }   # jak portal (Registry #166)
-  → POST /functions/v1/mamamia-proxy  { action: "getCustomer" }   # życzenie językowe jak w portalu (Registry #166)
+      { action: "listMatchings", variables: { limit: 200 } }
   → waehleFuenf(...)   # ta sama piątka co portal (patrz niżej)
   → POST /functions/v1/mamamia-proxy  { action: "getCaregiver", id }
       # driving_license + about_de/motivation — nie ma ich w liście matchingów
@@ -441,32 +440,16 @@ uzupełniają standardami w kolejności: termin → niemiecki → prawo jazdy
 Nagłówka nad haczykami nie ma („Warum … zu Ihren Angaben passt" usunięte) —
 pierwszy haczyk sam to mówi.
 
-**Kolejność MUSI być identyczna z portalem.** `waehleFuenf` kopiuje z `src/`:
-`rankComparator` ([matchingsRanking.ts](../src/lib/mamamia/matchingsRanking.ts),
-w mailu `rangVergleich`), liczbę lat `jahreErfahrung` ([badge.ts](../src/lib/mamamia/badge.ts),
-w mailu `jahreVon`) oraz filtr języka + lejek wieku z `effectiveMatched`
-([CustomerPortalPage.tsx](../src/pages/CustomerPortalPage.tsx)).
-
-**Od Registry #166 (14.11.2026, Martin: „die besten mit Foto und viele Jahre
-Erfahrung"):** kolejność = zdjęcie → lata doświadczenia (`care_experience`,
-inaczej `hp_total_days / 365`, ta sama liczba co na wierszu) → einsatze u nas
-(`hp_total_jobs`) → kobieta → wiek ≤ 60 → `available_from` → `last_contact_at`.
-Usunięte: stopień badge jako pierwsze kryterium, lejek „badge ≥ Bewährt"
-(≥ 2 einsatze) i krok „najwięcej einsatzów na miejsce 1" (`bestIdx` w portalu,
-`empfehlungNachOben` w mailu) — miejsce 1 to po prostu pierwsza po sortowaniu.
-Lata = `care_experience` + `care_experience_outside_de` (jak SA-Portal
-`experience.js`; proxy czyta to pole we wszystkich czterech zapytaniach o
-opiekunkę), dopiero gdy oba puste — `hp_total_days / 365`. Mail bierze życzenie
-językowe jak portal (`deutschStufeFuerListe` = kopia `resolveDeutschWishLevel`:
-najpierw `customer_caregiver_wish.germany_skill` z mamamii przez `getCustomer`,
-inaczej wartość z kalkulatora; zna `sehr-gut-sa` = level_4).
-Portal i mail czytają `listMatchings` z `limit: 1000` zamiast 200: Mamamia
-zwraca opiekunki ze zdjęciem najpierw, ale we własnej kolejności (pula prod
-14.11.: 4 731 opiekunek, 265 ze zdjęciem, wszystkie w pierwszych 829; jedna ze
-zdjęciem i 10 latami na pozycji 249). Czas odpowiedzi zmierzony: ~2,5 s przy 200
-i przy 1000. Portal ładuje profile w tle (`prefetchCaregivers` → `getCaregiver`)
-już tylko dla pierwszych 20 z kolejności + zaproszonych + aplikacji
-(`PROFILE_VORLADEN`) — wcześniej dla KAŻDEJ opiekunki z listy po filtrach.
+**Kolejność MUSI być identyczna z portalem.** `waehleFuenf` kopiuje trzy
+rzeczy z `src/`: `rankComparator`
+([matchingsRanking.ts](../src/lib/mamamia/matchingsRanking.ts)), filtr języka +
+lejek wiek/badge z `effectiveMatched`
+([CustomerPortalPage.tsx](../src/pages/CustomerPortalPage.tsx)) ORAZ ostatni
+krok portalu — „najwięcej einsatzów na miejsce 1" (`bestIdx`). Bez tego
+ostatniego kroku mail pokazywał **inną** opiekunkę niż klik: `rankComparator`
+sortuje po STOPNIU badge (12+ = Elite) i rozstrzyga remis zdjęciem/płcią/wiekiem,
+więc 20 einsatzów bez zdjęcia ląduje za 13 einsatzami ze zdjęciem — a w portalu
+przed nimi.
 
 Deeplinki z maila (obsługa w `CustomerPortalPage.tsx`):
 
@@ -1145,10 +1128,6 @@ GraphQL: `JobOfferMatchingsWithPagination(job_offer_id, limit, page, filters, or
 `JobOfferMatchingFiltersInputType` ma TYLKO boolean status flagi
 (`is_request`, `is_like`, `is_match`, `is_rejected`) — **brak filtru po
 gender/language**. Filtrowanie `wunschGeschlecht` po stronie frontendu.
-
-Portal i mail wołają z `limit: 1000` (Registry #166). Domyślna kolejność
-Mamamii: najpierw opiekunki ze zdjęciem; `total` dla jednego joba sięga kilku
-tysięcy (prod 14.11.2026: 4 731), większość bez zdjęcia i bez `care_experience`.
 
 #### `listInvitedCaregiverIds`
 GraphQL: `JobOfferMatchingsWithPagination(filters: { is_request: true })`.

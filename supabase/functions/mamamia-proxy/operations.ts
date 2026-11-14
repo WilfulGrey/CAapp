@@ -200,7 +200,6 @@ export const LIST_APPLICATIONS = /* GraphQL */ `
           birth_date
           germany_skill
           care_experience
-          care_experience_outside_de
           available_from
           last_contact_at
           last_login_at
@@ -241,7 +240,6 @@ export const LIST_INTERESTS = /* GraphQL */ `
           birth_date
           germany_skill
           care_experience
-          care_experience_outside_de
           available_from
           last_contact_at
           last_login_at
@@ -293,7 +291,6 @@ export const LIST_MATCHINGS = /* GraphQL */ `
           birth_date
           germany_skill
           care_experience
-          care_experience_outside_de
           available_from
           last_contact_at
           last_login_at
@@ -324,7 +321,6 @@ export const GET_CAREGIVER = /* GraphQL */ `
       birth_date
       germany_skill
       care_experience
-      care_experience_outside_de
       available_from
       last_contact_at
       last_login_at

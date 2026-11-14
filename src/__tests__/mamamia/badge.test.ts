@@ -5,11 +5,8 @@ import {
   caregiverBadgeScore,
   badgeTier,
   MIN_BADGE_SCORE,
-  jahreErfahrung,
 } from '../../lib/mamamia/badge';
 import { nurseLevel } from '../../components/portal/shared';
-import { mapCaregiverToNurse } from '../../lib/mamamia/mappers';
-import type { MamamiaCaregiverRef } from '../../lib/mamamia/types';
 
 describe('parseExperienceYears', () => {
   it('parses a numeric string', () => {
@@ -105,40 +102,5 @@ describe('nurseLevel — Labels folgen den Schwellen', () => {
     expect(nurseLevel(20, 0).label).toBe('Berufserfahren');
     expect(nurseLevel(1, 0).label).toBe('Berufserfahren');
     expect(nurseLevel(0, 0).label).toBe('Neu bei Primundus');
-  });
-});
-
-// Registry #166: dieselbe Zahl für die Zeile („N J. Erfahrung") und für die Reihenfolge.
-describe('jahreErfahrung', () => {
-  it('care_experience, sonst hp_total_days / 365 (mindestens 1), „0" fällt nicht zurück', () => {
-    expect(jahreErfahrung({ care_experience: '9', hp_total_days: 4000 })).toBe(9);
-    expect(jahreErfahrung({ care_experience: '', hp_total_days: 800 })).toBe(2);
-    expect(jahreErfahrung({ care_experience: null, hp_total_days: 100 })).toBe(1);
-    expect(jahreErfahrung({ care_experience: '0', hp_total_days: 800 })).toBe(0);
-    expect(jahreErfahrung({ care_experience: 'abc', hp_total_days: 800 })).toBe(0);
-    expect(jahreErfahrung({ care_experience: null, hp_total_days: null })).toBe(0);
-  });
-
-  it('Jahre in DE plus außerhalb DE, wie das SA-Portal (experience.js)', () => {
-    expect(jahreErfahrung({ care_experience: '0', care_experience_outside_de: 20 })).toBe(20);
-    expect(jahreErfahrung({ care_experience: null, care_experience_outside_de: 12, hp_total_days: 4000 })).toBe(12);
-    expect(jahreErfahrung({ care_experience: '5', care_experience_outside_de: 3 })).toBe(8);
-    expect(jahreErfahrung({ care_experience: '30+', care_experience_outside_de: null })).toBe(30);
-    expect(jahreErfahrung({ care_experience: null, care_experience_outside_de: 0, hp_total_days: 800 })).toBe(0);
-  });
-
-  it('gleich der Zahl, die mapCaregiverToNurse auf die Zeile schreibt', () => {
-    const faelle: Array<[string | null, number, number | null]> = [
-      ['9', 0, null], ['', 800, null], [null, 100, null], ['0', 800, null], [null, 0, null], ['abc', 800, null],
-      ['0', 0, 20], [null, 800, 12], ['5', 0, 3],
-    ];
-    for (const [care_experience, hp_total_days, care_experience_outside_de] of faelle) {
-      const cg = { id: 1, first_name: 'A', last_name: 'B', gender: 'female', year_of_birth: 1980, birth_date: null,
-        germany_skill: 'level_2', care_experience, care_experience_outside_de, available_from: null, last_contact_at: null, last_login_at: null,
-        is_active_user: true, hp_total_jobs: 0, hp_total_days, hp_avg_mission_days: 0, avatar: null, avatar_retouched: null,
-      } as MamamiaCaregiverRef;
-      const nurse = mapCaregiverToNurse(cg, { nowIso: '2026-11-14T00:00:00Z', nowYear: 2026 });
-      expect(nurse.experienceYears).toBe(jahreErfahrung(cg));
-    }
   });
 });

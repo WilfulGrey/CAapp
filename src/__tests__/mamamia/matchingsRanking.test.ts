@@ -1,16 +1,15 @@
 // Client-side ranking of Mamamia matchings — verifies the ordering
-// rules used by CustomerPortalPage's `effectiveMatched`. Hierarchy seit
-// Registry #166 (14.11.2026, Martin: „die besten mit Foto und viele Jahre
-// Erfahrung"), höchste Priorität zuerst:
+// rules used by CustomerPortalPage's `effectiveMatched`. Hierarchy
+// (höchste Priorität zuerst):
 //
-//   1. Foto vorhanden DESC
-//   2. Jahre Erfahrung DESC (jahreErfahrung: care_experience, sonst
-//      hp_total_days / 365)
-//   3. Einsätze bei uns (hp_total_jobs) DESC
-//   4. Weiblich DESC
-//   5. Alter ≤ 60 DESC
-//   6. available_from ASC
-//   7. last_contact_at DESC
+//   1. Badge-Tier DESC (Elite > Stammkraft > Bewährt > Bekannt
+//      > kein Label) — seit 12.08.2026 allein aus hp_total_jobs
+//   2. Foto vorhanden DESC
+//   3. Weiblich DESC
+//   4. Alter ≤ 60 DESC
+//   5. available_from ASC
+//   6. last_contact_at DESC
+//   7. hp_total_jobs DESC (numerischer Tie-Breaker)
 //
 // Der Comparator lebt in src/lib/mamamia/matchingsRanking.ts —
 // geteilt zwischen Test + Page, damit sie nicht auseinander driften.
@@ -19,8 +18,8 @@ import { describe, it, expect } from 'vitest';
 import { rankComparator } from '../../lib/mamamia/matchingsRanking';
 import type { MamamiaMatching, MamamiaCaregiverRef } from '../../lib/mamamia/types';
 
-// Default-Ref: female, 45 J. (year_of_birth 1981), 1 Jahr Erfahrung (care_experience='1'),
-// 0 Einsätze, Foto vorhanden. So sind alle Defaults „gut" und das jeweilige Test-Feld
+// Default-Ref: female, 45 J. (year_of_birth 1981), Bronze (care_experience='1'),
+// Foto vorhanden. So sind alle Defaults „gut" und das jeweilige Test-Feld
 // ist klar isoliert.
 function makeRef(o: Partial<MamamiaCaregiverRef>): MamamiaCaregiverRef {
   return {
@@ -52,69 +51,48 @@ function makeMatch(o: Partial<MamamiaCaregiverRef> & { id?: number }): MamamiaMa
 
 const NOW = new Date('2026-04-29T12:00:00.000Z');
 
-// ─── PRIMÄRE HIERARCHIE: Foto → Jahre → Einsätze → Weiblich → Alter ─────
+// ─── PRIMÄRE HIERARCHIE: Badge → Foto → Weiblich → Alter ─────────────
 
-describe('matchings ranking — Foto zuerst, dann Jahre, dann Einsätze (Registry #166)', () => {
-  it('Foto schlägt Einsätze: 14 Einsätze ohne Foto stehen hinter 1 Einsatz mit Foto', () => {
+describe('matchings ranking — badge tier first', () => {
+  it('Elite (≥12 Einsätze) ranks above Stammkraft (≥6)', () => {
     const sorted = [
-      makeMatch({ id: 1, hp_total_jobs: 14, avatar: null, avatar_retouched: null }),
-      makeMatch({ id: 2, hp_total_jobs: 1 }),
+      makeMatch({ id: 1, hp_total_jobs: 7 }),
+      makeMatch({ id: 2, hp_total_jobs: 14 }),
     ].sort(rankComparator(NOW));
     expect(sorted.map(m => m.id)).toEqual([2, 1]);
   });
 
-  it('Foto schlägt Jahre: 20 Jahre ohne Foto stehen hinter 1 Jahr mit Foto', () => {
+  it('Stammkraft > Bewährt > Bekannt > kein Label', () => {
     const sorted = [
-      makeMatch({ id: 1, care_experience: '20', avatar: null, avatar_retouched: null }),
-      makeMatch({ id: 2, care_experience: '1' }),
+      makeMatch({ id: 1, hp_total_jobs: 0 }),  // kein Label
+      makeMatch({ id: 2, hp_total_jobs: 1 }),  // Bekannt
+      makeMatch({ id: 3, hp_total_jobs: 3 }),  // Bewährt
+      makeMatch({ id: 4, hp_total_jobs: 8 }),  // Stammkraft
+    ].sort(rankComparator(NOW));
+    expect(sorted.map(m => m.id)).toEqual([4, 3, 2, 1]);
+  });
+
+  it('care_experience zählt NICHT mehr in den Score (seit 12.08.2026)', () => {
+    // 30 behauptete Berufsjahre, aber kein Einsatz über uns — schlägt
+    // die Kraft mit 2 echten Einsätzen NICHT.
+    const sorted = [
+      makeMatch({ id: 1, care_experience: '30', hp_total_jobs: 0 }),
+      makeMatch({ id: 2, care_experience: '0', hp_total_jobs: 2 }),
     ].sort(rankComparator(NOW));
     expect(sorted.map(m => m.id)).toEqual([2, 1]);
   });
 
-  it('Jahre schlagen Einsätze: 15 Jahre ohne Einsatz vor 2 Jahren mit 14 Einsätzen', () => {
+  it('Badge beats Foto: Stammkraft ohne Foto > Bekannt mit Foto', () => {
     const sorted = [
-      makeMatch({ id: 1, care_experience: '2', hp_total_jobs: 14 }),
-      makeMatch({ id: 2, care_experience: '15', hp_total_jobs: 0 }),
-      makeMatch({ id: 3, care_experience: '8', hp_total_jobs: 0 }),
-    ].sort(rankComparator(NOW));
-    expect(sorted.map(m => m.id)).toEqual([2, 3, 1]);
-  });
-
-  it('gleiche Jahre → mehr Einsätze zuerst', () => {
-    const sorted = [
-      makeMatch({ id: 1, care_experience: '6', hp_total_jobs: 1 }),
-      makeMatch({ id: 2, care_experience: '6', hp_total_jobs: 7 }),
-    ].sort(rankComparator(NOW));
-    expect(sorted.map(m => m.id)).toEqual([2, 1]);
-  });
-
-  it('Jahre aus hp_total_days zählen, wenn care_experience leer ist — wie auf der Zeile', () => {
-    const sorted = [
-      makeMatch({ id: 1, care_experience: '3' }),
-      makeMatch({ id: 2, care_experience: null, hp_total_days: 365 * 6 }),
-    ].sort(rankComparator(NOW));
-    expect(sorted.map(m => m.id)).toEqual([2, 1]);
-  });
-
-  it('Jahre außerhalb DE zählen mit: 0 in DE + 15 außerhalb vor 6 in DE', () => {
-    const sorted = [
-      makeMatch({ id: 1, care_experience: '6' }),
-      makeMatch({ id: 2, care_experience: '0', care_experience_outside_de: 15 }),
-    ].sort(rankComparator(NOW));
-    expect(sorted.map(m => m.id)).toEqual([2, 1]);
-  });
-
-  it('care_experience „0" fällt NICHT auf die Tage zurück', () => {
-    const sorted = [
-      makeMatch({ id: 1, care_experience: '0', hp_total_days: 365 * 9 }),
-      makeMatch({ id: 2, care_experience: '1' }),
+      makeMatch({ id: 1, hp_total_jobs: 1, avatar: { aws_url: 'p' }, avatar_retouched: { aws_url: 'p' } }),
+      makeMatch({ id: 2, hp_total_jobs: 14, avatar: null, avatar_retouched: null }),
     ].sort(rankComparator(NOW));
     expect(sorted.map(m => m.id)).toEqual([2, 1]);
   });
 });
 
-describe('matchings ranking — Foto-Quellen', () => {
-  it('Foto > kein Foto bei gleichen Jahren', () => {
+describe('matchings ranking — photo (within same badge)', () => {
+  it('Foto > kein Foto bei gleichem Badge', () => {
     const sorted = [
       makeMatch({ id: 1, care_experience: '6', avatar: null, avatar_retouched: null }),
       makeMatch({ id: 2, care_experience: '6', avatar: { aws_url: 'https://x/p.jpg' }, avatar_retouched: null }),
@@ -139,7 +117,7 @@ describe('matchings ranking — Foto-Quellen', () => {
   });
 });
 
-describe('matchings ranking — gender (gleiche Jahre + Foto)', () => {
+describe('matchings ranking — gender (within same badge + photo)', () => {
   it('weiblich > männlich', () => {
     const sorted = [
       makeMatch({ id: 1, care_experience: '6', gender: 'male' }),
@@ -157,7 +135,7 @@ describe('matchings ranking — gender (gleiche Jahre + Foto)', () => {
   });
 });
 
-describe('matchings ranking — age ≤ 60 (gleiche Jahre + Foto + Gender)', () => {
+describe('matchings ranking — age ≤ 60 (within badge + photo + gender)', () => {
   it('jung (45) > alt (65) — NOW=2026', () => {
     // 1981 → 45 J. (≤60); 1961 → 65 J. (>60)
     const sorted = [
@@ -184,7 +162,7 @@ describe('matchings ranking — age ≤ 60 (gleiche Jahre + Foto + Gender)', () 
   });
 });
 
-// ─── TIE-BREAKER: available_from → last_contact_at ────────────────────
+// ─── TIE-BREAKER: available_from → last_contact_at → hp_total_jobs ────
 
 describe('matchings ranking — tie-breakers (all primary keys equal)', () => {
   it('available_from null („Sofort") > future', () => {
@@ -214,12 +192,17 @@ describe('matchings ranking — tie-breakers (all primary keys equal)', () => {
     expect(sorted.map(m => m.id)).toEqual([2, 1, 3]);
   });
 
-  it('kein last_contact_at bei beiden → Gleichstand (0, nicht NaN), Reihenfolge bleibt', () => {
-    const cmp = rankComparator(NOW);
-    const a = makeMatch({ id: 1, last_contact_at: null });
-    const b = makeMatch({ id: 2, last_contact_at: null });
-    expect(cmp(a, b)).toBe(0);
-    expect([a, b].sort(cmp).map(m => m.id)).toEqual([1, 2]);
+  it('full tie → hp_total_jobs DESC als allerletztes Kriterium', () => {
+    // Alle ID-Felder gleich auf badge/photo/gender/age/avail/contact —
+    // unterscheiden sich nur in hp_total_jobs. Aber Achtung: hp_total_jobs
+    // beeinflusst auch Badge-Score! Daher gleich-balanciert über
+    // care_experience.
+    const sorted = [
+      makeMatch({ id: 1, care_experience: '5', hp_total_jobs: 0 }),  // Score 5 = Silber
+      makeMatch({ id: 2, care_experience: '5', hp_total_jobs: 0 }),  // Score 5 = Silber
+    ].sort(rankComparator(NOW));
+    // Beide gleich → stable sort behält Original-Reihenfolge.
+    expect(sorted.map(m => m.id)).toEqual([1, 2]);
   });
 });
 
@@ -238,18 +221,18 @@ describe('matchings ranking — stable sort on full tie', () => {
 // ─── ZUSAMMENSPIEL ───────────────────────────────────────────────────
 
 describe('matchings ranking — combined scenarios', () => {
-  it('Martins Fall: die mit Foto und den meisten Jahren steht oben, Einsätze entscheiden erst danach', () => {
+  it('Hierarchy respected: badge dominiert alle anderen', () => {
     const sorted = [
-      makeMatch({ id: 'stammkraft-ohne-foto', hp_total_jobs: 14, care_experience: '3', avatar: null, avatar_retouched: null } as never),
-      makeMatch({ id: 'neu-1-jahr', hp_total_jobs: 0, care_experience: '1' } as never),
-      makeMatch({ id: 'erfahren-15', hp_total_jobs: 0, care_experience: '15' } as never),
-      makeMatch({ id: 'bewaehrt-8', hp_total_jobs: 2, care_experience: '8' } as never),
+      // Bekannt, weiblich, jung, mit Foto — gut auf 2-4, aber nur 1 Einsatz
+      makeMatch({ id: 'low-badge', hp_total_jobs: 1, gender: 'female', year_of_birth: 1990, avatar: { aws_url: 'p' } } as never),
+      // Stammkraft, männlich, alt, ohne Foto — schlecht auf 2-4, aber 14 Einsätze
+      makeMatch({ id: 'stammkraft', hp_total_jobs: 14, gender: 'male', year_of_birth: 1955, avatar: null, avatar_retouched: null } as never),
     ].sort(rankComparator(NOW));
-    expect(sorted.map(m => m.id)).toEqual(['erfahren-15', 'bewaehrt-8', 'neu-1-jahr', 'stammkraft-ohne-foto']);
+    expect(sorted.map(m => m.id)).toEqual(['stammkraft', 'low-badge']);
   });
 
-  it('Bei gleichen Jahren und Einsätzen: Foto > Gender > Alter', () => {
-    // Alle 14 Jahre, 0 Einsätze:
+  it('Bei gleichem Badge: Foto > Gender > Alter', () => {
+    // Alle Gold (care_experience=14, hp_total_jobs=0):
     //   A: kein Foto, female, jung
     //   B: Foto, male, jung       → Foto schlägt Gender
     //   C: Foto, female, alt

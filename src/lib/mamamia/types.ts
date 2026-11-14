@@ -199,8 +199,6 @@ export interface MamamiaCaregiverRef {
   birth_date: string | null;
   germany_skill: string | null; // "level_0".."level_4"
   care_experience: string | null;
-  /** Jahre Erfahrung außerhalb Deutschlands (Int). Das SA-Portal zählt sie zu care_experience dazu (Registry #166). */
-  care_experience_outside_de?: number | null;
   available_from: string | null;
   last_contact_at: string | null;
   last_login_at: string | null;
