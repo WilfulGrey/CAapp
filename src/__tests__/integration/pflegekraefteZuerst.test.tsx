@@ -403,10 +403,10 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145, ?einstie
     await waitFor(() => expect(meldungen.find((m) => m.event === 'einladung_nach_speichern')?.metadata).toEqual({ anzahl: 1, ok: 0 }));
     expect(screen.queryByText(/ist eingeladen\.$/)).toBeNull();
     expect(localStorage.getItem(vormerkSchluessel(TOKEN))).toBeNull();
-    // Nach dem Speichern die heutige Karte: Emilia W. wieder mit „Einladen“.
+    // Nach dem Speichern die Zeile (Registry #164, dieselben Zeilen wie vor dem Speichern): Emilia wieder mit „Einladen“.
     await waitFor(() => {
-      const k = screen.getByText('Emilia W.').closest('.rounded-card') as HTMLElement;
-      expect(within(k).getByRole('button', { name: 'Einladen' })).toBeInTheDocument();
+      const z = document.querySelector('[data-pflegekraft-zeile="50003"]') as HTMLElement;
+      expect(within(z).getByRole('button', { name: / einladen$/ })).toBeInTheDocument();
     });
   }, 30_000);
 
@@ -461,9 +461,13 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145, ?einstie
     window.history.replaceState({}, '', `/?token=${TOKEN}&einstieg=zuerst`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
-    await screen.findByText('Emilia W.', {}, { timeout: 5000 });
-    const k = screen.getByText('Emilia W.').closest('.rounded-card') as HTMLElement;
-    await user.click(within(k).getByRole('button', { name: 'Einladen' }));
+    // Registry #164: nach dem Speichern Zeilen mit „Einladen“ statt Karten.
+    const z = await waitFor(() => {
+      const el = document.querySelector('[data-pflegekraft-zeile="50003"]') as HTMLElement | null;
+      if (!el) throw new Error('keine Zeile für Emilia');
+      return el;
+    }, { timeout: 5000 });
+    await user.click(within(z).getByRole('button', { name: / einladen$/ }));
     expect(await screen.findByText('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.', {}, { timeout: 8000 })).toBeInTheDocument();
     expect(zaehler.versuche).toBe(3);
   }, 30_000);

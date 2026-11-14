@@ -17,8 +17,8 @@
 //   1. nurseLevel()          (components/portal/shared.ts)      — UI badge
 //   2. rankComparator()      (lib/mamamia/matchingsRanking.ts)  — sort order
 //   3. MIN_BADGE_SCORE funnel (pages/CustomerPortalPage.tsx)    — "Bewährt+"
-//   4. EXPERIENCE_LEVELS     (components/portal/CustomerNurseModal.tsx)
-//                                                        — Erklär-Popup
+//   (4. bis Registry #164 das Erklär-Popup EXPERIENCE_LEVELS im Profilfenster; seit 14.11.2026 zeigt das Portal Kunden
+//       keine Stufen mehr, Martin: „das versteht kein Mensch“)
 // Ausserhalb dieses Repos zieht `detect-caregiver-events/index.ts`
 // (`mapHpToBadge`) dieselben Schwellen — bei Änderungen mitziehen; die
 // Edge Function wird separat deployt.

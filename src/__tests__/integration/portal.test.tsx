@@ -105,11 +105,11 @@ describe('Portal integration: golden paths', () => {
 
     await user.click(reviewBtn);
 
-    // …und im Modal an der Entscheidungsstelle (dort amber hervorgehoben).
+    // …und im Modal an der Entscheidungsstelle (Abschnitt „Nachricht“, Martin 14.11.2026).
     await waitFor(() => expect(screen.getAllByText('Test application message').length).toBeGreaterThan(1));
 
-    // Schritt 1 = Angebot/Konditionen → weiter zu „Ihre Angaben" (Schritt 2).
-    await user.click(await screen.findByRole('button', { name: /Weiter →/ }));
+    // Schritt 1 = Angebot → weiter zu „Ihre Angaben" (Schritt 2).
+    await user.click(await screen.findByRole('button', { name: /^Weiter$/ }));
 
     // Schritt 2 = Angaben. Vorbelegung wie bisher (Martin 29.09.2026: nichts am
     // Datenfluss ändern): Name der Kontaktperson leer — und genau das steht jetzt
@@ -240,9 +240,13 @@ describe('Portal integration: golden paths', () => {
 
     // findByRole polls until the element appears — handles the async
     // session bootstrap (mmReady flips from false to true).
-    const inviteBtn = await screen.findByRole(
-      'button', { name: /^Einladen$/i }, { timeout: 5000 },
-    );
+    // Seit Registry #164 ein Knopf je Zeile, für Vorleseprogramme mit Vorname („Helena einladen“); die Zeile der Testkraft.
+    const zeile = await waitFor(() => {
+      const el = document.querySelector(`[data-pflegekraft-zeile="${sampleMatching.caregiver.id}"]`) as HTMLElement | null;
+      if (!el) throw new Error('keine Zeile');
+      return el;
+    }, { timeout: 5000 });
+    const inviteBtn = within(zeile).getByRole('button', { name: /^\S+ einladen$/i });
     await user.click(inviteBtn);
 
     // After click: MatchCard awaits the real mutation (no fake setTimeout).
@@ -379,8 +383,11 @@ describe('Portal integration: golden paths', () => {
     expect(titel.some((t) => t.includes('Rund-um-Betreuung zu Hause') || t.includes('Ihre passenden Pflegekräfte') || t.includes('Ihre Pflegesituation ist noch nicht vollständig') || t.includes('Es fehlen noch Angaben zur Pflegesituation'))).toBe(false);
     // …und der Einstieg vor dem Speichern (Rückbau Registry #122, Stand 75b8df8) auch nicht.
     expect(titel.some((t) => t.includes('Noch 2 Minuten bis zu Ihren Bewerbungen') || t.includes('Pflegesituation unvollständig') || t.includes('Warum? Mehr'))).toBe(false);
-    // Wunschstart aus dem gespeicherten Formular, nicht aus mamamia `arrival_at`.
-    expect(screen.getByText(/Wunschstart:? 15\.11\./)).toBeInTheDocument();
+    // Registry #164: „So geht es weiter“ nach dem Speichern wie vor dem Speichern, ab Schritt 2, ohne Zeile „Ihr Wunschstart“
+    // (Martin 14.11.2026: „genauso … wie vorher auch, nur dass du jetzt einen Schritt weiter bist“). Damit steht auch kein
+    // Datum aus mamamia `arrival_at` da.
+    expect(document.querySelector('[data-ablauf-gute-phase]')).toHaveAttribute('data-ab-schritt', '2');
+    expect(screen.queryByText(/Wunschstart/)).toBeNull();
   }, 15_000);
 
   it('gebucht, Link aus Mail B (view=application), Annahmen kommen später: keine „aktive Bewerbung“, kein zweites „Angebot prüfen“', async () => {
@@ -434,7 +441,7 @@ describe('Portal integration: golden paths', () => {
     setLocation(`?token=${TEST_LEAD_TOKEN}&view=application`);
     render(<CustomerPortalPage />);
     await screen.findByRole('heading', { name: 'Angebot prüfen' }, { timeout: 5000 });
-    await userEvent.click(screen.getByRole('button', { name: 'Weiter →' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Weiter' }));
     const wert = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
     expect(wert('apm-vorname')).toBe('Erika');
     expect(wert('apm-strasse')).toBe('Lindenweg 3');
@@ -820,7 +827,9 @@ describe('Einstieg vor dem ersten Speichern wie Stand 75b8df8 (Rückbau Registry
     await waitFor(() => expect(gespeichert).toBe(1));
     // Nach dem Speichern der heutige Zustand (Fassung 33), nichts mehr vom Stand 75b8df8.
     expect(screen.getByRole('heading', { level: 2, name: 'So geht es weiter' })).toBeInTheDocument();
-    expect(screen.getByText('Pflegesituation vollständig')).toBeInTheDocument();
+    // Registry #164: derselbe Kasten wie vor dem Speichern, ab Schritt 2 (kein erledigter Schritt „Pflegesituation vollständig“).
+    expect(document.querySelector('[data-ablauf-gute-phase]')).toHaveAttribute('data-ab-schritt', '2');
+    expect(screen.queryByText('Pflegesituation vollständig')).toBeNull();
     expect(screen.getByRole('heading', { level: 2, name: 'Angebot und Pflegesituation' })).toBeInTheDocument();
     expect(screen.queryByText('Noch 2 Minuten bis zu Ihren Bewerbungen')).toBeNull();
     expect(screen.queryByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' })).toBeNull();

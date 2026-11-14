@@ -7,7 +7,7 @@ import { ERREICHBAR, TELEFON, TELEFON_HREF, whatsappHref } from '../../lib/konta
 
 // Die Angebotsmail sieht aus wie der Minimal-Einstieg des Portals (Registry #148, Martin 08.11.2026: „genauso wie im
 // Portal“) und übernimmt dessen Wortlaute: Titel der Angebotskarte, Bestpreisgarantie mit den drei Punkten, Kennzahlen,
-// Knopf „Bewerbungen erhalten“ mit Zeile darunter, Heim-Vergleich. Dieser Test hält Mail und Portal gleich; ändert sich
+// Zeile unter dem Knopf (der Knopf selbst heißt seit Registry #163 „Angebot & Pflegekräfte anzeigen“), Heim-Vergleich. Dieser Test hält Mail und Portal gleich; ändert sich
 // ein Wort im Portal, wird er rot, bis die Mail nachzieht. Gelesen wird der Quelltext der Mail, weil die Edge-Funktion
 // Deno-Module importiert.
 // BEWUSSTE ABWEICHUNGEN seit dem neuen Portal-Einstieg (13.11.2026): Die Mail ändert sich in diesem Schritt nicht und behält

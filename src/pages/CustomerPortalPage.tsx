@@ -38,6 +38,7 @@ import {
   mapApplicationToUI,
   mapMatchingToNurse,
   mapCaregiverToNurse,
+  mapMamamiaCustomerToPatientForm,
   resolveDeutschWishLevel,
   pickFinalConfirmedJob,
 } from '../lib/mamamia/mappers';
@@ -75,7 +76,7 @@ import { MatchCard } from '../components/portal/MatchCard';
 // „Noch 2 Minuten“, Karten mit „Einladen“ + Schloss, offenes Formular mit „Speichern“); Kopf und Häufige Fragen wie heute.
 import { EinstiegVorSpeichern, WarumSheetVorSpeichern } from '../components/portal/EinstiegVorSpeichern';
 import { EinladenSheetVorSpeichern, EinstiegPflegekraefteZuerst, type VorgemerkteKraft } from '../components/portal/EinstiegPflegekraefteZuerst';
-import { EinstiegMinimal, PflegekraftZeile, TestsiegerKopf, formularKopf } from '../components/portal/EinstiegMinimal';
+import { AblaufGutePhase, EinstiegMinimal, LISTE_TITEL, PflegekraftZeile, TestsiegerKopf, ZeilenListe, formularKopf } from '../components/portal/EinstiegMinimal';
 import { einladbareVormerkungen, eingeladenHinweis, ladeVormerkungen, MAX_VORMERKUNGEN, speichereVormerkungen } from '../lib/vormerkungen';
 import { DANK_DAUER_MS, useToastWarteschlange } from '../lib/toastWarteschlange';
 import { MatchCardVorSpeichern } from '../components/portal/MatchCardVorSpeichern';
@@ -89,6 +90,7 @@ import { DeclineConfirmModal } from '../components/portal/DeclineConfirmModal';
 import { InviteRateLimitModal } from '../components/portal/InviteRateLimitModal';
 import { AngebotPruefenModal, buildVertragsDaten } from '../components/portal/AngebotPruefenModal';
 import { CustomerNurseModal } from '../components/portal/CustomerNurseModal';
+import { bedarfAusFormular, bedarfFuerProfil, type GespeicherteSituation, type KundenBedarf } from '../lib/passtZuIhnen';
 import { zeigtSommerzuschlag } from '../components/portal/konditionen';
 import { PflegekraftChat } from '../components/portal/PflegekraftChat';
 import { TELEFON_HREF } from '../lib/kontakt';
@@ -326,6 +328,12 @@ const PREVIEW_LEAD: Lead = {
   updated_at: new Date().toISOString(),
 } as Lead;
 
+// Gespeicherte Pflegesituation der Vorschau nach dem Speichern (?preview=wartet, bewerbung …), dort gibt es kein mamamia.
+// Wie im freigegebenen Bild runde5/a_icons_v3 (14.11.2026): zwei Personen, Rollator, Demenz, Harninkontinenz, Nacht.
+const PREVIEW_PFLEGESITUATION: GespeicherteSituation = {
+  anzahl: '2', mobilitaet: 'Rollatorfähig', demenz: 'Mittelgradig', inkontinenz: 'Harninkontinenz', nacht: 'Bis zu 1 Mal',
+};
+
 const PREVIEW_INTEREST_PROFILE = {
   nationality: 'Polnisch',
   yearOfBirth: 1964,
@@ -439,6 +447,15 @@ const PREVIEW_SIGNED_FORM: ContractFormData = {
 // Deutsch-Stufe überall „Gut“ wie der Wunsch des Vorschau-Leads (sehr-gut): live zeigt die Liste nur Kräfte mit der
 // Wunsch-Stufe (`matchesGermanyWish`, strikt), und der Minimal-Einstieg zeigt bei jeder Kraft den Preis des Kunden
 // (Registry #147, 08.11.2026). Mit gemischten Stufen stünde in der Vorschau neben „Deutsch Grund“ der Preis für „Gut“.
+const WEITERE_VORSCHAU: Array<{ nurse: Nurse; caregiverId: number }> = ([
+  ['Maria Zielińska', 52, 6, 'Mittel'], ['Barbara Wójcik', 60, 10, 'Gut'], ['Krystyna Mazur', 63, 14, 'Gut'], ['Jolanta Krawczyk', 49, 3, 'Mittel'], ['Teresa Kaczmarek', 58, 9, 'Gut'],
+  ['Danuta Piotrowska', 61, 11, 'Gut'], ['Elżbieta Grabowska', 55, 5, 'Mittel'], ['Agnieszka Nowicka', 47, 4, 'Gut'], ['Małgorzata Pawłowska', 59, 8, 'Gut'], ['Renata Michalska', 56, 7, 'Mittel'],
+  ['Halina Król', 64, 15, 'Gut'], ['Grażyna Wieczorek', 53, 6, 'Gut'], ['Beata Jabłońska', 50, 5, 'Mittel'], ['Dorota Majewska', 57, 9, 'Gut'], ['Iwona Olszewska', 62, 12, 'Gut'],
+] as const).map(([name, age, jahre, stufe], i) => ({ caregiverId: 999020 + i, nurse: {
+  caregiverId: 999020 + i, name, age, experience: `${jahre} J. Erfahrung`, experienceYears: jahre, availability: 'sofort verfügbar', availableSoon: true,
+  language: { level: stufe, bars: stufe === 'Gut' ? 3 : 2 }, color: ['#8B7355', '#A18973', '#B5A184', '#6B5444'][i % 4], addedTime: 'heute', isLive: true, gender: 'female' as const,
+  history: { assignments: 1 + (i % 4), avgDurationMonths: 2.5 },
+} }));
 const PREVIEW_MATCHINGS: Array<{ nurse: Nurse; caregiverId: number }> = [
   { caregiverId: 999010, nurse: { caregiverId: 999010, name: 'Anna Nowak', age: 58, experience: '8 J. Erfahrung', experienceYears: 8, availability: 'sofort verfügbar', availableSoon: true, language: { level: 'Gut', bars: 3 }, color: '#8B7355', addedTime: 'heute', isLive: true, gender: 'female', image: 'https://i.pravatar.cc/200?img=44', history: { assignments: 22, avgDurationMonths: 3.1 } } },
   { caregiverId: 999011, nurse: { caregiverId: 999011, name: 'Ewa Lewandowski', age: 65, experience: '12 J. Erfahrung', experienceYears: 12, availability: 'verfügbar ab 02.06.', availableSoon: true, language: { level: 'Gut', bars: 3 }, color: '#A18973', addedTime: 'gestern', isLive: true, gender: 'female', image: 'https://i.pravatar.cc/200?img=49', history: { assignments: 35, avgDurationMonths: 3.6 } } },
@@ -449,6 +466,8 @@ const PREVIEW_MATCHINGS: Array<{ nurse: Nurse; caregiverId: number }> = [
   ...(IS_PREVIEW_PATIENT
     ? [{ caregiverId: 999014, nurse: { caregiverId: 999014, name: 'Irena Pawlak', age: 57, experience: '7 J. Erfahrung', experienceYears: 7, availability: 'sofort verfügbar', availableSoon: true, language: { level: 'Gut', bars: 3 }, color: '#A18973', addedTime: 'heute', isLive: true, gender: 'female' as const, image: 'https://i.pravatar.cc/200?img=32', history: { assignments: 2, avgDurationMonths: 2.2 } } }]
     : []),
+  // Weitere Vorschau-Kräfte für „5 weitere Pflegekräfte anzeigen“ (Entwurf 14.11.2026), nur in ?preview=patient.
+  ...(IS_PREVIEW_PATIENT ? WEITERE_VORSCHAU : []),
 ];
 
 // Rekonstruiert eine Nurse aus einem gespeicherten CaregiverSnapshot (volle
@@ -756,6 +775,9 @@ const CustomerPortalPage: FC = () => {
   const [einladenFenster, setEinladenFenster] = useState<{ caregiverId: number; name: string } | null>(null);
   // Gesetzt, sobald das ERSTE Speichern bei mamamia durch ist (onSaveToMamamia); der Effekt unten lädt dann ein.
   const [einladenNachSpeichern, setEinladenNachSpeichern] = useState(false);
+  // Registry #164 (Code-Prüfung): wer im automatischen Einladen nach dem Speichern noch wartet — die Zeilen zeigen für sie
+  // weiter „Eingeladen“, statt kurz wieder „Einladen“ (der Lauf hält mamamias Sperre bis zu 6 × 5 s aus).
+  const [einladenWarteschlange, setEinladenWarteschlange] = useState<number[]>([]);
   // Nachbesserung 2: wer eingeladen wird, steht im Moment des Speicherns fest — genau die Namen der Zeile. Danach lädt
   // mamamia die Liste neu (refetchMatchings, neue Reihenfolge); das darf die Auswahl nicht mehr verschieben.
   const einladenListe = useRef<number[]>([]);
@@ -813,6 +835,10 @@ const CustomerPortalPage: FC = () => {
   // Einladen je Pflegekraft, Fragen je Frage (Schlüssel in leadEvents.ts). Keine Personendaten in metadata.
   // `vor_speichern` = Pflegesituation noch nie gespeichert (weder in dieser Sitzung noch laut Lead oder mamamia).
   const vorSpeichern = !patientSaved && !schonAbgesendet;
+  // ENTWURF 14.11.2026 (Martin: „ermöglichen, weitere PKs anzuzeigen mit Textlink unter der letzten. Und spätestens nach 2 x
+  // dann bitte Angaben vervollständigen und Bewerbungen erhalten“): im Minimal-Einstieg vor dem Speichern bis zu zweimal je
+  // 5 weitere Zeilen.
+  const [weitereSeiten, setWeitereSeiten] = useState(0);
   const messen = (punkt: Messpunkt, metadata?: LeadEventMetadata) => {
     if (IS_PREVIEW_ANY) return;
     reportLeadEvent(lead?.token, punkt, metadata, false);
@@ -890,6 +916,19 @@ const CustomerPortalPage: FC = () => {
   // In dieser Sitzung abgesendet → dieses Formular, sonst der gespeicherte Bogen.
   const [abgesendetesFormular, setAbgesendetesFormular] = useState<PatientForm | null>(null);
   const formularStart = kalenderTag(abgesendetesFormular?.startDate ?? (lead?.patient_form?.startDate as string | undefined));
+  // „Warum … zu Ihnen passt“ im Profil (Martin 14.11.2026: „was der Kunde wünscht“). Welche Quelle gilt, entscheidet
+  // bedarfFuerProfil (lib/passtZuIhnen.ts): vor dem ersten Speichern der Rechner, danach in dieser Sitzung abgesendet >
+  // mamamia (nicht im Status „draft“) > Bogen am Lead > Rechner. Die Vorschau nach dem Speichern nimmt ausdrücklich
+  // PREVIEW_PFLEGESITUATION.
+  const profilBedarf = useMemo<KundenBedarf>(() => (IS_PREVIEW_ANY && !vorSpeichern
+    ? bedarfAusFormular(PREVIEW_PFLEGESITUATION)
+    : bedarfFuerProfil({
+      vorSpeichern,
+      rechner: lead?.kalkulation?.formularDaten,
+      abgesendet: abgesendetesFormular,
+      mamamia: mmCustomer?.patients?.length ? { status: mmCustomer.status, form: mapMamamiaCustomerToPatientForm(mmCustomer) } : null,
+      amLead: lead?.patient_form,
+    })), [vorSpeichern, lead, mmCustomer, abgesendetesFormular]);
   const { data: mmJobOffer, loading: mmJobOfferLoading, error: mmJobOfferError, refetch: refetchJobOffer } = useJobOffer(mmReady);
   const { data: mmApplications, loading: mmApplicationsLoading, error: mmApplicationsError, refetch: refetchApplications } = useApplications({ limit: 20 }, mmReady);
   // limit=20 is intentional — client-side ranking (see `effectiveMatched`)
@@ -2520,7 +2559,18 @@ const CustomerPortalPage: FC = () => {
       && (statusOverrides.get(id) === 'invited' || interestStatusOverrides.get(id) === 'invited')).length;
     const heldInvites = (inviteRate?.used_24h ?? 0) + unbestaetigt;
     const visibleCount = Math.max(0, 5 - heldInvites);
-    const pendingNurses: VisibleNurse[] = allVisible.filter(({ status }) => status === 'pending').slice(0, visibleCount);
+    const allePending = allVisible.filter(({ status }) => status === 'pending');
+    const pendingNurses: VisibleNurse[] = allePending.slice(0, visibleCount);
+    // ENTWURF 14.11.2026: weitere Zeilen hängen hinten an; die Empfehlung wird nur unter den ersten gesucht, damit die oberen
+    // Zeilen beim Nachladen stehen bleiben.
+    // Vorgemerkte aus den weiteren Zeilen (z. B. nach dem Neuladen) bleiben sichtbar: so viele Seiten wie nötig, höchstens 2;
+    // sonst verwürfe das Aufräumen der Vormerkungen sie, und nach dem Speichern würden sie nicht eingeladen.
+    const letzteVorgemerkt = Math.max(-1, ...vorgemerkt.map((id) => allePending.findIndex((p) => p.caregiverId === id)));
+    const seitenFuerVorgemerkte = letzteVorgemerkt >= visibleCount ? Math.ceil((letzteVorgemerkt - visibleCount + 1) / 5) : 0;
+    const seiten = Math.min(2, Math.max(weitereSeiten, seitenFuerVorgemerkte));
+    const weitereSichtbar = minimalEinstieg && vorSpeichern ? Math.min(5 * seiten, Math.max(0, allePending.length - visibleCount)) : 0;
+    const weitere: VisibleNurse[] = allePending.slice(visibleCount, visibleCount + weitereSichtbar);
+    const nochWeitere = minimalEinstieg && vorSpeichern ? Math.max(0, allePending.length - visibleCount - weitereSichtbar) : 0;
     // Die Empfehlung (höchste Badge-Bewertung, Score = Erfahrungsjahre +
     // Einsätze) nach ganz oben ziehen — die anderen behalten ihre
     // Reihenfolge. So steht "Empfehlung des Beraters" immer zuoberst.
@@ -2531,10 +2581,10 @@ const CustomerPortalPage: FC = () => {
       const s = badgeScore(p.nurse);
       if (s > bestScore) { bestScore = s; bestIdx = idx; }
     });
-    const visibleNurses: VisibleNurse[] = bestIdx > 0
+    const visibleNurses: VisibleNurse[] = [...(bestIdx > 0
       ? [pendingNurses[bestIdx], ...pendingNurses.filter((_, idx) => idx !== bestIdx)]
-      : pendingNurses;
-    return { allVisible, heldInvites, visibleNurses };
+      : pendingNurses), ...weitere];
+    return { allVisible, heldInvites, visibleNurses, nochWeitere, seiten };
   })();
 
   // Registry #145, Nachbesserung 2: wer nach dem Speichern wirklich eingeladen wird — die Vorgemerkten, die als offene
@@ -2568,6 +2618,7 @@ const CustomerPortalPage: FC = () => {
     const kandidaten = ids
       .map((id) => effectiveMatched.find((m) => m.caregiverId === id))
       .filter((m): m is { caregiverId: number; nurse: Nurse } => !!m && nurseStatusById.get(m.caregiverId) === 'pending');
+    setEinladenWarteschlange(kandidaten.map((m) => m.caregiverId));
     void (async () => {
       const eingeladen: string[] = [];
       let fehler = false;
@@ -2585,8 +2636,11 @@ const CustomerPortalPage: FC = () => {
           fehler = true;
           // Grenze erreicht: weitere Versuche scheitern genauso (das Fenster mit der Wartezeit ist schon offen).
           if (err instanceof MamamiaError && err.rateLimitPayload) break;
+        } finally {
+          setEinladenWarteschlange((q) => q.filter((id) => id !== m.caregiverId));
         }
       }
+      setEinladenWarteschlange([]);
       messen('einladung_nach_speichern', { anzahl: kandidaten.length, ok: eingeladen.length });
       if (eingeladen.length > 0 && !fehler) showToast(eingeladenHinweis(eingeladen), 4000, { hintenAn: true });
     })();
@@ -3851,8 +3905,20 @@ const CustomerPortalPage: FC = () => {
   // kann der Lauf #145 nach dem Speichern einladen), sonst der Knopf ins Formular wie seit #162. Kennung der angetippten
   // Pflegekraft (`selectedNurse`), nicht der nachgeladenen Profildaten: die kommen erst nach einem Effekt.
   const profilVorSpeichern = minimalEinstieg && vorSpeichern && !nurseModalApp;
+  // Listenplatz der Pflegekraft JETZT (über die Kennung); -1 = nicht mehr in der Liste. Ohne Kennung (Vorschau-Altdaten) der
+  // Platz vom Öffnen.
+  const matchIndexVon = (n: Nurse | null, beimOeffnen: number): number => {
+    const id = n?.caregiverId;
+    if (id === undefined) return beimOeffnen;
+    return effectiveMatched.findIndex((m) => m.caregiverId === id);
+  };
   const profilKennung = selectedNurse?.caregiverId;
-  const profilEinladbarVorSpeichern = profilVorSpeichern && profilKennung !== undefined && offeneKartenIds.includes(profilKennung);
+  // Höchstens so viele wie nach dem Speichern eingeladen werden können (5, nie mehr als frei): Wer schon 5 vorgemerkt hat,
+  // bekommt bei der sechsten den Knopf ins Formular (Entwurf 14.11.2026, „5 weitere Pflegekräfte anzeigen“).
+  const vormerkPlatzFrei = (id: number) => vorgemerktEinladbar.includes(id)
+    || vorgemerktEinladbar.length < Math.min(MAX_VORMERKUNGEN, freieEinladungen);
+  const profilEinladbarVorSpeichern = profilVorSpeichern && profilKennung !== undefined && offeneKartenIds.includes(profilKennung)
+    && vormerkPlatzFrei(profilKennung);
 
   // Registry #145: die Vorgemerkten für die Zeile über dem Formular — genau die, die nach dem Speichern eingeladen werden
   // (`vorgemerktEinladbar`, Nachbesserung 2: nie mehr Namen, als eingeladen werden können).
@@ -4198,6 +4264,13 @@ const CustomerPortalPage: FC = () => {
           sterne={sterne}
           vorgemerkte={vorgemerkteKraefte}
           onListeZumFormular={zurPflegesituationAus('hauptknopf')}
+          weitereAnzeigen={pflegekraftAuswahl.seiten < 2 && pflegekraftAuswahl.nochWeitere > 0
+            ? { anzahl: Math.min(5, pflegekraftAuswahl.nochWeitere), onClick: () => {
+                const seite = pflegekraftAuswahl.seiten + 1;
+                setWeitereSeiten(seite);
+                messen('weitere_pflegekraefte', { seite });
+              } }
+            : null}
           onAblaufZumFormular={zurPflegesituationAus('schritte')}
           onKostenAufgeklappt={() => messen('kosten_aufgeklappt')}
           onFaqGeoeffnet={messeFrage}
@@ -4434,15 +4507,14 @@ const CustomerPortalPage: FC = () => {
 
       {/* ── Stand heute (Martin 25.09.): nach dem Absenden liegt diese Karte über
            der Kante des Kopfs, wie vorher die Kostenkarte. ── */}
+      {/* ENTWURF 14.11.2026 (Martin: „So geht es weiter … der erledigte Schritt weg … so wie vorher auch, nur dass du jetzt
+          einen Schritt weiter bist“): derselbe Kasten wie vor dem Speichern, ab Schritt 2. */}
       {sucheLaeuft && nachAbsendenNeu && (
-        <div id="stand" className="max-w-3xl mx-auto px-5 pt-9 scroll-mt-20">
-          <AngebotAbschnitt id="so-geht-es-weiter" titel="So geht es weiter" className="">
-            <AngebotAblaufStand
-              bisherigeBewerbungen={applications.length}
-              wunschstart={formularStart}
-              onEinladen={() => document.getElementById('pflegekraefte')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            />
-          </AngebotAbschnitt>
+        <div id="stand" className="max-w-3xl mx-auto px-3 pt-8 scroll-mt-20">
+          <AblaufGutePhase
+            ab={1}
+            onEinladen={applications.length === 0 && pflegekraftAuswahl.visibleNurses.length > 0 ? () => document.getElementById('pflegekraefte')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) : undefined}
+          />
         </div>
       )}
       {sucheLaeuft && !nachAbsendenNeu && (
@@ -4500,7 +4572,9 @@ const CustomerPortalPage: FC = () => {
                 onReview={() => setSelectedApp(app)}
                 onDecline={() => setDeclineConfirmApp(app)}
                 onNurseClick={(n) => openNurseFromApp(n, app)}
-                onChat={CHAT_ENABLED ? (n) => setChatNurse(n) : undefined}
+                // ENTWURF 14.11.2026 (Martin: „Frage an Maria stellen, ich glaube, die Funktion gibt es gar nicht richtig“): echte
+                // Kunden sahen den Knopf nie (CHAT_ENABLED nur in der Vorschau); auch in der Vorschau weg.
+                onChat={undefined}
                 reserviertBis={pendingApps.length > 1 ? reservierungFuer(app) : null}
                 vorteile={app.id === pendingApps[0].id ? { onBestpreis: () => setBestpreisOffen(true), sterne } : undefined}
               />
@@ -4625,12 +4699,7 @@ const CustomerPortalPage: FC = () => {
              genau da, wo der Kunde landen soll. Deshalb KEIN zweiter Anker
              weiter unten: doppelte ids sind ungueltig, und getElementById
              nimmt ohnehin den ersten. */}
-        {!hasPending && nachAbsendenNeu && (
-          <div className="pt-6" id="pflegekraefte" style={{scrollMarginTop:96}}>
-            <h2 className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">{EINLADEN_TITEL}</h2>
-            <p className="mt-2 text-pretty text-[16px] leading-[1.55] text-pm-muted">{EINLADEN_ZEILE}</p>
-          </div>
-        )}
+        {/* ENTWURF 14.11.2026: nach dem Speichern steht Überschrift und Satz in der Liste selbst (ZeilenListe unten). */}
         {!hasPending && !nachAbsendenNeu && (
           <div className="px-1 pt-6" id="pflegekraefte" style={{scrollMarginTop:96}}>
             {/* Vor dem Absenden wieder der Wortlaut der guten Phase bis 24.09. (Registry #109,
@@ -4700,6 +4769,28 @@ const CustomerPortalPage: FC = () => {
                 )}
                 {/* Kein grauer Kasten mehr um die Karten (Teil 3): jede Karte
                     bekommt so ~26 px mehr Breite. */}
+                {nachAbsendenNeu ? (
+                  // ENTWURF 14.11.2026 (Martin: „immer die, die wir jetzt haben, mit dem Foto, mit den 3 Infos … wenn Daten
+                  // vervollständigt sind, kann man hier auch machen, einladen“): dieselben Zeilen wie vor dem Speichern, mit
+                  // „Einladen“ in Koralle. Handler und Messpunkte wie die Karte.
+                  <div className="pt-6">
+                    <ZeilenListe id="pflegekraefte" titel={LISTE_TITEL} zeile={EINLADEN_ZEILE} anzahl={visibleNurses.length}>
+                      {visibleNurses.map(({ nurse, i, caregiverId }) => (
+                        <PflegekraftZeile
+                          key={`zn-${i}`}
+                          nurse={nurse}
+                          vorgemerkt={einladenWarteschlange.includes(caregiverId)}
+                          onNurseClick={() => openNurseFromMatch(nurse, i)}
+                          einladen={{
+                            onInvite: () => { messeEinladen(nurse, 'karte'); return canInviteNurse(i); },
+                            onInviteConfirm: () => confirmInviteNurse(i, displayName(nurse.name)),
+                            gesperrt: inviteInFlight,
+                          }}
+                        />
+                      ))}
+                    </ZeilenListe>
+                  </div>
+                ) : (
                 <div>
                   <div className="space-y-3">
                     {/* Interest-Karten werden jetzt OBEN in einer eigenen
@@ -4754,6 +4845,7 @@ const CustomerPortalPage: FC = () => {
                     </div>
                   )}
                 </div>
+                )}
                 </>
               )}
 
@@ -5090,13 +5182,12 @@ const CustomerPortalPage: FC = () => {
             && aboutRegen.forId === fullCaregiver.id
             && aboutRegen.loading
           }
-          initialLevelInfo={nurseModalStufe}
+          // Profil ohne Stufen seit 14.11.2026 (`nurseModalStufe` öffnete die Stufen-Erklärung); stattdessen „Warum … passt“.
+          kundenBedarf={profilBedarf}
           onClose={() => { setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setNurseModalStufe(false); }}
           app={nurseModalApp ?? undefined}
           // Gebucht oder Vertrag offen: nur das Profil, kein „Einladen" (Review 25.09.).
           nurProfil={!!acceptedApp || !!contractApp}
-          // Gebucht-Seite (Vorschau und echt, Spezifikation 6.11): ohne „sofort verfügbar“.
-          ohneVerfuegbarkeit={!!gebuchtDaten}
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onChat={CHAT_ENABLED && nurseModalApp ? () => { const n = enrichedSelectedNurse; setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setChatNurse(n); } : undefined}
@@ -5136,8 +5227,11 @@ const CustomerPortalPage: FC = () => {
             minimalEinstieg && vorSpeichern ? undefined
             : nurseMatchIdx !== null
               ? async () => {
-                  const idx = nurseMatchIdx;
+                  // Registry #164 (Code-Prüfung): Listenplatz über die Kennung neu bestimmen — lädt die Liste nach dem Öffnen
+                  // neu (z. B. nach dem ersten Speichern), zeigte der alte Platz auf eine andere Pflegekraft.
+                  const idx = matchIndexVon(selectedNurse, nurseMatchIdx);
                   messeEinladen(selectedNurse, 'profil');
+                  if (idx < 0) { setSelectedNurse(null); setNurseMatchIdx(null); throw new Error('Pflegekraft nicht mehr in der Liste'); }
                   // Modal animation is driven by the returned Promise — surfaces
                   // failure to the user instead of fake success (CLAUDE.md §1).
                   try {
@@ -5167,7 +5261,8 @@ const CustomerPortalPage: FC = () => {
             minimalEinstieg && vorSpeichern ? undefined
             : nurseMatchIdx !== null
               ? () => {
-                  declineNurse(nurseMatchIdx);
+                  const idx = matchIndexVon(selectedNurse, nurseMatchIdx);
+                  if (idx >= 0) declineNurse(idx);
                   setSelectedNurse(null); setNurseMatchIdx(null);
                 }
               : selectedFromInterestId !== null
