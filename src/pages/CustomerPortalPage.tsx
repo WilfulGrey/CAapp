@@ -813,9 +813,6 @@ const CustomerPortalPage: FC = () => {
   // Einladen je Pflegekraft, Fragen je Frage (Schlüssel in leadEvents.ts). Keine Personendaten in metadata.
   // `vor_speichern` = Pflegesituation noch nie gespeichert (weder in dieser Sitzung noch laut Lead oder mamamia).
   const vorSpeichern = !patientSaved && !schonAbgesendet;
-  // 13.11.2026 (Martin: „nicht mehr mit einladen … das brauchen wir nicht“): im Minimal-Einstieg vor dem Speichern kein
-  // Vormerken und Einladen mehr, auch nicht der Lauf nach dem ersten Speichern (#145); das Profilfenster führt nur ins Formular.
-  const ohneEinladenVorSpeichern = (minimalEinstiegFlag: boolean) => minimalEinstiegFlag && vorSpeichern;
   const messen = (punkt: Messpunkt, metadata?: LeadEventMetadata) => {
     if (IS_PREVIEW_ANY) return;
     reportLeadEvent(lead?.token, punkt, metadata, false);
@@ -3071,7 +3068,7 @@ const CustomerPortalPage: FC = () => {
             setAbgesendetInSitzung(true);
             // Registry #145, nur Vorschau (dort speichert der Bogen ohne mamamia, onSaveToMamamia läuft nicht): das
             // Einladen der Vorgemerkten nach dem ersten Speichern zeigen.
-            if (IS_PREVIEW_ANY && !nurAenderung && modusPflegekraefteZuerst && !ohneEinladenVorSpeichern(minimalEinstieg)) { einladenListe.current = vorgemerktEinladbar; setEinladenNachSpeichern(true); }
+            if (IS_PREVIEW_ANY && !nurAenderung && modusPflegekraefteZuerst) { einladenListe.current = vorgemerktEinladbar; setEinladenNachSpeichern(true); }
             // Angaben geändert (nicht die erste Anfrage): bestätigen und zuklappen.
             if (!nurAenderung) return;
             showToast('✓ Ihre Angaben sind gespeichert.', 5000);
@@ -3261,7 +3258,7 @@ const CustomerPortalPage: FC = () => {
               Object.keys(leadEventMeta).length > 0 ? leadEventMeta : undefined,
             );
             // Registry #145: erstes Speichern ok → die vorgemerkten Pflegekräfte einladen, sobald die Seite umschaltet.
-            if (vorSpeichern && modusPflegekraefteZuerst && !ohneEinladenVorSpeichern(minimalEinstieg)) { einladenListe.current = vorgemerktEinladbar; setEinladenNachSpeichern(true); }
+            if (vorSpeichern && modusPflegekraefteZuerst) { einladenListe.current = vorgemerktEinladbar; setEinladenNachSpeichern(true); }
             // Patient form save flippa customer na active + dorzuca pełne
             // patient/wish dane. Mamamia matching engine re-scoreuje całą
             // listę z nowymi inputami — początkowo zwrócone caregivers
@@ -3846,17 +3843,20 @@ const CustomerPortalPage: FC = () => {
       key={`z-${i}`}
       nurse={nurse}
       vorgemerkt={vorgemerktEinladbar.includes(caregiverId)}
-      gesperrt={inviteInFlight}
       onNurseClick={() => openNurseFromMatch(nurse, i)}
-      onInvite={() => { messeEinladen(nurse, 'karte'); return canInviteNurse(i); }}
-      onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
-      preis={lead?.kalkulation?.bruttopreis ?? null}
     />
   ));
 
+  // Registry #163: Profilfenster im Minimal-Einstieg vor dem Speichern. Einladen nur für offene Karten der Liste (genau die
+  // kann der Lauf #145 nach dem Speichern einladen), sonst der Knopf ins Formular wie seit #162. Kennung der angetippten
+  // Pflegekraft (`selectedNurse`), nicht der nachgeladenen Profildaten: die kommen erst nach einem Effekt.
+  const profilVorSpeichern = minimalEinstieg && vorSpeichern && !nurseModalApp;
+  const profilKennung = selectedNurse?.caregiverId;
+  const profilEinladbarVorSpeichern = profilVorSpeichern && profilKennung !== undefined && offeneKartenIds.includes(profilKennung);
+
   // Registry #145: die Vorgemerkten für die Zeile über dem Formular — genau die, die nach dem Speichern eingeladen werden
   // (`vorgemerktEinladbar`, Nachbesserung 2: nie mehr Namen, als eingeladen werden können).
-  const vorgemerkteKraefte: VorgemerkteKraft[] = !pflegekraefteZuerst || ohneEinladenVorSpeichern(minimalEinstieg) ? [] : vorgemerktEinladbar.flatMap((id) => {
+  const vorgemerkteKraefte: VorgemerkteKraft[] = !pflegekraefteZuerst ? [] : vorgemerktEinladbar.flatMap((id) => {
     const m = effectiveMatched.find((x) => x.caregiverId === id);
     if (!m) return [];
     return [{ caregiverId: id, name: displayName(m.nurse.name), image: m.nurse.image, color: m.nurse.color, initialen: initials(m.nurse.name) }];
@@ -4197,6 +4197,7 @@ const CustomerPortalPage: FC = () => {
           formular={patientFormular(false, true, true)}
           sterne={sterne}
           vorgemerkte={vorgemerkteKraefte}
+          onListeZumFormular={zurPflegesituationAus('hauptknopf')}
           onAblaufZumFormular={zurPflegesituationAus('schritte')}
           onKostenAufgeklappt={() => messen('kosten_aufgeklappt')}
           onFaqGeoeffnet={messeFrage}
@@ -5015,6 +5016,7 @@ const CustomerPortalPage: FC = () => {
         name={einladenFenster?.name ?? ''}
         onClose={() => setEinladenFenster(null)}
         onVervollstaendigen={zurPflegesituationAus('einladen_fenster')}
+        gruen={minimalEinstieg}
       />
 
       {/* ── Rückmeldung zum Angebot (schwebend, unten rechts), zurück seit Registry #102 ────────────
@@ -5113,12 +5115,25 @@ const CustomerPortalPage: FC = () => {
               || statusOverrides.get(enrichedSelectedNurse.caregiverId) === 'invited'
               || interestStatusOverrides.get(enrichedSelectedNurse.caregiverId) === 'invited')
           }
-          zumFormular={ohneEinladenVorSpeichern(minimalEinstieg) && !nurseModalApp ? () => {
+          // Registry #163, 14.11.2026 (Martin: „einladen zur Bewerbung … Dann Popup, wenn Daten noch fehlen“): im Minimal-Einstieg vor dem
+          // Speichern EIN Knopf; er merkt vor und öffnet „{Name} einladen“ (Logik #145, `einladungVormerken` über die
+          // Kennung, nicht den Listenplatz), eingeladen wird nach dem ersten Speichern. „Nein danke“ entfällt dort. Nur für
+          // offene Karten der Liste (`offeneKartenIds`): Nur die lädt der Lauf nach dem Speichern ein. Andere Profile vor dem
+          // Speichern (bereits bearbeitet, Interesse, Mail-Link `cg=` außerhalb der Liste) behalten den Knopf ins Formular
+          // aus #162, sonst verspräche das Fenster eine Einladung, die nie verschickt wird.
+          einladenVorSpeichern={profilEinladbarVorSpeichern ? () => {
+            const kraft = selectedNurse;
+            const id = kraft.caregiverId!;
+            messeEinladen(kraft, 'profil');
+            setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setNurseModalStufe(false);
+            einladungVormerken(id, kraft);
+          } : undefined}
+          zumFormular={profilVorSpeichern && !profilEinladbarVorSpeichern ? () => {
             setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setNurseModalStufe(false);
             setTimeout(() => zurPflegesituationAus('karte')(), 60);
           } : undefined}
           onInvite={
-            ohneEinladenVorSpeichern(minimalEinstieg) ? undefined
+            minimalEinstieg && vorSpeichern ? undefined
             : nurseMatchIdx !== null
               ? async () => {
                   const idx = nurseMatchIdx;
@@ -5149,7 +5164,7 @@ const CustomerPortalPage: FC = () => {
               : undefined
           }
           onDeclineMatch={
-            ohneEinladenVorSpeichern(minimalEinstieg) ? undefined
+            minimalEinstieg && vorSpeichern ? undefined
             : nurseMatchIdx !== null
               ? () => {
                   declineNurse(nurseMatchIdx);
