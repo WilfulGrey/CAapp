@@ -155,7 +155,7 @@ export function eigenanteilAus(kalk: Record<string, any> | null | undefined): Ei
    Kasten „Ihr persönliches Angebot“ (Preis, grün „Nach Zuschüssen“, grau Pflegeheim-Vergleich, vier Punkte, Kennzahlen),
    eingekaufte Leads den Hinweis zu den Angaben, die passenden Pflegekräfte als Zeilen mit Foto, Preis und „Ansehen“ (ins
    Profil) und dem Textlink „Alle Pflegekräfte anzeigen“, die Erklärung zum Portal, EIN Knopf „Angebot & Pflegekräfte
-   anzeigen →“ / „100% kostenfrei & unverbindlich“ (oben ins Portal, Registry #163; bis 14.11.2026 „Bewerbungen erhalten →“ ins
+   anzeigen →“ (oben ins Portal, Registry #163; seit Registry #165 ohne Zeile darunter; bis 14.11.2026 „Bewerbungen erhalten →“ ins
    Formular), Gruß und Kontakt. Wortlaute aus dem Portal (Gleichlauf-Test
    src/__tests__/mails/angebotsmailWortlaut.test.ts); Betreff und Vorschau wie vorher. Das Siegel steht weiter im Kopf der Hülle. */
 export type AngebotKraft = { caregiverId: number; vorname: string; alter: number | null; erfahrungJahre: number; deutschWort: string | null; cid: string | null };
@@ -183,7 +183,6 @@ export const ALLE_KRAEFTE = "Alle Pflegekräfte anzeigen";
  *  auch passende Pflegekräfte. Diese können sich auch direkt bei Ihnen bewerben. Sie müssen nur die Situation einmal kurz
  *  beschreiben …“; Fassung OpenAI 08.11., ohne „nicht nur … sondern auch“, Handlung direkt vor dem Knopf). */
 export const PORTAL_ERKLAERUNG = "Im Kundenportal sehen Sie Ihr Angebot und passende Pflegekräfte. Beschreiben Sie einmal kurz die Pflegesituation, das dauert etwa 2\u00a0Minuten. Danach können sich Pflegekräfte direkt bei Ihnen bewerben. Erste Rückmeldungen kommen häufig innerhalb von 60\u00a0Minuten.";
-export const KNOPF_ZEILE = "100% kostenfrei &amp; unverbindlich";
 /** So viele Pflegekräfte zeigt die Mail höchstens; index.ts lädt nur für diese Fotos. */
 export const ANGEBOT_KRAEFTE_MAX = 5;
 const GOLD = "#D4A843";
@@ -270,14 +269,15 @@ function kraefteKarte(kraefte: AngebotKraft[], brutto: number, profil: (k: Angeb
     </table>`;
 }
 
-/** Hauptknopf: „Angebot & Pflegekräfte anzeigen →" und darunter „100% kostenfrei & unverbindlich". */
+/** Hauptknopf: „Angebot & Pflegekräfte anzeigen →", eine Zeile (Registry #165, Martin 14.11.2026: „beim Mail-Button ohne dieses
+ *  kostenfrei und unverbindlich“; bis dahin darunter „100% kostenfrei & unverbindlich"). Innenabstand 15 px, damit der Knopf
+ *  ohne die zweite Zeile nicht flacher als 48 px wird. */
 function knopfPortal(url: string, unten = 22): string {
   return `
     <table width="100%" role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 ${unten}px;border-collapse:separate;">
-      <tr><td align="center" bgcolor="${F.coral}" style="background-color:${F.coral};border-radius:12px;padding:12px 16px;">
+      <tr><td align="center" bgcolor="${F.coral}" style="background-color:${F.coral};border-radius:12px;padding:15px 16px;">
         <a href="${url}" target="_blank" style="display:block;color:#ffffff;text-decoration:none;text-align:center;">
           <span style="display:block;font-size:17px;font-weight:700;line-height:1.3;">${esc(KNOPF_TITEL)}&nbsp;&rarr;</span>
-          <span style="display:block;margin-top:2px;font-size:13px;font-weight:500;line-height:1.3;">${KNOPF_ZEILE}</span>
         </a>
       </td></tr>
     </table>`;
@@ -345,7 +345,7 @@ ${klartext(einstieg)}
 
 ${kasten}${hinweis ? `${hinweis}\n\n` : ""}${kraefteText}${PORTAL_ERKLAERUNG}
 
-${KNOPF_TITEL} (100% kostenfrei & unverbindlich): ${start}
+${KNOPF_TITEL}: ${start}
 
 Viele Grüße
 Marta Kapcio
