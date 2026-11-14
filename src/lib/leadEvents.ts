@@ -58,6 +58,8 @@ export const MESSPUNKTE = [
   // Pflegekräfte zuerst (Registry #145, Martin 03.11.): Vormerken vor dem Speichern, Einladen danach.
   'einladung_vorgemerkt',     // „Einladen" vor dem Speichern → Pflegekraft vorgemerkt {caregiver_id}, je Pflegekraft einmal
   'einladung_nach_speichern', // nach dem ersten Speichern automatisch eingeladen {anzahl: versucht, ok: davon eingeladen}
+  // Minimal-Einstieg: Link „5 weitere Pflegekräfte anzeigen“ unter der Liste, höchstens zweimal {seite: 1 | 2}.
+  'weitere_pflegekraefte',
 ] as const;
 export type Messpunkt = typeof MESSPUNKTE[number];
 
@@ -71,7 +73,8 @@ export type EinladenQuelle = 'karte' | 'interesse' | 'profil';
 export type FormularQuelle = 'kasten' | 'warum' | 'karte' | 'schritte' | 'frage' | 'mail' | 'stand'
   // Registry #145: Knopf im Fenster „{Name} einladen" (Pflegekräfte zuerst).
   | 'einladen_fenster'
-  // Registry #147: Hauptknopf „Angaben vervollständigen und Bewerbungen erhalten" im ersten Bild (Minimal-Einstieg).
+  // Registry #147: vom 08. bis 13.11.2026 der feste Knopf „Bewerbungen erhalten" im ersten Bild (mit #162 entfernt); seit
+  // Registry #163 (14.11.2026) der grüne Knopf „Pflegesituation vervollständigen" im Kasten unter der Liste.
   | 'hauptknopf';
 
 // Mini-Snapshot der Nurse-Daten, die wir brauchen um eine declined-from-
@@ -181,6 +184,8 @@ export interface LeadEventMetadata {
   anzahl?: number;
   // einladung_nach_speichern (Registry #145): wie viele der versuchten Einladungen angekommen sind (Zahl, kein Name).
   ok?: number;
+  /** weitere_pflegekraefte: die wievielte weitere Seite (1 oder 2). */
+  seite?: number;
 }
 
 // Session-level dedupe so a re-render or repeated save doesn't spam the
@@ -251,6 +256,8 @@ function dedupeKey(token: string, event: LeadEvent, metadata?: LeadEventMetadata
   if (event === 'portal_ladefehler') return `${token}:${event}:${metadata?.quelle_laden ?? ''}`;
   // Pflegekräfte zuerst (Registry #145): Vormerken je Pflegekraft einmal; das Einladen nach dem Speichern einmal je Sitzung.
   if (event === 'einladung_vorgemerkt') return `${token}:${event}:${metadata?.caregiver_id ?? ''}`;
+  // Weitere Pflegekräfte: je Seite einmal.
+  if (event === 'weitere_pflegekraefte') return `${token}:${event}:${metadata?.seite ?? ''}`;
   return `${token}:${event}`;
 }
 

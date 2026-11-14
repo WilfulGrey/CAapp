@@ -75,7 +75,7 @@ import { MatchCard } from '../components/portal/MatchCard';
 // „Noch 2 Minuten“, Karten mit „Einladen“ + Schloss, offenes Formular mit „Speichern“); Kopf und Häufige Fragen wie heute.
 import { EinstiegVorSpeichern, WarumSheetVorSpeichern } from '../components/portal/EinstiegVorSpeichern';
 import { EinladenSheetVorSpeichern, EinstiegPflegekraefteZuerst, type VorgemerkteKraft } from '../components/portal/EinstiegPflegekraefteZuerst';
-import { EinstiegMinimal, PflegekraftZeile, TestsiegerKopf, formularKopf } from '../components/portal/EinstiegMinimal';
+import { AblaufGutePhase, EinstiegMinimal, LISTE_TITEL, PflegekraftZeile, TestsiegerKopf, ZeilenListe, formularKopf } from '../components/portal/EinstiegMinimal';
 import { einladbareVormerkungen, eingeladenHinweis, ladeVormerkungen, MAX_VORMERKUNGEN, speichereVormerkungen } from '../lib/vormerkungen';
 import { DANK_DAUER_MS, useToastWarteschlange } from '../lib/toastWarteschlange';
 import { MatchCardVorSpeichern } from '../components/portal/MatchCardVorSpeichern';
@@ -2539,7 +2539,12 @@ const CustomerPortalPage: FC = () => {
     const pendingNurses: VisibleNurse[] = allePending.slice(0, visibleCount);
     // ENTWURF 14.11.2026: weitere Zeilen hängen hinten an; die Empfehlung wird nur unter den ersten gesucht, damit die oberen
     // Zeilen beim Nachladen stehen bleiben.
-    const weitereSichtbar = minimalEinstieg && vorSpeichern ? Math.min(5 * weitereSeiten, Math.max(0, allePending.length - visibleCount)) : 0;
+    // Vorgemerkte aus den weiteren Zeilen (z. B. nach dem Neuladen) bleiben sichtbar: so viele Seiten wie nötig, höchstens 2;
+    // sonst verwürfe das Aufräumen der Vormerkungen sie, und nach dem Speichern würden sie nicht eingeladen.
+    const letzteVorgemerkt = Math.max(-1, ...vorgemerkt.map((id) => allePending.findIndex((p) => p.caregiverId === id)));
+    const seitenFuerVorgemerkte = letzteVorgemerkt >= visibleCount ? Math.ceil((letzteVorgemerkt - visibleCount + 1) / 5) : 0;
+    const seiten = Math.min(2, Math.max(weitereSeiten, seitenFuerVorgemerkte));
+    const weitereSichtbar = minimalEinstieg && vorSpeichern ? Math.min(5 * seiten, Math.max(0, allePending.length - visibleCount)) : 0;
     const weitere: VisibleNurse[] = allePending.slice(visibleCount, visibleCount + weitereSichtbar);
     const nochWeitere = minimalEinstieg && vorSpeichern ? Math.max(0, allePending.length - visibleCount - weitereSichtbar) : 0;
     // Die Empfehlung (höchste Badge-Bewertung, Score = Erfahrungsjahre +
@@ -2555,7 +2560,7 @@ const CustomerPortalPage: FC = () => {
     const visibleNurses: VisibleNurse[] = [...(bestIdx > 0
       ? [pendingNurses[bestIdx], ...pendingNurses.filter((_, idx) => idx !== bestIdx)]
       : pendingNurses), ...weitere];
-    return { allVisible, heldInvites, visibleNurses, nochWeitere };
+    return { allVisible, heldInvites, visibleNurses, nochWeitere, seiten };
   })();
 
   // Registry #145, Nachbesserung 2: wer nach dem Speichern wirklich eingeladen wird — die Vorgemerkten, die als offene
@@ -3873,7 +3878,12 @@ const CustomerPortalPage: FC = () => {
   // Pflegekraft (`selectedNurse`), nicht der nachgeladenen Profildaten: die kommen erst nach einem Effekt.
   const profilVorSpeichern = minimalEinstieg && vorSpeichern && !nurseModalApp;
   const profilKennung = selectedNurse?.caregiverId;
-  const profilEinladbarVorSpeichern = profilVorSpeichern && profilKennung !== undefined && offeneKartenIds.includes(profilKennung);
+  // Höchstens so viele wie nach dem Speichern eingeladen werden können (5, nie mehr als frei): Wer schon 5 vorgemerkt hat,
+  // bekommt bei der sechsten den Knopf ins Formular (Entwurf 14.11.2026, „5 weitere Pflegekräfte anzeigen“).
+  const vormerkPlatzFrei = (id: number) => vorgemerktEinladbar.includes(id)
+    || vorgemerktEinladbar.length < Math.min(MAX_VORMERKUNGEN, freieEinladungen);
+  const profilEinladbarVorSpeichern = profilVorSpeichern && profilKennung !== undefined && offeneKartenIds.includes(profilKennung)
+    && vormerkPlatzFrei(profilKennung);
 
   // Registry #145: die Vorgemerkten für die Zeile über dem Formular — genau die, die nach dem Speichern eingeladen werden
   // (`vorgemerktEinladbar`, Nachbesserung 2: nie mehr Namen, als eingeladen werden können).
@@ -4219,8 +4229,12 @@ const CustomerPortalPage: FC = () => {
           sterne={sterne}
           vorgemerkte={vorgemerkteKraefte}
           onListeZumFormular={zurPflegesituationAus('hauptknopf')}
-          weitereAnzeigen={weitereSeiten < 2 && pflegekraftAuswahl.nochWeitere > 0
-            ? { anzahl: Math.min(5, pflegekraftAuswahl.nochWeitere), onClick: () => setWeitereSeiten((s) => Math.min(2, s + 1)) }
+          weitereAnzeigen={pflegekraftAuswahl.seiten < 2 && pflegekraftAuswahl.nochWeitere > 0
+            ? { anzahl: Math.min(5, pflegekraftAuswahl.nochWeitere), onClick: () => {
+                const seite = pflegekraftAuswahl.seiten + 1;
+                setWeitereSeiten(seite);
+                messen('weitere_pflegekraefte', { seite });
+              } }
             : null}
           onAblaufZumFormular={zurPflegesituationAus('schritte')}
           onKostenAufgeklappt={() => messen('kosten_aufgeklappt')}
@@ -4458,15 +4472,14 @@ const CustomerPortalPage: FC = () => {
 
       {/* ── Stand heute (Martin 25.09.): nach dem Absenden liegt diese Karte über
            der Kante des Kopfs, wie vorher die Kostenkarte. ── */}
+      {/* ENTWURF 14.11.2026 (Martin: „So geht es weiter … der erledigte Schritt weg … so wie vorher auch, nur dass du jetzt
+          einen Schritt weiter bist“): derselbe Kasten wie vor dem Speichern, ab Schritt 2. */}
       {sucheLaeuft && nachAbsendenNeu && (
-        <div id="stand" className="max-w-3xl mx-auto px-5 pt-9 scroll-mt-20">
-          <AngebotAbschnitt id="so-geht-es-weiter" titel="So geht es weiter" className="">
-            <AngebotAblaufStand
-              bisherigeBewerbungen={applications.length}
-              wunschstart={formularStart}
-              onEinladen={() => document.getElementById('pflegekraefte')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            />
-          </AngebotAbschnitt>
+        <div id="stand" className="max-w-3xl mx-auto px-3 pt-8 scroll-mt-20">
+          <AblaufGutePhase
+            ab={1}
+            onEinladen={applications.length === 0 && pflegekraftAuswahl.visibleNurses.length > 0 ? () => document.getElementById('pflegekraefte')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) : undefined}
+          />
         </div>
       )}
       {sucheLaeuft && !nachAbsendenNeu && (
@@ -4524,7 +4537,9 @@ const CustomerPortalPage: FC = () => {
                 onReview={() => setSelectedApp(app)}
                 onDecline={() => setDeclineConfirmApp(app)}
                 onNurseClick={(n) => openNurseFromApp(n, app)}
-                onChat={CHAT_ENABLED ? (n) => setChatNurse(n) : undefined}
+                // ENTWURF 14.11.2026 (Martin: „Frage an Maria stellen, ich glaube, die Funktion gibt es gar nicht richtig“): echte
+                // Kunden sahen den Knopf nie (CHAT_ENABLED nur in der Vorschau); auch in der Vorschau weg.
+                onChat={undefined}
                 reserviertBis={pendingApps.length > 1 ? reservierungFuer(app) : null}
                 vorteile={app.id === pendingApps[0].id ? { onBestpreis: () => setBestpreisOffen(true), sterne } : undefined}
               />
@@ -4649,12 +4664,7 @@ const CustomerPortalPage: FC = () => {
              genau da, wo der Kunde landen soll. Deshalb KEIN zweiter Anker
              weiter unten: doppelte ids sind ungueltig, und getElementById
              nimmt ohnehin den ersten. */}
-        {!hasPending && nachAbsendenNeu && (
-          <div className="pt-6" id="pflegekraefte" style={{scrollMarginTop:96}}>
-            <h2 className="text-[22px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">{EINLADEN_TITEL}</h2>
-            <p className="mt-2 text-pretty text-[16px] leading-[1.55] text-pm-muted">{EINLADEN_ZEILE}</p>
-          </div>
-        )}
+        {/* ENTWURF 14.11.2026: nach dem Speichern steht Überschrift und Satz in der Liste selbst (ZeilenListe unten). */}
         {!hasPending && !nachAbsendenNeu && (
           <div className="px-1 pt-6" id="pflegekraefte" style={{scrollMarginTop:96}}>
             {/* Vor dem Absenden wieder der Wortlaut der guten Phase bis 24.09. (Registry #109,
@@ -4724,6 +4734,28 @@ const CustomerPortalPage: FC = () => {
                 )}
                 {/* Kein grauer Kasten mehr um die Karten (Teil 3): jede Karte
                     bekommt so ~26 px mehr Breite. */}
+                {nachAbsendenNeu ? (
+                  // ENTWURF 14.11.2026 (Martin: „immer die, die wir jetzt haben, mit dem Foto, mit den 3 Infos … wenn Daten
+                  // vervollständigt sind, kann man hier auch machen, einladen“): dieselben Zeilen wie vor dem Speichern, mit
+                  // „Einladen“ in Koralle. Handler und Messpunkte wie die Karte.
+                  <div className="pt-6">
+                    <ZeilenListe id="pflegekraefte" titel={LISTE_TITEL} zeile={EINLADEN_ZEILE} anzahl={visibleNurses.length}>
+                      {visibleNurses.map(({ nurse, i }) => (
+                        <PflegekraftZeile
+                          key={`zn-${i}`}
+                          nurse={nurse}
+                          vorgemerkt={false}
+                          onNurseClick={() => openNurseFromMatch(nurse, i)}
+                          einladen={{
+                            onInvite: () => { messeEinladen(nurse, 'karte'); return canInviteNurse(i); },
+                            onInviteConfirm: () => confirmInviteNurse(i, displayName(nurse.name)),
+                            gesperrt: inviteInFlight,
+                          }}
+                        />
+                      ))}
+                    </ZeilenListe>
+                  </div>
+                ) : (
                 <div>
                   <div className="space-y-3">
                     {/* Interest-Karten werden jetzt OBEN in einer eigenen
@@ -4778,6 +4810,7 @@ const CustomerPortalPage: FC = () => {
                     </div>
                   )}
                 </div>
+                )}
                 </>
               )}
 
@@ -5119,8 +5152,6 @@ const CustomerPortalPage: FC = () => {
           app={nurseModalApp ?? undefined}
           // Gebucht oder Vertrag offen: nur das Profil, kein „Einladen" (Review 25.09.).
           nurProfil={!!acceptedApp || !!contractApp}
-          // Gebucht-Seite (Vorschau und echt, Spezifikation 6.11): ohne „sofort verfügbar“.
-          ohneVerfuegbarkeit={!!gebuchtDaten}
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onChat={CHAT_ENABLED && nurseModalApp ? () => { const n = enrichedSelectedNurse; setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setChatNurse(n); } : undefined}

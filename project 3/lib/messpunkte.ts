@@ -38,8 +38,10 @@
 //   einladung_vorgemerkt    { caregiver_id }                   „Einladen“ vor dem Speichern, Pflegekraft vorgemerkt
 //   einladung_nach_speichern { anzahl, ok }                     nach dem ersten Speichern: versucht / davon eingeladen
 // `zur_pflegesituation` kennt dazu die Quelle `einladen_fenster` (Knopf im Fenster „{Name} einladen“).
-// Minimal-Einstieg (Registry #147, Entwurf 07.11.2026): `zur_pflegesituation` mit Quelle `hauptknopf` (Knopf „Angaben
-// vervollständigen und Bewerbungen erhalten“ im ersten Bild). Kein neuer Messpunkt.
+// Minimal-Einstieg: `zur_pflegesituation` mit Quelle `hauptknopf` war vom 08. bis 13.11.2026 der feste Knopf „Bewerbungen
+// erhalten“ im ersten Bild (Registry #147, mit #162 entfernt); seit Registry #163 (14.11.2026) ist es der grüne Knopf
+// „Pflegesituation vervollständigen“ im Kasten unter der Liste.
+//   weitere_pflegekraefte   { seite }                          Link „5 weitere Pflegekräfte anzeigen“ (Seite 1 oder 2)
 // `portal_reopened` trägt zusätzlich geraet, browser, in_app, hoehe (Klassen, src/lib/messWerte.ts).
 // `vor_speichern` = die Pflegesituation wurde noch nie gespeichert (Portal: !patientSaved && !schonAbgesendet).
 export const MESSPUNKTE = [
@@ -67,6 +69,7 @@ export const MESSPUNKTE = [
   'pflegekraefte_geladen',
   'einladung_vorgemerkt',
   'einladung_nach_speichern',
+  'weitere_pflegekraefte',
 ] as const;
 
 export type Messpunkt = typeof MESSPUNKTE[number];

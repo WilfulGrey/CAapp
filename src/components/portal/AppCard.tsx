@@ -8,6 +8,10 @@ import { nochReserviertText } from '../../lib/reservierung';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { PflegekraftProfil } from './PflegekraftProfil';
+import { PunkteUndKennzahlen } from './EinstiegMinimal';
+
+// Graue Abschnittsüberschrift wie „Warum Primundus?“ in der Preiskarte (ENTWURF 14.11.2026).
+const ABSCHNITT = 'text-[15px] font-normal leading-5 text-pm-muted';
 
 export const AppCard: FC<{
   app: Application;
@@ -25,6 +29,18 @@ export const AppCard: FC<{
 }> = ({ app, exiting, onReview, onDecline, onNurseClick, onChat, reserviertBis, vorteile }) => {
   const { nurse } = app;
   const vorname = nurse.name.split(' ')[0];
+  const monat = app.offer.monatlicheKosten;
+  const tag = Math.round(monat / 30);
+  const euro = (n: number) => `${n.toLocaleString('de-DE')}\u00a0€`;
+  const reise = app.offer.anreisekosten === app.offer.abreisekosten
+    ? `${euro(app.offer.anreisekosten)} je Fahrt`
+    : `${euro(app.offer.anreisekosten)} Anreise, ${euro(app.offer.abreisekosten)} Abreise`;
+  const konditionen: [string, string][] = [
+    ['Tagessatz', `${euro(tag)} (${euro(monat)} im Monat)`],
+    ['Anreise', app.offer.anreisedatum],
+    ['Abreise', `vorauss. ${app.offer.abreisedatum}`],
+    ['Reisekosten', reise],
+  ];
   return (
     <div style={exiting ? { animation: 'exitCard 0.32s ease-in forwards' } : undefined}>
       {/* Grün umrandeter Kasten: eine echte Bewerbung ist das stärkste
@@ -38,6 +54,9 @@ export const AppCard: FC<{
           {/* Immer nur „Neue Bewerbung" (Martin 25.09.: nicht „Ihrer eingeladenen Pflegekraft"). */}
           Neue Bewerbung
         </div>
+        {/* ENTWURF 14.11.2026 (Martin: „darunter halt eben so in gräulich die Pflegekraft, das Angebot und da kommt 95 € Tagessatz,
+            in Klammern vielleicht nochmal den Monatssatz, Anreise, Abreise, Reisekosten und Nachricht, dass das alles so ein
+            bisschen strukturierter zusammenpasst“): drei Abschnitte mit grauer Überschrift wie „Warum Primundus?“. */}
         <div className="px-4 pt-4">
           {/* 72-h-Frist offen als Reservierung (Martin 25.09.). Nur mit echtem
               Anker aus den lead_events, sonst gar nicht (nicht raten). */}
@@ -48,31 +67,36 @@ export const AppCard: FC<{
               {nochReserviertText(reserviertBis)}
             </p>
           )}
-          <PflegekraftProfil nurse={nurse} onProfil={() => onNurseClick(nurse)} />
+          <h3 className={ABSCHNITT}>Pflegekraft</h3>
+          <div className="mt-2"><PflegekraftProfil nurse={nurse} onProfil={() => onNurseClick(nurse)} /></div>
         </div>
 
-      <div className="px-5 pt-4 pb-4">
-        <p className="text-[13.5px] text-pm-muted">Tagessatz</p>
-        <p className="text-[26px] font-extrabold leading-tight text-pm-ink">{Math.round(app.offer.monatlicheKosten / 30)}&nbsp;€<span className="text-[14.5px] font-medium text-pm-muted">&nbsp;/&nbsp;Tag</span></p>
-        <p className="mt-1.5 mb-4 text-[14.5px] leading-normal text-pm-body">
-          <span className="whitespace-nowrap">{app.offer.anreisedatum} – {app.offer.abreisedatum}</span>
-          {' · '}
-          <span className="whitespace-nowrap">Reisekosten à {app.offer.anreisekosten}&nbsp;€</span>
-        </p>
+      <div className="px-4 pt-4 pb-4">
+        <div className="border-t border-pm-line-soft pt-4">
+          <h3 className={ABSCHNITT}>Angebot</h3>
+          <dl className="mt-2 grid gap-2 text-[16px] leading-[22px]" data-bewerbung-angebot>
+            {konditionen.map(([wort, wert]) => (
+              <div key={wort} className="flex items-baseline justify-between gap-4">
+                <dt className="text-pm-muted">{wort}</dt>
+                <dd className="text-right font-semibold tabular-nums text-pm-ink">{wert}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
         {/*
-          „Hinweis der Agentur" = application.message VERBATIM (Entscheidung
+          Nachricht = application.message VERBATIM (Entscheidung
           Michał 2026-07-22, Registry #22): Rekruter schreiben dort kunden-
           relevante Hinweise („Die Pflegekraft reist mit einem Hund"). KEINE
-          LLM-Redaktion, KEIN Filter — die frühere Zwischenschicht ist raus,
-          für den Inhalt des Felds ist Mamamia verantwortlich. Anzeige 1:1,
-          Zeilenumbrüche erhalten. coverMessage = nur noch Preview-Mocks.
+          LLM-Redaktion, KEIN Filter — für den Inhalt des Felds ist Mamamia
+          verantwortlich. Anzeige 1:1, Zeilenumbrüche erhalten. coverMessage = nur noch Preview-Mocks.
         */}
         {(app.message?.trim() || app.coverMessage) && (
-          <div className="mb-3 rounded-[14px] bg-pm-paper px-4 py-3">
-            <p className="text-[11.5px] font-bold text-pm-taupe uppercase tracking-[.12em] mb-1.5">Hinweis der Agentur</p>
-            <p className="text-[14.5px] leading-relaxed text-pm-body whitespace-pre-wrap">{app.message?.trim() || app.coverMessage}</p>
+          <div className="mt-4 border-t border-pm-line-soft pt-4">
+            <h3 className={ABSCHNITT}>Nachricht</h3>
+            <p className="mt-2 text-[16px] leading-[1.5] text-pm-ink whitespace-pre-wrap">{app.message?.trim() || app.coverMessage}</p>
           </div>
         )}
+        <div className="mt-5" />
         {onChat && (
           <button
             onClick={() => onChat(nurse)}
@@ -89,28 +113,9 @@ export const AppCard: FC<{
         <Button breit onClick={onReview} className={`px-3 whitespace-nowrap ${onChat ? 'mt-3' : ''}`}>
           Angebot prüfen
         </Button>
-        {vorteile && (
-          <>
-            <ul className="mt-4 flex flex-col gap-2.5">
-              {HERO_PUNKTE.map((punkt) => (
-                <li key={punkt} className="flex items-center gap-1.5 text-[14px] min-[375px]:text-[14.5px] min-[390px]:gap-2 min-[390px]:text-[15px] leading-snug text-pm-ink">
-                  <Check className="h-[17px] w-[17px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
-                  {punkt}
-                </li>
-              ))}
-              <li className="flex items-center gap-1.5 text-[14px] min-[375px]:text-[14.5px] min-[390px]:gap-2 min-[390px]:text-[15px] leading-snug text-pm-ink">
-                <Check className="h-[17px] w-[17px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
-                <span>
-                  Bestpreisgarantie{' '}
-                  <button type="button" onClick={vorteile.onBestpreis} className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-green-deep underline underline-offset-[3px]">
-                    Mehr Infos
-                  </button>
-                </span>
-              </li>
-            </ul>
-            <BewertungsZeile stand={vorteile.sterne} className="mt-2" />
-          </>
-        )}
+        {/* ENTWURF 14.11.2026 (Martin: „unter dem Button die Punkte, dann sieht das genauso aus wie im Angebot“): dieselben Punkte
+            und Kennzahlen wie die Preiskarte vor dem Speichern. */}
+        {vorteile && <PunkteUndKennzahlen sterne={vorteile.sterne} onBestpreis={vorteile.onBestpreis} />}
       </div>
 
       <div className="px-5 pb-4 text-center">

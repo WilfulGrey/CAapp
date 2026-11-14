@@ -93,8 +93,6 @@ export const CustomerNurseModal: FC<{
   onDeclineMatch?: () => void;
   /** Nur ansehen, keine Aktionen (gebuchte Pflegekraft, Vertrag offen). */
   nurProfil?: boolean;
-  /** PROTOTYP Gebucht-Seite neu (15.10.2026, nur Vorschau, Spezifikation 6.11): ohne den Chip „sofort verfügbar". */
-  ohneVerfuegbarkeit?: boolean;
   /** Öffnet den (übersetzten) Chat mit der Pflegekraft. */
   onChat?: () => void;
   isInvited?: boolean;
@@ -103,7 +101,7 @@ export const CustomerNurseModal: FC<{
    *  Heart-Icon), der erklärt, dass eine Einladung ihre offizielle
    *  Bewerbung ermöglicht. */
   hasInterest?: boolean;
-}> = ({ nurse, profileLoading = false, aboutLoading = false, initialLevelInfo = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, onChat, isInvited = false, hasInterest = false, nurProfil = false, ohneVerfuegbarkeit = false, einladenVorSpeichern, zumFormular }) => {
+}> = ({ nurse, profileLoading = false, aboutLoading = false, initialLevelInfo = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, onChat, isInvited = false, hasInterest = false, nurProfil = false, einladenVorSpeichern, zumFormular }) => {
   const [invited, setInvited] = useState(isInvited);
   const [invitePhaseModal, setInvitePhaseModal] = useState<'idle' | 'sending' | 'done'>('idle');
   const [showLevelInfo, setShowLevelInfo] = useState(initialLevelInfo);
@@ -324,13 +322,8 @@ export const CustomerNurseModal: FC<{
                     {lvl.label}
                   </button>
                   )}
-                  {!headerCompact && !ohneVerfuegbarkeit && (
-                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex-shrink-0 ${
-                      nurse.availableSoon ? 'bg-[#E3F7EF] text-[#22A06B] border-[#B8E8D4]' : 'bg-[#FEF3E2] text-[#B45309] border-[#F9D99A]'
-                    }`}>
-                      {nurse.availability}
-                    </span>
-                  )}
+                  {/* Keine Verfügbarkeit („sofort verfügbar“, „verfügbar ab …“): Martin 14.11.2026: „die Verfügbarkeit der
+                      Pflegekraft niemals in der Karte anzeigen, weil wir die nicht haben und nicht zeigen wollen“. */}
                 </div>
               </div>
               <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/80 flex items-center justify-center shadow-sm flex-shrink-0">
