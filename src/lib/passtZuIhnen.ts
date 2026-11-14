@@ -126,14 +126,16 @@ export interface ProfilQuellen {
   amLead?: GespeicherteSituation | null;
 }
 
-/** Bedarf für „Warum … zu Ihnen passt“. Vor dem ersten Speichern nur der Rechner (auch wenn `formularDaten.demenz` gesetzt
- *  ist: Demenz und Inkontinenz bleiben offen). Danach die gespeicherte Pflegesituation in dieser Rangfolge: in dieser
+/** Bedarf für „Warum … zu Ihnen passt“. Vor dem ersten Speichern der Rechner (Personen, Mobilität, Nacht); Demenz und
+ *  Inkontinenz fragt der Rechner nicht ab, sie zählen vor dem Speichern als vorhanden, damit das Profil schon vor dem
+ *  Speichern vollständig überzeugt (Martin 14.11.2026: „das Profil muss auch vorher schon vollständig angezeigt werden und
+ *  nicht erst nach dem Speichern. Wir wollen vorher überzeugen“). Danach die gespeicherte Pflegesituation in dieser Rangfolge: in dieser
  *  Sitzung abgesendet, mamamia, Bogen am Lead; fehlen alle drei, wieder der Rechner. mamamia im Status „draft“ zählt nicht:
  *  Dort stehen nur die Daten aus dem Onboarding (Demenz und Inkontinenz leer, Heben auf dem Standardwert), der echte Bogen
  *  liegt dann am Lead. */
 export function bedarfFuerProfil(q: ProfilQuellen): KundenBedarf {
   const rechner = bedarfAusRechner(q.rechner);
-  if (q.vorSpeichern) return rechner;
+  if (q.vorSpeichern) return { ...rechner, demenz: true, inkontinenz: true };
   const mamamia = q.mamamia && q.mamamia.status !== 'draft' ? q.mamamia.form : null;
   const gespeichert = q.abgesendet ?? mamamia ?? q.amLead ?? null;
   return gespeichert ? bedarfAusFormular(gespeichert) : rechner;

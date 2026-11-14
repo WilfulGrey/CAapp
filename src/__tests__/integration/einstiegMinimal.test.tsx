@@ -426,10 +426,10 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     const profil = profilfenster();
     // (Name im Profil aus dem vollen Profil der Testdaten: getCaregiver liefert dort immer dieselbe Pflegekraft.)
     expect(within(profil).getByText(/^Laden Sie \S+ ein, sich zu bewerben\.$/)).toBeInTheDocument();
-    // „Warum … zu Ihnen passt“ vor dem Speichern nur aus dem Rechner (eine Person, nachts gelegentlich, Rollstuhl);
-    // Demenz und Inkontinenz fragt der Rechner nicht ab (lib/passtZuIhnen.ts).
+    // „Warum … zu Ihnen passt“ vor dem Speichern aus dem Rechner (eine Person, nachts gelegentlich, Rollstuhl) und, weil der
+    // Rechner sie nicht abfragt, Demenz und Inkontinenz (Martin 14.11.2026: „Wir wollen vorher überzeugen“).
     await waitFor(() => expect([...profil.querySelectorAll('[data-passt-gruende] li')].map((li) => li.textContent))
-      .toEqual(['Erfahrung mit Einsätzen in der Nacht', 'Erfahrung mit Rollstuhl']));
+      .toEqual(['Erfahrung mit Demenz', 'Erfahrung mit Inkontinenz', 'Erfahrung mit Einsätzen in der Nacht', 'Erfahrung mit Rollstuhl']));
     expect(within(profil).queryByRole('button', { name: 'Nein danke' })).toBeNull();
     expect(within(profil).queryByRole('button', { name: 'Einladen' })).toBeNull();
     expect(within(profil).queryByRole('button', { name: 'Pflegesituation vervollständigen' })).toBeNull();

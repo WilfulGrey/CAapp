@@ -112,11 +112,14 @@ describe('bedarfFuerProfil: welche Quelle das Profil nimmt', () => {
   const aktiv = { status: 'active', form: mamamiaForm };
   const gruende = (q: Parameters<typeof bedarfFuerProfil>[0]) => passtGruende(bedarfFuerProfil(q));
 
-  it('vor dem ersten Speichern nur der Rechner, auch wenn schon ein Bogen da wäre; formularDaten.demenz = „ja“ ergibt keine Demenz-Zeile', () => {
+  it('vor dem ersten Speichern der Rechner (Personen, Nacht, Mobilität), auch wenn schon ein Bogen da wäre; Demenz und Inkontinenz fragt der Rechner nicht ab, sie stehen vor dem Speichern immer da (Martin 14.11.2026: „Wir wollen vorher überzeugen“)', () => {
     expect(gruende({ vorSpeichern: true, rechner, abgesendet, mamamia: aktiv, amLead }))
-      .toEqual(['Erfahrung mit zwei Personen', 'Erfahrung mit Einsätzen in der Nacht', 'Erfahrung mit Rollstuhl']);
-    expect(bedarfFuerProfil({ vorSpeichern: true, rechner }).demenz).toBeNull();
-    expect(bedarfFuerProfil({ vorSpeichern: true })).toEqual(OHNE_BEDARF);
+      .toEqual(['Erfahrung mit Demenz', 'Erfahrung mit zwei Personen', 'Erfahrung mit Inkontinenz', 'Erfahrung mit Einsätzen in der Nacht', 'Erfahrung mit Rollstuhl']);
+    expect(bedarfFuerProfil({ vorSpeichern: true, rechner: { ...rechner, demenz: 'nein' } }).demenz).toBe(true);
+    expect(bedarfFuerProfil({ vorSpeichern: true })).toEqual({ ...OHNE_BEDARF, demenz: true, inkontinenz: true });
+    // Eine Person, nachts nie, mobil: vor dem Speichern trotzdem Demenz und Inkontinenz.
+    expect(gruende({ vorSpeichern: true, rechner: { betreuung_fuer: '1-person', mobilitaet: 'mobil', nachteinsaetze: 'nein' } }))
+      .toEqual(['Erfahrung mit Demenz', 'Erfahrung mit Inkontinenz']);
   });
 
   it('nach dem Speichern: in dieser Sitzung abgesendet > mamamia > Bogen am Lead > Rechner', () => {
