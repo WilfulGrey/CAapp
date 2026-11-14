@@ -17,7 +17,7 @@ import { ERREICHBAR, TELEFON, TELEFON_HREF, whatsappHref } from '../../lib/konta
 // - Punkte: Portal KOPF_PUNKTE unter „Bestpreisgarantie“, Mail GARANTIE_PUNKTE.
 // - Liste: Portal LISTE_TITEL („Ihre Pflegekräfte-Auswahl“), Mail „Passende Pflegekräfte“.
 // - Knopf: Die Mail zeigt seit Registry #163 „Angebot & Pflegekräfte anzeigen“ (Martin 14.11.2026) mit der Zeile des früheren
-//   festen Knopfs darunter (FEST_ZEILE); im Portal gibt es den festen Knopf nicht mehr, FEST_TITEL steht nirgends mehr.
+//   festen Knopfs darunter (FEST_ZEILE), seit Registry #165 ohne diese Zeile; im Portal gibt es den festen Knopf nicht mehr.
 
 const WURZEL = join(__dirname, '..', '..', '..');
 const MAIL = readFileSync(join(WURZEL, 'project 3/supabase/functions/send-scheduled-emails/kundenMails.ts'), 'utf8');
@@ -84,12 +84,16 @@ describe('Angebotsmail wie das Portal (Registry #148)', () => {
     }
   });
 
-  it('Knopf „Angebot & Pflegekräfte anzeigen“ (Registry #163) mit der Zeile des früheren festen Knopfs darunter (FEST_ZEILE); „Bewerbungen erhalten“ (FEST_TITEL) weder in der Mail noch im Portal', () => {
+  it('Knopf „Angebot & Pflegekräfte anzeigen“ (Registry #163) ohne Zeile darunter (Registry #165); „Bewerbungen erhalten“ (FEST_TITEL) und „100% kostenfrei & unverbindlich“ (FEST_ZEILE) weder in der Mail noch im Portal', () => {
     // Martin 14.11.2026: „in der Mail würde ich den Buttontext machen: Angebot & Pflegekräfte anzeigen“.
     expect(konst('KNOPF_TITEL')).toBe('Angebot & Pflegekräfte anzeigen');
     // Ohne Kommentare (dort steht der frühere Knopf als Geschichte); `//` nach einem Doppelpunkt ist eine Adresse.
     expect(ANGEBOT.replace(/\/\*[\s\S]*?\*\/|(?<!:)\/\/.*$/gm, '')).not.toContain(FEST_TITEL);
-    expect(konst('KNOPF_ZEILE').replace(/&amp;/g, '&')).toBe(FEST_ZEILE);
+    // Registry #165 (Martin 14.11.2026: „beim Mail-Button ohne dieses kostenfrei und unverbindlich“): keine Zeile darunter.
+    expect(MAIL).not.toContain('export const KNOPF_ZEILE');
+    const ohneKommentare = ANGEBOT.replace(/\/\*[\s\S]*?\*\/|(?<!:)\/\/.*$/gm, '');
+    expect(ohneKommentare).not.toContain(FEST_ZEILE.replace('&', '&amp;'));
+    expect(ohneKommentare).not.toContain(FEST_ZEILE);
     // Gewollte Abweichung: Das Portal zeigt FEST_TITEL und FEST_ZEILE nirgends mehr an.
     expect(EINSTIEG).not.toContain('{FEST_TITEL}');
     expect(EINSTIEG).not.toContain('{FEST_ZEILE}');

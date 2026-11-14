@@ -131,8 +131,10 @@ function inFolge(name: string, text: string, teile: string[]) {
 function pruefeAngebot(name: string, m: KundenMail) {
   grundregeln(name, m, KNOPF);
   assertEquals(zaehle(m.html, `href="${KNOPF}"`), 1, `${name}: genau ein Knopf ins Portal`);
-  inFolge(`${name} Knopf`, m.html, [`href="${KNOPF}"`, `${KNOPF_HTML}&nbsp;&rarr;</span>`, "100% kostenfrei &amp; unverbindlich</span>"]);
-  assertStringIncludes(m.text, `Angebot & Pflegekräfte anzeigen (100% kostenfrei & unverbindlich): ${KNOPF}`);
+  inFolge(`${name} Knopf`, m.html, [`href="${KNOPF}"`, `${KNOPF_HTML}&nbsp;&rarr;</span>`]);
+  assertStringIncludes(m.text, `Angebot & Pflegekräfte anzeigen: ${KNOPF}`);
+  // Registry #165 (Martin 14.11.2026): keine Zeile „100% kostenfrei & unverbindlich“ mehr unter dem Knopf.
+  for (const t of [m.html, m.text]) assert(!/kostenfrei (&amp;|&) unverbindlich/.test(t), `${name}: Zeile unter dem Knopf`);
   // Der frühere Knopf und sein Sprung ins Formular sind weg.
   for (const alt of ["Bewerbungen erhalten", "goto=anfragen"]) {
     assert(!m.html.includes(alt) && !m.text.includes(alt), `${name}: enthält noch „${alt}"`);
@@ -170,7 +172,7 @@ Deno.test("01 Angebot (#148): Inhalt und Reihenfolge wie der freigegebene Entwur
       + "★★★★★ 4,9 · 126 Bewertungen · 20 Jahre Erfahrung · 6× in Folge Testsieger\n\n",
     `PASSENDE PFLEGEKRÄFTE (2)\n- Maria, 58 · 12 Jahre Erfahrung · Deutsch Gut · 3.050 € · Ansehen: ${profil(11)}\n`
       + `- Ewa · 1 Jahr Erfahrung · 3.050 € · Ansehen: ${profil(22)}\nAlle Pflegekräfte anzeigen: ${ALLE}\n\n`,
-    `${PORTAL_ERKLAERUNG}\n\nAngebot & Pflegekräfte anzeigen (100% kostenfrei & unverbindlich): ${KNOPF}\n\n`,
+    `${PORTAL_ERKLAERUNG}\n\nAngebot & Pflegekräfte anzeigen: ${KNOPF}\n\n`,
     "Viele Grüße\nMarta Kapcio\nPflegeberaterin bei Primundus",
     "Fragen? 089 200 000 830, täglich 8–20 Uhr, auch per WhatsApp (https://wa.me/4989200000830).",
   ]);
