@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FC, MouseEvent as ReactMouseEvent } from 'react';
-import { ArrowDown, Check, X, UserPlus, Heart, FileText, Download } from 'lucide-react';
+import { Check, X, UserPlus, Heart, FileText, Download } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { nurseLevel, displayName, initials, einsaetzeText, badgeErklaerung } from './shared';
@@ -83,9 +83,10 @@ export const CustomerNurseModal: FC<{
    *  promise resolves; on rejection modal rolls back to idle and the
    *  parent surfaces the error (CLAUDE.md §1 — no fake animation). */
   onInvite?: () => Promise<void>;
-  /** 13.11.2026 (Martin: „nie einladen“): vor dem Speichern nur ansehen, unten EIN grüner Knopf ins Formular statt
-   *  „Nein danke“ und „Einladen“. */
-  zumFormular?: () => void;
+  /** ENTWURF 14.11.2026 (Martin: „wenn man ein Profil öffnet, dann muss dort nicht Button mit vervollständigen sein, sondern
+   *  einladen zur Bewerbung … Dann Popup, wenn Daten noch fehlen“): vor dem Speichern EIN grüner Knopf „Zur Bewerbung
+   *  einladen“ statt „Nein danke“ und „Einladen“; das Portal merkt vor und öffnet „{Name} einladen“ (Logik #145). */
+  einladenVorSpeichern?: () => void;
   onDeclineMatch?: () => void;
   /** Nur ansehen, keine Aktionen (gebuchte Pflegekraft, Vertrag offen). */
   nurProfil?: boolean;
@@ -99,7 +100,7 @@ export const CustomerNurseModal: FC<{
    *  Heart-Icon), der erklärt, dass eine Einladung ihre offizielle
    *  Bewerbung ermöglicht. */
   hasInterest?: boolean;
-}> = ({ nurse, profileLoading = false, aboutLoading = false, initialLevelInfo = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, onChat, isInvited = false, hasInterest = false, nurProfil = false, ohneVerfuegbarkeit = false, zumFormular }) => {
+}> = ({ nurse, profileLoading = false, aboutLoading = false, initialLevelInfo = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, onChat, isInvited = false, hasInterest = false, nurProfil = false, ohneVerfuegbarkeit = false, einladenVorSpeichern }) => {
   const [invited, setInvited] = useState(isInvited);
   const [invitePhaseModal, setInvitePhaseModal] = useState<'idle' | 'sending' | 'done'>('idle');
   const [showLevelInfo, setShowLevelInfo] = useState(initialLevelInfo);
@@ -174,7 +175,7 @@ export const CustomerNurseModal: FC<{
   // Gebucht-Bildschirm, dem Vertrag und den erledigten Karten kommt das Profil
   // ohne onInvite. Vorher stand dort trotzdem „Einladen" und meldete
   // „Pflegekraft wurde eingeladen!", ohne dass etwas gesendet wurde.
-  const zeigeAktionen = !nurProfil && (!!app || !!onInvite || invited || !!zumFormular);
+  const zeigeAktionen = !nurProfil && (!!app || !!onInvite || invited || !!einladenVorSpeichern);
 
   const handleModalInvite = async () => {
     if (!onInvite) return;
@@ -661,15 +662,15 @@ export const CustomerNurseModal: FC<{
             )}
             {zeigeAktionen && (
             <div className="flex gap-3">
-            {!app && zumFormular ? (
+            {!app && einladenVorSpeichern ? (
               <button
                 type="button"
-                onClick={zumFormular}
+                onClick={einladenVorSpeichern}
                 className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[12px] bg-pm-green px-3 text-[16px] font-bold text-white hover:bg-pm-green-deep max-[339px]:text-[15px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-green"
-                data-profil-zum-formular
+                data-profil-einladen
               >
-                <span className="whitespace-nowrap">Pflegesituation vervollständigen</span>
-                <ArrowDown className="h-[18px] w-[18px] flex-none max-[339px]:hidden" strokeWidth={2.5} aria-hidden="true" />
+                <UserPlus className="h-[18px] w-[18px] flex-none max-[339px]:hidden" strokeWidth={2.5} aria-hidden="true" />
+                <span className="whitespace-nowrap">Zur Bewerbung einladen</span>
               </button>
             ) : app ? (
               app.status === 'declined' ? (

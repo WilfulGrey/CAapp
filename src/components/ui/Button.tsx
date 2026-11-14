@@ -3,7 +3,7 @@
 // Mindestens 44 px Tippfläche, Hauptknöpfe 52 px.
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from 'react';
 
-type Variante = 'primaer' | 'sekundaer' | 'whatsapp' | 'link';
+type Variante = 'primaer' | 'gruen' | 'sekundaer' | 'whatsapp' | 'link';
 type Groesse = 'md' | 'sm';
 
 const BASIS =
@@ -13,6 +13,8 @@ const BASIS =
 
 const VARIANTE: Record<Variante, string> = {
   primaer: 'bg-pm-coral hover:bg-pm-coral-deep text-white',
+  // Grün wie die Knöpfe der Seite vor dem ersten Speichern (Minimal-Einstieg, Registry #162).
+  gruen: 'bg-pm-green hover:bg-pm-green-deep text-white',
   sekundaer: 'bg-white border-[1.5px] border-pm-chip text-pm-taupe-ink hover:border-pm-taupe',
   whatsapp: 'bg-pm-whatsapp hover:bg-[#1FBA59] text-white',
   link: 'bg-transparent text-pm-taupe-ink underline underline-offset-4 decoration-pm-taupe/40 hover:decoration-pm-taupe-ink rounded-md font-semibold',

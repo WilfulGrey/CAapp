@@ -174,7 +174,9 @@ export type AngebotEingabe = {
 /** Wortlaute wie im Portal (src/components/portal/EinstiegMinimal.tsx: ANGEBOT_TITEL, GARANTIE_*, VERTRAUEN, FEST_*). */
 export const ANGEBOT_TITEL = "Ihr persönliches Angebot";
 export const GARANTIE_PUNKTE = ["Bestpreisgarantie", "Keine Vorauszahlung", "Keine Vermittlungsgebühr", "Keine Mindestlaufzeit"] as const;
-export const KNOPF_TITEL = "Bewerbungen erhalten";
+/** Hauptknopf (ENTWURF 14.11.2026, Martin: „in der Mail würde ich den Buttontext machen: Angebot & Pflegekräfte anzeigen“);
+ *  führt seitdem oben ins Portal (Angebot und Liste), bis dahin „Bewerbungen erhalten“ ins Formular. */
+export const KNOPF_TITEL = "Angebot & Pflegekräfte anzeigen";
 export const ALLE_KRAEFTE = "Alle Pflegekräfte anzeigen";
 /** Über dem Knopf: was im Portal passiert (Martin 08.11.: „erklären, dass man im Portal nicht nur das Angebot sieht, sondern
  *  auch passende Pflegekräfte. Diese können sich auch direkt bei Ihnen bewerben. Sie müssen nur die Situation einmal kurz
@@ -267,13 +269,13 @@ function kraefteKarte(kraefte: AngebotKraft[], brutto: number, profil: (k: Angeb
     </table>`;
 }
 
-/** Hauptknopf wie im Portal: „Bewerbungen erhalten →" und darunter „100% kostenfrei & unverbindlich". */
-function knopfBewerbungen(url: string, unten = 22): string {
+/** Hauptknopf: „Angebot & Pflegekräfte anzeigen →" und darunter „100% kostenfrei & unverbindlich". */
+function knopfPortal(url: string, unten = 22): string {
   return `
     <table width="100%" role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 ${unten}px;border-collapse:separate;">
       <tr><td align="center" bgcolor="${F.coral}" style="background-color:${F.coral};border-radius:12px;padding:12px 16px;">
         <a href="${url}" target="_blank" style="display:block;color:#ffffff;text-decoration:none;text-align:center;">
-          <span style="display:block;font-size:17px;font-weight:700;line-height:1.3;">${KNOPF_TITEL}&nbsp;&rarr;</span>
+          <span style="display:block;font-size:17px;font-weight:700;line-height:1.3;">${esc(KNOPF_TITEL)}&nbsp;&rarr;</span>
           <span style="display:block;margin-top:2px;font-size:13px;font-weight:500;line-height:1.3;">${KNOPF_ZEILE}</span>
         </a>
       </td></tr>
@@ -288,8 +290,8 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
   const eigen = brutto ? eigenanteilAus(kalk) : null;
   const n = a.empfehlung ? Math.max(1, Math.min(5, a.empfehlung.sichtbar || 1)) : 0;
   const kraefte = (a.empfehlung?.kraefte ?? []).slice(0, ANGEBOT_KRAEFTE_MAX);
-  // „Bewerbungen erhalten" führt wie im Portal ins Formular; die Zeilen zu den Pflegekräften.
-  const start = k.portal({ m: "eb", goto: "anfragen" });
+  // Der Hauptknopf führt oben ins Portal (Angebot und Pflegekräfte), die Zeilen zu den Pflegekräften.
+  const start = k.portal({ m: "eb" });
   const zuKraeften = k.portal({ m: "eb", goto: "matches" });
   const zumProfil = (x: AngebotKraft) => k.portal({ cg: String(x.caregiverId), m: "eb" });
 
@@ -316,7 +318,7 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
     ${hinweis ? mKlein(esc(hinweis), 16) : ""}
     ${kraefte.length ? kraefteKarte(kraefte, brutto, zumProfil, zuKraeften) : ""}
     ${mp(PORTAL_ERKLAERUNG, 14)}
-    ${knopfBewerbungen(start)}
+    ${knopfPortal(start)}
     <p style="margin:0 0 14px;font-size:16px;line-height:1.55;color:${F.text};">Viele Grüße<br><strong style="color:${F.ink};">Marta Kapcio</strong><br><span style="font-size:14.5px;color:${F.muted};">Pflegeberaterin bei Primundus</span></p>
     ${mKlein(`Fragen? ${kontaktLink(TELEFON_HREF, TELEFON_TEXT)}, täglich <span style="white-space:nowrap;">8–20&nbsp;Uhr</span>, auch per ${kontaktLink(WHATSAPP_HREF, "WhatsApp")}.`, 0)}`;
 

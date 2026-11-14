@@ -24,7 +24,7 @@
 // vervollständigen und Bewerbungen erhalten“.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUp, Check, ChevronDown, ChevronRight, Info, Phone, X } from 'lucide-react';
+import { AlertCircle, ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Info, Phone, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { formatEuro, type Lead } from '../../lib/supabase';
 import { eigenanteilAus } from '../../lib/angebotZuschuss';
@@ -55,13 +55,20 @@ export const WARUM_TITEL = 'Warum Primundus?';
 /** Unter der Listen-Überschrift (Martin 13.11.2026: „Es muss definitiv irgendwo stehen, diese Pflegekräfte sind verfügbar und
  *  passen zu ihrer Auswahl“). „Anfrage“ statt „Angaben“: im Portal filtert nur die Deutsch-Stufe. Nur über einer Liste mit Zeilen. */
 export const LISTE_ZEILE = 'Diese Pflegekräfte sind verfügbar und passen zu Ihrer Anfrage.';
+/** Kasten unter der Liste (ENTWURF 14.11.2026, Martin: „Im Portal fehlt der Text und Button unter den PKs“, Bild „Neu, ganze
+ *  Seite“ vom 13.11. vormittags): Hinweis, Satz und Knopf wie dort, der Knopf jetzt grün wie alle anderen. Der Satz stand
+ *  seit #162 über dem Formular und steht jetzt nur noch hier. */
+export const LISTE_UNVOLLSTAENDIG = 'Ihre Angaben sind noch unvollständig';
+export const LISTE_WARUM = 'Beschreiben Sie kurz die Pflegesituation. So verstehen die Pflegekräfte, worauf es bei Ihnen ankommt, und können sich unverbindlich bewerben. Das dauert ca. 2 Minuten.';
+export const LISTE_KNOPF = 'Pflegesituation vervollständigen';
 /** Titel des Marta-Kastens unter dem Formular (13.11.2026, Martin: „Anbieten von Beratung“). */
 export const MARTA_BERATUNG_TITEL = 'Lieber persönlich beraten lassen?';
 /** Kopf über der Formularkarte (13.11.2026, Martin: „ob das formular als popup kommen müsste und wenn nicht, dann besser
  *  sichtbar als formular“, „Titel nicht doppeln“, „Pflegesituation vervollständigen finde ich ganz gut … der Text … passt“):
- *  Formular offen direkt unter der Liste wie in der guten Phase, Titel und Satz auf dem Seitengrund über der Karte. */
+ *  Formular offen direkt unter der Liste wie in der guten Phase, Titel auf dem Seitengrund über der Karte. Der Satz darunter
+ *  steht seit 14.11. im Kasten unter der Liste (LISTE_WARUM), sonst stünde er zweimal untereinander. */
 export function formularKopf(): { titel: string; zeile: string; aussen: boolean } {
-  return { titel: FORMULAR_TITEL, aussen: true, zeile: 'Beschreiben Sie kurz die Situation. So verstehen die Pflegekräfte, worauf es bei Ihnen ankommt, und können sich unverbindlich bewerben. Das dauert ca.\u00a02\u00a0Minuten.' };
+  return { titel: FORMULAR_TITEL, aussen: true, zeile: '' };
 }
 /** Kein fester Knopf mehr (Martin 13.11.2026: „button nicht hier schon anzeigen, weil zu fordernd gleich mit bewerbungen zu
  *  kommen“). FEST_TITEL und FEST_ZEILE bleiben nur für den Gleichlauf mit dem Knopf der Angebotsmail (Test angebotsmailWortlaut). */
@@ -400,6 +407,13 @@ export function PflegekraftZeile({ nurse, preis, vorgemerkt, gesperrt, onNurseCl
           {fakten.map((teil) => (
             <span key={teil} className="mt-0.5 block text-[16px] leading-[22px] text-pm-ink">{teil}</span>
           ))}
+          {/* ENTWURF 14.11.2026: Einladen geht wieder über das Profil (Logik #145); vorgemerkt → grüner Text wie seit #161
+              (Martin 10.11.: „wenn eingeladen, dann kein button, sondern nur grün und text“). */}
+          {vorgemerkt && (
+            <span className="mt-1 flex items-center gap-1 text-[15.5px] font-bold leading-[22px] text-pm-green-deep" data-zeile-eingeladen>
+              <Check aria-hidden="true" className="h-[18px] w-[18px] flex-none" strokeWidth={3} />{EINGELADEN}
+            </span>
+          )}
         </span>
         <ChevronRight className="h-5 w-5 flex-none text-pm-muted" aria-hidden="true" />
       </button>
@@ -620,7 +634,7 @@ function AblaufGutePhase({ onZumFormular }: { onZumFormular?: () => void }) {
 export function EinstiegMinimal({
   anrede, lead, onBestpreis, heimEigenanteil, heimQuelle,
   laedt, zeilen, gehalteneEinladungen, vorschlaegeVorhanden, bereitsBearbeitet, formular, sterne, vorgemerkte,
-  onAblaufZumFormular, onKostenAufgeklappt, onFaqGeoeffnet,
+  onListeZumFormular, onAblaufZumFormular, onKostenAufgeklappt, onFaqGeoeffnet,
 }: {
   /** Anrede für „Guten Tag, …“ (customerSalutation), ohne Anrede nur „Guten Tag“. */
   anrede: string | null;
@@ -639,6 +653,9 @@ export function EinstiegMinimal({
   formular: ReactNode;
   sterne: SterneStand | null;
   vorgemerkte: VorgemerkteKraft[];
+  /** Knopf im Kasten unter der Liste: Sprung zum Formular (Messpunkt `zur_pflegesituation`, Quelle `hauptknopf` wie der
+   *  Knopf unter der Liste bis #162). */
+  onListeZumFormular?: () => void;
   /** „Pflegesituation vervollständigen“ in „So geht es weiter“: Sprung zum Formular (Messpunkt `zur_pflegesituation`, Quelle
    *  `schritte`). Ohne Rückruf bleibt der Schritt reiner Text. */
   onAblaufZumFormular?: () => void;
@@ -706,7 +723,28 @@ export function EinstiegMinimal({
                 {Array.from({ length: PLATZHALTER }, (_, i) => <Platzhalterzeile key={i} />)}
               </ul>
             ) : anzahl > 0 ? (
-              <ul>{zeilen}</ul>
+              <>
+                <ul>{zeilen}</ul>
+                {/* ENTWURF 14.11.2026 (Martin: „Im Portal fehlt der Text und Button unter den PKs“): wie im Bild vom 13.11.
+                    vormittags, Knopf grün über die ganze Breite, Pfeil nach unten (das Formular steht direkt darunter). */}
+                {onListeZumFormular && (
+                  <div className="border-t border-pm-line-soft px-4 pt-5 pb-5" data-liste-knopf>
+                    <p className="flex items-center gap-2 text-[16px] font-semibold leading-[22px] text-pm-amber-ink" data-liste-unvollstaendig>
+                      <AlertCircle className="h-5 w-5 flex-none text-pm-amber" strokeWidth={2.25} aria-hidden="true" />
+                      {LISTE_UNVOLLSTAENDIG}
+                    </p>
+                    <p className="mt-2 text-[16px] leading-[22px] text-pm-ink" data-liste-warum>{LISTE_WARUM}</p>
+                    <button
+                      type="button"
+                      onClick={onListeZumFormular}
+                      className={`${FOKUS} mt-4 flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[12px] bg-pm-green px-3 text-[16px] font-bold text-white hover:bg-pm-green-deep active:scale-[0.99] max-[339px]:text-[15px]`}
+                    >
+                      <span className="whitespace-nowrap">{LISTE_KNOPF}</span>
+                      <ArrowDown className="h-[18px] w-[18px] flex-none max-[339px]:hidden" strokeWidth={2.5} aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
+              </>
             ) : gehalteneEinladungen > 0 ? (
               hinweis('Ihre Auswahl ist eingeladen', 'Die Pflegekräfte melden sich meist innerhalb von 1–2 Tagen. Sobald Rückmeldungen da sind, sehen Sie sie hier. Meldet sich niemand, schlagen wir Ihnen automatisch weitere Pflegekräfte vor.')
             ) : (
