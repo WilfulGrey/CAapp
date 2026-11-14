@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { istAdmin } from '@/lib/admin-sitzung';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   ergebnisJeMonat, berlinTag, EINSATZ_STATUS, WACHSTUM_START,
@@ -28,8 +29,7 @@ async function alle<T>(abruf: (von: number, bis: number) => PromiseLike<{ data: 
 }
 
 export async function GET(request: NextRequest) {
-  const cookie = request.cookies.get('admin_auth')?.value ?? '';
-  if (cookie !== (process.env.ADMIN_PASSWORD || 'primundus2026')) {
+  if (!(await istAdmin(request))) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
