@@ -52,6 +52,8 @@ export interface MatchCaregiver {
   year_of_birth?: number | null;
   germany_skill?: string | null;
   care_experience?: string | null;
+  /** Jahre außerhalb Deutschlands (Int) — zählt zu den Jahren dazu, wie im Portal und im SA-Portal (Registry #166). */
+  care_experience_outside_de?: number | null;
   available_from?: string | null;
   last_contact_at?: string | null;
   hp_total_jobs?: number | null;
@@ -190,10 +192,17 @@ export function erfahrungJahre(careExperience: string | null | undefined): numbe
 }
 
 /** Jahre Erfahrung wie auf der Portal-Zeile — Kopie von `jahreErfahrung` (src/lib/mamamia/badge.ts, Registry #166):
- *  `care_experience`, sonst `hp_total_days` / 365 (mindestens 1), sonst 0. „0" fällt NICHT auf die Tage zurück. */
-export function jahreVon(cg: { care_experience?: string | null; hp_total_days?: number | null }): number {
-  if (typeof cg.care_experience === "string" && cg.care_experience.length > 0) {
-    return erfahrungJahre(cg.care_experience);
+ *  `care_experience` plus `care_experience_outside_de` (wie das SA-Portal); trägt keins einen Wert, `hp_total_days` / 365
+ *  (mindestens 1), sonst 0. „0" ist ein Wert und fällt NICHT auf die Tage zurück. */
+export function jahreVon(
+  cg: { care_experience?: string | null; care_experience_outside_de?: number | null; hp_total_days?: number | null },
+): number {
+  const inDe = typeof cg.care_experience === "string" && cg.care_experience.length > 0 ? cg.care_experience : null;
+  const ausland = typeof cg.care_experience_outside_de === "number" && Number.isFinite(cg.care_experience_outside_de)
+    ? cg.care_experience_outside_de
+    : null;
+  if (inDe !== null || ausland !== null) {
+    return Math.max(0, (inDe !== null ? erfahrungJahre(inDe) : 0) + Math.max(0, ausland ?? 0));
   }
   return cg.hp_total_days ? Math.max(1, Math.floor(cg.hp_total_days / 365)) : 0;
 }
@@ -205,7 +214,23 @@ export function requiredGermanyLevelForWish(wunsch: string | null | undefined): 
   if (v === "grundlegend") return "level_1";
   if (v === "kommunikativ") return "level_2";
   if (v === "sehr-gut" || v === "sehr_gut" || v === "gut") return "level_3";
+  // „Sehr gut" vergibt nur die Agentur im SA-Portal (Key 'sehr-gut-sa', level_4) — wie im Portal. Ohne diese Zeile
+  // filterte die Mail bei diesem Wunsch gar nicht (Registry #166).
+  if (v === "sehr-gut-sa" || v === "sehr_gut_sa") return "level_4";
   return null;
+}
+
+/** Welche Deutschstufe gilt — Kopie von `resolveDeutschWishLevel` (src/lib/mamamia/mappers.ts, Registry #166): der
+ *  Wunsch bei mamamia (`customer_caregiver_wish.germany_skill`, den die SA nachbessern kann) gewinnt, solange dort eine
+ *  echte Stufe steht; 'not_important'/'level_0' heißen „kein Filter“; sonst der Rechnerwert. So zeigt die Mail dieselben
+ *  Kräfte wie das Portal. */
+export function deutschStufeFuerListe(
+  mamamiaSkill: string | null | undefined,
+  rechnerWunsch: string | null | undefined,
+): string | null {
+  if (mamamiaSkill === "not_important" || mamamiaSkill === "level_0") return null;
+  if (typeof mamamiaSkill === "string" && /^level_[1-4]$/.test(mamamiaSkill)) return mamamiaSkill;
+  return requiredGermanyLevelForWish(rechnerWunsch);
 }
 
 export function matchesGermanyWish(
@@ -286,6 +311,8 @@ export function waehleFuenf(
   matchings: Matching[],
   deutschWunsch: string | null | undefined,
   now: Date,
+  /** Deutschwunsch bei mamamia (customer_caregiver_wish.germany_skill); `undefined` = nicht gelesen → Rechnerwert. */
+  mamamiaDeutsch?: string | null,
 ): Matching[] {
   const nowYear = now.getFullYear();
 
@@ -300,7 +327,10 @@ export function waehleFuenf(
 
   const sprachGefiltert = eindeutig
     .filter((m) => m.is_show !== false)
-    .filter((m) => matchesGermanyWish(m.caregiver.germany_skill, deutschWunsch))
+    .filter((m) => {
+      const stufe = deutschStufeFuerListe(mamamiaDeutsch, deutschWunsch);
+      return !stufe || !m.caregiver.germany_skill || m.caregiver.germany_skill === stufe;
+    })
     .sort(rangVergleich(now));
 
   const zuAlt = (yob: number | null | undefined): boolean =>
@@ -664,7 +694,22 @@ async function holeMatchings(deps: HoleDeps): Promise<{
     mRes?.data?.JobOfferMatchingsWithPagination?.data ??
     mRes?.JobOfferMatchingsWithPagination?.data ??
     [];
-  const fuenf = Array.isArray(roh) ? waehleFuenf(roh, deps.formularDaten.deutschkenntnisse, now) : [];
+
+  // ③ Deutschwunsch wie im Portal (Registry #166): erst der Stand bei mamamia, dann der Rechnerwert. Scheitert das
+  //    Lesen, gilt der Rechnerwert — so wie im Portal, solange der Kunde noch nicht geladen ist.
+  let mamamiaDeutsch: string | null | undefined = undefined;
+  try {
+    const cRes = await proxy("getCustomer", {}) as {
+      data?: { Customer?: { customer_caregiver_wish?: { germany_skill?: string | null } | null } };
+      Customer?: { customer_caregiver_wish?: { germany_skill?: string | null } | null };
+    };
+    const kunde = cRes?.data?.Customer ?? cRes?.Customer;
+    mamamiaDeutsch = kunde?.customer_caregiver_wish?.germany_skill ?? null;
+  } catch (e) {
+    console.warn("[empfehlung] getCustomer für den Deutschwunsch fehlgeschlagen, Rechnerwert gilt:", e instanceof Error ? e.message : String(e));
+  }
+
+  const fuenf = Array.isArray(roh) ? waehleFuenf(roh, deps.formularDaten.deutschkenntnisse, now, mamamiaDeutsch) : [];
   return { proxy, fuenf };
 }
 
@@ -680,7 +725,7 @@ export async function holeEmpfehlung(deps: HoleDeps): Promise<EmpfehlungErgebnis
     if (!basis || basis.fuenf.length === 0) return null;
     const { proxy, fuenf } = basis;
 
-    // ③ Zusatzfelder nur für die EINE empfohlene Kraft (Raucherin,
+    // ④ Zusatzfelder nur für die EINE empfohlene Kraft (Raucherin,
     //    Führerschein, Nationalität stehen nicht in der Matching-Liste).
     //    Schlägt das fehl, bleiben eben zwei Gründe statt vier.
     let extra: CaregiverExtra | null = null;

@@ -352,6 +352,7 @@ send-scheduled-emails (email_type=eingangsbestaetigung)
       → { customer_id, job_offer_id, session_token }
   → POST /functions/v1/mamamia-proxy  X-Session-Token: <jwt>
       { action: "listMatchings", variables: { limit: 1000 } }   # jak portal (Registry #166)
+  → POST /functions/v1/mamamia-proxy  { action: "getCustomer" }   # życzenie językowe jak w portalu (Registry #166)
   → waehleFuenf(...)   # ta sama piątka co portal (patrz niżej)
   → POST /functions/v1/mamamia-proxy  { action: "getCaregiver", id }
       # driving_license + about_de/motivation — nie ma ich w liście matchingów
@@ -453,6 +454,12 @@ inaczej `hp_total_days / 365`, ta sama liczba co na wierszu) → einsatze u nas
 Usunięte: stopień badge jako pierwsze kryterium, lejek „badge ≥ Bewährt"
 (≥ 2 einsatze) i krok „najwięcej einsatzów na miejsce 1" (`bestIdx` w portalu,
 `empfehlungNachOben` w mailu) — miejsce 1 to po prostu pierwsza po sortowaniu.
+Lata = `care_experience` + `care_experience_outside_de` (jak SA-Portal
+`experience.js`; proxy czyta to pole we wszystkich czterech zapytaniach o
+opiekunkę), dopiero gdy oba puste — `hp_total_days / 365`. Mail bierze życzenie
+językowe jak portal (`deutschStufeFuerListe` = kopia `resolveDeutschWishLevel`:
+najpierw `customer_caregiver_wish.germany_skill` z mamamii przez `getCustomer`,
+inaczej wartość z kalkulatora; zna `sehr-gut-sa` = level_4).
 Portal i mail czytają `listMatchings` z `limit: 1000` zamiast 200: Mamamia
 zwraca opiekunki ze zdjęciem najpierw, ale we własnej kolejności (pula prod
 14.11.: 4 731 opiekunek, 265 ze zdjęciem, wszystkie w pierwszych 829; jedna ze

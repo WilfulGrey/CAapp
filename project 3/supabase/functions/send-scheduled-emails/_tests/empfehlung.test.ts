@@ -17,6 +17,7 @@ import {
   stufenZusatz,
   waehleFuenf,
   jahreVon,
+  deutschStufeFuerListe,
   type CaregiverExtra,
   type Matching,
 } from "../empfehlung.ts";
@@ -119,6 +120,22 @@ Deno.test("waehleFuenf: kein Einsätze-Filter mehr — 2 Einsätze ohne Jahre ve
 Deno.test("waehleFuenf: gleiche Jahre → mehr Einsätze zuerst", () => {
   const liste = [cg({ id: 1, hp_total_jobs: 1 }), cg({ id: 2, hp_total_jobs: 6 })];
   assertEquals(waehleFuenf(liste, null, JETZT).map((m) => m.caregiver.id), [2, 1]);
+});
+
+Deno.test("jahreVon: Jahre in DE plus außerhalb DE, wie das SA-Portal", () => {
+  assertEquals(jahreVon({ care_experience: "0", care_experience_outside_de: 20 }), 20);
+  assertEquals(jahreVon({ care_experience: null, care_experience_outside_de: 12, hp_total_days: 4000 }), 12);
+  assertEquals(jahreVon({ care_experience: "5", care_experience_outside_de: 3 }), 8);
+  assertEquals(jahreVon({ care_experience: "30+", care_experience_outside_de: null }), 30);
+  assertEquals(jahreVon({ care_experience: null, care_experience_outside_de: 0, hp_total_days: 800 }), 0);
+});
+
+Deno.test("deutschStufeFuerListe: mamamia vor Rechner, not_important/level_0 = kein Filter, sehr-gut-sa = level_4", () => {
+  assertEquals(deutschStufeFuerListe("level_3", "kommunikativ"), "level_3");
+  assertEquals(deutschStufeFuerListe("not_important", "kommunikativ"), null);
+  assertEquals(deutschStufeFuerListe("level_0", "kommunikativ"), null);
+  assertEquals(deutschStufeFuerListe(null, "kommunikativ"), "level_2");
+  assertEquals(deutschStufeFuerListe(undefined, "sehr-gut-sa"), "level_4");
 });
 
 Deno.test("jahreVon: wie die Portal-Zeile — care_experience, sonst Tage / 365, „0“ fällt nicht zurück", () => {
@@ -477,7 +494,7 @@ Deno.test("holeEmpfehlung: Glücksfall — beste Kraft plus Gründe", async () =
   assertEquals(r!.empfehlung.caregiverId, 9, "nicht die erfahrenste Kraft empfohlen");
   assertEquals(r!.sichtbarGesamt, 2);
   assertEquals(r!.empfehlung.gruende, [HAKEN_WUNSCHPROFIL, HAKEN_VERFUEGBAR]);
-  assertEquals(rufe, ["onboard", "listMatchings", "getCaregiver"]);
+  assertEquals(rufe, ["onboard", "listMatchings", "getCustomer", "getCaregiver"]);
   assertEquals(limit, 1000, "wie das Portal (Registry #166)");
 });
 

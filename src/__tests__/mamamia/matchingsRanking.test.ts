@@ -96,6 +96,14 @@ describe('matchings ranking — Foto zuerst, dann Jahre, dann Einsätze (Registr
     expect(sorted.map(m => m.id)).toEqual([2, 1]);
   });
 
+  it('Jahre außerhalb DE zählen mit: 0 in DE + 15 außerhalb vor 6 in DE', () => {
+    const sorted = [
+      makeMatch({ id: 1, care_experience: '6' }),
+      makeMatch({ id: 2, care_experience: '0', care_experience_outside_de: 15 }),
+    ].sort(rankComparator(NOW));
+    expect(sorted.map(m => m.id)).toEqual([2, 1]);
+  });
+
   it('care_experience „0" fällt NICHT auf die Tage zurück', () => {
     const sorted = [
       makeMatch({ id: 1, care_experience: '0', hp_total_days: 365 * 9 }),

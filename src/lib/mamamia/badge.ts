@@ -39,15 +39,22 @@ export function parseExperienceYears(careExperience: string | null | undefined):
     : 0;
 }
 
-/** Jahre Erfahrung, wie sie auf der Zeile stehen („N Jahre Erfahrung"): `care_experience`, sonst `hp_total_days` / 365
- *  (mindestens 1), sonst 0. „0" in `care_experience` heißt keine Angabe und fällt NICHT auf die Tage zurück.
+/** Jahre Erfahrung, wie sie auf der Zeile stehen („N Jahre Erfahrung"): `care_experience` (in Deutschland, Text, auch
+ *  „30+") PLUS `care_experience_outside_de` (außerhalb Deutschlands, Zahl) — wie das SA-Portal
+ *  (mamamia-sadash `resources/js/lib/experience.js`, Michał 05.08.: beide Felder summieren). Trägt keins der beiden
+ *  Felder einen Wert, zählen die Einsatztage `hp_total_days` / 365 (mindestens 1), sonst 0. „0" ist ein Wert und fällt
+ *  NICHT auf die Tage zurück.
  *  Eine Quelle für die Anzeige (`mapCaregiverToNurse`) und die Reihenfolge (`rankComparator`, Registry #166). Die
  *  Angebotsmail rechnet dasselbe in `send-scheduled-emails/empfehlung.ts` `jahreVon` (Kopie, Edge Function). */
 export function jahreErfahrung(
-  cg: { care_experience?: string | null; hp_total_days?: number | null },
+  cg: { care_experience?: string | null; care_experience_outside_de?: number | null; hp_total_days?: number | null },
 ): number {
-  if (typeof cg.care_experience === 'string' && cg.care_experience.length > 0) {
-    return Math.max(0, parseInt(cg.care_experience, 10) || 0);
+  const inDe = typeof cg.care_experience === 'string' && cg.care_experience.length > 0 ? cg.care_experience : null;
+  const ausland = typeof cg.care_experience_outside_de === 'number' && Number.isFinite(cg.care_experience_outside_de)
+    ? cg.care_experience_outside_de
+    : null;
+  if (inDe !== null || ausland !== null) {
+    return Math.max(0, (inDe !== null ? parseInt(inDe, 10) || 0 : 0) + Math.max(0, ausland ?? 0));
   }
   return cg.hp_total_days ? Math.max(1, Math.floor(cg.hp_total_days / 365)) : 0;
 }
