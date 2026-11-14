@@ -407,7 +407,8 @@ export function PflegekraftZeile({ nurse, vorgemerkt, onNurseClick, einladen }: 
         <ChevronRight className="h-5 w-5 flex-none text-pm-muted" aria-hidden="true" />
       </button>
       {/* Unter den Angaben eingerückt wie der Text (16 + 72 + 16 px); eigener Knopf, nicht im Profil-Knopf. */}
-      {einladen && (
+      {/* Vorgemerkt bzw. in der Warteschlange des automatischen Einladens: oben steht schon „Eingeladen“, kein Knopf. */}
+      {einladen && !vorgemerkt && (
         <div className="-mt-1.5 pb-4 pl-[104px] pr-4" data-zeile-einladen>
           {phase === 'fertig' ? (
             <span className="flex items-center gap-1 text-[15.5px] font-bold leading-[22px] text-pm-green-deep">
@@ -418,11 +419,13 @@ export function PflegekraftZeile({ nurse, vorgemerkt, onNurseClick, einladen }: 
               type="button"
               onClick={() => { void einladenTippen(); }}
               disabled={phase === 'sendet' || einladen.gesperrt}
+              aria-label={phase === 'sendet' || einladen.gesperrt ? undefined : `${vorname} einladen`}
               // Dezent, weil der Knopf in jeder Zeile steht (Martin 14.11.: „mit Umrandung … bei Mouse Over ist er dann ausgefüllt“);
               // auf dem Handy füllt er sich beim Antippen (active). Schrift dunkle Koralle: auf Weiß gut lesbar.
-              className={`${FOKUS} inline-flex h-10 items-center gap-1.5 rounded-[10px] border-[1.5px] border-pm-coral bg-white px-4 text-[15.5px] font-bold text-pm-coral-ink transition-colors hover:bg-pm-coral hover:text-white active:bg-pm-coral active:text-white disabled:cursor-not-allowed disabled:opacity-60`}
+              className={`${FOKUS} inline-flex h-10 items-center gap-1.5 rounded-[10px] border-[1.5px] border-pm-coral bg-white px-4 text-[15.5px] font-bold text-pm-coral-ink transition-colors enabled:hover:bg-pm-coral enabled:hover:text-white enabled:active:bg-pm-coral enabled:active:text-white disabled:cursor-not-allowed disabled:opacity-60`}
             >
-              {phase === 'sendet' ? 'Bitte warten…' : (<><UserPlus className="h-[18px] w-[18px] flex-none" strokeWidth={2.5} aria-hidden="true" />Einladen</>)}
+              {/* Während irgendeine Einladung läuft (auch die automatische nach dem Speichern) „Bitte warten…“ wie die Karte. */}
+              {phase === 'sendet' || einladen.gesperrt ? 'Bitte warten…' : (<><UserPlus className="h-[18px] w-[18px] flex-none" strokeWidth={2.5} aria-hidden="true" />Einladen</>)}
             </button>
           )}
         </div>

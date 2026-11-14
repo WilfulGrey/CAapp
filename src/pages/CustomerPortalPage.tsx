@@ -775,6 +775,9 @@ const CustomerPortalPage: FC = () => {
   const [einladenFenster, setEinladenFenster] = useState<{ caregiverId: number; name: string } | null>(null);
   // Gesetzt, sobald das ERSTE Speichern bei mamamia durch ist (onSaveToMamamia); der Effekt unten lädt dann ein.
   const [einladenNachSpeichern, setEinladenNachSpeichern] = useState(false);
+  // Registry #164 (Code-Prüfung): wer im automatischen Einladen nach dem Speichern noch wartet — die Zeilen zeigen für sie
+  // weiter „Eingeladen“, statt kurz wieder „Einladen“ (der Lauf hält mamamias Sperre bis zu 6 × 5 s aus).
+  const [einladenWarteschlange, setEinladenWarteschlange] = useState<number[]>([]);
   // Nachbesserung 2: wer eingeladen wird, steht im Moment des Speicherns fest — genau die Namen der Zeile. Danach lädt
   // mamamia die Liste neu (refetchMatchings, neue Reihenfolge); das darf die Auswahl nicht mehr verschieben.
   const einladenListe = useRef<number[]>([]);
@@ -2615,6 +2618,7 @@ const CustomerPortalPage: FC = () => {
     const kandidaten = ids
       .map((id) => effectiveMatched.find((m) => m.caregiverId === id))
       .filter((m): m is { caregiverId: number; nurse: Nurse } => !!m && nurseStatusById.get(m.caregiverId) === 'pending');
+    setEinladenWarteschlange(kandidaten.map((m) => m.caregiverId));
     void (async () => {
       const eingeladen: string[] = [];
       let fehler = false;
@@ -2632,8 +2636,11 @@ const CustomerPortalPage: FC = () => {
           fehler = true;
           // Grenze erreicht: weitere Versuche scheitern genauso (das Fenster mit der Wartezeit ist schon offen).
           if (err instanceof MamamiaError && err.rateLimitPayload) break;
+        } finally {
+          setEinladenWarteschlange((q) => q.filter((id) => id !== m.caregiverId));
         }
       }
+      setEinladenWarteschlange([]);
       messen('einladung_nach_speichern', { anzahl: kandidaten.length, ok: eingeladen.length });
       if (eingeladen.length > 0 && !fehler) showToast(eingeladenHinweis(eingeladen), 4000, { hintenAn: true });
     })();
@@ -3898,6 +3905,13 @@ const CustomerPortalPage: FC = () => {
   // kann der Lauf #145 nach dem Speichern einladen), sonst der Knopf ins Formular wie seit #162. Kennung der angetippten
   // Pflegekraft (`selectedNurse`), nicht der nachgeladenen Profildaten: die kommen erst nach einem Effekt.
   const profilVorSpeichern = minimalEinstieg && vorSpeichern && !nurseModalApp;
+  // Listenplatz der Pflegekraft JETZT (über die Kennung); -1 = nicht mehr in der Liste. Ohne Kennung (Vorschau-Altdaten) der
+  // Platz vom Öffnen.
+  const matchIndexVon = (n: Nurse | null, beimOeffnen: number): number => {
+    const id = n?.caregiverId;
+    if (id === undefined) return beimOeffnen;
+    return effectiveMatched.findIndex((m) => m.caregiverId === id);
+  };
   const profilKennung = selectedNurse?.caregiverId;
   // Höchstens so viele wie nach dem Speichern eingeladen werden können (5, nie mehr als frei): Wer schon 5 vorgemerkt hat,
   // bekommt bei der sechsten den Knopf ins Formular (Entwurf 14.11.2026, „5 weitere Pflegekräfte anzeigen“).
@@ -4761,11 +4775,11 @@ const CustomerPortalPage: FC = () => {
                   // „Einladen“ in Koralle. Handler und Messpunkte wie die Karte.
                   <div className="pt-6">
                     <ZeilenListe id="pflegekraefte" titel={LISTE_TITEL} zeile={EINLADEN_ZEILE} anzahl={visibleNurses.length}>
-                      {visibleNurses.map(({ nurse, i }) => (
+                      {visibleNurses.map(({ nurse, i, caregiverId }) => (
                         <PflegekraftZeile
                           key={`zn-${i}`}
                           nurse={nurse}
-                          vorgemerkt={false}
+                          vorgemerkt={einladenWarteschlange.includes(caregiverId)}
                           onNurseClick={() => openNurseFromMatch(nurse, i)}
                           einladen={{
                             onInvite: () => { messeEinladen(nurse, 'karte'); return canInviteNurse(i); },
@@ -5213,8 +5227,11 @@ const CustomerPortalPage: FC = () => {
             minimalEinstieg && vorSpeichern ? undefined
             : nurseMatchIdx !== null
               ? async () => {
-                  const idx = nurseMatchIdx;
+                  // Registry #164 (Code-Prüfung): Listenplatz über die Kennung neu bestimmen — lädt die Liste nach dem Öffnen
+                  // neu (z. B. nach dem ersten Speichern), zeigte der alte Platz auf eine andere Pflegekraft.
+                  const idx = matchIndexVon(selectedNurse, nurseMatchIdx);
                   messeEinladen(selectedNurse, 'profil');
+                  if (idx < 0) { setSelectedNurse(null); setNurseMatchIdx(null); throw new Error('Pflegekraft nicht mehr in der Liste'); }
                   // Modal animation is driven by the returned Promise — surfaces
                   // failure to the user instead of fake success (CLAUDE.md §1).
                   try {
@@ -5244,7 +5261,8 @@ const CustomerPortalPage: FC = () => {
             minimalEinstieg && vorSpeichern ? undefined
             : nurseMatchIdx !== null
               ? () => {
-                  declineNurse(nurseMatchIdx);
+                  const idx = matchIndexVon(selectedNurse, nurseMatchIdx);
+                  if (idx >= 0) declineNurse(idx);
                   setSelectedNurse(null); setNurseMatchIdx(null);
                 }
               : selectedFromInterestId !== null

@@ -240,9 +240,13 @@ describe('Portal integration: golden paths', () => {
 
     // findByRole polls until the element appears — handles the async
     // session bootstrap (mmReady flips from false to true).
-    const inviteBtn = await screen.findByRole(
-      'button', { name: /^Einladen$/i }, { timeout: 5000 },
-    );
+    // Seit Registry #164 ein Knopf je Zeile, für Vorleseprogramme mit Vorname („Helena einladen“); die Zeile der Testkraft.
+    const zeile = await waitFor(() => {
+      const el = document.querySelector(`[data-pflegekraft-zeile="${sampleMatching.caregiver.id}"]`) as HTMLElement | null;
+      if (!el) throw new Error('keine Zeile');
+      return el;
+    }, { timeout: 5000 });
+    const inviteBtn = within(zeile).getByRole('button', { name: /^\S+ einladen$/i });
     await user.click(inviteBtn);
 
     // After click: MatchCard awaits the real mutation (no fake setTimeout).

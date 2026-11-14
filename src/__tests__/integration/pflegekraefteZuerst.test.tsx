@@ -406,7 +406,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145, ?einstie
     // Nach dem Speichern die Zeile (Registry #164, dieselben Zeilen wie vor dem Speichern): Emilia wieder mit „Einladen“.
     await waitFor(() => {
       const z = document.querySelector('[data-pflegekraft-zeile="50003"]') as HTMLElement;
-      expect(within(z).getByRole('button', { name: 'Einladen' })).toBeInTheDocument();
+      expect(within(z).getByRole('button', { name: / einladen$/ })).toBeInTheDocument();
     });
   }, 30_000);
 
@@ -467,7 +467,7 @@ describe('Pflegekräfte zuerst vor dem ersten Speichern (Registry #145, ?einstie
       if (!el) throw new Error('keine Zeile für Emilia');
       return el;
     }, { timeout: 5000 });
-    await user.click(within(z).getByRole('button', { name: 'Einladen' }));
+    await user.click(within(z).getByRole('button', { name: / einladen$/ }));
     expect(await screen.findByText('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.', {}, { timeout: 8000 })).toBeInTheDocument();
     expect(zaehler.versuche).toBe(3);
   }, 30_000);
