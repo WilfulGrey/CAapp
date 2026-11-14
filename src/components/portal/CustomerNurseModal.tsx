@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FC, MouseEvent as ReactMouseEvent } from 'react';
-import { Check, X, UserPlus, Heart, FileText, Download } from 'lucide-react';
+import { ArrowDown, Check, X, UserPlus, Heart, FileText, Download } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { nurseLevel, displayName, initials, einsaetzeText, badgeErklaerung } from './shared';
@@ -87,6 +87,9 @@ export const CustomerNurseModal: FC<{
    *  einladen zur Bewerbung … Dann Popup, wenn Daten noch fehlen“): vor dem Speichern EIN grüner Knopf „Zur Bewerbung
    *  einladen“ statt „Nein danke“ und „Einladen“; das Portal merkt vor und öffnet „{Name} einladen“ (Logik #145). */
   einladenVorSpeichern?: () => void;
+  /** 13.11.2026 (#162): vor dem Speichern EIN grüner Knopf ins Formular. Seit #163 nur noch für Profile, die das Portal vor dem
+   *  Speichern nicht einladen kann (nicht in der offenen Liste); `einladenVorSpeichern` hat Vorrang. */
+  zumFormular?: () => void;
   onDeclineMatch?: () => void;
   /** Nur ansehen, keine Aktionen (gebuchte Pflegekraft, Vertrag offen). */
   nurProfil?: boolean;
@@ -100,7 +103,7 @@ export const CustomerNurseModal: FC<{
    *  Heart-Icon), der erklärt, dass eine Einladung ihre offizielle
    *  Bewerbung ermöglicht. */
   hasInterest?: boolean;
-}> = ({ nurse, profileLoading = false, aboutLoading = false, initialLevelInfo = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, onChat, isInvited = false, hasInterest = false, nurProfil = false, ohneVerfuegbarkeit = false, einladenVorSpeichern }) => {
+}> = ({ nurse, profileLoading = false, aboutLoading = false, initialLevelInfo = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, onChat, isInvited = false, hasInterest = false, nurProfil = false, ohneVerfuegbarkeit = false, einladenVorSpeichern, zumFormular }) => {
   const [invited, setInvited] = useState(isInvited);
   const [invitePhaseModal, setInvitePhaseModal] = useState<'idle' | 'sending' | 'done'>('idle');
   const [showLevelInfo, setShowLevelInfo] = useState(initialLevelInfo);
@@ -175,7 +178,7 @@ export const CustomerNurseModal: FC<{
   // Gebucht-Bildschirm, dem Vertrag und den erledigten Karten kommt das Profil
   // ohne onInvite. Vorher stand dort trotzdem „Einladen" und meldete
   // „Pflegekraft wurde eingeladen!", ohne dass etwas gesendet wurde.
-  const zeigeAktionen = !nurProfil && (!!app || !!onInvite || invited || !!einladenVorSpeichern);
+  const zeigeAktionen = !nurProfil && (!!app || !!onInvite || invited || !!einladenVorSpeichern || !!zumFormular);
 
   const handleModalInvite = async () => {
     if (!onInvite) return;
@@ -671,6 +674,16 @@ export const CustomerNurseModal: FC<{
               >
                 <UserPlus className="h-[18px] w-[18px] flex-none max-[339px]:hidden" strokeWidth={2.5} aria-hidden="true" />
                 <span className="whitespace-nowrap">Zur Bewerbung einladen</span>
+              </button>
+            ) : !app && zumFormular ? (
+              <button
+                type="button"
+                onClick={zumFormular}
+                className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[12px] bg-pm-green px-3 text-[16px] font-bold text-white hover:bg-pm-green-deep max-[339px]:text-[15px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-green"
+                data-profil-zum-formular
+              >
+                <span className="whitespace-nowrap">Pflegesituation vervollständigen</span>
+                <ArrowDown className="h-[18px] w-[18px] flex-none max-[339px]:hidden" strokeWidth={2.5} aria-hidden="true" />
               </button>
             ) : app ? (
               app.status === 'declined' ? (

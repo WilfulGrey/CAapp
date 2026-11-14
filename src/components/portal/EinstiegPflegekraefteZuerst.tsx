@@ -276,12 +276,14 @@ function Punkt({ children }: { children: string }) {
   );
 }
 
-export function EinladenSheetVorSpeichern({ offen, name, onClose, onVervollstaendigen }: {
+export function EinladenSheetVorSpeichern({ offen, name, onClose, onVervollstaendigen, gruen = false }: {
   offen: boolean;
   /** Der auf der Karte angezeigte Name (displayName), z. B. „Emilia W.“. */
   name: string;
   onClose: () => void;
   onVervollstaendigen: () => void;
+  /** Registry #163: im Minimal-Einstieg grün wie die Knöpfe der Seite darunter; `?einstieg=zuerst` bleibt koralle. */
+  gruen?: boolean;
 }) {
   return (
     <Sheet
@@ -290,8 +292,7 @@ export function EinladenSheetVorSpeichern({ offen, name, onClose, onVervollstaen
       onClose={onClose}
       fuss={(
         <>
-          {/* Grün wie die Knöpfe der Seite darunter (Registry #163). */}
-          <Button variante="gruen" breit onClick={() => { onClose(); onVervollstaendigen(); }} className="px-3">
+          <Button variante={gruen ? 'gruen' : 'primaer'} breit onClick={() => { onClose(); onVervollstaendigen(); }} className="px-3">
             Pflegesituation vervollständigen
           </Button>
           <Button variante="link" breit onClick={onClose} className="mt-2">Später</Button>

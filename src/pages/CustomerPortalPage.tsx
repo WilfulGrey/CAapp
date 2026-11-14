@@ -3847,6 +3847,13 @@ const CustomerPortalPage: FC = () => {
     />
   ));
 
+  // Registry #163: Profilfenster im Minimal-Einstieg vor dem Speichern. Einladen nur für offene Karten der Liste (genau die
+  // kann der Lauf #145 nach dem Speichern einladen), sonst der Knopf ins Formular wie seit #162. Kennung der angetippten
+  // Pflegekraft (`selectedNurse`), nicht der nachgeladenen Profildaten: die kommen erst nach einem Effekt.
+  const profilVorSpeichern = minimalEinstieg && vorSpeichern && !nurseModalApp;
+  const profilKennung = selectedNurse?.caregiverId;
+  const profilEinladbarVorSpeichern = profilVorSpeichern && profilKennung !== undefined && offeneKartenIds.includes(profilKennung);
+
   // Registry #145: die Vorgemerkten für die Zeile über dem Formular — genau die, die nach dem Speichern eingeladen werden
   // (`vorgemerktEinladbar`, Nachbesserung 2: nie mehr Namen, als eingeladen werden können).
   const vorgemerkteKraefte: VorgemerkteKraft[] = !pflegekraefteZuerst ? [] : vorgemerktEinladbar.flatMap((id) => {
@@ -5009,6 +5016,7 @@ const CustomerPortalPage: FC = () => {
         name={einladenFenster?.name ?? ''}
         onClose={() => setEinladenFenster(null)}
         onVervollstaendigen={zurPflegesituationAus('einladen_fenster')}
+        gruen={minimalEinstieg}
       />
 
       {/* ── Rückmeldung zum Angebot (schwebend, unten rechts), zurück seit Registry #102 ────────────
@@ -5108,13 +5116,21 @@ const CustomerPortalPage: FC = () => {
               || interestStatusOverrides.get(enrichedSelectedNurse.caregiverId) === 'invited')
           }
           // Registry #163, 14.11.2026 (Martin: „einladen zur Bewerbung … Dann Popup, wenn Daten noch fehlen“): im Minimal-Einstieg vor dem
-          // Speichern EIN Knopf; er merkt vor und öffnet „{Name} einladen“ (Logik #145, `canInviteNurse`), eingeladen wird nach
-          // dem ersten Speichern. „Nein danke“ entfällt dort.
-          einladenVorSpeichern={minimalEinstieg && vorSpeichern && !nurseModalApp && nurseMatchIdx !== null ? () => {
-            const idx = nurseMatchIdx;
-            messeEinladen(selectedNurse, 'profil');
-            setSelectedNurse(null); setNurseMatchIdx(null); setNurseModalStufe(false);
-            canInviteNurse(idx);
+          // Speichern EIN Knopf; er merkt vor und öffnet „{Name} einladen“ (Logik #145, `einladungVormerken` über die
+          // Kennung, nicht den Listenplatz), eingeladen wird nach dem ersten Speichern. „Nein danke“ entfällt dort. Nur für
+          // offene Karten der Liste (`offeneKartenIds`): Nur die lädt der Lauf nach dem Speichern ein. Andere Profile vor dem
+          // Speichern (bereits bearbeitet, Interesse, Mail-Link `cg=` außerhalb der Liste) behalten den Knopf ins Formular
+          // aus #162, sonst verspräche das Fenster eine Einladung, die nie verschickt wird.
+          einladenVorSpeichern={profilEinladbarVorSpeichern ? () => {
+            const kraft = selectedNurse;
+            const id = kraft.caregiverId!;
+            messeEinladen(kraft, 'profil');
+            setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setNurseModalStufe(false);
+            einladungVormerken(id, kraft);
+          } : undefined}
+          zumFormular={profilVorSpeichern && !profilEinladbarVorSpeichern ? () => {
+            setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setNurseModalStufe(false);
+            setTimeout(() => zurPflegesituationAus('karte')(), 60);
           } : undefined}
           onInvite={
             minimalEinstieg && vorSpeichern ? undefined
