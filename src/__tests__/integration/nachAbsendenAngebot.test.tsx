@@ -3,11 +3,12 @@
 // Eigene Datei, weil der Schalter `KOMPAKT_LOOK` beim Laden des Moduls aus der Adresse gelesen wird: Die Adresse muss
 // VOR dem Import stehen (vi.hoisted).
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../../../test/mocks/server';
 import { http, HttpResponse } from 'msw';
 import { defaultHandlers, defaultLead, sampleCustomer } from '../../../test/fixtures/mamamia-mocks';
+import { SCHRITT_2_NACH_SPEICHERN } from '../../components/portal/EinstiegMinimal';
 
 vi.hoisted(() => { window.history.replaceState({}, '', '/?look=angebot'); });
 
@@ -53,11 +54,20 @@ describe('Ansicht nach dem Absenden im Look „angebot" (Fassung 31)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Ihre Suche läuft' }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText('Passende Pflegekräfte sehen jetzt Ihre Anfrage und können sich bei Ihnen bewerben.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'So geht es weiter' })).toBeInTheDocument();
-    expect(screen.getByText('Pflegesituation vollständig')).toBeInTheDocument();
-    expect(screen.getByText(/Pflegekräfte, die Ihnen zusagen, können Sie weiter einladen, kostenlos und unverbindlich/)).toBeInTheDocument();
-    expect(await screen.findByText('Ihr Wunschstart: 15.11.')).toBeInTheDocument();
+    // Registry #164 (Martin 14.11.2026: „der erledigte Schritt weg … so wie vorher auch, nur dass du jetzt einen Schritt weiter
+    // bist“): derselbe Kasten wie vor dem Speichern, ab Schritt 2; ohne „Pflegesituation vollständig“ und ohne Wunschstart.
+    const ablauf = document.querySelector('[data-ablauf-gute-phase]') as HTMLElement;
+    expect(ablauf).toHaveAttribute('data-ab-schritt', '2');
+    expect(within(ablauf).getAllByRole('listitem').map((li) => li.querySelector('p')!.textContent)).toEqual(['Bewerbungen erhalten', 'Auswählen und starten']);
+    expect(within(ablauf).getByText(SCHRITT_2_NACH_SPEICHERN.text)).toBeInTheDocument();
+    expect(SCHRITT_2_NACH_SPEICHERN.text).toBe('Sie erhalten in Kürze Bewerbungen, hier im Portal und per E\u2011Mail. Ihre Wunschkandidaten können Sie schon jetzt einladen, sich bei Ihnen zu bewerben. Kostenfrei und unverbindlich.');
+    expect(screen.queryByText('Pflegesituation vollständig')).toBeNull();
+    expect(screen.queryByText(/Ihr Wunschstart/)).toBeNull();
     expect(screen.queryByText('Stand heute')).toBeNull();
-    expect(await screen.findByRole('heading', { level: 2, name: 'Pflegekräfte einladen' }, { timeout: 5000 })).toBeInTheDocument();
+    // Die Pflegekräfte als dieselbe Liste wie vor dem Speichern (Überschrift mit Zahl in der Liste); der Knopf im Schritt heißt
+    // „Pflegekräfte einladen“.
+    expect(await screen.findByRole('heading', { level: 2, name: /^Ihre Pflegekräfte-Auswahl/ }, { timeout: 5000 })).toBeInTheDocument();
+    expect(within(ablauf).getByRole('button', { name: 'Pflegekräfte einladen' })).toBeInTheDocument();
     expect(screen.queryByText('Unsicher bei der Auswahl?')).toBeNull();
     expect(screen.queryByText(/meldet sich meist innerhalb/)).toBeNull();
     // Kein Link zum Ändern oben (Martin zu Fassung 31), kein alter Abschnitt „Für Ihre Bewerbungen · Pflegesituation".

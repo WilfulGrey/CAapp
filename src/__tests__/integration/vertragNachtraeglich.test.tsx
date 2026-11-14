@@ -113,8 +113,10 @@ describe('Vertrag nachträglich abschließen (agentur-seitige Annahme)', () => {
     // Modal öffnet DIREKT auf den Angaben (Schritt 2) — kein Angebots-
     // Schritt, kein Weg zurück zum Angebot.
     expect(await screen.findByRole('region', { name: /Betreute Person/ })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Weiter →/ })).toBeNull();
-    expect(screen.queryByText('1 · Angebot')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Weiter$/ })).toBeNull();
+    // Schritte nur „Ihre Angaben“ und „Unterschrift“ (Kreise 1 und 2, Martin 14.11.2026).
+    expect(within(screen.getByRole('list', { name: 'Schritte' })).getAllByRole('listitem').map((s) => s.textContent))
+      .toEqual(['1Ihre Angaben', '2Unterschrift']);
     expect(screen.queryByRole('button', { name: /^Zurück$/ })).toBeNull();
 
     // Vorbefüllt aus lead.patient_* (Stufe B).

@@ -20,7 +20,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../../../test/mocks/server';
 import { http, HttpResponse } from 'msw';
-import { defaultHandlers, defaultLead, sampleCaregiver, sampleMatching, bridgeHandler } from '../../../test/fixtures/mamamia-mocks';
+import { defaultHandlers, defaultLead, sampleCaregiver, sampleCustomer, sampleMatching, bridgeHandler } from '../../../test/fixtures/mamamia-mocks';
 import { vormerkSchluessel } from '../../lib/vormerkungen';
 import {
   ABLAUF_GUTE_PHASE, EinstiegMinimal, FEST_TITEL, FEST_ZEILE, FORMULAR_TITEL, KOPF_PUNKTE, KOPF_TITEL, LISTE_KNOPF, LISTE_TITEL,
@@ -35,9 +35,14 @@ vi.mock('../../lib/supabase', async () => {
     ...actual,
     // Jeder Test mit eigenem Token (Sitzungs-Dedupe der Meldungen je Token). Lead wie im Rechner: eine Person, Pflegegrad 3.
     // Token mit „ohnetel“: Lead ohne Rückrufnummer (Kontakt in drei Schritten, Registry #76). Token mit „ehepaar“:
-    // Betreuung für zwei Personen.
+    // Betreuung für zwei Personen. Token mit „gespeichert“: Pflegesituation schon abgeschickt, am Lead ein eigener Bogen
+    // (eine Person, mobil, nur Stuhlinkontinenz), damit man sieht, welche Quelle das Profil nimmt.
     fetchLeadByToken: vi.fn(async (token: string) => token.startsWith('token-mi-')
-      ? { lead: { ...defaultLead, token, telefon: token.includes('ohnetel') ? null : defaultLead.telefon, kalkulation: { ...defaultLead.kalkulation, formularDaten: { ...defaultLead.kalkulation.formularDaten, betreuung_fuer: token.includes('ehepaar') ? 'ehepaar' : '1-person' } } } as unknown as import('../../lib/supabase').Lead, error: null }
+      ? { lead: {
+        ...defaultLead, token, telefon: token.includes('ohnetel') ? null : defaultLead.telefon,
+        kalkulation: { ...defaultLead.kalkulation, formularDaten: { ...defaultLead.kalkulation.formularDaten, betreuung_fuer: token.includes('ehepaar') ? 'ehepaar' : '1-person' } },
+        ...(token.includes('gespeichert') ? { patient_form_at: '2026-09-24T10:00:00Z', patient_form: { startDate: '2099-11-15', anzahl: '1', mobilitaet: 'Selbstständig mobil', demenz: 'Nein', inkontinenz: 'Stuhlinkontinenz', nacht: 'Nein' } } : {}),
+      } as unknown as import('../../lib/supabase').Lead, error: null }
       : { lead: null, error: 'Token nicht gefunden' }),
     fetchNotfallTelefon: vi.fn(async () => null),
   };
@@ -415,9 +420,16 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     await user.click(within(zeileVon('Emilia')).getByRole('button'));
     await waitFor(() => expect(knopfEinladen()).not.toBeNull(), { timeout: 5000 });
     await waitFor(() => expect(meldungen.find((m) => m.event === 'profil_geoeffnet')?.metadata).toEqual({ caregiver_id: 50003, quelle: 'karte', vor_speichern: true }));
-    // Statt „Nein danke“ und „Einladen“ EIN grüner Knopf „Zur Bewerbung einladen“ (Martin 14.11.: „wenn man ein Profil öffnet,
-    // dann muss dort nicht Button mit vervollständigen sein, sondern einladen zur Bewerbung oder so“).
+    // Statt „Nein danke“ und „Einladen“ EIN Knopf „Zur Bewerbung einladen“ (Martin 14.11.: „wenn man ein Profil öffnet,
+    // dann muss dort nicht Button mit vervollständigen sein, sondern einladen zur Bewerbung oder so“), seit dem neuen Profil
+    // in Koralle (Martin 14.11.2026: Grün nur für Knöpfe zu „Pflegesituation vervollständigen“); darüber der graue Satz.
     const profil = profilfenster();
+    // (Name im Profil aus dem vollen Profil der Testdaten: getCaregiver liefert dort immer dieselbe Pflegekraft.)
+    expect(within(profil).getByText(/^Laden Sie \S+ ein, sich zu bewerben\.$/)).toBeInTheDocument();
+    // „Warum … zu Ihnen passt“ vor dem Speichern nur aus dem Rechner (eine Person, nachts gelegentlich, Rollstuhl);
+    // Demenz und Inkontinenz fragt der Rechner nicht ab (lib/passtZuIhnen.ts).
+    await waitFor(() => expect([...profil.querySelectorAll('[data-passt-gruende] li')].map((li) => li.textContent))
+      .toEqual(['Erfahrung mit Einsätzen in der Nacht', 'Erfahrung mit Rollstuhl']));
     expect(within(profil).queryByRole('button', { name: 'Nein danke' })).toBeNull();
     expect(within(profil).queryByRole('button', { name: 'Einladen' })).toBeNull();
     expect(within(profil).queryByRole('button', { name: 'Pflegesituation vervollständigen' })).toBeNull();
@@ -425,7 +437,8 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     const knopf = knopfEinladen()!;
     expect(knopf.tagName).toBe('BUTTON');
     expect(knopf.textContent).toBe('Zur Bewerbung einladen');
-    expect(knopf.className).toContain('bg-pm-green');
+    expect(knopf.className).toContain('bg-pm-coral');
+    expect(knopf.className).not.toContain('bg-pm-green');
     const zeichen = knopf.querySelector('svg')!;
     expect(zeichen.getAttribute('class')).toContain('lucide-user-plus');
     expect(zeichen).toHaveAttribute('aria-hidden', 'true');
@@ -860,6 +873,57 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     const formKarte = await waitFor(() => formularKarte(), { timeout: 5000 });
     expect(formKarte.className).toContain('[&_[data-mess=weiter]]:!bg-pm-green');
     expect(formKarte.className).toContain('[&_[role=progressbar]>span]:!bg-pm-green');
+  }, 20_000);
+});
+
+// Martin 14.11.2026: „dann gucken wir nicht, was sie gemacht hat, sondern was der Kunde wünscht“. Nach dem Speichern kommen
+// die Gründe aus der gespeicherten Pflegesituation (bedarfFuerProfil, lib/passtZuIhnen.ts), nicht aus dem Rechner (dort:
+// eine Person, Rollstuhl, nachts gelegentlich).
+describe('Profil nach dem Speichern: „Warum … zu Ihnen passt“ aus der gespeicherten Pflegesituation', () => {
+  /** Zwei Personen in mamamia: Demenz und Rollator bei der ersten, Harninkontinenz und Nacht bei der zweiten. */
+  const zweiPatienten = [
+    { id: 12001, dementia: 'yes', dementia_description: null, incontinence: null, incontinence_urine: null, incontinence_feces: null, night_operations: 'no', mobility_id: 3 },
+    { id: 12002, dementia: 'no', dementia_description: null, incontinence: null, incontinence_urine: true, incontinence_feces: null, night_operations: 'up_to_1_time', mobility_id: 1 },
+  ];
+  const gruendeImProfil = async (status: string, token: string) => {
+    server.use(...lesen, ...defaultHandlers({ proxy: {
+      ...ohneBewerbung, listMatchings: zweiVorschlaege,
+      getCustomer: () => ({ Customer: { ...sampleCustomer, status, patients: status === 'draft' ? [{ id: 12001, dementia: null, incontinence: null, mobility_id: 3 }] : zweiPatienten } }),
+    } }));
+    window.history.replaceState({}, '', `/?token=${token}`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+    await waitFor(() => expect(zeilen().length).toBeGreaterThan(0), { timeout: 8000 });
+    expect(document.querySelector('[data-einstieg="minimal"]')).toBeNull();
+    await user.click(zeilen()[0].querySelector('button')!);
+    // Profil nach dem Speichern: „Einladen“ im Fuß (nicht „Zur Bewerbung einladen“).
+    const profil = await waitFor(() => {
+      const blatt = document.querySelector('[data-passt-gruende]')?.closest('.pointer-events-auto') as HTMLElement | null;
+      expect(blatt).not.toBeNull();
+      return blatt!;
+    }, { timeout: 5000 });
+    expect(within(profil).getByRole('button', { name: 'Einladen' })).toBeInTheDocument();
+    expect(knopfEinladen()).toBeNull();
+    return () => [...document.querySelectorAll('[data-passt-gruende] li')].map((li) => li.textContent);
+  };
+
+  it('mamamia (Status „active“) vor dem Bogen am Lead und vor dem Rechner; ein Bedarf zählt, wenn eine der beiden Personen ihn hat', async () => {
+    const gruende = await gruendeImProfil('active', 'token-mi-gespeichert-mamamia');
+    await waitFor(() => expect(gruende()).toEqual([
+      'Erfahrung mit Demenz',
+      'Erfahrung mit zwei Personen',
+      'Erfahrung mit Inkontinenz',
+      'Erfahrung mit Einsätzen in der Nacht',
+      'Erfahrung mit Rollator',
+    ]), { timeout: 5000 });
+  }, 20_000);
+
+  it('mamamia noch im Status „draft“ (nur Onboarding-Daten): der Bogen am Lead gilt', async () => {
+    const gruende = await gruendeImProfil('draft', 'token-mi-gespeichert-entwurf');
+    await waitFor(() => expect(gruende()).toEqual(['Erfahrung mit Inkontinenz']), { timeout: 5000 });
+    // Nicht der Rechner (Rollstuhl, Nacht) und nicht der mamamia-Entwurf (Rollator).
+    await new Promise((r) => setTimeout(r, 200));
+    expect(gruende()).toEqual(['Erfahrung mit Inkontinenz']);
   }, 20_000);
 });
 

@@ -2256,7 +2256,8 @@ Deno.serve(async (req: Request) => {
           eventTypeFailed = "email_angebot_failed";
         } else if (scheduledEmail.email_type === "eingangsbestaetigung") {
           // Mail 1 wie das Portal (Registry #148, Martin 08.11.2026): Angebot kompakt, die passenden Pflegekräfte als Zeilen
-          // mit Foto und Preis, EIN Knopf „Bewerbungen erhalten →“.
+          // mit Foto und Preis, EIN Knopf „Angebot & Pflegekräfte anzeigen →“ oben ins Portal (seit Registry #163, 14.11.2026;
+          // bis dahin „Bewerbungen erhalten →“ ins Formular).
           // Re-Submit: angepasster Betreff und Einstieg (Kunde hat das Formular nochmal
           // abgeschickt). Eingekaufter Lead: eigener Betreff, Portalname im Einstieg, Hinweis zu den Angaben unter dem
           // Kasten — Herkunft schlägt Resubmit.

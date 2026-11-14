@@ -184,7 +184,7 @@ describe('AngebotPruefenModal — was fehlt, steht da', () => {
     await user.click(hintergrund);
     expect(onClose).toHaveBeenCalledTimes(1);
     // Schritt 2: nicht mehr — Eingetipptes bliebe sonst weg.
-    await user.click(screen.getByRole('button', { name: /Weiter →/ }));
+    await user.click(screen.getByRole('button', { name: /^Weiter$/ }));
     await user.click(document.querySelector('.backdrop-blur-sm') as HTMLElement);
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('heading', { name: 'Ihre Angaben' })).toBeTruthy();

@@ -38,6 +38,7 @@ import {
   mapApplicationToUI,
   mapMatchingToNurse,
   mapCaregiverToNurse,
+  mapMamamiaCustomerToPatientForm,
   resolveDeutschWishLevel,
   pickFinalConfirmedJob,
 } from '../lib/mamamia/mappers';
@@ -89,6 +90,7 @@ import { DeclineConfirmModal } from '../components/portal/DeclineConfirmModal';
 import { InviteRateLimitModal } from '../components/portal/InviteRateLimitModal';
 import { AngebotPruefenModal, buildVertragsDaten } from '../components/portal/AngebotPruefenModal';
 import { CustomerNurseModal } from '../components/portal/CustomerNurseModal';
+import { bedarfAusFormular, bedarfFuerProfil, type GespeicherteSituation, type KundenBedarf } from '../lib/passtZuIhnen';
 import { zeigtSommerzuschlag } from '../components/portal/konditionen';
 import { PflegekraftChat } from '../components/portal/PflegekraftChat';
 import { TELEFON_HREF } from '../lib/kontakt';
@@ -325,6 +327,12 @@ const PREVIEW_LEAD: Lead = {
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 } as Lead;
+
+// Gespeicherte Pflegesituation der Vorschau nach dem Speichern (?preview=wartet, bewerbung …), dort gibt es kein mamamia.
+// Wie im freigegebenen Bild runde5/a_icons_v3 (14.11.2026): zwei Personen, Rollator, Demenz, Harninkontinenz, Nacht.
+const PREVIEW_PFLEGESITUATION: GespeicherteSituation = {
+  anzahl: '2', mobilitaet: 'Rollatorfähig', demenz: 'Mittelgradig', inkontinenz: 'Harninkontinenz', nacht: 'Bis zu 1 Mal',
+};
 
 const PREVIEW_INTEREST_PROFILE = {
   nationality: 'Polnisch',
@@ -905,6 +913,19 @@ const CustomerPortalPage: FC = () => {
   // In dieser Sitzung abgesendet → dieses Formular, sonst der gespeicherte Bogen.
   const [abgesendetesFormular, setAbgesendetesFormular] = useState<PatientForm | null>(null);
   const formularStart = kalenderTag(abgesendetesFormular?.startDate ?? (lead?.patient_form?.startDate as string | undefined));
+  // „Warum … zu Ihnen passt“ im Profil (Martin 14.11.2026: „was der Kunde wünscht“). Welche Quelle gilt, entscheidet
+  // bedarfFuerProfil (lib/passtZuIhnen.ts): vor dem ersten Speichern der Rechner, danach in dieser Sitzung abgesendet >
+  // mamamia (nicht im Status „draft“) > Bogen am Lead > Rechner. Die Vorschau nach dem Speichern nimmt ausdrücklich
+  // PREVIEW_PFLEGESITUATION.
+  const profilBedarf = useMemo<KundenBedarf>(() => (IS_PREVIEW_ANY && !vorSpeichern
+    ? bedarfAusFormular(PREVIEW_PFLEGESITUATION)
+    : bedarfFuerProfil({
+      vorSpeichern,
+      rechner: lead?.kalkulation?.formularDaten,
+      abgesendet: abgesendetesFormular,
+      mamamia: mmCustomer?.patients?.length ? { status: mmCustomer.status, form: mapMamamiaCustomerToPatientForm(mmCustomer) } : null,
+      amLead: lead?.patient_form,
+    })), [vorSpeichern, lead, mmCustomer, abgesendetesFormular]);
   const { data: mmJobOffer, loading: mmJobOfferLoading, error: mmJobOfferError, refetch: refetchJobOffer } = useJobOffer(mmReady);
   const { data: mmApplications, loading: mmApplicationsLoading, error: mmApplicationsError, refetch: refetchApplications } = useApplications({ limit: 20 }, mmReady);
   // limit=20 is intentional — client-side ranking (see `effectiveMatched`)
@@ -5147,7 +5168,8 @@ const CustomerPortalPage: FC = () => {
             && aboutRegen.forId === fullCaregiver.id
             && aboutRegen.loading
           }
-          initialLevelInfo={nurseModalStufe}
+          // Profil ohne Stufen seit 14.11.2026 (`nurseModalStufe` öffnete die Stufen-Erklärung); stattdessen „Warum … passt“.
+          kundenBedarf={profilBedarf}
           onClose={() => { setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setNurseModalStufe(false); }}
           app={nurseModalApp ?? undefined}
           // Gebucht oder Vertrag offen: nur das Profil, kein „Einladen" (Review 25.09.).

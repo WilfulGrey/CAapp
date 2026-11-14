@@ -1,8 +1,6 @@
 import type { FC } from 'react';
-import { Check, Clock, Mail } from 'lucide-react';
-import { HERO_PUNKTE } from '../../lib/heroPunkte';
+import { Clock, Mail } from 'lucide-react';
 import type { SterneStand } from '../../lib/sterne';
-import { BewertungsZeile } from './BewertungsZeile';
 import { Button } from '../ui/Button';
 import { nochReserviertText } from '../../lib/reservierung';
 import type { Nurse } from '../../types';

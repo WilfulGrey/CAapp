@@ -21,30 +21,39 @@ const voll = (einsaetze: unknown[], onOtherJob = false) => ({
 });
 const fertig = { arrival_date: '2026-04-10 00:00:00', departure_date: '2026-05-11 00:00:00', duration_days: 31, status: 'finish', zip_code: '10115', city: 'Berlin' };
 
-describe('PflegekraftProfil – Einsätze', () => {
+// Registry #164 (Martin 14.11.2026: „überall angleichen … immer die, die wir jetzt haben, mit dem Foto, mit den 3 Infos“; zu
+// den Stufen: „das versteht kein Mensch“): Der Kopf jeder Karte ist die Zeile der Liste. Keine Stufe, keine Einsätze-Zahl,
+// kein „Neu bei uns“/„Im Einsatz“, auch wenn das volle Profil im Cache liegt.
+describe('PflegekraftProfil – Kopf wie die Zeile der Liste (Registry #164)', () => {
   beforeEach(() => { _resetCache(); vi.restoreAllMocks(); });
 
-  it('ohne geladenes Profil: Zahl der Liste, kein eigener Abruf', () => {
+  it('ohne geladenes Profil: „Vorname, Alter“, Erfahrung, Deutsch, Pfeil; keine Stufe, keine Einsätze; kein eigener Abruf', () => {
     const spy = vi.spyOn(client, 'callMamamia');
-    render(<PflegekraftProfil nurse={nurse} onProfil={() => {}} />);
-    expect(screen.getByText('Neu bei uns')).toBeInTheDocument();
+    const { container } = render(<PflegekraftProfil nurse={nurse} onProfil={() => {}} />);
+    const kopf = screen.getByTestId('pflegekraft-profil');
+    // Ohne Foto die Initialen (für Vorleseprogramme ausgeblendet), daneben die drei Angaben.
+    const ohneInitialen = kopf.cloneNode(true) as HTMLElement;
+    ohneInitialen.querySelectorAll('[aria-hidden="true"]').forEach((e) => e.remove());
+    expect(ohneInitialen.textContent).toBe('Anna, 402 Jahre ErfahrungDeutsch Mittel');
+    expect(kopf).toHaveAccessibleName('Profil von Anna G. ansehen');
+    expect(container.textContent).not.toMatch(/Elite|Stammkraft|Einsatz|Einsätze|Neu bei uns|Profil ansehen|ab sofort/);
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it('Profil im Cache mit mamamia-Einsatz: „1 Einsatz bei uns" statt „Neu bei uns"', async () => {
-    vi.spyOn(client, 'callMamamia').mockResolvedValue({ Caregiver: voll([fertig]) });
+  it('auch mit Profil im Cache (Einsatz bei uns, gerade woanders im Einsatz) keine Einsätze-Angabe', async () => {
+    vi.spyOn(client, 'callMamamia').mockResolvedValue({ Caregiver: voll([fertig, { ...fertig, status: 'on_job' }], true) });
     await fetchCaregiver(31033);
-    render(<PflegekraftProfil nurse={nurse} onProfil={() => {}} />);
-    expect(screen.getByText('1 Einsatz bei uns')).toBeInTheDocument();
-    expect(screen.queryByText('Neu bei uns')).toBeNull();
+    const { container } = render(<PflegekraftProfil nurse={nurse} onProfil={() => {}} />);
+    expect(container.textContent).not.toMatch(/Einsatz|Einsätze|Neu bei uns|Im Einsatz|anderen Kunden/);
+    expect(screen.getByText('Deutsch Mittel')).toBeInTheDocument();
   });
 
-  it('gerade woanders im Einsatz, keiner abgeschlossen: „Im Einsatz / bei einem anderen Kunden"', async () => {
-    vi.spyOn(client, 'callMamamia').mockResolvedValue({ Caregiver: voll([{ ...fertig, status: 'on_job' }], true) });
-    await fetchCaregiver(31033);
-    render(<PflegekraftProfil nurse={nurse} onProfil={() => {}} />);
-    expect(screen.getByText('Im Einsatz')).toBeInTheDocument();
-    expect(screen.getByText('bei einem anderen Kunden')).toBeInTheDocument();
-    expect(screen.queryByText('Neu bei uns')).toBeNull();
+  it('Tipp und Enter öffnen das Profil', async () => {
+    const onProfil = vi.fn();
+    render(<PflegekraftProfil nurse={nurse} onProfil={onProfil} />);
+    const kopf = screen.getByTestId('pflegekraft-profil');
+    kopf.click();
+    kopf.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(onProfil).toHaveBeenCalledTimes(2);
   });
 });

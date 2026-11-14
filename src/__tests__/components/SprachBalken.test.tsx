@@ -41,12 +41,12 @@ describe('Pflegekraft-Karte', () => {
     expect(karte.className).not.toContain('#F4F4F6');
   });
 
-  it('zeigt Deutsch als Punkte im Profil („V", 27.09.2026)', () => {
+  it('zeigt Deutsch wie die Zeile der Liste: „Deutsch Gut“, ohne Punkte (Registry #164, Kopf wie die Zeile)', () => {
     const { container } = render(
       <MatchCard nurse={kraft()} status="pending" onNurseClick={() => {}} />,
     );
-    expect(container.textContent).toContain('Deutsch gut');
-    expect(container.querySelectorAll('.bg-pm-taupe').length).toBe(3);
+    expect(container.textContent).toContain('Deutsch Gut');
+    expect(container.querySelectorAll('.bg-pm-taupe').length).toBe(0);
   });
 
   it('ohne bekannte Stufe keine leeren Punkte', () => {

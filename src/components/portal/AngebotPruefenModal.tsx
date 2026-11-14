@@ -8,7 +8,8 @@ import { AlertCircle, Check, ChevronRight, Info, X } from 'lucide-react';
 const FEIERTAGE_LIST = 'Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. + 2. Weihnachtstag, Silvester, Neujahr';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
-import { displayName, initials, nurseLevel, nurseFacts, isEmail } from './shared';
+import { isEmail } from './shared';
+import { PflegekraftProfil } from './PflegekraftProfil';
 
 // Einzige Anreden, die Mamamia für den Leistungsempfänger annimmt (Registry #88).
 // Auftraggeber und Kontaktperson behalten „Divers": dort ist die Anrede optional
@@ -329,6 +330,11 @@ type Schritt = 1 | 2 | 3;
 const SCHRITT_TITEL: Record<Schritt, string> = { 1: 'Angebot prüfen', 2: 'Ihre Angaben', 3: 'Vertrag & Unterschrift' };
 const SCHRITT_KURZ: Record<Schritt, string> = { 1: 'Angebot', 2: 'Ihre Angaben', 3: 'Unterschrift' };
 
+// Schritt 1 gegliedert wie die Bewerbungskarte (AppCard.tsx), Martin 14.11.2026 (mockup_pruefen.html): graue
+// Abschnittstitel „Pflegekraft“, „Angebot“, „Nachricht“; Zeilen links grau, rechts dunkel, dünne Linien dazwischen.
+const ABSCHNITT = 'mb-3 text-[15px] font-normal leading-5 text-pm-muted';
+const euro = (n: number) => `${n.toLocaleString('de-DE')} €`;
+
 // Feld → Element-ID (Sprung aus der Zusammenfassung, aria-describedby).
 const feldId = (feld: keyof ContractFormData) => `apm-${feld}`;
 
@@ -368,8 +374,6 @@ export const AngebotPruefenModal: FC<{
   const [step, setStep] = useState<Schritt>(contractOnly ? 2 : 1);
   const [feiertagInfoOpen, setFeiertagInfoOpen] = useState(false);
   const { nurse, offer } = app;
-  const inits = initials(nurse.name);
-  const name = displayName(nurse.name);
 
   // Anrede des Leistungsempfängers geht als contract_patient.salutation an
   // StoreConfirmation — dort PFLICHT und nur 'Mr.'/'Mrs.' (Registry #88,
@@ -471,7 +475,28 @@ export const AngebotPruefenModal: FC<{
   );
   const zuschlagRelevance = computeZuschlagRelevance(offer.anreisedatum, offer.abreisedatum);
 
+  // Zeilen „Angebot“ in Schritt 1: dieselben Werte und Bedingungen wie bisher, nur benannt wie im Entwurf
+  // (Martin 14.11.2026). Reisekosten in einer Zeile: gleich hoch → „125 € je Fahrt / für Anreise und Abreise“.
+  const angebotZeilen: { label: string; wert: string; zusatz?: string; feiertage?: boolean }[] = [
+    // Klammer ohne Umbruch: unter 375 px bricht die Zeile vor „(“, nicht mitten in „im Monat“ (gemessen bei 320 px).
+    { label: 'Tagessatz', wert: `${euro(tagessatz)} (${euro(offer.monatlicheKosten)} im Monat)` },
+    { label: 'Anreise', wert: offer.anreisedatum },
+    { label: 'Abreise', wert: `vorauss. ${offer.abreisedatum}` },
+    offer.anreisekosten === offer.abreisekosten
+      ? { label: 'Reisekosten', wert: `${euro(offer.anreisekosten)} je Fahrt`, zusatz: 'für Anreise und Abreise' }
+      : { label: 'Reisekosten', wert: `${euro(offer.anreisekosten)} Anreise, ${euro(offer.abreisekosten)} Abreise` },
+    { label: 'Reisetage', wert: 'voller Tagessatz' },
+    // Feiertage stehen immer da (hingen bis 09.09.2026 am Sommerzuschlag und verschwanden mit ihm); ⓘ klappt die Liste auf.
+    { label: 'Feiertage', wert: 'doppelter Tagessatz', feiertage: true },
+    /* Sommerzuschlag nur, wenn der Einsatzzeitraum wirklich in Juli/August reicht (Martin, 09.09.2026). Berechnet wird er
+       unveraendert, im Vertrag steht er weiterhin. */
+    ...(zuschlagRelevance.hasSummer ? [{ label: 'Sommerzuschlag', wert: '6,67 € pro Tag', zusatz: 'im Juli und August' }] : []),
+    { label: 'Kündigung', wert: 'täglich kündbar' },
+  ];
+
   const schritte: Schritt[] = contractOnly ? [2, 3] : [1, 2, 3];
+  // Verbindungslinie von der Mitte des ersten bis zur Mitte des letzten Kreises (12 px Rand je Seite).
+  const linieRand = `calc(12px + (100% - 24px) / ${2 * schritte.length})`;
   const block = 'rounded-2xl border border-pm-line bg-white p-4 min-[400px]:p-5';
 
   // Gruppierte Zusammenfassung: eine Zeile je Block, Sprung zum ersten offenen Feld.
@@ -494,157 +519,121 @@ export const AngebotPruefenModal: FC<{
           style={{ animation: 'slideSheet 0.3s cubic-bezier(0.32,0.72,0,1)' }}
           onClick={e => e.stopPropagation()}
         >
-          <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
-            <div className="w-10 h-1 rounded-full bg-gray-300" />
+          <div className="flex justify-center pt-2 sm:hidden flex-shrink-0">
+            <div className="w-10 h-1 rounded-full bg-pm-chip" />
           </div>
 
-          <div className="px-5 pt-4 pb-0 flex-shrink-0">
-            <div className="flex items-start justify-between mb-2">
-              <h2 id="apm-titel" ref={titelRef} tabIndex={-1} className="text-lg font-bold text-pm-ink outline-none">
+          <div className="flex-shrink-0">
+            <div className="flex items-center justify-between gap-3 px-5 pt-3.5 sm:pt-5">
+              <h2 id="apm-titel" ref={titelRef} tabIndex={-1} className="text-[22px] leading-7 font-bold text-pm-ink outline-none">
                 {SCHRITT_TITEL[step]}
               </h2>
-              <button onClick={onClose} aria-label="Schließen" className="relative w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors flex-shrink-0 mt-0.5 before:absolute before:-inset-1.5 before:content-['']">
-                <X className="w-4 h-4 text-gray-500" />
+              <button onClick={onClose} aria-label="Schließen" className="w-10 h-10 rounded-full bg-pm-grund hover:bg-pm-line flex items-center justify-center transition-colors flex-shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-pm-taupe">
+                <X className="w-[18px] h-[18px] text-pm-muted" strokeWidth={2.2} aria-hidden="true" />
               </button>
             </div>
 
-            {/* Schritte: erledigte sind antippbar (zurück), kommende nicht —
+            {/* Schritte als Kreise mit Linie (Martin 14.11.2026, mockup_pruefen.html): der aktuelle dunkel gefüllt, die
+                anderen grau umrandet, ohne Farbton. Erledigte sind antippbar (zurück, Haken statt Zahl), kommende nicht:
                 nach vorn geht es nur über „Weiter", damit nichts übersprungen wird. */}
-            <ol className="flex border-b border-pm-line-soft" aria-label="Schritte">
-              {schritte.map((s, i) => {
-                const erledigt = s < step;
-                const aktiv = s === step;
-                const text = <>{erledigt ? <Check className="w-3.5 h-3.5 text-pm-green" aria-hidden="true" /> : null}{i + 1} · {SCHRITT_KURZ[s]}</>;
-                const cls = `relative flex items-center gap-1 px-0.5 pb-2.5 mr-4 last:mr-0 text-[13px] font-semibold border-b-2 whitespace-nowrap transition-colors ${aktiv ? 'border-pm-taupe text-pm-taupe-ink' : 'border-transparent text-pm-mute'}`;
-                return (
-                  <li key={s} aria-current={aktiv ? 'step' : undefined}>
-                    {erledigt ? (
-                      <button type="button" onClick={() => setStep(s)} className={`${cls} before:absolute before:inset-x-0 before:-top-3.5 before:bottom-0 before:content-['']`}>
-                        {text}
-                      </button>
-                    ) : (
-                      <span className={cls}>{text}</span>
-                    )}
-                  </li>
-                );
-              })}
-            </ol>
+            <div className="relative px-3 pt-5 pb-[18px] border-b border-pm-line-soft">
+              <div aria-hidden="true" className="absolute top-[34px] h-0.5 bg-pm-line" style={{ left: linieRand, right: linieRand }} />
+              <ol className={`relative grid ${schritte.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`} aria-label="Schritte">
+                {schritte.map((s, i) => {
+                  const erledigt = s < step;
+                  const aktiv = s === step;
+                  const inhalt = (
+                    <>
+                      <span data-schritt-kreis className={`flex h-[30px] w-[30px] items-center justify-center rounded-full border-2 text-[15px] font-bold tabular-nums ${aktiv ? 'border-pm-ink bg-pm-ink text-white' : 'border-pm-line bg-white text-pm-muted'}`}>
+                        {erledigt ? <><Check className="h-4 w-4 text-pm-ink" strokeWidth={3} aria-hidden="true" /><span className="sr-only">{i + 1}</span></> : i + 1}
+                      </span>
+                      <span className={`whitespace-nowrap text-[15px] leading-5 max-[359px]:text-[14px] ${aktiv ? 'font-semibold text-pm-ink' : 'font-medium text-pm-muted'}`}>
+                        {SCHRITT_KURZ[s]}
+                      </span>
+                    </>
+                  );
+                  return (
+                    <li key={s} aria-current={aktiv ? 'step' : undefined} className="flex justify-center">
+                      {erledigt ? (
+                        <button type="button" onClick={() => setStep(s)}
+                          className="relative flex flex-col items-center gap-2 rounded-lg hover:[&>span:last-child]:text-pm-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-taupe before:absolute before:-inset-x-2 before:-inset-y-1.5 before:content-['']">
+                          {inhalt}
+                        </button>
+                      ) : (
+                        <span className="flex flex-col items-center gap-2">{inhalt}</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
           </div>
 
           {/* Scrollbarer Body — robustes Flex-Muster: flex-1 (füllt den Platz
               zwischen Header und fixem Footer) + min-h-0 (erlaubt Schrumpfen
               unter Content-Höhe → echtes Scrollen) + overflow-y-auto. */}
           <div ref={scrollRef} data-scrollbox className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-            {step === 1 && (/* Seite 1 oben: Pflegekraft + Konditionen (Anreise/Kosten) */
-              <div className="p-5 space-y-5">
-                <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
-                  <div className="w-12 h-12 rounded-xl flex-shrink-0 overflow-hidden">
-                    {nurse.image ? (
-                      <img src={nurse.image} alt={nurse.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-sm font-bold text-white" style={{ backgroundColor: nurse.color }}>
-                        {inits}
-                      </div>
-                    )}
-                  </div>
-                  {/* CG-Box im einheitlichen Portal-Stil (wie MatchCard):
-                      „Name, Alter" · Deutsch · Stufe + Fakten, keine Balken. */}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm" style={{ color: '#18181B' }}>
-                      {name}{nurse.age ? <span className="font-normal" style={{ color: '#71717A' }}>, {nurse.age}</span> : null}
-                    </p>
-                    <p className="text-sm mt-0.5" style={{ color: '#71717A' }}>Deutsch {nurse.language.level}</p>
-                    <p className="text-sm mt-0.5" style={{ color: '#71717A' }}>
-                      {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return lvl.label ? (
-                        <span className="font-semibold" style={{ color: '#18181B' }}>{lvl.label}: </span>
-                      ) : null; })()}
-                      {nurseFacts(nurse)}
-                    </p>
-                  </div>
-                  <button onClick={() => onNurseClick(nurse)} className="-my-3 min-h-[44px] text-sm font-semibold text-[#8B7355] hover:underline flex-shrink-0">
-                    Profil →
-                  </button>
+            {step === 1 && (/* Seite 1: Pflegekraft, Angebot, Nachricht (Martin 14.11.2026, mockup_pruefen.html) */
+              <div className="px-5">
+                {/* Derselbe Kopf wie die Zeile der Liste und die Bewerbungskarte (PflegekraftProfil): rundes Foto 72 px,
+                    „Vorname, Alter“, Erfahrung, Deutsch, Pfeil; Tipp öffnet das Profil wie vorher „Profil →“. Ohne Stufe. */}
+                <div className="pt-5 pb-4" data-pruefen-pflegekraft>
+                  <h3 className={ABSCHNITT}>Pflegekraft</h3>
+                  <PflegekraftProfil nurse={nurse} onProfil={() => onNurseClick(nurse)} />
                 </div>
 
-                {/*
-                  „Hinweis der Agentur" = application.message VERBATIM
-                  (Entscheidung Michał 2026-07-22, Registry #22). Der Kunde
-                  MUSS den Rekruter-Hinweis („Die Pflegekraft reist mit einem
-                  Hund") vor der Annahme sehen — sonst akzeptiert er einen
-                  Rozjazd unbewusst. Keine LLM-Redaktion, kein Filter; hier
-                  bewusst hervorgehoben (amber), weil dies der Entscheidungs-
-                  moment ist. coverMessage = nur noch Preview-Mocks.
-                */}
-                {(app.message?.trim() || app.coverMessage) && (
-                  <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
-                    <p className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide mb-1.5">Hinweis der Agentur</p>
-                    <p className="text-sm leading-relaxed text-gray-800 whitespace-pre-wrap">{app.message?.trim() || app.coverMessage}</p>
-                  </div>
-                )}
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-bold text-gray-700">Konditionen</p>
-                    <p className="text-xs text-gray-400">{offer.submittedAt}</p>
-                  </div>
-                  <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100">
-                    {([
-                      { label: 'Tagessatz', value: `${tagessatz} €/Tag`, bold: true },
-                      { label: 'Anreisedatum', value: offer.anreisedatum },
-                      { label: 'Abreisedatum', value: `Vorauss. ${offer.abreisedatum}` },
-                      { label: 'Anreisekosten', value: `${offer.anreisekosten} €` },
-                      { label: 'Abreisekosten', value: `${offer.abreisekosten} €` },
-                      { label: 'Reisetage', value: 'Voller Tagessatz' },
-                      /* Sommerzuschlag nur, wenn der Einsatzzeitraum wirklich in
-                         Juli/August reicht (Martin, 09.09.2026). Er stand hier
-                         fest in der Tabelle — auch bei einem Einsatz von
-                         September bis Dezember, wo er nie anfaellt. Berechnet
-                         wird er unveraendert, im Vertrag steht er weiterhin. */
-                      ...(zuschlagRelevance.hasSummer
-                        ? [{ label: 'Sommerzuschlag', value: '6,67 €/Tag (Juli + Aug.)' }]
-                        : []),
-                      // Feiertagszuschlag wird separat unten gerendert (mit
-                      // Info-Icon zum Aufklappen der Feiertagsliste).
-                      { label: 'Kündigungsfrist', value: 'Täglich' },
-                    ] as { label: string; value: string; bold?: boolean }[]).map((row, idx, arr) => (
-                      <div key={row.label}>
-                        <div className={`flex items-center justify-between px-4 py-2.5 ${row.label === 'Kündigungsfrist' ? 'bg-green-50' : 'bg-white'}`}>
-                          <span className={`text-sm flex-shrink-0 ${row.label === 'Kündigungsfrist' ? 'font-semibold text-green-800' : 'text-gray-500'}`}>{row.label}</span>
-                          <span className={`text-sm text-right ${row.label === 'Kündigungsfrist' ? 'font-bold text-green-700' : row.bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>{row.label === 'Kündigungsfrist' ? '✓ Täglich kündbar' : row.value}</span>
-                        </div>
-                        {/* Feiertagszuschlag-Block haengt an „Reisetage",
-                            nicht mehr am Sommerzuschlag: den gibt es seit
-                            09.09.2026 nur noch in der Saison, und mit ihm waere
-                            sonst die ganze Feiertagsliste stumm verschwunden. */}
-                        {row.label === 'Reisetage' && (
-                          <>
-                            <div className="flex items-center justify-between px-4 py-2.5 bg-white border-t border-gray-100">
-                              <span className="text-sm text-gray-500">Feiertagszuschlag</span>
-                              <span className="text-sm font-semibold text-gray-700 inline-flex items-center gap-1.5">
-                                Doppelter Tagessatz
-                                <button
-                                  type="button"
-                                  onClick={() => setFeiertagInfoOpen(v => !v)}
-                                  aria-label="Welche Feiertage?"
-                                  className="relative text-gray-400 hover:text-gray-700 transition-colors before:absolute before:-inset-4 before:content-['']"
-                                >
-                                  <Info className="w-3.5 h-3.5" />
-                                </button>
-                              </span>
-                            </div>
-                            {feiertagInfoOpen && (
-                              <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100">
-                                <p className="text-[12px] text-gray-600 leading-relaxed">
-                                  <span className="font-semibold">Feiertage mit doppeltem Tagessatz:</span> {FEIERTAGE_LIST}
-                                </p>
-                              </div>
-                            )}
-                          </>
+                <div className="border-t border-pm-line-soft pt-5 pb-3.5">
+                  <h3 className={ABSCHNITT}>Angebot</h3>
+                  <dl data-pruefen-angebot>
+                    {angebotZeilen.map((z) => (
+                      <div key={z.label} className="flex flex-wrap items-baseline justify-between gap-x-4 border-b border-pm-line-soft py-[11px] first:pt-0 last:border-b-0">
+                        <dt className="flex-none text-[16px] leading-[22px] text-pm-muted">{z.label}</dt>
+                        <dd className="min-w-0 flex-1 text-right text-[16px] leading-[22px] font-semibold text-pm-ink tabular-nums">
+                          {z.feiertage ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              {z.wert}
+                              {/* Feste 20 px wie im Entwurf (.info): mit before:-inset-3 genau 44 px Tippfläche. */}
+                              <button
+                                type="button"
+                                onClick={() => setFeiertagInfoOpen(v => !v)}
+                                aria-label="Welche Feiertage?"
+                                aria-expanded={feiertagInfoOpen}
+                                aria-controls="apm-feiertage"
+                                className="relative -mr-0.5 grid h-5 w-5 flex-none place-items-center text-pm-muted hover:text-pm-ink transition-colors before:absolute before:-inset-3 before:content-['']"
+                              >
+                                <Info className="w-[18px] h-[18px]" aria-hidden="true" />
+                              </button>
+                            </span>
+                          ) : z.wert}
+                          {z.zusatz && <span className="mt-px block text-[15px] font-normal text-pm-muted">{z.zusatz}</span>}
+                        </dd>
+                        {/* Immer im DOM, nur per hidden verborgen: aria-controls braucht ein vorhandenes Ziel. */}
+                        {z.feiertage && (
+                          <dd id="apm-feiertage" hidden={!feiertagInfoOpen} className="mt-2 w-full rounded-lg bg-pm-paper px-3 py-2 text-[14px] leading-5 text-pm-body">
+                            <span className="font-semibold">Feiertage mit doppeltem Tagessatz:</span> {FEIERTAGE_LIST}
+                          </dd>
                         )}
                       </div>
                     ))}
-                  </div>
+                  </dl>
                 </div>
+
+                {/*
+                  „Nachricht" = application.message VERBATIM (Entscheidung
+                  Michał 2026-07-22, Registry #22). Der Kunde MUSS den
+                  Rekruter-Hinweis („Die Pflegekraft reist mit einem Hund")
+                  vor der Annahme sehen, sonst akzeptiert er einen Rozjazd
+                  unbewusst. Keine LLM-Redaktion, kein Filter, Zeilenumbrüche
+                  erhalten. Seit Martin 14.11.2026 als eigener Abschnitt wie auf
+                  der Bewerbungskarte, ohne gelben Kasten. coverMessage = nur
+                  noch Preview-Mocks.
+                */}
+                {(app.message?.trim() || app.coverMessage) && (
+                  <div className="border-t border-pm-line-soft pt-5 pb-[26px]">
+                    <h3 className={ABSCHNITT}>Nachricht</h3>
+                    <p className="text-[16px] leading-[25px] text-pm-ink whitespace-pre-wrap">{app.message?.trim() || app.coverMessage}</p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -784,7 +773,8 @@ export const AngebotPruefenModal: FC<{
             )}
           </div>
 
-          <div className="px-5 pt-3 pb-[max(0.875rem,env(safe-area-inset-bottom))] border-t border-pm-line-soft flex-shrink-0 bg-white">
+          {/* Leichter Schatten nach oben wie im Entwurf (.fuss, Martin 14.11.2026): trennt den Fuß vom Inhalt darüber. */}
+          <div data-pruefen-fuss className="px-5 pt-3 pb-[max(0.875rem,env(safe-area-inset-bottom))] border-t border-pm-line-soft flex-shrink-0 bg-white shadow-[0_-6px_16px_rgba(28,28,28,0.04)]">
             {step === 2 && fehlend.length > 0 && (
               <div className="mb-2 text-center">
                 <button type="button" onClick={() => springeZu(feldId(fehlend[0].feld))}
@@ -793,9 +783,15 @@ export const AngebotPruefenModal: FC<{
                 </button>
               </div>
             )}
+            {/* Martin 14.11.2026 (mockup_pruefen.html): nimmt die Sorge, mit „Weiter" schon etwas zu buchen. */}
+            {step === 1 && (
+              <p className="mb-3 text-center text-[15px] leading-5 text-pm-muted">Sie unterschreiben erst in Schritt 3.</p>
+            )}
             <div className="flex gap-2.5">
             {step === 1 && (
-              <Button breit onClick={() => setStep(2)}>Weiter →</Button>
+              <Button breit onClick={() => setStep(2)} className="!min-h-[54px] !rounded-[12px] !text-[16px]">
+                Weiter<ChevronRight className="w-[18px] h-[18px] flex-none" strokeWidth={2.5} aria-hidden="true" />
+              </Button>
             )}
             {step === 2 && (
               <>
