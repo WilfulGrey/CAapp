@@ -60,13 +60,6 @@ export const PflegekraftProfil: FC<{
     onStufeClick();
   };
 
-  // ENTWURF 14.11.2026 (Martin: „überall angleichen … immer die, die wir jetzt haben, mit dem Foto, mit den 3 Infos“): derselbe
-  // Kopf wie die Zeile der Liste (PflegekraftZeile in EinstiegMinimal.tsx): rundes Foto 72 px, „Vorname, Alter“, Erfahrung,
-  // Deutsch, Pfeil. Ohne Stufe („Elite“), ohne „Einsätze bei uns“ und ohne „Profil ansehen“ (Martin: „das versteht kein Mensch“).
-  void stufeTipp; void felder; void stern;
-  const vorname = nurse.name.split(' ')[0] || nurse.name;
-  const fakten = [jahre > 0 ? (jahre === 1 ? '1 Jahr Erfahrung' : `${jahre} Jahre Erfahrung`) : null, deutsch && deutsch !== '—' ? `Deutsch ${deutsch}` : null].filter(Boolean) as string[];
-  const foto = 'h-[72px] w-[72px] flex-none rounded-full ring-1 ring-pm-line';
   return (
     <div
       role="button"
@@ -74,26 +67,47 @@ export const PflegekraftProfil: FC<{
       onClick={(e) => { e.stopPropagation(); onProfil(); }}
       onKeyDown={tastatur}
       aria-label={`Profil von ${name} ansehen`}
-      className="flex cursor-pointer select-none items-center gap-4 py-1 active:brightness-[.98]"
+      className="rounded-[16px] bg-pm-profil cursor-pointer select-none active:brightness-[.98]"
       data-testid="pflegekraft-profil"
     >
-      {nurse.image ? (
-        <img src={nurse.image} alt="" className={`${foto} bg-pm-grund object-cover`} />
-      ) : (
-        <span aria-hidden="true" className={`${foto} flex items-center justify-center text-[18px] font-bold text-white`} style={{ backgroundColor: nurse.color }}>
-          {initials(nurse.name).slice(0, 2)}
-        </span>
-      )}
-      <span className="min-w-0 flex-1">
-        <span className="block text-[18px] font-semibold leading-6 text-pm-ink">
-          {vorname}
-          {nurse.age ? <span className="font-normal text-pm-muted">, {nurse.age}</span> : null}
-        </span>
-        {fakten.map((teil) => (
-          <span key={teil} className="mt-0.5 block text-[16px] leading-[22px] text-pm-ink">{teil}</span>
+      <div className="flex items-center gap-3.5 px-4 pt-4 pb-3.5">
+        {nurse.image ? (
+          <img src={nurse.image} alt={nurse.name} className="w-20 h-20 flex-none rounded-[14px] border-[3px] border-white object-cover" />
+        ) : (
+          <div className="w-20 h-20 flex-none rounded-[14px] border-[3px] border-white flex items-center justify-center text-2xl font-bold text-white"
+            style={{ backgroundColor: nurse.color }}>
+            {initials(nurse.name)}
+          </div>
+        )}
+        <div className="min-w-0">
+          <p className="text-[19px] font-extrabold leading-tight text-[#18181B]">
+            {name}
+            {nurse.age ? <span className="font-normal text-pm-mute">, {nurse.age}</span> : null}
+          </p>
+          {deutsch && (
+            <p className="mt-1.5 flex items-center gap-1.5 text-[15px] text-pm-muted">
+              {punkte > 0 && <DeutschPunkte punkte={punkte} />}
+              Deutsch {deutsch.toLowerCase()}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className={`grid ${felder.length > 1 ? 'grid-cols-2 divide-x divide-pm-profil-linie' : 'grid-cols-1'} border-t border-pm-profil-linie`}>
+        {felder.map((f) => (
+          <div key={f.label} className="px-1.5 py-3 text-center" onClick={f.stufe ? stufeTipp : undefined}>
+            <p className="text-[15.5px] font-extrabold leading-snug text-pm-ink whitespace-nowrap">
+              {f.stufe && stern && <span className="text-pm-stern" aria-hidden="true">★&nbsp;</span>}
+              {f.wert}
+            </p>
+            <p className="text-[13px] leading-snug text-pm-muted whitespace-nowrap">{f.label}</p>
+          </div>
         ))}
-      </span>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 flex-none text-pm-muted" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+      </div>
+
+      <p className="border-t border-pm-profil-linie py-2.5 text-center text-[14.5px] font-bold text-pm-taupe-ink">
+        Profil ansehen&nbsp;›
+      </p>
     </div>
   );
 };

@@ -25,7 +25,7 @@
 // vervollständigen und Bewerbungen erhalten“.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertCircle, ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Info, Phone, UserPlus, X } from 'lucide-react';
+import { AlertCircle, ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Info, Phone, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { formatEuro, type Lead } from '../../lib/supabase';
 import { eigenanteilAus } from '../../lib/angebotZuschuss';
@@ -62,9 +62,6 @@ export const LISTE_ZEILE = 'Diese Pflegekräfte sind verfügbar und passen zu Ih
 export const LISTE_UNVOLLSTAENDIG = 'Ihre Angaben sind noch unvollständig';
 export const LISTE_WARUM = 'Beschreiben Sie kurz die Pflegesituation. So verstehen die Pflegekräfte, worauf es bei Ihnen ankommt, und können sich unverbindlich bewerben. Das dauert ca. 2 Minuten.';
 export const LISTE_KNOPF = 'Pflegesituation vervollständigen';
-/** ENTWURF 14.11.2026 (Martin: „weitere PKs anzuzeigen mit Textlink unter der letzten“): Textlink unter der letzten Zeile,
- *  höchstens zweimal, je 5 weitere; danach steht direkt unter der Liste nur noch der Kasten. */
-export const weitereText = (anzahl: number) => (anzahl === 1 ? '1 weitere Pflegekraft anzeigen' : `${anzahl} weitere Pflegekräfte anzeigen`);
 /** Titel des Marta-Kastens unter dem Formular (13.11.2026, Martin: „Anbieten von Beratung“). */
 export const MARTA_BERATUNG_TITEL = 'Lieber persönlich beraten lassen?';
 /** Kopf über der Formularkarte (13.11.2026, Martin: „ob das formular als popup kommen müsste und wenn nicht, dann besser
@@ -203,6 +200,7 @@ export function KopfBereich({ anrede, lead, heimEigenanteil, heimQuelle, sterne,
   // lassen“); Text 16 px normal dunkel wie die Punkte, auch der Heimvergleich (Martin: „den Text so lassen, wie bei
   // Preisgarantie … dann haben wir nur dieses Grün und dann … wie die Punkte“); „Details“ in Taupe; klein 15 px grau
   // (Gruß, „Warum Primundus?“, „/ Monat“, Beschriftung der Kennzahlen).
+  const warum = <h2 className="mt-8 text-[15px] font-normal leading-5 text-pm-muted" data-kopf-warum>{WARUM_TITEL}</h2>;
   return (
     <div data-kopf>
       {/* Gruß und Titel frei auf dem Seitengrund wie die Kopfzone Vorher; linke Kante = Inhalt der Karte. */}
@@ -264,75 +262,63 @@ export function KopfBereich({ anrede, lead, heimEigenanteil, heimQuelle, sterne,
             <KostenAufstellung lead={lead} heimEigenanteil={heimEigenanteil} heimQuelle={heimQuelle} siegel={false} />
           </div>
         )}
-        <PunkteUndKennzahlen sterne={sterne} onBestpreis={onBestpreis} />
+        {/* Vier gleichwertige Punkte wie Vorher: grüner Haken (18 px, gut lesbar), dunkle Schrift, kein Kasten (Martin 13.11.:
+            „das jetzige ist mir zu bunt“). „Bestpreisgarantie“ zuerst und antippbar; das Info-Symbol in der Farbe von
+            „Details“ zeigt, dass man tippen kann. */}
+        {warum}
+        <ul className="mt-4 grid gap-3" data-garantie data-kopf-garantie>
+          <li className="flex items-center gap-2.5 text-[16px] leading-[22px] text-pm-ink">
+            <Check className="h-[18px] w-[18px] flex-none text-pm-green" strokeWidth={2.75} aria-hidden="true" />
+            <button
+              type="button"
+              onClick={onBestpreis}
+              className={`${TIPPFLAECHE_HOCH} ${FOKUS} inline-flex items-center gap-1.5 rounded text-left`}
+              data-kopf-bestpreis
+            >
+              {GARANTIE_TITEL}
+              <Info className="h-[18px] w-[18px] flex-none text-pm-taupe-ink" aria-label="Mehr Infos" />
+            </button>
+          </li>
+          {KOPF_PUNKTE.map((punkt) => (
+            <li key={punkt} className="flex items-center gap-2.5 text-[16px] leading-[22px] text-pm-ink">
+              <Check className="h-[18px] w-[18px] flex-none text-pm-green" strokeWidth={2.75} aria-hidden="true" />{punkt}
+            </li>
+          ))}
+        </ul>
+        {/* Kennzahlen wie live: Sterne (ohne Stand fehlt die Spalte, kein Ersatzwert), 20 Jahre, 6× in Folge Testsieger; gleiche
+            Abstände zwischen den Spalten, Text linksbündig (Martin 08.11.: „der erste und zweite Punkt zu nah beieinander …
+            linksbündig, aber der Abstand muss besser passen“). Ab 360 px brechen Werte und Beschriftungen nicht um. Rechts 24 px
+            frei: Martas Reiter steht in Ruhe 42 px in den Bildschirm hinein und lag auf iPhone 13 und Android 360 genau auf „6×
+            in Folge“ (gemessen 14 und 18 px verdeckt). Unter 360 px liegt er tiefer, dort kein Abstand.
+            Prüfung 13.11.: Die Spalten schrumpfen nie unter ihren Text (kein min-w-0), sonst lief er bei 320 px in die Nachbar-
+            spalte („126 BewertungenErfahrung“). Unter 390 px eine Stufe kleiner (Beschriftung 14 px), damit zwischen den
+            Spalten Luft bleibt (Android 360 vorher 11 px, iPhone SE ohne Reserve); unter 360 px darf nur die kleine Beschriftung
+            umbrechen, die Werte bleiben einzeilig (bei 320 px bricht so nur „126 Bewertungen“, statt dass alle drei Spalten brechen).
+            Vorgelesen: „Bewertung: 4,9 von 5 Sternen, 126 Bewertungen“, „Erfahrung: 20 Jahre“, „Testsieger: 6× in Folge“ (die
+            sichtbare Beschriftung ist für Vorleseprogramme ausgeblendet, sie steht schon im dt). */}
+        <dl className={`mt-6 ${linie} pt-6 flex justify-between gap-3 whitespace-nowrap min-[360px]:pr-6`} data-vertrauen>
+          {sterne && (
+            <div>
+              <dt className="sr-only">Bewertung</dt>
+              {/* „4,9“ und dahinter alle fünf Sterne (Martin 08.11.), anteilig gefüllt wie in der Bewertungszeile. */}
+              <dd className="flex items-center gap-1.5 text-[16px] font-bold leading-[22px] text-pm-ink max-[389px]:text-[15px]">
+                <span>{sterne.schnitt}</span>
+                <span className="sr-only"> von 5 Sternen</span>
+                <FuenfSterne wert={sterne.wert} />
+              </dd>
+              <dd className="mt-0.5 text-[15px] leading-5 text-pm-muted max-[389px]:text-[14px] max-[359px]:whitespace-normal">{anzahlText(sterne.anzahl)}</dd>
+            </div>
+          )}
+          {VERTRAUEN.map(([wert, wort]) => (
+            <div key={wert}>
+              <dt className="sr-only">{wort}</dt>
+              <dd className="text-[16px] font-bold leading-[22px] text-pm-ink max-[389px]:text-[15px]">{wert}</dd>
+              <dd className="mt-0.5 text-[15px] leading-5 text-pm-muted max-[389px]:text-[14px] max-[359px]:whitespace-normal" aria-hidden="true">{wort}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
     </div>
-  );
-}
-
-/** „Warum Primundus?“, die vier Punkte und die Kennzahlen der Preiskarte. ENTWURF 14.11.2026 (Martin: „unter dem Button die
- *  Punkte, dann sieht das genauso aus wie im Angebot … darunter 4,9er Bewertung und Testsieger und 20 Jahre“): auch unter
- *  „Angebot prüfen“ in der Bewerbung. */
-export function PunkteUndKennzahlen({ sterne, onBestpreis }: { sterne: SterneStand | null; onBestpreis: () => void }) {
-  const linie = 'border-t border-pm-line-soft';
-  return (
-    <>
-          {/* Vier gleichwertige Punkte wie Vorher: grüner Haken (18 px, gut lesbar), dunkle Schrift, kein Kasten (Martin 13.11.:
-              „das jetzige ist mir zu bunt“). „Bestpreisgarantie“ zuerst und antippbar; das Info-Symbol in der Farbe von
-              „Details“ zeigt, dass man tippen kann. */}
-          <h2 className="mt-8 text-[15px] font-normal leading-5 text-pm-muted" data-kopf-warum>{WARUM_TITEL}</h2>
-          <ul className="mt-4 grid gap-3" data-garantie data-kopf-garantie>
-            <li className="flex items-center gap-2.5 text-[16px] leading-[22px] text-pm-ink">
-              <Check className="h-[18px] w-[18px] flex-none text-pm-green" strokeWidth={2.75} aria-hidden="true" />
-              <button
-                type="button"
-                onClick={onBestpreis}
-                className={`${TIPPFLAECHE_HOCH} ${FOKUS} inline-flex items-center gap-1.5 rounded text-left`}
-                data-kopf-bestpreis
-              >
-                {GARANTIE_TITEL}
-                <Info className="h-[18px] w-[18px] flex-none text-pm-taupe-ink" aria-label="Mehr Infos" />
-              </button>
-            </li>
-            {KOPF_PUNKTE.map((punkt) => (
-              <li key={punkt} className="flex items-center gap-2.5 text-[16px] leading-[22px] text-pm-ink">
-                <Check className="h-[18px] w-[18px] flex-none text-pm-green" strokeWidth={2.75} aria-hidden="true" />{punkt}
-              </li>
-            ))}
-          </ul>
-          {/* Kennzahlen wie live: Sterne (ohne Stand fehlt die Spalte, kein Ersatzwert), 20 Jahre, 6× in Folge Testsieger; gleiche
-              Abstände zwischen den Spalten, Text linksbündig (Martin 08.11.: „der erste und zweite Punkt zu nah beieinander …
-              linksbündig, aber der Abstand muss besser passen“). Ab 360 px brechen Werte und Beschriftungen nicht um. Rechts 24 px
-              frei: Martas Reiter steht in Ruhe 42 px in den Bildschirm hinein und lag auf iPhone 13 und Android 360 genau auf „6×
-              in Folge“ (gemessen 14 und 18 px verdeckt). Unter 360 px liegt er tiefer, dort kein Abstand.
-              Prüfung 13.11.: Die Spalten schrumpfen nie unter ihren Text (kein min-w-0), sonst lief er bei 320 px in die Nachbar-
-              spalte („126 BewertungenErfahrung“). Unter 390 px eine Stufe kleiner (Beschriftung 14 px), damit zwischen den
-              Spalten Luft bleibt (Android 360 vorher 11 px, iPhone SE ohne Reserve); unter 360 px darf nur die kleine Beschriftung
-              umbrechen, die Werte bleiben einzeilig (bei 320 px bricht so nur „126 Bewertungen“, statt dass alle drei Spalten brechen).
-              Vorgelesen: „Bewertung: 4,9 von 5 Sternen, 126 Bewertungen“, „Erfahrung: 20 Jahre“, „Testsieger: 6× in Folge“ (die
-              sichtbare Beschriftung ist für Vorleseprogramme ausgeblendet, sie steht schon im dt). */}
-          <dl className={`mt-6 ${linie} pt-6 flex justify-between gap-3 whitespace-nowrap min-[360px]:pr-6`} data-vertrauen>
-            {sterne && (
-              <div>
-                <dt className="sr-only">Bewertung</dt>
-                {/* „4,9“ und dahinter alle fünf Sterne (Martin 08.11.), anteilig gefüllt wie in der Bewertungszeile. */}
-                <dd className="flex items-center gap-1.5 text-[16px] font-bold leading-[22px] text-pm-ink max-[389px]:text-[15px]">
-                  <span>{sterne.schnitt}</span>
-                  <span className="sr-only"> von 5 Sternen</span>
-                  <FuenfSterne wert={sterne.wert} />
-                </dd>
-                <dd className="mt-0.5 text-[15px] leading-5 text-pm-muted max-[389px]:text-[14px] max-[359px]:whitespace-normal">{anzahlText(sterne.anzahl)}</dd>
-              </div>
-            )}
-            {VERTRAUEN.map(([wert, wort]) => (
-              <div key={wert}>
-                <dt className="sr-only">{wort}</dt>
-                <dd className="text-[16px] font-bold leading-[22px] text-pm-ink max-[389px]:text-[15px]">{wert}</dd>
-                <dd className="mt-0.5 text-[15px] leading-5 text-pm-muted max-[389px]:text-[14px] max-[359px]:whitespace-normal" aria-hidden="true">{wort}</dd>
-              </div>
-            ))}
-          </dl>
-    </>
   );
 }
 
@@ -354,25 +340,15 @@ export function zeilenFakten(nurse: Pick<Nurse, 'experienceYears' | 'language'>)
 // einer eigenen Zeile; rechts der Preis (ohne „/ Monat“, Martin 08.11.) und darunter „Einladen“. Der Preis ist der des
 // Kunden: Die Liste zeigt nur Kräfte mit seiner Deutsch-Stufe (`matchesGermanyWish`, strikt), und die Stufe ist der einzige
 // Preisfaktor, der an der Kraft hängt (lib/preisJeKraft.ts im Zweig feat/portal-preis-bei-pflegekraeften).
-export function PflegekraftZeile({ nurse, vorgemerkt, onNurseClick, einladen }: {
+export function PflegekraftZeile({ nurse, vorgemerkt, onNurseClick }: {
   nurse: Nurse;
   /** Registry #145: vorgemerkt → grüne Zeile `EINGELADEN` mit Haken unter den Angaben (#163). */
   vorgemerkt: boolean;
   /** Tipp auf die Zeile: Profil (Messpunkt `profil_geoeffnet` mit Quelle `karte`, wie die Karte). */
   onNurseClick: () => void;
-  /** ENTWURF 14.11.2026 (Martin: „wenn Daten vervollständigt sind, kann man hier auch machen, einladen, ansonsten kein
-   *  Einladen-Button“): nur nach dem Speichern; Knopf in Koralle unter den Angaben, wie die Karte (`onInvite` false = das
-   *  Portal hat selbst reagiert, z. B. Grenze). */
-  einladen?: { onInvite: () => boolean; onInviteConfirm: () => Promise<void>; gesperrt: boolean };
 }) {
   const vorname = nurse.name.split(' ')[0] || nurse.name;
   const fakten = zeilenFakten(nurse);
-  const [phase, setPhase] = useState<'bereit' | 'sendet' | 'fertig'>('bereit');
-  const einladenTippen = async () => {
-    if (!einladen || phase !== 'bereit' || !einladen.onInvite()) return;
-    setPhase('sendet');
-    try { await einladen.onInviteConfirm(); setPhase('fertig'); } catch { setPhase('bereit'); }
-  };
   // Foto auf heller Kreisfläche mit feinem Ring: freigestellte Fotos und Initialen wirken gleich groß und rund.
   // Größer als im ersten Bild (Martin: „die Karten schön ein bisschen größer auch mit den Bildern“).
   // 13.11.2026 (Martin: „schöner präsentieren … nicht ganz so kompakt … der Preis würde ich da rausnehmen und
@@ -406,46 +382,7 @@ export function PflegekraftZeile({ nurse, vorgemerkt, onNurseClick, einladen }: 
         </span>
         <ChevronRight className="h-5 w-5 flex-none text-pm-muted" aria-hidden="true" />
       </button>
-      {/* Unter den Angaben eingerückt wie der Text (16 + 72 + 16 px); eigener Knopf, nicht im Profil-Knopf. */}
-      {/* Vorgemerkt bzw. in der Warteschlange des automatischen Einladens: oben steht schon „Eingeladen“, kein Knopf. */}
-      {einladen && !vorgemerkt && (
-        <div className="-mt-1.5 pb-4 pl-[104px] pr-4" data-zeile-einladen>
-          {phase === 'fertig' ? (
-            <span className="flex items-center gap-1 text-[15.5px] font-bold leading-[22px] text-pm-green-deep">
-              <Check aria-hidden="true" className="h-[18px] w-[18px] flex-none" strokeWidth={3} />{EINGELADEN}
-            </span>
-          ) : (
-            <button
-              type="button"
-              onClick={() => { void einladenTippen(); }}
-              disabled={phase === 'sendet' || einladen.gesperrt}
-              aria-label={phase === 'sendet' || einladen.gesperrt ? undefined : `${vorname} einladen`}
-              // Dezent, weil der Knopf in jeder Zeile steht (Martin 14.11.: „mit Umrandung … bei Mouse Over ist er dann ausgefüllt“);
-              // auf dem Handy füllt er sich beim Antippen (active). Schrift dunkle Koralle: auf Weiß gut lesbar.
-              className={`${FOKUS} inline-flex h-10 items-center gap-1.5 rounded-[10px] border-[1.5px] border-pm-coral bg-white px-4 text-[15.5px] font-bold text-pm-coral-ink transition-colors enabled:hover:bg-pm-coral enabled:hover:text-white enabled:active:bg-pm-coral enabled:active:text-white disabled:cursor-not-allowed disabled:opacity-60`}
-            >
-              {/* Während irgendeine Einladung läuft (auch die automatische nach dem Speichern) „Bitte warten…“ wie die Karte. */}
-              {phase === 'sendet' || einladen.gesperrt ? 'Bitte warten…' : (<><UserPlus className="h-[18px] w-[18px] flex-none" strokeWidth={2.5} aria-hidden="true" />Einladen</>)}
-            </button>
-          )}
-        </div>
-      )}
     </li>
-  );
-}
-
-/** ENTWURF 14.11.2026: dieselbe Liste wie vor dem Speichern (weiße Karte, Überschrift mit Zahl, Satz, Zeilen) für die Seite
- *  nach dem Speichern. */
-export function ZeilenListe({ id, titel, zeile, anzahl, children }: { id?: string; titel: string; zeile: string; anzahl: number; children: ReactNode }) {
-  return (
-    <section id={id} style={{ scrollMarginTop: 96 }} aria-labelledby={`${id ?? 'liste'}-titel`} className={`${KARTE} overflow-hidden`}>
-      <h2 id={`${id ?? 'liste'}-titel`} className="flex items-center gap-2 px-4 pt-3.5 pb-2.5 text-[18px] font-semibold leading-6 text-pm-ink">
-        {titel}
-        <span className="rounded-full bg-pm-grund px-2 py-px text-[13px] font-semibold leading-5 tabular-nums text-pm-muted">{anzahl}</span>
-      </h2>
-      <p className="-mt-1 px-4 pb-3.5 text-[15px] leading-5 text-pm-muted">{zeile}</p>
-      <ul>{children}</ul>
-    </section>
   );
 }
 
@@ -619,58 +556,27 @@ export const ABLAUF_GUTE_PHASE: readonly { titel: string; text: string }[] = [
   { titel: 'Auswählen und starten', text: 'Sie wählen in Ruhe aus, erst danach schließen Sie den Vertrag. Wir übernehmen den Rest, Anreise schon ab 3\u00a0Tagen möglich.' },
 ];
 
-/** Schritt 2 nach dem Speichern (ENTWURF 14.11.2026). */
-export const SCHRITT_2_NACH_SPEICHERN = {
-  titel: 'Bewerbungen erhalten',
-  // Martin 14.11.2026 (diktiert): „Sie erhalten in Kürze Bewerbungen hier im Portal und auch per E-Mail. Ihre Wunschkandidaten
-  // … können Sie jetzt schon einladen, kostenfrei und unverbindlich. Das ist in Ordnung.“ Der zweite Satz erklärt den Knopf.
-  // Nachgeschärft (Martin: „Ihre Wunschkandidaten können Sie einladen, sich zu bewerben. Sonst versteht das doch kein Mensch“).
-  text: 'Sie erhalten in Kürze Bewerbungen, hier im Portal und per E\u2011Mail. Ihre Wunschkandidaten können Sie schon jetzt einladen, sich bei Ihnen zu bewerben. Kostenfrei und unverbindlich.',
-} as const;
-
-/** „So geht es weiter“. Vor dem Speichern ab Schritt 1 (grün, Knopf ins Formular). ENTWURF 14.11.2026 (Martin: „so wie
- *  vorher … nur dass du jetzt einen Schritt weiter bist“, „der erledigte Schritt weg“, „Grün ist nur zu Patientendaten
- *  vervollständigen“): nach dem Speichern derselbe Kasten ab Schritt 2, der aktuelle Schritt ruhig beige hinterlegt (kein
- *  Koralle-Ton, Martin: „sieht aus wie ein Fehler“), nur der Knopf zu den Pflegekräften in Koralle. */
-export function AblaufGutePhase({ onZumFormular, ab = 0, onEinladen }: { onZumFormular?: () => void; ab?: 0 | 1; onEinladen?: () => void }) {
-  const koralle = ab === 1;
+function AblaufGutePhase({ onZumFormular }: { onZumFormular?: () => void }) {
   return (
-    <section aria-labelledby="ablauf-titel" data-ablauf-gute-phase data-ab-schritt={ab + 1}>
+    <section aria-labelledby="ablauf-titel" data-ablauf-gute-phase>
       <h2 id="ablauf-titel" className="px-1 pb-3 text-[20px] font-bold leading-[26px] text-pm-ink">So geht es weiter</h2>
       <ol className="overflow-hidden rounded-card border border-pm-line bg-white">
-        {ABLAUF_GUTE_PHASE.map((s, i) => {
-          let schritt = s;
-          if (i < ab) return null;
-          const jetzt = i === ab;
-          // Nach dem Speichern (ab Schritt 2): ohne „innerhalb von 60 Minuten“; der Text nennt das Einladen, das der Knopf
-          // darunter auslöst (Martin 14.11.: „Sie können jetzt schon bereits Ihre Wunschkandidaten einladen und dann erst der
-          // Button“).
-          if (koralle && i === 1) schritt = SCHRITT_2_NACH_SPEICHERN;
+        {ABLAUF_GUTE_PHASE.map((schritt, i) => {
+          const jetzt = i === 0;
           return (
-            <li key={schritt.titel} className={`px-4 py-4 ${jetzt ? (koralle ? 'bg-pm-shell' : 'bg-pm-mint') : 'border-t border-pm-line'}`} aria-current={jetzt ? 'step' : undefined}>
+            <li key={schritt.titel} className={`px-4 py-4 ${jetzt ? 'bg-pm-mint' : 'border-t border-pm-line'}`} aria-current={jetzt ? 'step' : undefined}>
               <div className="flex gap-3">
-                <span className={`mt-0.5 flex h-[27px] w-[27px] flex-none items-center justify-center rounded-full text-[13px] font-bold text-white ${jetzt ? (koralle ? 'bg-pm-taupe-ink' : 'bg-pm-green') : 'bg-pm-taupe-deep'}`}>
+                <span className={`mt-0.5 flex h-[27px] w-[27px] flex-none items-center justify-center rounded-full text-[13px] font-bold text-white ${jetzt ? 'bg-pm-green' : 'bg-pm-taupe-deep'}`}>
                   {i + 1}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className={`text-[16.5px] font-bold leading-[1.35] ${jetzt ? (koralle ? 'text-pm-ink' : 'text-pm-green-deep') : 'text-pm-ink'}`}>{schritt.titel}</p>
+                  <p className={`text-[16.5px] font-bold leading-[1.35] ${jetzt ? 'text-pm-green-deep' : 'text-pm-ink'}`}>{schritt.titel}</p>
                   <p className={`mt-1 text-[15px] leading-[1.45] ${jetzt ? 'text-pm-body' : 'text-pm-muted'}`}>{schritt.text}</p>
                 </div>
               </div>
-              {jetzt && koralle && onEinladen && (
-                <button
-                  type="button"
-                  onClick={onEinladen}
-                  className={`${FOKUS} mt-3.5 flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[12px] bg-pm-coral px-3 text-[16px] font-bold text-white hover:bg-pm-coral-deep`}
-                  data-ablauf-einladen
-                >
-                  <span className="whitespace-nowrap">Pflegekräfte einladen</span>
-                  <ArrowDown className="h-[18px] w-[18px] flex-none" strokeWidth={2.5} aria-hidden="true" />
-                </button>
-              )}
               {/* Knopf über die ganze Kastenbreite, damit „Pflegesituation vervollständigen“ auch auf dem iPhone SE in eine Zeile passt;
                   unter 340 px (Anzeigezoom) etwas kleiner und ohne Pfeil, sonst ragt der Text über den Rand. */}
-              {jetzt && !koralle && onZumFormular && (
+              {jetzt && onZumFormular && (
                 <button
                   type="button"
                   onClick={onZumFormular}
@@ -693,7 +599,7 @@ export function AblaufGutePhase({ onZumFormular, ab = 0, onEinladen }: { onZumFo
 export function EinstiegMinimal({
   anrede, lead, onBestpreis, heimEigenanteil, heimQuelle,
   laedt, zeilen, gehalteneEinladungen, vorschlaegeVorhanden, bereitsBearbeitet, formular, sterne, vorgemerkte,
-  onListeZumFormular, onAblaufZumFormular, onKostenAufgeklappt, onFaqGeoeffnet, weitereAnzeigen,
+  onListeZumFormular, onAblaufZumFormular, onKostenAufgeklappt, onFaqGeoeffnet,
 }: {
   /** Anrede für „Guten Tag, …“ (customerSalutation), ohne Anrede nur „Guten Tag“. */
   anrede: string | null;
@@ -715,8 +621,6 @@ export function EinstiegMinimal({
   /** Knopf im Kasten unter der Liste: Sprung zum Formular (Messpunkt `zur_pflegesituation`, Quelle `hauptknopf` wie der
    *  Knopf unter der Liste bis #162). */
   onListeZumFormular?: () => void;
-  /** ENTWURF 14.11.2026: Textlink „5 weitere Pflegekräfte anzeigen“ unter der letzten Zeile; null = kein Link mehr. */
-  weitereAnzeigen?: { anzahl: number; onClick: () => void } | null;
   /** „Pflegesituation vervollständigen“ in „So geht es weiter“: Sprung zum Formular (Messpunkt `zur_pflegesituation`, Quelle
    *  `schritte`). Ohne Rückruf bleibt der Schritt reiner Text. */
   onAblaufZumFormular?: () => void;
@@ -786,19 +690,6 @@ export function EinstiegMinimal({
             ) : anzahl > 0 ? (
               <>
                 <ul>{zeilen}</ul>
-                {/* ENTWURF 14.11.2026: Textlink unter der letzten Zeile, höchstens zweimal (danach null). Farbe wie die übrigen
-                    Links (Taupe, unterstrichen); Grün nur für Knöpfe (Martin 14.11.: „niemals einen grünen Link verwenden“). */}
-                {weitereAnzeigen && (
-                  <button
-                    type="button"
-                    onClick={weitereAnzeigen.onClick}
-                    className={`${FOKUS} focus-visible:outline-offset-[-3px] flex min-h-[52px] w-full items-center justify-center gap-1.5 border-t border-pm-line-soft px-4 text-[16px] font-semibold text-pm-taupe-ink underline decoration-pm-taupe/40 underline-offset-4 hover:bg-pm-paper hover:decoration-pm-taupe-ink`}
-                    data-weitere-anzeigen
-                  >
-                    {weitereText(weitereAnzeigen.anzahl)}
-                    <ChevronDown className="h-[18px] w-[18px] flex-none" strokeWidth={2.5} aria-hidden="true" />
-                  </button>
-                )}
                 {/* Registry #163, 14.11.2026 (Martin: „Im Portal fehlt der Text und Button unter den PKs“): wie im Bild vom 13.11.
                     vormittags, Knopf grün über die ganze Breite, Pfeil nach unten (das Formular steht direkt darunter). */}
                 {onListeZumFormular && (

@@ -582,13 +582,14 @@ describe('Notfallfeld im Hilfe-Blatt hängt am berechneten Zustand', () => {
 });
 
 describe('Bausteine außerhalb der Seite (nur mit den neuen Props anders)', () => {
-  it('Profil-Blatt (gebucht, nurProfil): nie eine Verfügbarkeit, keine Aktionen (Spezifikation 6.11; seit 14.11.2026 immer, Martin: „die Verfügbarkeit der Pflegekraft niemals … anzeigen“)', async () => {
+  it('Profil-Blatt: ohneVerfuegbarkeit blendet „ab sofort" aus, ohne Prop bleibt es (Spezifikation 6.11)', async () => {
     const { CustomerNurseModal } = await import('../../components/portal/CustomerNurseModal');
-    const n = { ...NURSE, availability: 'ab sofort', image: undefined, onOtherJob: true } as Nurse;
-    render(<CustomerNurseModal nurse={n} onClose={() => {}} nurProfil />);
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Maria, 61');
-    expect(screen.queryByText(/ab sofort|verfügbar|Derzeit im Einsatz/)).toBeNull();
-    expect(screen.queryByRole('button', { name: /Einladen|Nein danke/ })).toBeNull();
+    const n = { ...NURSE, availability: 'ab sofort', image: undefined } as Nurse;
+    const mit = render(<CustomerNurseModal nurse={n} onClose={() => {}} nurProfil />);
+    expect(screen.getByText('ab sofort')).toBeTruthy();
+    mit.unmount();
+    render(<CustomerNurseModal nurse={n} onClose={() => {}} nurProfil ohneVerfuegbarkeit />);
+    expect(screen.queryByText('ab sofort')).toBeNull();
   });
   it('Hilfe-Blatt: ohne Props unverändert, mit `vorKontakt` Notfallfeld VOR Martas Tageskontakt (Martin 24.10.), X bleibt oben, „täglich 8–20 Uhr"', async () => {
     const { ContactPopup } = await import('../../components/portal/ContactPopup');

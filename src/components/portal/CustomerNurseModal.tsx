@@ -1,18 +1,23 @@
-import { useEffect, useState } from 'react';
-import type { FC, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
-import { Check, X, UserPlus, ArrowDown, Undo2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import type { FC, MouseEvent as ReactMouseEvent } from 'react';
+import { ArrowDown, Check, X, UserPlus, Heart, FileText, Download } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
-import { displayName, initials } from './shared';
-import { MOBILITAETS_GRUENDE, passtGruende, weitereQualifikationen, type KundenBedarf } from '../../lib/passtZuIhnen';
+import { nurseLevel, displayName, initials, einsaetzeText, badgeErklaerung } from './shared';
+import { SprachBalken } from './SprachBalken';
 
-// Profil der Pflegekraft als Blatt von unten. Neu gebaut nach dem freigegebenen Bild vom 14.11.2026 (Runde 5, Richtung A
-// „Eine Symbolsprache“, seo-reports/analysen/pk-karten-einheitlich-2026-11-14/runde5/a_icons_v3): EIN weißes Blatt, Kopf
-// mit rundem Foto, „Vorname, Alter“, Erfahrung und Deutsch; der Kasten „Warum … zu Ihnen passt“ ist das einzige hinterlegte
-// Element; jede Angabe in derselben Zeilenform (beiger Kreis mit dünnem Symbol, graue Zeile, dunkler Wert); Abschnitte nur
-// durch Weißraum getrennt. Martin 14.11.2026: keine Stufen („Elite“, „Unsere Erfahrungsstufen“), keine Verfügbarkeit, kein
-// Geschlecht, Geburtsjahr, Gewicht, Größe, „Weitere Interessen“ und keine „Akzeptierte Mobilität“ („betreut … das hat da
-// oben nichts zu suchen“), keine Emojis.
+// Erklärung der Stufe. Die Labels MÜSSEN mit `nurseLevel`
+// (components/portal/shared.ts) und den Schwellen in lib/mamamia/badge.ts
+// übereinstimmen. Hier standen bis 12.08. noch „⭐ Starter / 🥉 Bronze /
+// 🥈 Silber / 🥇 Gold / 🏆 Platin" — Ränge, die es im Portal seit dem 11.08.
+// nirgends mehr gibt; die Zeile „Aktuell" markierte deshalb nie etwas.
+// Reihenfolge: niedrigste Stufe zuerst.
+const EXPERIENCE_LEVELS = [
+  { label: 'Bekannt', desc: 'Ein Einsatz über uns' },
+  { label: 'Bewährt', desc: '2 bis 5 Einsätze — sie kam wieder' },
+  { label: 'Stammkraft', desc: '6 bis 11 Einsätze — fest bei uns im Einsatz' },
+  { label: 'Elite', desc: '12 Einsätze und mehr — die erfahrensten Kräfte in unserem Bestand' },
+];
 
 // Customer-facing explanation der drei Sprach-Stufen.
 // Wortlaut 1:1 aus der bereits existierenden FAQ im CustomerPortalPage
@@ -36,100 +41,27 @@ const LANGUAGE_LEVELS = [
   },
 ];
 
+// Gemeinsame Klassen für den Design-Durchgang vom 11./12.08.: abgesetzte
+// Kästen (Fläche #F5F5F6, Rand #D4D4D8) statt randloser Grauflächen,
+// Fließtext 16 px, Abschnittsköpfe eine Stufe über dem Fließtext.
+const boxCls = 'rounded-2xl p-4 border border-[#D4D4D8] bg-[#F5F5F6]';
+const sectionHeadCls = 'text-[1.05rem] font-bold text-[#18181B] mb-2';
+const assignLabelCls = 'text-[12px] uppercase tracking-wide mb-0.5 text-[#A1A1AA]';
+const assignValueCls = 'text-[15px] font-semibold text-[#18181B]';
+
 const LANGUAGE_LEVELS_INTRO =
   'Eine grobe Orientierung — kein Sprach-Zertifikat. Die genaue Kommunikation hängt immer auch vom Tempo, der Mundart und der Geduld beider Seiten ab.';
 
-// Dünne Liniensymbole wie im freigegebenen Bild (Pfade aus Lucide, ISC). Inline statt aus lucide-react: Die installierte
-// Fassung kennt „briefcase-medical“ und das neue „house“ noch nicht, und so stimmen alle Symbole mit dem Bild überein.
-const SYMBOLE = {
-  flagge: <><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><path d="M4 22v-7" /></>,
-  person: <><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
-  herz: <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />,
-  spross: <><path d="M7 20h10" /><path d="M10 20c5.5-2.5.8-6.4 3-10" /><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z" /><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z" /></>,
-  rauchfrei: <><path d="M12 12H3a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h13" /><path d="M18 8c0-2.5-2-2.5-2-5" /><path d="m2 2 20 20" /><path d="M21 12a1 1 0 0 1 1 1v2a1 1 0 0 1-.5.866" /><path d="M22 8c0-2.5-2-2.5-2-5" /><path d="M7 12v4" /></>,
-  rauchen: <><path d="M17 12H3a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h14" /><path d="M18 8c0-2.5-2-2.5-2-5" /><path d="M21 16a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M22 8c0-2.5-2-2.5-2-5" /><path d="M7 12v4" /></>,
-  auto: <><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" /><circle cx="7" cy="17" r="2" /><path d="M9 17h6" /><circle cx="17" cy="17" r="2" /></>,
-  hut: <><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z" /><path d="M22 10v6" /><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5" /></>,
-  koffer: <><path d="M12 11v4" /><path d="M14 13h-4" /><path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" /><rect width="20" height="14" x="2" y="6" rx="2" /></>,
-  haus: <><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></>,
-  datei: <><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M10 9H8" /><path d="M16 13H8" /><path d="M16 17H8" /></>,
-} as const;
-type SymbolName = keyof typeof SYMBOLE;
-
-/** Runder Kreis 40 px mit Symbol: beige mit Taupe (Angaben) oder weiß mit grünem Haken (Kasten „Warum … passt“). */
-const Kreis: FC<{ symbol?: SymbolName; haken?: boolean; laedt?: boolean }> = ({ symbol, haken = false, laedt = false }) => (
-  <span
-    className={`flex h-10 w-10 flex-none items-center justify-center rounded-full ${haken ? 'bg-white text-pm-green' : 'bg-pm-shell text-pm-taupe'} ${laedt ? 'animate-pulse' : ''}`}
-    aria-hidden="true"
-  >
-    {(symbol || haken) && (
-      <svg
-        viewBox="0 0 24 24"
-        className={haken ? 'h-[18px] w-[18px]' : 'h-5 w-5'}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={haken ? 2.6 : 1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        {haken ? <path d="M20 6 9 17l-5-5" /> : SYMBOLE[symbol!]}
-      </svg>
-    )}
-  </span>
-);
-
-/** Die eine Zeilenform: Kreis links, rechts graue Zeile oben (optional) und dunkler Wert darunter. */
-const Zeile: FC<{ symbol: SymbolName; label?: string; wert: ReactNode }> = ({ symbol, label, wert }) => (
-  <div className="flex items-start gap-3">
-    <Kreis symbol={symbol} />
-    <div className="flex min-h-[40px] min-w-0 flex-col justify-center">
-      {label && <p className="text-[15px] leading-5 text-pm-muted">{label}</p>}
-      <p className={`text-[16px] font-medium leading-[22px] tracking-[-0.01em] text-pm-ink ${label ? 'mt-px' : ''}`}>{wert}</p>
-    </div>
-  </div>
-);
-
-/** Platzhalter einer Zeile, solange das volle Profil lädt. */
-const ZeileLaedt: FC = () => (
-  <div className="flex items-start gap-3">
-    <Kreis laedt />
-    <div className="flex min-h-[40px] flex-1 animate-pulse flex-col justify-center gap-2">
-      <div className="h-2.5 w-20 rounded bg-pm-line-soft" />
-      <div className="h-3 w-40 rounded bg-pm-line-soft" />
-    </div>
-  </div>
-);
-
-const Kreisel: FC<{ className?: string }> = ({ className = '' }) => (
-  <svg className={`animate-spin flex-shrink-0 ${className}`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-  </svg>
-);
-
-const ueberschriftCls = 'text-[19px] font-semibold leading-[26px] tracking-[-0.01em] text-pm-ink';
-// Fuß: Hauptknopf Koralle, Nebenaktion als Textlink in Taupe (Regeln Martin, 14.11.2026).
-const knopfCoralCls = 'flex min-h-[52px] flex-1 items-center justify-center gap-[9px] rounded-[14px] bg-pm-coral px-4 text-[17px] font-semibold tracking-[-0.005em] text-white transition-colors hover:bg-pm-coral-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-coral';
-const textlinkCls = 'flex min-h-[48px] items-center whitespace-nowrap pr-1 text-[16px] font-semibold text-pm-taupe-ink underline decoration-pm-taupe/40 decoration-[1.5px] underline-offset-4 hover:decoration-pm-taupe';
-const zustandCls = 'flex min-h-[52px] flex-1 items-center justify-center gap-2 rounded-[14px] border border-pm-line bg-pm-paper px-4 text-[16px] font-semibold text-pm-taupe-ink';
-
-/** „10.01. bis 20.03.2026“; über den Jahreswechsel mit beiden Jahren („15.12.2025 bis 20.02.2026“). */
-function zeitraum(start: string, ende: string): string {
-  const s = start.split('.');
-  const e = ende.split('.');
-  const gleichesJahr = s.length === 3 && e.length === 3 && s[2] === e[2];
-  return `${gleichesJahr ? `${s[0]}.${s[1]}.` : start} bis ${ende}`;
-}
-
-const grossAnfang = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+const LANGUAGE_LEVELS_FOOTER =
+  'Wenn Sprachsicherheit besonders wichtig ist (z. B. Demenz, schwerhörige oder spracheingeschränkte Patienten), sprechen Sie uns gerne an — wir helfen bei der Einordnung.';
 
 export const CustomerNurseModal: FC<{
   nurse: Nurse;
   /** True while the full Caregiver profile is in flight. The header and
    *  basic nurse data render immediately from the matching/application
-   *  card; the deep "Über …" rows wait on GET_CAREGIVER (~1.7-3.1s on beta).
-   *  When this is true we render a shimmer skeleton for those rows instead
-   *  of empty ones. */
+   *  card; the deep "Über mich" / "Besondere Merkmale" sections wait on
+   *  GET_CAREGIVER (~1.7-3.1s on beta). When this is true we render a
+   *  shimmer skeleton for those sections instead of empty rows. */
   profileLoading?: boolean;
   /** True while the AI-generated "Über die Pflegekraft" introduction is in
    *  flight. Decoupled from profileLoading because the basic profile lands
@@ -139,10 +71,9 @@ export const CustomerNurseModal: FC<{
    *  resolves, then either the AI text (success) or the Mamamia fallback
    *  (failure / null). */
   aboutLoading?: boolean;
-  /** Bedarf des Kunden für „Warum {Vorname} zu Ihnen passt“ (Martin 14.11.2026: „was der Kunde wünscht“): vor dem ersten
-   *  Speichern aus dem Rechner, danach aus der gespeicherten Pflegesituation (lib/passtZuIhnen.ts). Ohne Bedarf entfällt
-   *  der Kasten. */
-  kundenBedarf?: KundenBedarf | null;
+  /** Stufen-Erklärung sofort geöffnet, wenn der Kunde auf der Karte die
+   *  Plakette (Elite, Stammkraft, Bewährt) getippt hat (07.09.). */
+  initialLevelInfo?: boolean;
   onClose: () => void;
   app?: Application;
   onReview?: () => void;
@@ -153,9 +84,8 @@ export const CustomerNurseModal: FC<{
    *  parent surfaces the error (CLAUDE.md §1 — no fake animation). */
   onInvite?: () => Promise<void>;
   /** Registry #163, 14.11.2026 (Martin: „wenn man ein Profil öffnet, dann muss dort nicht Button mit vervollständigen sein, sondern
-   *  einladen zur Bewerbung … Dann Popup, wenn Daten noch fehlen“): vor dem Speichern EIN Knopf „Zur Bewerbung einladen“
-   *  statt „Nein danke“ und „Einladen“; das Portal merkt vor und öffnet „{Name} einladen“ (Logik #145). Seit dem neuen Profil
-   *  in Koralle (Martin 14.11.2026: Grün nur für Knöpfe, die zu „Pflegesituation vervollständigen“ führen). */
+   *  einladen zur Bewerbung … Dann Popup, wenn Daten noch fehlen“): vor dem Speichern EIN grüner Knopf „Zur Bewerbung
+   *  einladen“ statt „Nein danke“ und „Einladen“; das Portal merkt vor und öffnet „{Name} einladen“ (Logik #145). */
   einladenVorSpeichern?: () => void;
   /** 13.11.2026 (#162): vor dem Speichern EIN grüner Knopf ins Formular. Seit #163 nur noch für Profile, die das Portal vor dem
    *  Speichern nicht einladen kann (nicht in der offenen Liste); `einladenVorSpeichern` hat Vorrang. */
@@ -163,19 +93,37 @@ export const CustomerNurseModal: FC<{
   onDeclineMatch?: () => void;
   /** Nur ansehen, keine Aktionen (gebuchte Pflegekraft, Vertrag offen). */
   nurProfil?: boolean;
+  /** PROTOTYP Gebucht-Seite neu (15.10.2026, nur Vorschau, Spezifikation 6.11): ohne den Chip „sofort verfügbar". */
+  ohneVerfuegbarkeit?: boolean;
   /** Öffnet den (übersetzten) Chat mit der Pflegekraft. */
   onChat?: () => void;
   isInvited?: boolean;
   /** Wenn true, hat die Pflegekraft in Mamamia Interesse signalisiert.
-   *  Modal zeigt dann unter dem Kopf einen Hinweis, dass eine Einladung
-   *  ihre offizielle Bewerbung ermöglicht. */
+   *  Modal zeigt dann oben einen Hinweis-Block (warmer Coral-Ton mit
+   *  Heart-Icon), der erklärt, dass eine Einladung ihre offizielle
+   *  Bewerbung ermöglicht. */
   hasInterest?: boolean;
-}> = ({ nurse, profileLoading = false, aboutLoading = false, kundenBedarf = null, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, onChat, isInvited = false, hasInterest = false, nurProfil = false, einladenVorSpeichern, zumFormular }) => {
+}> = ({ nurse, profileLoading = false, aboutLoading = false, initialLevelInfo = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, onChat, isInvited = false, hasInterest = false, nurProfil = false, ohneVerfuegbarkeit = false, einladenVorSpeichern, zumFormular }) => {
   const [invited, setInvited] = useState(isInvited);
   const [invitePhaseModal, setInvitePhaseModal] = useState<'idle' | 'sending' | 'done'>('idle');
-  // Erklärung der Sprachstufe klappt unter dem Kopf auf, zweiter Tipp schließt (Entwurf mockup_profil_v3, 14.11.2026).
-  const [sprachInfoOffen, setSprachInfoOffen] = useState(false);
+  const [showLevelInfo, setShowLevelInfo] = useState(initialLevelInfo);
+  const [showLanguageInfo, setShowLanguageInfo] = useState(false);
   const [refDownloading, setRefDownloading] = useState(false);
+
+  // Header kollabiert beim Scrollen — wie bei modernen App-Profilen. Im
+  // kollabierten Zustand wird das Bild kleiner und Verfügbarkeits-Chip
+  // ausgeblendet, sodass mehr vom scrollbaren Inhalt sichtbar bleibt.
+  // Schwellwert: 40px — knapp genug, damit selbst kleine Daumen-Scrolls
+  // die kompakte Variante triggern.
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const [headerCompact, setHeaderCompact] = useState(false);
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const onScroll = () => setHeaderCompact(el.scrollTop > 40);
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Body-Scroll-Lock solange das Modal offen ist. Ohne diesen Lock
   // propagiert ein Scroll-Versuch im Modal-Body auf das darunter liegende
@@ -244,267 +192,487 @@ export const CustomerNurseModal: FC<{
       setInvitePhaseModal('idle');
     }
   };
-
-  const vorname = nurse.name.split(' ')[0] || nurse.name;
+  const inits = initials(nurse.name);
+  const name = displayName(nurse.name);
+  const bars = Array.from({ length: 3 }, (_, i) => i < nurse.language.bars);
+  const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
+  // Erklaerung zur Stufe — steht sichtbar im Profil (nicht mehr nur im
+  // Popup hinter dem Chip). Wortlaut + Schwellen in shared.ts.
+  const stufeErklaerung = badgeErklaerung(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0, nurse.onOtherJob);
   const p = nurse.profile;
-  // Volles Profil noch unterwegs: Zeilen als Platzhalter, Mobilitäts-Zeile im Kasten erst danach (sonst stünde sie kurz
-  // da und verschwände wieder, wenn die Pflegekraft die Stufe nicht annimmt).
-  const laedt = profileLoading && !p;
+  const dash = '—';
+  const yesNo = (v: boolean | undefined): string => v == null ? dash : v ? 'Ja' : 'Nein';
+  const smokingLabel: Record<string, string> = {
+    no: 'Nein',
+    yes: 'Ja',
+    yes_outside: 'Ja, draußen',
+  };
+  // "Über die Pflegekraft" prose — built from real fields only. If the
+  // backend hasn't filled them in we show a neutral placeholder rather
+  // than fabricating personality traits (CLAUDE.md §1).
+  const aboutSentence = p?.aboutDe
+    ? p.aboutDe
+    : p?.motivation
+    ? p.motivation
+    : `${name} verfügt über ${nurse.experience} in der 24h-Betreuung und spricht Deutsch auf ${
+        nurse.language.level === 'Grund' ? 'Grundniveau'
+        : nurse.language.level === 'Mittel' ? 'mittlerem Niveau'
+        : nurse.language.level === 'Gut' ? 'gutem Niveau'
+        : `${nurse.language.level}-Niveau`
+      }.${
+        nurse.history ? ` Mit ${nurse.history.assignments} erfolgreich abgeschlossenen Einsätzen bringt sie bewährte Praxiserfahrung mit.` : ''
+      }`;
 
-  const jahre = nurse.experienceYears ?? 0;
-  const erfahrung = jahre > 0 ? (jahre === 1 ? '1 Jahr Erfahrung' : `${jahre} Jahre Erfahrung`) : null;
-  const stufe = nurse.language?.level && nurse.language.level !== '—' ? nurse.language.level : null;
-  const stufenText = LANGUAGE_LEVELS.find((l) => l.label === stufe);
+  const InfoRow = ({ emoji, label, value, chips }: { emoji: string; label: string; value?: string; chips?: string[] }) => (
+    <div className="flex gap-3.5 py-3 border-b border-gray-100 last:border-0">
+      <span className="text-xl w-7 flex-shrink-0 text-center leading-none mt-0.5">{emoji}</span>
+      <div className="min-w-0">
+        <p className="text-[13px] mb-0.5" style={{ color: '#71717A' }}>{label}</p>
+        {value && <p className="text-[16px] font-semibold" style={{ color: '#18181B' }}>{value}</p>}
+        {chips && (
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {chips.map(c => (
+              <span key={c} className="text-[13px] px-2.5 py-1 rounded-full"
+                style={{ background: '#F5F5F6', border: '1px solid #D4D4D8', color: '#52525B' }}>{c}</span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
-  const alleGruende = passtGruende(kundenBedarf, p);
-  const gruende = laedt ? alleGruende.filter((g) => !MOBILITAETS_GRUENDE.includes(g)) : alleGruende;
-
-  // „Über …“: nur echte Angaben (CLAUDE.md §1). Ohne Text von mamamia kein erfundener Ersatzsatz mehr: Erfahrung und Deutsch
-  // stehen schon im Kopf.
-  const ueberText = p?.aboutDe || p?.motivation || '';
-  const rauchen = !p?.smoking ? null
-    : p.smoking === 'no' ? (nurse.gender === 'male' ? 'Nichtraucher' : 'Nichtraucherin')
-    : `${nurse.gender === 'male' ? 'Raucher' : 'Raucherin'}${p.smoking === 'yes_outside' ? ' (nur draußen)' : ''}`;
-  const qualifikationen = weitereQualifikationen(p?.qualifications, alleGruende);
-  // Reihenfolge fest (Martin 14.11.2026, Bild a_icons_v3); fehlende Angaben entfallen.
-  const angaben: Array<{ symbol: SymbolName; label?: string; wert: string }> = [];
-  if (p?.nationality) angaben.push({ symbol: 'flagge', label: 'Nationalität', wert: p.nationality });
-  if (p?.maritalStatus) angaben.push({ symbol: 'person', label: 'Familienstand', wert: p.maritalStatus });
-  if (p && p.personalities.length > 0) angaben.push({ symbol: 'herz', label: 'Persönlichkeit', wert: grossAnfang(p.personalities.join(', ')) });
-  if (p && p.hobbies.length > 0) angaben.push({ symbol: 'spross', label: 'Hobbys', wert: grossAnfang(p.hobbies.join(', ')) });
-  if (rauchen) angaben.push({ symbol: p?.smoking === 'no' ? 'rauchfrei' : 'rauchen', wert: rauchen });
-  if (p?.drivingLicense != null) {
-    angaben.push({ symbol: 'auto', label: 'Führerschein', wert: p.drivingLicense ? `Ja${p.drivingLicenseGearbox ? ` (${p.drivingLicenseGearbox})` : ''}` : 'Nein' });
-  }
-  if (p?.isNurse != null) angaben.push({ symbol: 'hut', label: 'Pflegeberuf erlernt', wert: p.isNurse ? 'Ja' : 'Nein' });
-  if (qualifikationen.length > 0) angaben.push({ symbol: 'koffer', label: 'Weitere Qualifikationen', wert: qualifikationen.join(', ') });
-  const zeigeUeber = laedt || aboutLoading || !!ueberText || angaben.length > 0;
-
-  const einsaetze = nurse.detailedAssignments ?? [];
-  // Kein Hinweis „Derzeit im Einsatz bei einem anderen Kunden“ mehr: Martin 14.11.2026, keine Verfügbarkeit im Profil.
-  // Überschrift „Letzte Einsätze“ nur, wenn es Einsätze (oder den Fehler der Abfrage) gibt; die Referenzen allein stehen
-  // ohne Überschrift an derselben Stelle.
-  const zeigeEinsaetze = einsaetze.length > 0 || !!nurse.einsaetzeError;
-
-  // Satz über den Knöpfen, nur wenn es ums Einladen geht (nicht bei Bewerbungen, nicht nach der Einladung). Nicht neben dem
-  // Interesse-Kasten: Der sagt schon „Laden Sie … ein“.
-  const zeigeHinweis = zeigeAktionen && !app && !invited && !hasInterest && (!!einladenVorSpeichern || (!zumFormular && !!onInvite));
+  // Shimmer placeholder for profile sections while GET_CAREGIVER is in flight.
+  const SkeletonRow = ({ chips = false }: { chips?: boolean }) => (
+    <div className="flex gap-3.5 py-3 border-b border-gray-100 last:border-0 animate-pulse">
+      <div className="w-7 h-7 rounded bg-gray-200 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="h-2 w-20 bg-gray-200 rounded mb-2" />
+        {chips ? (
+          <div className="flex gap-1.5 mt-1">
+            <div className="h-5 w-14 bg-gray-200 rounded-full" />
+            <div className="h-5 w-20 bg-gray-200 rounded-full" />
+            <div className="h-5 w-16 bg-gray-200 rounded-full" />
+          </div>
+        ) : (
+          <div className="h-3 w-32 bg-gray-200 rounded" />
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-black/45" onClick={onClose}
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" onClick={onClose}
         style={{ animation: 'fadeIn 0.2s ease-out' }} />
 
       <div className="fixed z-50 inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4 pointer-events-none"
         style={{ animation: 'fadeIn 0.2s ease-out' }}>
         <div
-          className="relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[24px] bg-white font-pm text-pm-ink shadow-2xl pointer-events-auto sm:max-w-lg sm:rounded-[24px]"
+          className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-3xl max-h-[92dvh] overflow-hidden pointer-events-auto shadow-2xl flex flex-col"
           style={{ animation: 'slideSheet 0.3s cubic-bezier(0.32,0.72,0,1)' }}
           onClick={e => e.stopPropagation()}
         >
-          {/* Griff mit schmalem weißen Rand darunter, damit gescrollter Text nicht direkt am Griff klebt. */}
-          <div className="flex-shrink-0 pb-1.5 pt-2.5 sm:hidden">
-            <div className="mx-auto h-[5px] w-10 rounded-[3px] bg-pm-chip" />
+          <div className="flex justify-center pt-3 pb-2 sm:hidden flex-shrink-0">
+            <div className="w-10 h-1 rounded-full bg-gray-300" />
           </div>
-          {/* Schließen: 44-px-Fläche, bleibt beim Scrollen oben rechts. */}
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute right-3 top-[14px] z-10 flex h-11 w-11 items-center justify-center"
-            aria-label="Schließen"
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-pm-shell text-pm-taupe-ink">
-              <X className="h-[18px] w-[18px]" strokeWidth={2.2} aria-hidden="true" />
-            </span>
-          </button>
 
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-11">
-            {/* Kopf: Foto, „Vorname, Alter“, Erfahrung, Deutsch mit Erklärung */}
-            <div className="flex items-center gap-[18px] pr-11 pt-4 sm:pt-[22px]">
-              {nurse.image ? (
-                <img
-                  src={nurse.image}
-                  alt={`Foto von ${vorname}`}
-                  className="h-[92px] w-[92px] flex-none rounded-full bg-pm-shell object-cover ring-1 ring-pm-line ring-offset-4 ring-offset-white"
-                />
-              ) : (
-                <div
-                  className="flex h-[92px] w-[92px] flex-none items-center justify-center rounded-full bg-pm-shell text-[28px] font-semibold text-pm-taupe-ink ring-1 ring-pm-line ring-offset-4 ring-offset-white"
-                  aria-hidden="true"
-                >
-                  {initials(nurse.name)}
+          {/* Sticky header — nur Bild + Name + Badges, KEINE Detail-Cards.
+              Schrumpft beim Scrollen (kleineres Bild, Verfügbarkeits-Chip
+              klappt weg), sodass mehr Inhalt sichtbar bleibt. */}
+          <div
+            className="px-5 flex-shrink-0 transition-all duration-200"
+            style={{ backgroundColor: `${nurse.color}12`, paddingTop: headerCompact ? '0.75rem' : '1.25rem', paddingBottom: headerCompact ? '0.5rem' : '1rem' }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative flex-shrink-0">
+                {nurse.image ? (
+                  <img
+                    src={nurse.image}
+                    alt={nurse.name}
+                    className={`rounded-2xl object-cover border-2 border-white shadow transition-all duration-200 ${headerCompact ? 'w-12 h-12' : 'w-20 h-20'}`}
+                  />
+                ) : (
+                  <div
+                    className={`rounded-2xl flex items-center justify-center font-bold text-white border-2 border-white shadow transition-all duration-200 ${headerCompact ? 'w-12 h-12 text-base' : 'w-20 h-20 text-2xl'}`}
+                    style={{ backgroundColor: nurse.color }}
+                  >
+                    {inits}
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                {/* 14.06.: Verfügbarkeits-Chip in dieselbe flex-wrap-Zeile
+                    wie Name/Alter/Badge gezogen (war vorher mt-1.5 + eigene
+                    Zeile, was 3-zeilig wirkte). flex-wrap erlaubt umbruch,
+                    falls Mobile-Breite knapp wird. Header-Compact-Modus
+                    blendet ihn weiterhin aus. */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className={`font-bold text-gray-900 leading-tight transition-all duration-200 ${headerCompact ? 'text-base' : 'text-xl'}`}>{name}</h2>
+                  {nurse.age ? (
+                    <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
+                  ) : null}
+                  {/* Ohne Stufe (keine Jahre, keine Einsätze) KEIN Chip —
+                      vorher rendete `nurseLevel` dort ein leeres Label und
+                      der Kunde sah eine leere Pille mit Rahmen. */}
+                  {lvl.label && (
+                  <button
+                    type="button"
+                    onClick={() => setShowLevelInfo(true)}
+                    className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex-shrink-0 cursor-pointer transition-transform active:scale-95 hover:brightness-95 ${lvl.cls}`}
+                    aria-label="Erfahrungs-Level erklären"
+                  >
+                    {lvl.label}
+                  </button>
+                  )}
+                  {!headerCompact && !ohneVerfuegbarkeit && (
+                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex-shrink-0 ${
+                      nurse.availableSoon ? 'bg-[#E3F7EF] text-[#22A06B] border-[#B8E8D4]' : 'bg-[#FEF3E2] text-[#B45309] border-[#F9D99A]'
+                    }`}>
+                      {nurse.availability}
+                    </span>
+                  )}
                 </div>
-              )}
-              <div className="min-w-0">
-                <h2 className="text-[24px] font-semibold leading-[30px] tracking-[-0.015em] text-pm-ink">
-                  {vorname}{nurse.age ? <span className="font-normal text-pm-muted">, {nurse.age}</span> : null}
-                </h2>
-                {erfahrung && <p className="mt-1 text-[16px] leading-[22px] text-pm-ink">{erfahrung}</p>}
-                {stufe && (
-                  <p className="mt-1 flex items-center gap-0.5 text-[16px] leading-[22px] text-pm-ink">
-                    Deutsch {stufe}
+              </div>
+              <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/80 flex items-center justify-center shadow-sm flex-shrink-0">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+          </div>
+
+          <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto">
+            {/* Erfahrung / Deutschkenntnisse Cards — vorher im sticky Header,
+                jetzt im scrollbaren Bereich. Spart Vertikalraum + erlaubt
+                den (i)-Button für die Sprach-FAQ direkt am Niveau. */}
+            <div className="px-5 pt-4 pb-1">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl px-3 py-2.5 border" style={{ background: '#FFFFFF', borderColor: '#D4D4D8' }}>
+                  <p className="text-[13px] mb-1" style={{ color: '#71717A' }}>Erfahrung</p>
+                  <p className="text-[16px] font-bold text-[#8B7355]">{nurse.experience}</p>
+                </div>
+                <div className="rounded-xl px-3 py-2.5 border" style={{ background: '#FFFFFF', borderColor: '#D4D4D8' }}>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[13px]" style={{ color: '#71717A' }}>Deutschkenntnisse</p>
+                    {/* Sauberer Brand-Kreis mit "i" — weiß auf Brand-Braun,
+                        passt zur Farbpalette und ist groß genug zum Tippen
+                        ohne aufdringlich zu wirken. */}
                     <button
                       type="button"
-                      onClick={() => setSprachInfoOffen((offen) => !offen)}
-                      className="-my-[11px] -ml-[9px] -mr-[13px] flex h-11 w-11 flex-none items-center justify-center text-pm-taupe"
-                      aria-label={`Was bedeutet Deutsch ${stufe}?`}
-                      aria-expanded={sprachInfoOffen}
-                      // Nur auf ein Ziel zeigen, das es gibt: Die Erklärung steht erst im geöffneten Zustand im DOM.
-                      aria-controls={sprachInfoOffen ? 'profil-sprachstufe' : undefined}
+                      onClick={() => setShowLanguageInfo(true)}
+                      className="w-5 h-5 rounded-full bg-[#8B7355]/15 hover:bg-[#8B7355]/25 text-[#8B7355] transition-colors flex items-center justify-center flex-shrink-0"
+                      aria-label="Sprach-Stufen erklären"
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
-                      </svg>
+                      <span className="text-[11px] font-bold leading-none" style={{ fontFamily: 'Georgia, serif' }}>i</span>
                     </button>
-                  </p>
-                )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <SprachBalken balken={bars.filter(Boolean).length} gesamt={bars.length} />
+                    <span className="text-[16px] font-bold" style={{ color: '#18181B' }}>{nurse.language.level}</span>
+                  </div>
+                </div>
               </div>
             </div>
-
-            {/* Erklärung der Sprachstufe: Standardtexte wie in den Häufigen Fragen. */}
-            {stufe && sprachInfoOffen && (
-              <div id="profil-sprachstufe" className="mt-5 rounded-[14px] border border-pm-line-soft bg-pm-paper px-4 py-3.5" data-sprachstufe>
-                {stufenText && (
-                  <>
-                    <p className="flex items-center gap-2 text-[16px] font-semibold leading-[22px] text-pm-ink">
-                      <span className="inline-flex gap-[3px]" aria-hidden="true">
-                        {LANGUAGE_LEVELS.map((l) => (
-                          <span key={l.bars} className={`block h-[9px] w-[9px] rounded-full ${l.bars <= stufenText.bars ? 'bg-pm-taupe' : 'bg-pm-chip'}`} />
-                        ))}
-                      </span>
-                      Deutsch {stufenText.label}
-                    </p>
-                    <p className="mt-1.5 text-[15px] leading-[22px] text-pm-ink">{stufenText.desc}</p>
-                  </>
-                )}
-                <p className={`${stufenText ? 'mt-2' : ''} text-[14px] leading-5 text-pm-muted`}>{LANGUAGE_LEVELS_INTRO}</p>
+            {/* Erfahrungsstufe im Klartext. Der Chip oben nennt nur das Wort;
+                warum GENAU diese Kraft es traegt, stand bisher ausschliesslich
+                im Popup hinter dem Chip — also fuer die meisten Kunden
+                unsichtbar (Martin, 08.09.2026). Die Leiter aller Stufen bleibt
+                im Popup, hier steht der Fall dieser Pflegekraft. */}
+            {lvl.label && (
+              <div className="px-5 pt-3">
+                <div className="rounded-xl border px-4 py-3" style={{ background: '#FFFFFF', borderColor: '#D4D4D8' }}>
+                  {/* Reihenfolge (Martin, 08.09.2026): erst die Ueberschrift,
+                      dann das Ergebnis, dann die Begruendung. Die Ueberschrift
+                      BENENNT nur — sie erklaert die Stufe nicht schon vorweg,
+                      das macht der Text darunter. Deshalb ist sie fuer alle
+                      Stufen dieselbe; das Stufenwort traegt das Gewicht. */}
+                  <p className="text-[16px] font-bold" style={{ color: '#18181B' }}>
+                    Unsere Erfahrungsstufen
+                  </p>
+                  <p className="text-[22px] font-bold leading-tight mt-0.5 mb-1.5" style={{ color: '#8B7355' }}>
+                    {lvl.label}
+                  </p>
+                  <p className="text-[15px] leading-relaxed" style={{ color: '#71717A' }}>
+                    {stufeErklaerung}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowLevelInfo(true)}
+                    className="mt-2 text-[13px] font-bold hover:underline"
+                    style={{ color: '#8B7355' }}
+                  >
+                    Alle Stufen ansehen →
+                  </button>
+                </div>
               </div>
             )}
-
             {/* "Hat Interesse"-Hinweis — nur wenn die Pflegekraft in Mamamia
-                proaktiv Interesse signalisiert hat (z.B. via Like). Seit 14.11.2026
-                ohne Koralle-Fläche (Regel Martin: keine roten Flächen). */}
+                proaktiv Interesse signalisiert hat (z.B. via Like). Erklärt
+                kurz, dass eine Einladung die offizielle Bewerbung ermöglicht. */}
             {hasInterest && (
-              <div className="mt-5 rounded-[16px] border border-pm-line bg-pm-paper px-4 py-3.5">
-                <p className="flex items-center gap-2 text-[16px] font-semibold leading-[22px] text-pm-ink">
-                  <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] flex-none text-pm-taupe" fill="currentColor" aria-hidden="true">{SYMBOLE.herz}</svg>
-                  {vorname} hat Interesse signalisiert
-                </p>
-                <p className="mt-1 text-[15px] leading-[22px] text-pm-muted">
-                  Sie hat Ihre Anfrage gesehen und würde sich gerne bei Ihnen bewerben. Laden Sie {vorname} ein, damit wir ihre offizielle Bewerbung anstoßen können.
-                </p>
+              <div className="mx-5 mt-4 rounded-xl border px-4 py-3"
+                   style={{ background: 'linear-gradient(135deg, #FFF1EC 0%, #FFE5DE 100%)', borderColor: '#F0B0A4' }}>
+                <div className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#FFCFC4' }}>
+                    <Heart className="w-3.5 h-3.5" fill="currentColor" style={{ color: '#C04A40' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold" style={{ color: '#C04A40' }}>
+                      {nurse.name.split(' ')[0]} hat Interesse signalisiert
+                    </p>
+                    <p className="text-[13px] text-gray-700 mt-0.5 leading-relaxed">
+                      Sie hat Ihre Anfrage gesehen und würde sich gerne bei Ihnen bewerben. Laden Sie {nurse.name.split(' ')[0]} ein, damit wir ihre offizielle Bewerbung anstoßen können.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* Design-Angleichung 12.08.: Der Rest des Portals wurde am
+                11.08. auf abgesetzte Kästen (#F5F5F6 + Rand #D4D4D8) und
+                16-px-Fließtext umgestellt — das Profil hatte nur die Farben
+                mitbekommen und stand noch auf 14 px in randlosen Flächen. */}
+            <div className="px-5 pt-4 pb-5">
+              <h3 className={sectionHeadCls}>Über {nurse.name.split(' ')[0]}</h3>
+              {profileLoading && !p ? (
+                <div className={boxCls + ' animate-pulse'}>
+                  <div className="h-3 w-full bg-gray-200 rounded mb-2" />
+                  <div className="h-3 w-11/12 bg-gray-200 rounded mb-2" />
+                  <div className="h-3 w-9/12 bg-gray-200 rounded" />
+                </div>
+              ) : aboutLoading ? (
+                <div className={boxCls + ' flex items-start gap-3'}>
+                  <svg
+                    className="w-5 h-5 animate-spin text-[#8B7355] flex-shrink-0 mt-0.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                  <p className="text-[16px] italic leading-relaxed" style={{ color: '#71717A' }}>
+                    Wir bereiten Ihnen gerade eine persönliche Vorstellung von {nurse.name.split(' ')[0]} vor…
+                  </p>
+                </div>
+              ) : (
+                <div className={boxCls}>
+                  <p className="text-[16px] leading-relaxed whitespace-pre-line" style={{ color: '#18181B' }}>{aboutSentence}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Referenz-PDF — wird direkt VOR den letzten Einsätzen
+                gerendert (starkes Vertrauenssignal aus erster Hand). Klick
+                lädt die PDF herunter (siehe handleReferenceDownload) statt
+                den langen vorsignierten S3-Link im Tab zu zeigen. Das href
+                bleibt gesetzt, damit „Link speichern unter" / Fallback
+                weiterhin funktionieren. */}
+            {nurse.referencePdfUrl && (
+              <div className="px-5 pb-5">
+                <a
+                  href={nurse.referencePdfUrl}
+                  onClick={handleReferenceDownload}
+                  download
+                  className="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-[#F5F5F6] hover:bg-[#EBE2D5] px-4 py-3 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0 border border-[#E9E9EB]">
+                    <FileText className="w-5 h-5 text-[#8B7355]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] font-semibold text-[#3D2B1F] leading-tight">
+                      Referenzen
+                    </p>
+                    <p className="text-[12px] text-gray-500 leading-tight mt-0.5">
+                      {refDownloading ? 'Wird heruntergeladen…' : 'Empfehlungen früherer Familien'}
+                    </p>
+                  </div>
+                  {refDownloading ? (
+                    <svg className="w-4 h-4 animate-spin text-[#8B7355] flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                  ) : (
+                    <Download className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
+                  )}
+                </a>
               </div>
             )}
 
-            {/* Der eine hervorgehobene Kasten. Kreise auf denselben Kanten wie alle anderen (−10 px Rand, 10 px Innenabstand). */}
-            {gruende.length > 0 && (
-              <section className="-mx-2.5 mt-7 rounded-[20px] bg-pm-shell px-2.5 py-5" data-passt-gruende>
-                <h3 className={`${ueberschriftCls} mb-3.5`}>Warum {vorname} zu Ihnen passt</h3>
-                <ul className="grid gap-2.5">
-                  {gruende.map((g) => (
-                    <li key={g} className="flex items-start gap-3">
-                      <Kreis haken />
-                      <span className="flex min-h-[40px] items-center text-[16px] font-medium leading-[22px] tracking-[-0.01em] text-pm-ink">{g}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {zeigeUeber && (
-              <section className="mt-10">
-                <h3 className={`${ueberschriftCls} mb-4`}>Über {vorname}</h3>
-                {laedt ? (
-                  <div className="mb-[22px] animate-pulse space-y-2.5" aria-hidden="true">
-                    <div className="h-3 w-full rounded bg-pm-line-soft" />
-                    <div className="h-3 w-11/12 rounded bg-pm-line-soft" />
-                    <div className="h-3 w-9/12 rounded bg-pm-line-soft" />
-                  </div>
-                ) : aboutLoading ? (
-                  <div className="mb-[22px] flex items-start gap-3">
-                    <Kreisel className="mt-0.5 h-5 w-5 text-pm-taupe" />
-                    <p className="text-[16px] italic leading-[26px] text-pm-muted">
-                      Wir bereiten Ihnen gerade eine persönliche Vorstellung von {vorname} vor…
-                    </p>
-                  </div>
-                ) : ueberText ? (
-                  <p className="mb-[22px] whitespace-pre-line text-[16px] leading-[26px] text-pm-ink">{ueberText}</p>
-                ) : null}
-                {laedt ? (
-                  <div className="grid gap-[18px]">
-                    <ZeileLaedt /><ZeileLaedt /><ZeileLaedt /><ZeileLaedt />
-                  </div>
-                ) : angaben.length > 0 && (
-                  <div className="grid gap-[18px]">
-                    {angaben.map((a) => <Zeile key={a.symbol} symbol={a.symbol} label={a.label} wert={a.wert} />)}
-                  </div>
-                )}
-              </section>
-            )}
-
-            {/* Letzte Einsätze — CaregiverDeparturesWithPagination (Registry #126). Je Einsatz eine Zeile: Zeitraum und Dauer
-                grau, Ort dunkel. Fehler der Abfrage sichtbar; die Referenzen früherer Familien als letzte Zeile, ohne
-                Einsätze ohne die Überschrift. */}
-            {(zeigeEinsaetze || !!nurse.referencePdfUrl) && (
-              <section className="mt-10" data-einsaetze>
-                {zeigeEinsaetze && <h3 className={`${ueberschriftCls} mb-4`}>Letzte Einsätze</h3>}
-                <div className="grid gap-[18px]">
-                  {einsaetze.map((a, i) => {
-                    const ort = a.city || a.postalCode;
-                    const zeile = [zeitraum(a.startDate, a.endDate), a.duration].filter(Boolean).join(' · ');
-                    return <Zeile key={i} symbol="haus" label={ort ? zeile : undefined} wert={ort || zeile} />;
-                  })}
-                  {nurse.einsaetzeError && (
-                    <p className="text-[16px] leading-[22px] text-pm-muted">Die Einsätze können wir gerade nicht abrufen.</p>
-                  )}
-                  {/* Referenz-PDF: Klick lädt die PDF herunter (siehe handleReferenceDownload) statt den langen
-                      vorsignierten S3-Link im Tab zu zeigen. Das href bleibt gesetzt, damit „Link speichern unter" /
-                      Fallback weiterhin funktionieren. */}
-                  {nurse.referencePdfUrl && (
-                    <a href={nurse.referencePdfUrl} onClick={handleReferenceDownload} download className="flex items-start gap-3">
-                      <Kreis symbol="datei" />
-                      <span className="flex min-h-[40px] min-w-0 flex-col justify-center">
-                        <span className="text-[15px] leading-5 text-pm-muted">Referenzen</span>
-                        <span className="mt-px flex items-center gap-2 text-[16px] font-medium leading-[22px] tracking-[-0.01em] text-pm-taupe-ink underline decoration-pm-taupe/40 underline-offset-4">
-                          {refDownloading ? 'Wird heruntergeladen…' : 'Empfehlungen früherer Familien'}
-                          {refDownloading && <Kreisel className="h-4 w-4 text-pm-taupe" />}
-                        </span>
-                      </span>
-                    </a>
+            {/* Letzte Einsätze — CaregiverDeparturesWithPagination (Registry #126).
+                Drei ehrliche Zustände wie im SA-Portal: gerade woanders im
+                Einsatz, Liste der abgeschlossenen, Fehler der Abfrage. */}
+            {(nurse.onOtherJob || nurse.einsaetzeError || (nurse.detailedAssignments?.length ?? 0) > 0) && (
+              <div className="px-5 pb-5">
+                <div className="flex items-center justify-between mb-2 gap-2">
+                  <h3 className={sectionHeadCls + ' mb-0'}>Letzte Einsätze</h3>
+                  {nurse.history && (nurse.detailedAssignments?.length ?? 0) > 0 && (
+                    <span className="text-[13px] font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
+                      style={{ color: '#71717A', background: '#F5F5F6', border: '1px solid #D4D4D8' }}>
+                      {/* Gleicher Wortlaut wie die Karte, ohne Ø-Dauer (Martin, 03.09.). */}
+                      {einsaetzeText(nurse.history.assignments)}
+                    </span>
                   )}
                 </div>
-              </section>
+                <div className="space-y-2">
+                  {nurse.onOtherJob && (
+                    <div className={boxCls}>
+                      <p className="text-[16px] leading-relaxed" style={{ color: '#71717A' }}>Derzeit im Einsatz bei einem anderen Kunden.</p>
+                    </div>
+                  )}
+                  {nurse.detailedAssignments?.map((a, i) => (
+                    <div key={i} className={boxCls}>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                        <div><p className={assignLabelCls}>Zeitraum</p><p className={assignValueCls}>{a.startDate} – {a.endDate}</p></div>
+                        <div><p className={assignLabelCls}>Dauer</p><p className={assignValueCls}>{a.duration}</p></div>
+                        {(a.postalCode || a.city) && (
+                          <div><p className={assignLabelCls}>Ort</p><p className={assignValueCls}>{a.postalCode} {a.city}</p></div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {nurse.einsaetzeError && (
+                    <div className={boxCls}>
+                      <p className="text-[16px] leading-relaxed" style={{ color: '#71717A' }}>Die Einsätze können wir gerade nicht abrufen.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
+
+            <div className="px-5 pb-5">
+              <h3 className={sectionHeadCls + ' mb-3'}>Über mich</h3>
+              {profileLoading ? (
+                <div className="divide-y divide-gray-100">
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow chips />
+                  <SkeletonRow chips />
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  <InfoRow emoji="👤" label="Geschlecht" value={nurse.gender === 'female' ? 'Weiblich' : 'Männlich'} />
+                  {p?.nationality && (
+                    <InfoRow emoji="🌍" label="Nationalität" value={p.nationality} />
+                  )}
+                  {p?.yearOfBirth && (
+                    <InfoRow emoji="🎂" label="Geburtsjahr" value={String(p.yearOfBirth)} />
+                  )}
+                  {p?.weight && (
+                    <InfoRow emoji="⚖️" label="Gewicht" value={p.weight} />
+                  )}
+                  {p?.height && (
+                    <InfoRow emoji="📏" label="Größe" value={p.height} />
+                  )}
+                  {p?.maritalStatus && (
+                    <InfoRow emoji="💍" label="Familienstand" value={p.maritalStatus} />
+                  )}
+                  {p && p.personalities.length > 0 && (
+                    <InfoRow emoji="🧠" label="Persönlichkeit" chips={p.personalities} />
+                  )}
+                  {p && p.hobbies.length > 0 && (
+                    <InfoRow emoji="🎯" label="Hobbys" chips={p.hobbies} />
+                  )}
+                  {p?.furtherHobbies && (
+                    <InfoRow emoji="✨" label="Weitere Interessen" value={p.furtherHobbies} />
+                  )}
+                </div>
+              )}
+            </div>
+
+            {(() => {
+              // Hide whole "Besondere Merkmale" section when post-load every
+              // row would be empty. During loading we show skeletons —
+              // can't know yet which rows have data.
+              const smokingValue = p?.smoking ? smokingLabel[p.smoking] : '';
+              const hasDrivingLicense = p?.drivingLicense != null;
+              const hasSmoking = !!smokingValue;
+              const hasIsNurse = p?.isNurse != null;
+              const hasQualifications = !!p?.qualifications;
+              const hasEducation = !!p?.education;
+              // "Andere Sprachkenntnisse" (Muttersprache, z. B. Polski) bewusst
+              // NICHT zeigen: für den Kunden zählt immer das DEUTSCH-Niveau, und
+              // das steht prominent oben (Karte) + im 3-Stufen-Block weiter unten.
+              const showSpecial = profileLoading
+                || hasDrivingLicense || hasSmoking || hasIsNurse
+                || hasQualifications || hasEducation;
+              if (!showSpecial) return null;
+              return (
+                <div className="px-5 pb-5">
+                  <h3 className={sectionHeadCls + ' mb-3'}>Besondere Merkmale</h3>
+                  {profileLoading ? (
+                    <div className="divide-y divide-gray-100">
+                      <SkeletonRow />
+                      <SkeletonRow />
+                      <SkeletonRow />
+                      <SkeletonRow chips />
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {hasDrivingLicense && (
+                        <InfoRow
+                          emoji="🚗"
+                          label="Führerschein"
+                          value={`${yesNo(p!.drivingLicense)}${p!.drivingLicenseGearbox ? ` (${p!.drivingLicenseGearbox})` : ''}`}
+                        />
+                      )}
+                      {hasSmoking && (
+                        <InfoRow emoji="🚬" label="Raucher" value={smokingValue} />
+                      )}
+                      {hasIsNurse && (
+                        <InfoRow emoji="🎓" label="Pflegeberuf erlernt" value={yesNo(p!.isNurse)} />
+                      )}
+                      {hasQualifications && (
+                        <InfoRow emoji="🏥" label="Qualifikationen" value={p!.qualifications} />
+                      )}
+                      {hasEducation && (
+                        <InfoRow emoji="📚" label="Ausbildung" value={p!.education} />
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {profileLoading ? (
+              <div className="px-5 pb-6">
+                <h3 className={sectionHeadCls + ' mb-3'}>Berufliche Anforderungen</h3>
+                <div className="divide-y divide-gray-100">
+                  <SkeletonRow chips />
+                </div>
+              </div>
+            ) : (p && p.acceptedMobilities.length > 0 && (
+              <div className="px-5 pb-6">
+                <h3 className={sectionHeadCls + ' mb-3'}>Berufliche Anforderungen</h3>
+                <div className="divide-y divide-gray-100">
+                  <InfoRow emoji="🦽" label="Akzeptierte Mobilität" chips={p.acceptedMobilities} />
+                </div>
+              </div>
+            ))}
           </div>
 
           {(onChat || zeigeAktionen) && (
-          <div className="flex-shrink-0 space-y-3 border-t border-pm-line bg-white px-5 pb-[max(26px,env(safe-area-inset-bottom))] pt-3.5 shadow-[0_-10px_28px_rgba(40,30,20,0.06)]">
+          <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 space-y-3">
             {onChat && (
               <button
-                type="button"
                 onClick={onChat}
-                className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] border border-pm-line bg-white text-[16px] font-semibold text-pm-taupe-ink transition-colors hover:bg-pm-paper"
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#8B7355]/30 bg-white hover:bg-[#F5F5F6] text-[#6B5444] text-sm font-semibold py-3 transition-colors"
               >
-                <svg className="h-[18px] w-[18px] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l.8-3.2A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
-                Frage an {vorname} stellen
+                Frage an {nurse.name.split(' ')[0]} stellen
               </button>
             )}
             {zeigeAktionen && (
-            <div>
-            {zeigeHinweis && (
-              <p className="mb-2.5 text-center text-[15px] leading-[21px] text-pm-muted">Laden Sie {vorname} ein, sich zu bewerben.</p>
-            )}
-            <div className="flex items-center gap-4">
+            <div className="flex gap-3">
             {!app && einladenVorSpeichern ? (
               <button
                 type="button"
                 onClick={einladenVorSpeichern}
-                className={`${knopfCoralCls} w-full max-[339px]:text-[15px]`}
+                className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[12px] bg-pm-green px-3 text-[16px] font-bold text-white hover:bg-pm-green-deep max-[339px]:text-[15px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-green"
                 data-profil-einladen
               >
-                <UserPlus className="h-[19px] w-[19px] flex-none max-[339px]:hidden" strokeWidth={2.2} aria-hidden="true" />
+                <UserPlus className="h-[18px] w-[18px] flex-none max-[339px]:hidden" strokeWidth={2.5} aria-hidden="true" />
                 <span className="whitespace-nowrap">Zur Bewerbung einladen</span>
               </button>
             ) : !app && zumFormular ? (
@@ -520,18 +688,23 @@ export const CustomerNurseModal: FC<{
             ) : app ? (
               app.status === 'declined' ? (
                 <button
-                  type="button"
                   onClick={() => { onUndo?.(); onClose(); }}
-                  className={`${zustandCls} transition-colors hover:bg-pm-shell`}
+                  className="flex-1 bg-[#F5F5F6] text-[#8B7355] border border-[#E9E9EB] rounded-xl py-3 font-bold text-sm hover:bg-[#EBE2D5] transition-colors flex items-center justify-center gap-2"
                 >
-                  <Undo2 className="h-[18px] w-[18px]" aria-hidden="true" /> Ablehnung rückgängig machen
+                  ↩ Ablehnung rückgängig machen
                 </button>
               ) : (
                 <>
-                  <button type="button" onClick={() => onDecline?.()} className={textlinkCls}>
+                  <button
+                    onClick={() => onDecline?.()}
+                    className="flex-1 border-2 border-red-100 bg-red-50 text-red-500 rounded-xl py-3 font-semibold text-sm hover:bg-red-100 transition-colors"
+                  >
                     Ablehnen
                   </button>
-                  <button type="button" onClick={onReview} className={knopfCoralCls}>
+                  <button
+                    onClick={onReview}
+                    className="flex-[2] bg-[#E76F63] text-white rounded-xl py-3 font-bold text-sm hover:bg-[#D65E52] shadow-sm transition-colors"
+                  >
                     Angebot prüfen
                   </button>
                 </>
@@ -541,39 +714,189 @@ export const CustomerNurseModal: FC<{
                 {!invited ? (
                   <>
                     {onDeclineMatch && (
-                    <button type="button" onClick={() => { onDeclineMatch(); }} className={textlinkCls}>
+                    <button
+                      onClick={() => { onDeclineMatch(); }}
+                      className="flex-1 border-2 border-gray-200 text-gray-500 rounded-xl py-3 font-semibold text-sm hover:bg-gray-50 transition-colors"
+                    >
                       Nein danke
                     </button>
                     )}
                     {invitePhaseModal === 'sending' ? (
-                      <div className={zustandCls}>
-                        <Kreisel className="h-4 w-4" />
+                      <div className="flex-[2] bg-[#F5F5F6] text-[#8B7355] rounded-xl py-3 font-bold text-sm border border-[#E9E9EB] flex items-center justify-center gap-2">
+                        <svg className="w-4 h-4 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                        </svg>
                         Pflegekraft wird eingeladen…
                       </div>
                     ) : invitePhaseModal === 'done' ? (
-                      <div className={`${zustandCls} text-pm-ink`}>
-                        <Check className="h-[18px] w-[18px] text-pm-green" aria-hidden="true" /> Pflegekraft wurde eingeladen!
+                      <div className="flex-[2] bg-[#E3F7EF] text-[#22A06B] rounded-xl py-3 font-bold text-sm border border-[#B8E8D4] flex items-center justify-center gap-2">
+                        <Check className="w-4 h-4" /> Pflegekraft wurde eingeladen!
                       </div>
                     ) : (
-                      <button type="button" onClick={handleModalInvite} className={knopfCoralCls}>
-                        <UserPlus className="h-[19px] w-[19px] flex-none" strokeWidth={2.2} aria-hidden="true" /> Einladen
+                      <button
+                        onClick={handleModalInvite}
+                        className="flex-[2] bg-[#E76F63] text-white rounded-xl py-3 font-bold text-sm hover:bg-[#D65E52] shadow-sm transition-colors flex items-center justify-center gap-2"
+                      >
+                        <UserPlus className="w-4 h-4" /> Einladen
                       </button>
                     )}
                   </>
                 ) : (
-                  <div className={zustandCls}>
-                    <Check className="h-[18px] w-[18px]" aria-hidden="true" /> Eingeladen — warten auf Bewerbung
+                  <div className="flex-1 bg-[#F5F5F6] text-[#8B7355] rounded-xl py-3 font-bold text-sm border border-[#E9E9EB] flex items-center justify-center gap-2">
+                    <Check className="w-4 h-4" /> Eingeladen — warten auf Bewerbung
                   </div>
                 )}
               </>
             )}
-            </div>
             </div>
             )}
           </div>
           )}
         </div>
       </div>
+
+      {/* Experience-level explanation — opened by tapping the badge */}
+      {showLevelInfo && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70]"
+            onClick={() => setShowLevelInfo(false)}
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          />
+          <div
+            className="fixed z-[70] inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4 pointer-events-none"
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          >
+            <div
+              className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-3xl pointer-events-auto shadow-2xl"
+              style={{ animation: 'slideSheet 0.3s cubic-bezier(0.32,0.72,0,1)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex justify-center pt-3 pb-1 sm:hidden">
+                <div className="w-10 h-1 rounded-full bg-gray-300" />
+              </div>
+              <div className="px-5 pt-3 pb-5">
+                <div className="flex items-start justify-between gap-3 mb-1.5">
+                  <h3 className="text-[1.05rem] font-bold" style={{ color: '#18181B' }}>Erfahrungsstufe</h3>
+                  <button
+                    onClick={() => setShowLevelInfo(false)}
+                    className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"
+                    aria-label="Schließen"
+                  >
+                    <X className="w-4 h-4 text-gray-500" />
+                  </button>
+                </div>
+                <p className="text-[15px] leading-relaxed mb-4" style={{ color: '#71717A' }}>
+                  Die Stufe zeigt, wie oft eine Pflegekraft schon über uns im
+                  Einsatz war — gezählt werden nur abgeschlossene Einsätze.
+                  Wer wiederkommt, hat sich bei Familien vor Ihnen bewährt.
+                </p>
+                <div className="space-y-1.5">
+                  {EXPERIENCE_LEVELS.map(level => {
+                    const isCurrent = level.label === lvl.label;
+                    return (
+                      <div
+                        key={level.label}
+                        className="flex items-center gap-3 rounded-xl px-3 py-2.5 border"
+                        style={
+                          isCurrent
+                            ? { background: '#FFFFFF', borderColor: '#8B7355' }
+                            : { background: '#F5F5F6', borderColor: '#E4E4E7' }
+                        }
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[15px] font-bold" style={{ color: '#18181B' }}>{level.label}</p>
+                          <p className="text-[13px]" style={{ color: '#71717A' }}>{level.desc}</p>
+                        </div>
+                        {isCurrent && (
+                          <span className="text-[12px] font-bold flex-shrink-0" style={{ color: '#8B7355' }}>Aktuell</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Sprach-Stufen-Erklärung — geöffnet vom (i)-Button im
+          Deutschkenntnisse-Block. Hebt aktuell zutreffende Stufe optisch
+          hervor, damit der Kunde direkt sieht, was die Bars für DIESE
+          Pflegekraft bedeuten. */}
+      {showLanguageInfo && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70]"
+            onClick={() => setShowLanguageInfo(false)}
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          />
+          <div
+            className="fixed z-[70] inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4 pointer-events-none"
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          >
+            <div
+              className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-3xl pointer-events-auto shadow-2xl"
+              style={{ animation: 'slideSheet 0.3s cubic-bezier(0.32,0.72,0,1)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex justify-center pt-3 pb-1 sm:hidden">
+                <div className="w-10 h-1 rounded-full bg-gray-300" />
+              </div>
+              <div className="px-5 pt-3 pb-5">
+                <div className="flex items-start justify-between gap-3 mb-1.5">
+                  <h3 className="text-base font-bold text-gray-900">Deutschkenntnisse</h3>
+                  <button
+                    onClick={() => setShowLanguageInfo(false)}
+                    className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"
+                    aria-label="Schließen"
+                  >
+                    <X className="w-4 h-4 text-gray-500" />
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                  {LANGUAGE_LEVELS_INTRO}
+                </p>
+                <div className="space-y-1.5">
+                  {LANGUAGE_LEVELS.map(level => {
+                    const isCurrent = level.bars === nurse.language.bars;
+                    return (
+                      <div
+                        key={level.label}
+                        className={`flex items-start gap-3 rounded-xl px-3 py-2.5 border ${
+                          isCurrent ? 'bg-[#F5F5F6] border-zinc-200' : 'bg-gray-50 border-gray-100'
+                        }`}
+                      >
+                        <div className="flex gap-0.5 pt-1 flex-shrink-0">
+                          {Array.from({ length: 3 }, (_, i) => (
+                            <div key={i} className={`w-3 h-1.5 rounded-full ${i < level.bars ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />
+                          ))}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className={`text-sm font-bold ${isCurrent ? 'text-[#3D2B1F]' : 'text-gray-800'}`}>{level.label}</p>
+                            {isCurrent && (
+                              <span className="text-[10px] font-bold text-[#8B7355] bg-white border border-zinc-200 px-2 py-0.5 rounded-full">
+                                Aktuell
+                              </span>
+                            )}
+                          </div>
+                          <p className={`text-xs mt-0.5 leading-relaxed ${isCurrent ? 'text-gray-700' : 'text-gray-500'}`}>{level.desc}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-gray-500 leading-relaxed mt-4">
+                  {LANGUAGE_LEVELS_FOOTER}
+                </p>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 };

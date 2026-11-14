@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import type { Application } from './shared';
-import { initials } from './shared';
+import { nurseLevel, nurseFacts, displayName, initials } from './shared';
 
 export const DeclineConfirmModal: FC<{
   app: Application;
@@ -10,9 +10,9 @@ export const DeclineConfirmModal: FC<{
 }> = ({ app, onCancel, onConfirm }) => {
   const [message, setMessage] = useState('');
   const { nurse } = app;
-  const vorname = nurse.name.split(' ')[0] || nurse.name;
-  const jahre = nurse.experienceYears ?? 0;
-  const deutsch = nurse.language?.level;
+  const name = displayName(nurse.name);
+  const inits = initials(nurse.name);
+  const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
 
   return (
     <>
@@ -35,35 +35,40 @@ export const DeclineConfirmModal: FC<{
               <p className="text-sm text-gray-600 mt-0.5">Die Agentur wird über die Absage informiert.</p>
             </div>
 
-            {/* Registry #164 (Code-Prüfung 14.11.2026): Pflegekraft wie die Zeile der Liste, ohne Stufe und Einsätze (Martin: „das
-                mit der Elite … versteht kein Mensch“); hier nur zum Erkennen, nicht antippbar. */}
-            <div className="flex items-center gap-4" data-ablehnen-pflegekraft>
-              {nurse.image ? (
-                <img src={nurse.image} alt="" className="h-[72px] w-[72px] flex-none rounded-full object-cover ring-1 ring-pm-line bg-pm-grund" />
-              ) : (
-                <span aria-hidden="true" className="flex h-[72px] w-[72px] flex-none items-center justify-center rounded-full text-[18px] font-bold text-white ring-1 ring-pm-line" style={{ backgroundColor: nurse.color }}>
-                  {initials(nurse.name).slice(0, 2)}
-                </span>
-              )}
-              <span className="min-w-0">
-                <span className="block text-[18px] font-semibold leading-6 text-pm-ink">
-                  {vorname}{nurse.age ? <span className="font-normal text-pm-muted">, {nurse.age}</span> : null}
-                </span>
-                {jahre > 0 && <span className="mt-0.5 block text-[16px] leading-[22px] text-pm-ink">{jahre === 1 ? '1 Jahr Erfahrung' : `${jahre} Jahre Erfahrung`}</span>}
-                {deutsch && deutsch !== '—' && <span className="mt-0.5 block text-[16px] leading-[22px] text-pm-ink">Deutsch {deutsch}</span>}
-              </span>
+            <div className="flex items-center gap-3.5 bg-gray-50 rounded-2xl px-4 py-3.5 border border-gray-200">
+              <div className="flex-shrink-0">
+                {nurse.image ? (
+                  <img src={nurse.image} alt={nurse.name} className="w-16 h-16 rounded-xl object-cover" />
+                ) : (
+                  <div className="w-16 h-16 rounded-xl flex items-center justify-center text-lg font-bold text-white"
+                    style={{ backgroundColor: nurse.color }}>
+                    {inits}
+                  </div>
+                )}
+              </div>
+              {/* CG-Box im einheitlichen Portal-Stil (wie MatchCard). */}
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-base" style={{ color: '#18181B' }}>
+                  {name}{nurse.age ? <span className="font-normal" style={{ color: '#71717A' }}>, {nurse.age}</span> : null}
+                </p>
+                <p className="text-sm mt-0.5" style={{ color: '#71717A' }}>Deutsch {nurse.language.level}</p>
+                <p className="text-sm mt-1" style={{ color: '#71717A' }}>
+                  {lvl.label && <span className="font-semibold" style={{ color: '#18181B' }}>{lvl.label}: </span>}
+                  {nurseFacts(nurse)}
+                </p>
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Grund der Ablehnung <span className="text-pm-coral-ink">*</span>
+                Grund der Ablehnung <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={message}
                 onChange={e => setMessage(e.target.value)}
                 placeholder="z.B. Die Pflegekraft passt leider nicht zu unserem Patienten…"
                 rows={3}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:border-pm-taupe focus:ring-2 focus:ring-pm-taupe/15 transition-all resize-none"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:border-[#9B1FA1] focus:ring-2 focus:ring-[#9B1FA1]/10 transition-all resize-none"
               />
             </div>
 
@@ -77,8 +82,7 @@ export const DeclineConfirmModal: FC<{
               <button
                 onClick={() => onConfirm(message.trim())}
                 disabled={message.trim() === ''}
-                // Koralle wie alle Knöpfe außer „Pflegesituation vervollständigen“ (Martin 14.11.2026), kein Rot.
-                className="flex-1 bg-pm-coral text-white rounded-xl py-3 text-base font-bold transition-colors enabled:hover:bg-pm-coral-deep disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 bg-red-500 text-white rounded-xl py-3 text-base font-bold transition-colors hover:bg-red-600 disabled:bg-red-200 disabled:cursor-not-allowed"
               >
                 Ablehnen
               </button>
