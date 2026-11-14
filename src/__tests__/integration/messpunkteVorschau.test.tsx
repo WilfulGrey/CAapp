@@ -30,7 +30,7 @@ const gescrollt = () => (Element.prototype.scrollIntoView as unknown as { mock: 
 const sprungLeeren = () => (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
 
 describe('Messpunkte in der Vorschau (?preview=patient)', () => {
-  it('Bestpreis, Kosten, Frage, „Pflegesituation vervollständigen“ im Kasten unter der Liste und in „So geht es weiter“, Profil mit „Zur Bewerbung einladen“ und das Fenster danach antippen — keine einzige Meldung an die Bridge', async () => {
+  it('Bestpreis, Kosten, Frage, „Pflegesituation vervollständigen“ in „So geht es weiter“, Profil und der Knopf darin antippen — keine einzige Meldung an die Bridge', async () => {
     const meldungen: unknown[] = [];
     server.use(
       bridgeHandler((b) => { meldungen.push(b); }),
@@ -41,19 +41,14 @@ describe('Messpunkte in der Vorschau (?preview=patient)', () => {
     );
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
-    // Minimal-Einstieg vor dem Speichern (Registry #147, Stand 14.11.2026, #163): „Details“ klappt die Kosten in der Preiskarte
-    // auf, „Bestpreisgarantie“ öffnet ihr Fenster. Ins Formular führen der grüne Knopf im Kasten unter der Liste (Messpunkt
-    // zur_pflegesituation, Quelle hauptknopf), der in „So geht es weiter“ (Quelle schritte) und der im Fenster „{Name}
-    // einladen“ (Quelle einladen_fenster); das Profil öffnet die Zeile (profil_geoeffnet), sein Knopf „Zur Bewerbung einladen“
-    // meldet einladen_getippt und einladung_vorgemerkt. Jeder dieser Wege muss in der Vorschau stumm bleiben. Dass der Sprung
-    // zum Formular wirklich lief, zeigt scrollIntoView auf #patientendaten: Der Messpunkt sitzt direkt davor
-    // (zurPflegesituationAus), ohne Sprung hätte der Test nichts geprüft.
-    const ablaufKnopf = await waitFor(() => {
-      const k = document.querySelector<HTMLElement>('[data-ablauf-link]');
-      if (!k) throw new Error('kein Knopf in „So geht es weiter“');
-      return k;
-    }, { timeout: 5000 });
-    expect(ablaufKnopf.textContent).toBe('Pflegesituation vervollständigen');
+    // Minimal-Einstieg vor dem Speichern (Registry #147, Stand 13.11.2026): „Details“ klappt die Kosten in der Preiskarte auf,
+    // „Bestpreisgarantie“ öffnet ihr Fenster. Kein fester Knopf und kein „Einladen“ mehr: Ins Formular führen der grüne Knopf in
+    // „So geht es weiter“ (Messpunkt zur_pflegesituation, Quelle schritte) und im Profil der Knopf „Pflegesituation
+    // vervollständigen“ (Quelle karte); das Profil öffnet die Zeile (profil_geoeffnet). Jeder dieser Wege muss in der Vorschau
+    // stumm bleiben. Dass der Sprung zum Formular wirklich lief, zeigt scrollIntoView auf #patientendaten: Der Messpunkt sitzt
+    // direkt davor (zurPflegesituationAus), ohne Sprung hätte der Test nichts geprüft.
+    const ablaufKnopf = await screen.findByRole('button', { name: 'Pflegesituation vervollständigen' }, { timeout: 5000 });
+    expect(ablaufKnopf).toHaveAttribute('data-ablauf-link');
 
     await user.click(screen.getByRole('button', { name: /^Bestpreisgarantie/ }));
     await user.click(within(await screen.findByRole('dialog')).getAllByRole('button', { name: 'Schließen' })[0]);
@@ -64,28 +59,16 @@ describe('Messpunkte in der Vorschau (?preview=patient)', () => {
     await user.click(ablaufKnopf);
     await waitFor(() => expect(gescrollt()).toContain('patientendaten'));
 
-    const kastenKnopf = await waitFor(() => {
-      const k = document.querySelector<HTMLElement>('[data-liste-knopf] button');
-      if (!k) throw new Error('kein Kasten unter der Liste');
-      return k;
-    }, { timeout: 5000 });
-    sprungLeeren();
-    await user.click(kastenKnopf);
-    await waitFor(() => expect(gescrollt()).toContain('patientendaten'));
-
     await user.click(await screen.findByText((_, el) => el?.tagName === 'SPAN' && el.textContent === 'Anna, 58'));
-    const einladen = await waitFor(() => {
-      const el = document.querySelector<HTMLElement>('[data-profil-einladen]');
-      if (!el) throw new Error('Profilfenster ohne Knopf „Zur Bewerbung einladen“');
+    const zumFormular = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-profil-zum-formular]');
+      if (!el) throw new Error('Profilfenster ohne Knopf „Pflegesituation vervollständigen“');
       return el;
     }, { timeout: 5000 });
-    await user.click(einladen);
-    const fenster = await screen.findByRole('dialog', { name: /einladen$/ });
-    expect(document.querySelector('[data-profil-einladen]')).toBeNull();
     sprungLeeren();
-    await user.click(within(fenster).getByRole('button', { name: 'Pflegesituation vervollständigen' }));
+    await user.click(zumFormular);
     await waitFor(() => expect(gescrollt()).toContain('patientendaten'));
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.querySelector('[data-profil-zum-formular]')).toBeNull();
 
     await new Promise((r) => setTimeout(r, 100));
     expect(meldungen).toEqual([]);

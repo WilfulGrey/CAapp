@@ -3,9 +3,8 @@
 //
 // Martin 07.11.2026 zum Mockup (seo-reports/analysen/vorschlag-minimal-2026-11-07/mockup/portal.html): „Ja, alle drei“.
 // Vorher (Abnahme 07.11.): auf dem iPhone 13 kam die erste Pflegekraft bei 1.426 px, das Formular bei 2.603 px.
-// #162 nahm das „Einladen“ vor dem Speichern heraus (Martin 13.11.: „nicht mehr mit einladen … das brauchen wir nicht“);
-// seit #163 kommt es über das Profil zurück (Martin 14.11.: „einladen zur Bewerbung … Dann popup, wenn daten noch fehlen.
-// Weil so versteht es keiner“): Logik #145 (Vormerken, nach dem ersten Speichern automatisch einladen), Liste ohne Knopf.
+// Seit #162 gibt es vor dem Speichern kein „Einladen“ mehr (Martin 13.11.: „nicht mehr mit einladen … das brauchen wir nicht“);
+// die Logik aus #145 (Vormerken, nach dem ersten Speichern automatisch einladen) gilt nur noch für `?einstieg=zuerst`.
 //
 // Kontakt: Reiter am rechten Rand mit Martas Foto, wie die Ansprechpartnerin in der CG-App (umbrella/.notes/requests/
 // opiekomat-start/makieta-v59.html, `.edge` + `.drawer`): halb eingeschoben, beim Scrollen weiter weg, nach dem Scrollen
@@ -25,7 +24,7 @@
 // vervollständigen und Bewerbungen erhalten“.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertCircle, ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Info, Phone, X } from 'lucide-react';
+import { ArrowUp, Check, ChevronDown, ChevronRight, Info, Phone, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { formatEuro, type Lead } from '../../lib/supabase';
 import { eigenanteilAus } from '../../lib/angebotZuschuss';
@@ -56,25 +55,16 @@ export const WARUM_TITEL = 'Warum Primundus?';
 /** Unter der Listen-Überschrift (Martin 13.11.2026: „Es muss definitiv irgendwo stehen, diese Pflegekräfte sind verfügbar und
  *  passen zu ihrer Auswahl“). „Anfrage“ statt „Angaben“: im Portal filtert nur die Deutsch-Stufe. Nur über einer Liste mit Zeilen. */
 export const LISTE_ZEILE = 'Diese Pflegekräfte sind verfügbar und passen zu Ihrer Anfrage.';
-/** Kasten unter der Liste (Registry #163, 14.11.2026, Martin: „Im Portal fehlt der Text und Button unter den PKs“, Bild „Neu, ganze
- *  Seite“ vom 13.11. vormittags): Hinweis, Satz und Knopf wie dort, der Knopf jetzt grün wie alle anderen. Der Satz stand
- *  seit #162 über dem Formular und steht jetzt nur noch hier. */
-export const LISTE_UNVOLLSTAENDIG = 'Ihre Angaben sind noch unvollständig';
-export const LISTE_WARUM = 'Beschreiben Sie kurz die Pflegesituation. So verstehen die Pflegekräfte, worauf es bei Ihnen ankommt, und können sich unverbindlich bewerben. Das dauert ca. 2 Minuten.';
-export const LISTE_KNOPF = 'Pflegesituation vervollständigen';
 /** Titel des Marta-Kastens unter dem Formular (13.11.2026, Martin: „Anbieten von Beratung“). */
 export const MARTA_BERATUNG_TITEL = 'Lieber persönlich beraten lassen?';
 /** Kopf über der Formularkarte (13.11.2026, Martin: „ob das formular als popup kommen müsste und wenn nicht, dann besser
  *  sichtbar als formular“, „Titel nicht doppeln“, „Pflegesituation vervollständigen finde ich ganz gut … der Text … passt“):
- *  Formular offen direkt unter der Liste wie in der guten Phase, Titel auf dem Seitengrund über der Karte. Der Satz darunter
- *  steht seit 14.11. im Kasten unter der Liste (LISTE_WARUM), sonst stünde er zweimal untereinander. */
+ *  Formular offen direkt unter der Liste wie in der guten Phase, Titel und Satz auf dem Seitengrund über der Karte. */
 export function formularKopf(): { titel: string; zeile: string; aussen: boolean } {
-  return { titel: FORMULAR_TITEL, aussen: true, zeile: '' };
+  return { titel: FORMULAR_TITEL, aussen: true, zeile: 'Beschreiben Sie kurz die Situation. So verstehen die Pflegekräfte, worauf es bei Ihnen ankommt, und können sich unverbindlich bewerben. Das dauert ca.\u00a02\u00a0Minuten.' };
 }
 /** Kein fester Knopf mehr (Martin 13.11.2026: „button nicht hier schon anzeigen, weil zu fordernd gleich mit bewerbungen zu
- *  kommen“). FEST_ZEILE bleibt für den Gleichlauf mit der Zeile unter dem Knopf der Angebotsmail (Test angebotsmailWortlaut);
- *  FEST_TITEL nur noch für die Tests, dass der frühere Knopf nirgends steht (die Mail heißt seit #163 „Angebot & Pflegekräfte
- *  anzeigen“). */
+ *  kommen“). FEST_TITEL und FEST_ZEILE bleiben nur für den Gleichlauf mit dem Knopf der Angebotsmail (Test angebotsmailWortlaut). */
 /** Fester Knopf unten: eine Zeile Titel, darunter Martins Unterzeile (08.11.: „Pflegesituation vervollständigen &
  *  Bewerbungen erhalten - darunter: 100% kostenfrei & unverbindlich“, danach „definitiv zu langtextlich“). Kurz der Nutzen;
  *  „Pflegesituation vervollständigen“ steht als Titel direkt darunter am Formular. */
@@ -102,13 +92,19 @@ export const KOPF_PUNKTE = ['Keine Vermittlungsgebühren', 'Tägliche Kündigung
 /** Vertrauen unten in der Angebotskarte (Martin: „seit 20 Jahren und 6 Jahre in Folge … Testsieger … die Sterne“): Wert
  *  groß, Beschriftung klein darunter, wie die Kennzahlen im CGA-Panel. Wortlaut „6× in Folge“ wie die Auszeichnungsseite. */
 export const VERTRAUEN = [['20 Jahre', 'Erfahrung'], ['6× in Folge', 'Testsieger']] as const;
-/** Zeile der Liste nach „Zur Bewerbung einladen“ im Profil (statt „Vorgemerkt“, Martin: „sieht natürlich komisch aus“).
- *  „Eingeladen“ (Martin 08.11. abends: „warum steht da ausgewählt, wenn ich eingeladen habe … muss auch eingeladen sein“);
- *  verschickt wird die Einladung technisch mit dem Absenden der Pflegesituation (Logik #145 unverändert). */
+/** Knopf der Zeile nach dem Tipp auf „Einladen“ (statt „Vorgemerkt“, Martin: „sieht natürlich komisch aus“). „Eingeladen“
+ *  (Martin 08.11. abends: „warum steht da ausgewählt, wenn ich eingeladen habe … muss auch eingeladen sein“); verschickt wird
+ *  die Einladung technisch mit dem Absenden der Pflegesituation (Logik #145 unverändert). */
 export const EINGELADEN = 'Eingeladen';
+// Wie in der Navigationsleiste: Tippfläche ≥ 44 px über ein unsichtbares ::before, die sichtbare Pille bleibt kleiner.
+const TIPPFLAECHE = "relative before:absolute before:-inset-y-1.5 before:-inset-x-1 before:content-['']";
 // Für Textknöpfe in der Angebotskarte: unsichtbar bis 44 px hoch (Prüfung 09.11.2026: „Details“ und „Bestpreisgarantie“ lagen darunter).
 const TIPPFLAECHE_HOCH = "relative before:absolute before:-inset-y-[11px] before:-inset-x-1 before:content-['']";
 const FOKUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-taupe';
+// Knopf rechts in der Zeile: in allen Zuständen gleich breit und hoch, damit die Zeile ihre Höhe hält. 104 × 36 px (unter
+// 375 px 96 px): „Eingeladen“ mit Haken in 13 px passt mit Luft hinein (Martin 08.11.: „passender in den Button … macht die
+// Button-Tick größer von vornherein“); vorher 88 × 34 px mit 12 px Schrift.
+const PILLE = 'flex h-11 w-[108px] max-[374px]:w-[104px] flex-none items-center justify-center rounded-[10px] font-semibold whitespace-nowrap';
 // Karte wie im CGA-Panel: weiß auf dem Seitengrund, ohne Rahmen und Schatten.
 const KARTE = 'rounded-card bg-white';
 const STERN = 'M10 1.6l2.47 5.2 5.7.72-4.2 3.93 1.08 5.64L10 14.3l-5.05 2.79 1.08-5.64-4.2-3.93 5.7-.72z';
@@ -340,20 +336,52 @@ export function zeilenFakten(nurse: Pick<Nurse, 'experienceYears' | 'language'>)
 // einer eigenen Zeile; rechts der Preis (ohne „/ Monat“, Martin 08.11.) und darunter „Einladen“. Der Preis ist der des
 // Kunden: Die Liste zeigt nur Kräfte mit seiner Deutsch-Stufe (`matchesGermanyWish`, strikt), und die Stufe ist der einzige
 // Preisfaktor, der an der Kraft hängt (lib/preisJeKraft.ts im Zweig feat/portal-preis-bei-pflegekraeften).
-export function PflegekraftZeile({ nurse, vorgemerkt, onNurseClick }: {
+export function PflegekraftZeile({ nurse, preis, vorgemerkt, gesperrt, onNurseClick, onInvite, onInviteConfirm }: {
   nurse: Nurse;
-  /** Registry #145: vorgemerkt → grüne Zeile `EINGELADEN` mit Haken unter den Angaben (#163). */
+  /** Monatspreis des Kunden (`kalkulation.bruttopreis`); ohne Preis entfällt die Angabe. */
+  preis?: number | null;
+  /** Registry #145: vorgemerkt → `EINGELADEN` mit Haken, bleibt tippbar und öffnet das Fenster erneut. */
   vorgemerkt: boolean;
-  /** Tipp auf die Zeile: Profil (Messpunkt `profil_geoeffnet` mit Quelle `karte`, wie die Karte). */
+  /** Eine Einladung läuft gerade (nach dem Speichern) → „Bitte warten…“ wie auf der Karte. */
+  gesperrt: boolean;
+  /** Tipp auf Foto oder Namen: Profil (Messpunkt `profil_geoeffnet` mit Quelle `karte`, wie die Karte). */
   onNurseClick: () => void;
+  /** Tipp auf „Einladen“ — wie bei der Karte: false = das Portal hat selbst reagiert (vor dem Speichern: vormerken). */
+  onInvite: () => boolean;
+  onInviteConfirm?: () => Promise<void>;
 }) {
   const vorname = nurse.name.split(' ')[0] || nurse.name;
   const fakten = zeilenFakten(nurse);
+  const einladen = () => {
+    if (!onInvite()) return;
+    // Nur nach dem Speichern erreichbar (dann steht diese Zeile nicht mehr da); Fehler meldet das Portal selbst.
+    void onInviteConfirm?.().catch(() => {});
+  };
   // Foto auf heller Kreisfläche mit feinem Ring: freigestellte Fotos und Initialen wirken gleich groß und rund.
   // Größer als im ersten Bild (Martin: „die Karten schön ein bisschen größer auch mit den Bildern“).
   // 13.11.2026 (Martin: „schöner präsentieren … nicht ganz so kompakt … der Preis würde ich da rausnehmen und
   // einladen erstmal auch“): Foto 72 px, mehr Luft, ohne Preis und „Einladen“; die ganze Zeile öffnet das Profil (Pfeil rechts).
   const foto = 'h-[72px] w-[72px] flex-none rounded-full ring-1 ring-pm-line';
+  const preisText = preis ? (
+    <span className="whitespace-nowrap text-[16.5px] font-semibold tabular-nums text-pm-ink" data-preis>{formatEuro(preis)}</span>
+  ) : null;
+  // „Einladen“ grün umrandet (Martin 08.11.: die Koralle-Fläche „wirkt nicht passend zum rest und wirkt negativ“); Grün wie
+  // die Zuschuss-Zeile und der Kasten, „Eingeladen“ dann grün gefüllt (Mint).
+  const knopf = gesperrt ? (
+    <button type="button" disabled aria-disabled="true" className={`${PILLE} cursor-not-allowed bg-pm-grund text-[14px] text-pm-muted`}>
+      Bitte warten…
+    </button>
+  ) : vorgemerkt ? (
+    // Martin 10.11.2026: „wenn eingeladen, dann kein button, sondern nur grün und text“ — ohne Fläche und Rahmen, rechtsbündig
+    // unter dem Preis; tippbar bleibt es (öffnet das Fenster erneut, Logik #145).
+    <button type="button" onClick={einladen} aria-label={`${EINGELADEN} ✓`} className={`${TIPPFLAECHE} ${FOKUS} flex h-11 w-[108px] max-[374px]:w-[104px] flex-none items-center justify-end gap-1 rounded-[10px] whitespace-nowrap text-[15.5px] font-bold text-pm-green-deep`}>
+      <Check aria-hidden="true" className="h-[18px] w-[18px] flex-none" strokeWidth={3} />{EINGELADEN}
+    </button>
+  ) : (
+    <button type="button" onClick={einladen} className={`${TIPPFLAECHE} ${FOKUS} ${PILLE} border-2 border-pm-green bg-white text-[15.5px] text-pm-green-deep hover:bg-pm-mint`}>
+      Einladen
+    </button>
+  );
   return (
     <li className="border-t border-pm-line-soft" data-pflegekraft-zeile={nurse.caregiverId} data-vorgemerkt={vorgemerkt || undefined}>
       <button type="button" onClick={onNurseClick} className={`${FOKUS} focus-visible:outline-offset-[-3px] group flex w-full items-center gap-4 px-4 py-4 text-left hover:bg-pm-paper`}>
@@ -372,13 +400,6 @@ export function PflegekraftZeile({ nurse, vorgemerkt, onNurseClick }: {
           {fakten.map((teil) => (
             <span key={teil} className="mt-0.5 block text-[16px] leading-[22px] text-pm-ink">{teil}</span>
           ))}
-          {/* #163: Einladen geht über das Profil (Logik #145); vorgemerkt → grüner Text wie seit #161
-              (Martin 10.11.: „wenn eingeladen, dann kein button, sondern nur grün und text“). */}
-          {vorgemerkt && (
-            <span className="mt-1 flex items-center gap-1 text-[15.5px] font-bold leading-[22px] text-pm-green-deep" data-zeile-eingeladen>
-              <Check aria-hidden="true" className="h-[18px] w-[18px] flex-none" strokeWidth={3} />{EINGELADEN}
-            </span>
-          )}
         </span>
         <ChevronRight className="h-5 w-5 flex-none text-pm-muted" aria-hidden="true" />
       </button>
@@ -599,7 +620,7 @@ function AblaufGutePhase({ onZumFormular }: { onZumFormular?: () => void }) {
 export function EinstiegMinimal({
   anrede, lead, onBestpreis, heimEigenanteil, heimQuelle,
   laedt, zeilen, gehalteneEinladungen, vorschlaegeVorhanden, bereitsBearbeitet, formular, sterne, vorgemerkte,
-  onListeZumFormular, onAblaufZumFormular, onKostenAufgeklappt, onFaqGeoeffnet,
+  onAblaufZumFormular, onKostenAufgeklappt, onFaqGeoeffnet,
 }: {
   /** Anrede für „Guten Tag, …“ (customerSalutation), ohne Anrede nur „Guten Tag“. */
   anrede: string | null;
@@ -618,9 +639,6 @@ export function EinstiegMinimal({
   formular: ReactNode;
   sterne: SterneStand | null;
   vorgemerkte: VorgemerkteKraft[];
-  /** Knopf im Kasten unter der Liste: Sprung zum Formular (Messpunkt `zur_pflegesituation`, Quelle `hauptknopf` wie der
-   *  Knopf unter der Liste bis #162). */
-  onListeZumFormular?: () => void;
   /** „Pflegesituation vervollständigen“ in „So geht es weiter“: Sprung zum Formular (Messpunkt `zur_pflegesituation`, Quelle
    *  `schritte`). Ohne Rückruf bleibt der Schritt reiner Text. */
   onAblaufZumFormular?: () => void;
@@ -688,28 +706,7 @@ export function EinstiegMinimal({
                 {Array.from({ length: PLATZHALTER }, (_, i) => <Platzhalterzeile key={i} />)}
               </ul>
             ) : anzahl > 0 ? (
-              <>
-                <ul>{zeilen}</ul>
-                {/* Registry #163, 14.11.2026 (Martin: „Im Portal fehlt der Text und Button unter den PKs“): wie im Bild vom 13.11.
-                    vormittags, Knopf grün über die ganze Breite, Pfeil nach unten (das Formular steht direkt darunter). */}
-                {onListeZumFormular && (
-                  <div className="border-t border-pm-line-soft px-4 pt-5 pb-5" data-liste-knopf>
-                    <p className="flex items-center gap-2 text-[16px] font-semibold leading-[22px] text-pm-amber-ink" data-liste-unvollstaendig>
-                      <AlertCircle className="h-5 w-5 flex-none text-pm-amber" strokeWidth={2.25} aria-hidden="true" />
-                      {LISTE_UNVOLLSTAENDIG}
-                    </p>
-                    <p className="mt-2 text-[16px] leading-[22px] text-pm-ink" data-liste-warum>{LISTE_WARUM}</p>
-                    <button
-                      type="button"
-                      onClick={onListeZumFormular}
-                      className={`${FOKUS} mt-4 flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[12px] bg-pm-green px-3 text-[16px] font-bold text-white hover:bg-pm-green-deep active:scale-[0.99] max-[339px]:text-[15px]`}
-                    >
-                      <span className="whitespace-nowrap">{LISTE_KNOPF}</span>
-                      <ArrowDown className="h-[18px] w-[18px] flex-none max-[339px]:hidden" strokeWidth={2.5} aria-hidden="true" />
-                    </button>
-                  </div>
-                )}
-              </>
+              <ul>{zeilen}</ul>
             ) : gehalteneEinladungen > 0 ? (
               hinweis('Ihre Auswahl ist eingeladen', 'Die Pflegekräfte melden sich meist innerhalb von 1–2 Tagen. Sobald Rückmeldungen da sind, sehen Sie sie hier. Meldet sich niemand, schlagen wir Ihnen automatisch weitere Pflegekräfte vor.')
             ) : (

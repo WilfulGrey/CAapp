@@ -1,20 +1,17 @@
 /** @vitest-environment jsdom */
 // Minimal-Einstieg vor dem ersten Speichern der Pflegesituation (Registry #147; Martin 07.11.2026 zum Mockup „Minimal“: „Ja,
-// alle drei“). Stand 13.11.2026 (Registry #162) mit Registry #163 vom 14.11.2026 (Martin: „Im Portal fehlt der Text und
-// Button unter den PKs … einladen zur Bewerbung … Dann Popup, wenn Daten noch fehlen“):
+// alle drei“). Endstand 13.11.2026 (Martin am Bild abgenommen):
 //   - Reihenfolge: Kopf mit Testsieger statt „Hilfe“ → „Guten Tag, …“ klein → Titel „Ihr Preis für die Betreuung zu Hause“
 //     → Preiskarte mit „Warum Primundus?“ über den Punkten → „Ihre Pflegekräfte-Auswahl“ mit Anzahl und Satz, Zeilen ohne
-//     Preis und ohne Knopf, darunter der Kasten „Ihre Angaben sind noch unvollständig“ mit Satz und grünem Knopf →
-//     Pflegesituation (Titel über der Karte, „Betreuung für 1 Person“ oben in der Karte) → Marta „Lieber persönlich beraten
-//     lassen?“ → So geht es weiter → Fragen → Marta „Noch Fragen?“; dazu der Kontakt-Reiter rechts (Panel: Anrufen, WhatsApp)
+//     Preis und ohne „Einladen“ → Pflegesituation (Titel und Satz über der Karte, „Betreuung für 1 Person“ oben in der
+//     Karte) → Marta „Lieber persönlich beraten lassen?“ → So geht es weiter → Fragen → Marta „Noch Fragen?“; dazu der
+//     Kontakt-Reiter rechts (Panel: Anrufen, WhatsApp)
 //   - kein fester Knopf, nirgends ein Knopf „Bewerbungen erhalten“ vor dem Speichern
-//   - Platzhalterzeilen ohne Text und ohne Knopf, solange die Liste lädt (auch ohne Kasten)
-//   - Einladen über das Profil: „Zur Bewerbung einladen“ öffnet das Fenster „{Name} einladen“ (#145) und merkt vor; die Zeile
-//     zeigt dann grün „Eingeladen“, über dem Formular steht die Vormerkzeile; nach dem ersten Speichern lädt der Lauf #145
-//     die Vorgemerkten ein
-//   - Messpunkte: Knopf im Kasten als Quelle `hauptknopf`, in „So geht es weiter“ als `schritte`, im Fenster als
-//     `einladen_fenster`; „Zur Bewerbung einladen“ als `einladen_getippt` (Quelle `profil`) und `einladung_vorgemerkt`;
-//     „Details“ als `kosten_aufgeklappt`, Profil wie die Karte (`profil_geoeffnet`, Quelle `karte`)
+//   - Platzhalterzeilen ohne Text und ohne Knopf, solange die Liste lädt
+//   - kein Vormerken, kein Einladen: Tipp auf die Zeile öffnet das Profil, dort nur der Knopf ins Formular; nach dem ersten
+//     Speichern lädt der Minimal-Einstieg niemanden ein (Lauf #145 nur noch unter `?einstieg=zuerst`)
+//   - Messpunkte: Knopf in „So geht es weiter“ als Quelle `schritte`, Knopf im Profil als `karte`, „Details“ als
+//     `kosten_aufgeklappt`, Profil wie die Karte (`profil_geoeffnet`, Quelle `karte`)
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -23,8 +20,8 @@ import { http, HttpResponse } from 'msw';
 import { defaultHandlers, defaultLead, sampleCaregiver, sampleMatching, bridgeHandler } from '../../../test/fixtures/mamamia-mocks';
 import { vormerkSchluessel } from '../../lib/vormerkungen';
 import {
-  ABLAUF_GUTE_PHASE, EinstiegMinimal, FEST_TITEL, FEST_ZEILE, FORMULAR_TITEL, KOPF_PUNKTE, KOPF_TITEL, LISTE_KNOPF, LISTE_TITEL,
-  LISTE_UNVOLLSTAENDIG, LISTE_WARUM, LISTE_ZEILE, MARTA_BERATUNG_TITEL, WARUM_TITEL, formularKopf, zeilenFakten,
+  ABLAUF_GUTE_PHASE, EinstiegMinimal, FEST_TITEL, FEST_ZEILE, FORMULAR_TITEL, KOPF_PUNKTE, KOPF_TITEL, LISTE_TITEL, LISTE_ZEILE,
+  MARTA_BERATUNG_TITEL, WARUM_TITEL, formularKopf, zeilenFakten,
 } from '../../components/portal/EinstiegMinimal';
 import { FAQ_MINIMAL } from '../../components/portal/FaqListe';
 import type { Nurse } from '../../types';
@@ -100,10 +97,8 @@ const vollerEntwurf = (token: string) => localStorage.setItem(`patient_${token}`
 type Meldung = { token?: string; event?: string; metadata?: Record<string, unknown>; notify?: boolean };
 /** Der frühere feste Knopf (bis 13.11.2026). Vor dem Speichern darf es ihn nirgends mehr geben. */
 const HAUPTKNOPF = /^Bewerbungen erhalten/;
-/** Satz im Kasten unter der Liste (Registry #163; bis dahin über der Formularkarte mit „die Situation“), „ca. 2 Minuten“ mit
- *  geschützten Leerzeichen. */
-const LISTE_SATZ = 'Beschreiben Sie kurz die Pflegesituation. So verstehen die Pflegekräfte, worauf es bei Ihnen ankommt, und können sich unverbindlich bewerben. Das dauert ca.\u00a02\u00a0Minuten.';
-const NBSP = '\u00a0';
+/** Satz über der Formularkarte, nur im ersten Schritt (Martin 13.11.2026), „ca. 2 Minuten“ mit geschützten Leerzeichen. */
+const FORMULAR_SATZ = 'Beschreiben Sie kurz die Situation. So verstehen die Pflegekräfte, worauf es bei Ihnen ankommt, und können sich unverbindlich bewerben. Das dauert ca.\u00a02\u00a0Minuten.';
 /** Tipp auf eine feste, preisrelevante Angabe. */
 const PREIS_SATZ = 'Diese Angabe bestimmt den Preis. Ändern kann sie Ihre Beraterin, dann schicken wir Ihnen ein neues Angebot.';
 const davor = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
@@ -117,28 +112,19 @@ const vorgelesen = (el: Element) => ohne(el, '[aria-hidden="true"]');
 /** Alle Vormerkungen im Gerät (Schlüssel `pm_vorgemerkt_<token>`), egal für welches Token. */
 const vorgemerktImSpeicher = () => Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i) ?? '')
   .filter((k) => k.startsWith(vormerkSchluessel('')));
-/** Knopf „Zur Bewerbung einladen“ im Profilfenster (nur im Minimal-Einstieg vor dem Speichern); null = Profilfenster zu. */
-const knopfEinladen = () => document.querySelector('[data-profil-einladen]') as HTMLElement | null;
-const profilfenster = () => knopfEinladen()!.closest('.pointer-events-auto') as HTMLElement;
+/** Knopf im Profilfenster ins Formular (nur im Minimal-Einstieg vor dem Speichern); null = Profilfenster zu. */
+const knopfInsFormular = () => document.querySelector('[data-profil-zum-formular]') as HTMLElement | null;
+const profilfenster = () => knopfInsFormular()!.closest('.pointer-events-auto') as HTMLElement;
 /** Profilfenster über das X oben rechts schließen (der Knopf hat kein Label, darum über sein Zeichen). */
 const profilSchliessen = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click([...profilfenster().querySelectorAll('button')].find((b) => b.querySelector('.lucide-x'))!);
-  await waitFor(() => expect(knopfEinladen()).toBeNull());
-};
-/** Profil der Pflegekraft öffnen, „Zur Bewerbung einladen“, im Fenster „Später“: vorgemerkt. */
-const vormerkenUeberProfil = async (user: ReturnType<typeof userEvent.setup>, vorname: string) => {
-  await user.click(within(zeileVon(vorname)).getByRole('button'));
-  await waitFor(() => expect(knopfEinladen()).not.toBeNull(), { timeout: 5000 });
-  await user.click(knopfEinladen()!);
-  const fenster = await screen.findByRole('dialog', { name: new RegExp(`^${vorname} .+ einladen$`) });
-  await user.click(within(fenster).getByRole('button', { name: 'Später' }));
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  await waitFor(() => expect(knopfInsFormular()).toBeNull());
 };
 /** Die weiße Formularkarte (Rahmen) in der Pflegesituation. */
 const formularKarte = () => within(document.getElementById('patientendaten')!).getByRole('progressbar').closest('.rounded-card') as HTMLElement;
 
 describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
-  it('Reihenfolge und Wortlaut: Kopf mit Testsieger, Gruß, Titel, Preiskarte mit „Warum Primundus?“, Pflegekräfte-Auswahl als Zeilen ohne Preis und ohne Knopf, Kasten mit Knopf unter der Liste, Kontakt, kein fester Knopf; darunter Formular, Marta-Beratung, So geht es weiter, Fragen, Marta', async () => {
+  it('Reihenfolge und Wortlaut: Kopf mit Testsieger, Gruß, Titel, Preiskarte mit „Warum Primundus?“, Pflegekräfte-Auswahl als Zeilen ohne Preis und ohne Einladen, Kontakt, kein fester Knopf; darunter Formular, Marta-Beratung, So geht es weiter, Fragen, Marta', async () => {
     uhrzeit('2026-11-09T10:00:00+01:00'); // Montag 10 Uhr: Marta erreichbar
     server.use(...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
     window.history.replaceState({}, '', '/?token=token-mi-reihe');
@@ -203,8 +189,8 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(listeZeile.textContent).toBe('Diese Pflegekräfte sind verfügbar und passen zu Ihrer Anfrage.');
     expect(LISTE_ZEILE).toBe(listeZeile.textContent);
     // Jede Zeile ist EIN Knopf über die ganze Breite: rundes Foto (72 px), „Vorname, Alter“, „N Jahre Erfahrung“, „Deutsch
-    // Gut“, Pfeil rechts; kein Preis und kein Knopf „Einladen“ (Martin 13.11.: „der Preis würde ich da rausnehmen und einladen
-    // erstmal auch“; eingeladen wird seit #163 im Profil). Empfehlung oben.
+    // Gut“, Pfeil rechts; kein Preis und kein „Einladen“ (Martin 13.11.: „der Preis würde ich da rausnehmen und einladen
+    // erstmal auch“). Empfehlung oben.
     const [erste, zweite] = zeilen();
     expect(erste.textContent).toMatch(/^Helena, \d+5 Jahre ErfahrungDeutsch Gut$/);
     expect(zweite.textContent).toMatch(/^Emilia, \d+5 Jahre ErfahrungDeutsch Gut$/);
@@ -226,25 +212,8 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
       expect(pfeil).toHaveAttribute('aria-hidden', 'true');
     }
     expect(screen.queryAllByRole('button', { name: /Einladen|Eingeladen/ })).toHaveLength(0);
-    // Unter der Liste der Kasten (Registry #163, Martin 14.11.: „Im Portal fehlt der Text und Button unter den PKs“; wie im Bild
-    // vom 13.11. vormittags): Hinweis mit Zeichen, Satz, EIN grüner Knopf mit Pfeil nach unten. Im Abschnitt also drei Knöpfe.
-    const kasten = abschnitt.querySelector('[data-liste-knopf]') as HTMLElement;
-    const unvollstaendig = kasten.querySelector('[data-liste-unvollstaendig]') as HTMLElement;
-    expect(unvollstaendig.textContent).toBe('Ihre Angaben sind noch unvollständig');
-    expect(LISTE_UNVOLLSTAENDIG).toBe(unvollstaendig.textContent);
-    expect(unvollstaendig.className).toContain('text-pm-amber-ink');
-    expect(unvollstaendig.querySelector('svg')!.getAttribute('class')).toContain('lucide-alert-circle');
-    expect(unvollstaendig.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
-    const kastenSatz = kasten.querySelector('[data-liste-warum]') as HTMLElement;
-    expect(kastenSatz.textContent).toBe(LISTE_SATZ);
-    expect(LISTE_WARUM).toBe(LISTE_SATZ);
-    const kastenKnopf = within(kasten).getByRole('button');
-    expect(kastenKnopf.textContent).toBe('Pflegesituation vervollständigen');
-    expect(LISTE_KNOPF).toBe(kastenKnopf.textContent);
-    expect(kastenKnopf.className).toContain('bg-pm-green');
-    expect(kastenKnopf.querySelector('svg')!.getAttribute('class')).toContain('lucide-arrow-down');
-    expect(kastenKnopf.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
-    expect(abschnitt.querySelectorAll('button')).toHaveLength(3);
+    // Kein Knopf unter der Liste: im Abschnitt nur die beiden Zeilen.
+    expect(abschnitt.querySelectorAll('button')).toHaveLength(2);
     // Nicht mehr im ersten Bild: Titel, Satz und Empfehlungszeile von #145, große Karten.
     expect(screen.queryByText('Ihr Angebot zur 24-Stunden-Betreuung')).toBeNull();
     expect(screen.queryByText('Laden Sie ein, wer Ihnen gefällt. Dafür beschreiben Sie kurz die Pflegesituation.')).toBeNull();
@@ -278,18 +247,17 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     await userEvent.setup().click(within(panel).getByRole('button', { name: 'Schließen' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 
-    // Pflegesituation direkt unter der Liste: Titel über der Karte auf dem Seitengrund (Martin 13.11.: „Titel nicht doppeln“,
-    // „Pflegesituation vervollständigen finde ich ganz gut“); der Satz steht seit #163 nur im Kasten darüber. Keine Kostenkarte
-    // mehr (ihre Aufstellung steht unter „Details“).
+    // Pflegesituation direkt unter der Liste: Titel und Satz über der Karte auf dem Seitengrund (Martin 13.11.: „Titel nicht
+    // doppeln“, „Pflegesituation vervollständigen finde ich ganz gut … der Text … passt“). Keine Kostenkarte mehr (ihre
+    // Aufstellung steht unter „Details“).
     const pflegesituation = document.getElementById('patientendaten')!;
     const formularKopfAussen = pflegesituation.querySelector('[data-formular-kopf-aussen]') as HTMLElement;
     expect(within(formularKopfAussen).getByRole('heading', { level: 2 }).textContent).toBe('Pflegesituation vervollständigen');
     expect(FORMULAR_TITEL).toBe('Pflegesituation vervollständigen');
     expect(screen.getAllByRole('heading', { name: 'Pflegesituation vervollständigen' })).toHaveLength(1);
-    expect(formularKopfAussen.querySelector('p')).toBeNull();
-    expect(formularKopfAussen.textContent).not.toMatch(/Beschreiben Sie kurz/);
-    expect(document.body.textContent!.split('Beschreiben Sie kurz die Pflegesituation. So verstehen')).toHaveLength(2);
-    expect(formularKopf()).toEqual({ titel: FORMULAR_TITEL, zeile: '', aussen: true });
+    const satz = within(formularKopfAussen).getByText(/^Beschreiben Sie kurz die Situation\./);
+    expect(satz.textContent).toBe(FORMULAR_SATZ);
+    expect(formularKopf()).toEqual({ titel: FORMULAR_TITEL, zeile: FORMULAR_SATZ, aussen: true });
     expect(within(pflegesituation).queryByText('Für Ihre Bewerbungen')).toBeNull();
     expect(screen.queryByText(/Danach können Sie Pflegekräfte einladen/)).toBeNull();
     // Die Karte: Taupe-Rahmen statt Koralle, „Weiter“ und Fortschrittsbalken grün, kein Strich über der Knopfleiste.
@@ -343,8 +311,8 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     const fragen = screen.getByRole('heading', { level: 2, name: 'Häufige Fragen' });
     const marta = screen.getByText('Noch Fragen?');
     const reihe = [
-      gruss, h1, karte, preis, warum, garantie, vertrauen, abschnitt, listeZeile, erste, zweite, kasten, unvollstaendig, kastenSatz,
-      kastenKnopf, pflegesituation, formularKopfAussen, formKarte, personen, schritt, formKnopf, gespeichert, martaBeratung, soGehts, fragen, marta,
+      gruss, h1, karte, preis, warum, garantie, vertrauen, abschnitt, listeZeile, erste, zweite,
+      pflegesituation, formularKopfAussen, formKarte, personen, schritt, formKnopf, gespeichert, martaBeratung, soGehts, fragen, marta,
     ];
     for (let i = 1; i < reihe.length; i++) expect(davor(reihe[i - 1], reihe[i])).toBe(true);
     // Wortlaut-Regeln: nie „Betreuungskräfte“, nie „vermitteln“.
@@ -392,7 +360,7 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(within(abschnitt).getByRole('heading', { level: 2 }).textContent).toBe('Ihre Pflegekräfte-Auswahl2');
   }, 20_000);
 
-  it('Zeilen ohne Preis und ohne Knopf; das Profil lädt mit „Zur Bewerbung einladen“ ein: Fenster „{Name} einladen“ (#145), „Später“, grün „Eingeladen“ in der Zeile, Vormerkzeile über dem Formular, der Fenster-Knopf führt ins Formular; vor dem Speichern niemand eingeladen', async () => {
+  it('Zeilen ohne Preis und ohne „Einladen“; Tipp öffnet das Profil ohne „Nein danke“ und „Einladen“, sein Knopf führt ins Formular (Quelle karte); nichts vorgemerkt, nichts im localStorage pm_vorgemerkt_*', async () => {
     let einladungen = 0;
     const meldungen: Meldung[] = [];
     server.use(
@@ -407,94 +375,43 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     for (const z of zeilen()) {
       expect(within(z).queryByRole('button', { name: /Einladen|Eingeladen/ })).toBeNull();
       expect(z.querySelector('[data-preis]')).toBeNull();
-      expect(z.querySelector('[data-zeile-eingeladen]')).toBeNull();
       expect(z.textContent).not.toMatch(/€/);
     }
 
     // Tipp auf die Zeile (sie ist ein einziger Knopf) öffnet das Profil; Messpunkt wie bei der Karte.
     await user.click(within(zeileVon('Emilia')).getByRole('button'));
-    await waitFor(() => expect(knopfEinladen()).not.toBeNull(), { timeout: 5000 });
+    await waitFor(() => expect(knopfInsFormular()).not.toBeNull(), { timeout: 5000 });
     await waitFor(() => expect(meldungen.find((m) => m.event === 'profil_geoeffnet')?.metadata).toEqual({ caregiver_id: 50003, quelle: 'karte', vor_speichern: true }));
-    // Statt „Nein danke“ und „Einladen“ EIN grüner Knopf „Zur Bewerbung einladen“ (Martin 14.11.: „wenn man ein Profil öffnet,
-    // dann muss dort nicht Button mit vervollständigen sein, sondern einladen zur Bewerbung oder so“).
+    // Statt „Nein danke“ und „Einladen“ EIN grüner Knopf ins Formular (Martin 13.11.: „nie einladen“), mit Pfeil nach unten.
     const profil = profilfenster();
     expect(within(profil).queryByRole('button', { name: 'Nein danke' })).toBeNull();
-    expect(within(profil).queryByRole('button', { name: 'Einladen' })).toBeNull();
-    expect(within(profil).queryByRole('button', { name: 'Pflegesituation vervollständigen' })).toBeNull();
-    expect(document.querySelector('[data-profil-zum-formular]')).toBeNull();
-    const knopf = knopfEinladen()!;
+    expect(within(profil).queryByRole('button', { name: /Einladen/ })).toBeNull();
+    expect(profil.textContent).not.toMatch(/einlad|eingeladen/i);
+    const knopf = knopfInsFormular()!;
     expect(knopf.tagName).toBe('BUTTON');
-    expect(knopf.textContent).toBe('Zur Bewerbung einladen');
+    expect(knopf.textContent).toBe('Pflegesituation vervollständigen');
     expect(knopf.className).toContain('bg-pm-green');
-    const zeichen = knopf.querySelector('svg')!;
-    expect(zeichen.getAttribute('class')).toContain('lucide-user-plus');
-    expect(zeichen).toHaveAttribute('aria-hidden', 'true');
+    const pfeil = knopf.querySelector('svg')!;
+    expect(pfeil.getAttribute('class')).toContain('lucide-arrow-down');
+    expect(pfeil).toHaveAttribute('aria-hidden', 'true');
 
-    // Tipp: Profil zu, Fenster „Emilia W. einladen“ (Martin: „Dann Popup, wenn Daten noch fehlen“; Wortlaut wie #145, der
-    // Knopf darin grün wie die Seite), Emilia vorgemerkt. Messpunkte still, ohne Namen.
+    // Tipp: Fenster zu, Sprung zum Formular, Messpunkt zur_pflegesituation mit Quelle karte (still).
+    (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
     await user.click(knopf);
-    const fenster = await screen.findByRole('dialog', { name: 'Emilia W. einladen' });
-    expect(knopfEinladen()).toBeNull();
-    expect(within(fenster).getByText('Damit Emilia W. sieht, ob der Einsatz passt, braucht es ein paar Angaben zur Pflegesituation, zum Beispiel:')).toBeInTheDocument();
-    expect(within(fenster).getByText('Das dauert etwa 2 Minuten. Danach laden wir Emilia W. für Sie ein. Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten.')).toBeInTheDocument();
-    expect(within(fenster).getByRole('button', { name: 'Pflegesituation vervollständigen' }).className).toContain('bg-pm-green');
-    expect(JSON.parse(localStorage.getItem(vormerkSchluessel('token-mi-profil'))!)).toEqual([50003]);
-    await waitFor(() => expect(meldungen.find((m) => m.event === 'einladen_getippt')?.metadata).toEqual({ caregiver_id: 50003, quelle: 'profil', vor_speichern: true }));
-    await waitFor(() => expect(meldungen.filter((m) => m.event === 'einladung_vorgemerkt').map((m) => m.metadata)).toEqual([{ caregiver_id: 50003 }]));
-    for (const m of meldungen.filter((x) => ['einladen_getippt', 'einladung_vorgemerkt'].includes(x.event ?? ''))) expect(m.notify).toBe(false);
-
-    // „Später“: Die Zeile zeigt grün „Eingeladen“ mit Haken unter den Angaben und bleibt EIN Knopf; über dem Formular die
-    // Vormerkzeile.
-    await user.click(within(fenster).getByRole('button', { name: 'Später' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    const emilia = zeileVon('Emilia');
-    expect(emilia).toHaveAttribute('data-vorgemerkt');
-    expect(within(emilia).getAllByRole('button')).toHaveLength(1);
-    const eingeladen = emilia.querySelector('[data-zeile-eingeladen]') as HTMLElement;
-    expect(eingeladen.textContent).toBe('Eingeladen');
-    expect(eingeladen.className).toContain('text-pm-green-deep');
-    expect(eingeladen.querySelector('svg')!.getAttribute('class')).toContain('lucide-check');
-    expect(eingeladen.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
-    expect(zeileVon('Helena').querySelector('[data-zeile-eingeladen]')).toBeNull();
-    const vormerkZeile = document.querySelector('[data-vormerk-zeile]') as HTMLElement;
-    expect(vormerkZeile.textContent).toBe(`Nach dem Speichern laden wir Emilia${NBSP}W. für Sie ein.`);
-    expect(davor(document.getElementById('patientendaten')!, vormerkZeile)).toBe(true);
-    expect(davor(vormerkZeile, screen.getByText(/Schritt 1 von 4/))).toBe(true);
-
-    // Noch einmal über das Profil: dasselbe Fenster, sein Knopf springt zum Formular (Quelle einladen_fenster); keine zweite
-    // Vormerkung, keine zweite Meldung.
-    await user.click(within(emilia).getByRole('button'));
-    await waitFor(() => expect(knopfEinladen()).not.toBeNull(), { timeout: 5000 });
-    await user.click(knopfEinladen()!);
-    const wieder = await screen.findByRole('dialog', { name: 'Emilia W. einladen' });
-    (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
-    await user.click(within(wieder).getByRole('button', { name: 'Pflegesituation vervollständigen' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(knopfInsFormular()).toBeNull());
     await waitFor(() => expect(gescrollt().map((e) => e.id)).toContain('patientendaten'));
-    await waitFor(() => expect(meldungen.find((m) => m.event === 'zur_pflegesituation')?.metadata).toEqual({ quelle: 'einladen_fenster', vor_speichern: true }));
-    expect(JSON.parse(localStorage.getItem(vormerkSchluessel('token-mi-profil'))!)).toEqual([50003]);
-    expect(meldungen.filter((m) => m.event === 'einladung_vorgemerkt')).toHaveLength(1);
-    // Vor dem Speichern lädt niemand ein.
-    expect(einladungen).toBe(0);
-  }, 20_000);
-
-  it('Knopf im Kasten unter der Liste springt zum Formular (Messpunkt zur_pflegesituation, Quelle hauptknopf, still)', async () => {
-    const meldungen: Meldung[] = [];
-    server.use(
-      bridgeHandler((b) => { meldungen.push(b as Meldung); }),
-      ...lesen,
-      ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }),
-    );
-    window.history.replaceState({}, '', '/?token=token-mi-kasten');
-    const user = userEvent.setup();
-    render(<CustomerPortalPage />);
-    await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
-    const kastenKnopf = within(document.querySelector('[data-liste-knopf]') as HTMLElement).getByRole('button', { name: LISTE_KNOPF });
-    (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
-    await user.click(kastenKnopf);
-    await waitFor(() => expect(gescrollt().map((e) => e.id)).toContain('patientendaten'));
-    await waitFor(() => expect(meldungen.filter((m) => m.event === 'zur_pflegesituation').map((m) => m.metadata)).toEqual([{ quelle: 'hauptknopf', vor_speichern: true }]));
+    await waitFor(() => expect(meldungen.find((m) => m.event === 'zur_pflegesituation')?.metadata).toEqual({ quelle: 'karte', vor_speichern: true }));
     expect(meldungen.find((m) => m.event === 'zur_pflegesituation')?.notify).toBe(false);
+
+    // Nichts vorgemerkt, nichts eingeladen: kein Messpunkt dazu, keine Zeile über dem Formular, kein Eintrag im Gerät, kein
+    // Fenster „{Name} einladen“.
+    expect(meldungen.filter((m) => ['einladung_vorgemerkt', 'einladen_getippt'].includes(m.event ?? ''))).toEqual([]);
+    expect(document.querySelector('[data-vormerk-zeile]')).toBeNull();
+    expect(screen.queryByText(/Nach dem Speichern laden wir/)).toBeNull();
+    expect(screen.queryByRole('dialog', { name: /einladen$/ })).toBeNull();
+    expect(zeileVon('Emilia')).not.toHaveAttribute('data-vorgemerkt');
+    expect(vorgemerktImSpeicher()).toEqual([]);
+    expect(einladungen).toBe(0);
   }, 20_000);
 
   it('Knopf in „So geht es weiter“ springt zum Formular (Messpunkt zur_pflegesituation, Quelle schritte); drei Schritte im Wortlaut der guten Phase, der erste grün', async () => {
@@ -687,26 +604,24 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     }
   }, 30_000);
 
-  it('vor dem Speichern steht nirgends „Kostenrechner“ und „einladen“ nur im Knopf „Zur Bewerbung einladen“ des Profils: Profilfenster zu und offen, auch mit „Details“, Bestpreisgarantie, Marta und allen Fragen aufgeklappt', async () => {
+  it('vor dem Speichern steht nirgends „einladen“ oder „Kostenrechner“ im Text der Seite: Profilfenster zu und offen, auch mit „Details“, Bestpreisgarantie, Marta und allen Fragen aufgeklappt', async () => {
     server.use(...lesen, ...defaultHandlers({ proxy: { ...ohneBewerbung, listMatchings: zweiVorschlaege } }));
     window.history.replaceState({}, '', '/?token=token-mi-woerter');
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
     await waitFor(() => expect(formularKarte()).toBeTruthy(), { timeout: 5000 });
-    // Martin 13.11.: „Kein Mensch weiß, was ein Kostenrechner ist“. „Einladen“ gibt es seit #163 wieder, aber nur als Knopf im
-    // Profil (und im Fenster danach); die Seite selbst und die Fragen sprechen nicht davon. Geprüft wird der ganze Text der
-    // Seite ohne diesen Knopf, sichtbar und nur vorgelesen (auch „Einladung“, „eingeladen“).
+    // Martin 13.11.: „nicht mehr mit einladen … das brauchen wir nicht“, „Kein Mensch weiß, was ein Kostenrechner ist“.
+    // Geprüft wird der ganze Text der Seite, sichtbar und nur vorgelesen (auch „Einladung“, „eingeladen“).
     const verboten = /einlad|eingeladen|Kostenrechner/i;
     const pruefen = (wann: string) => {
-      expect(ohne(document.body, '.sr-only, [data-profil-einladen]'), wann).not.toMatch(verboten);
-      expect(ohne(document.body, '[data-profil-einladen]'), wann).not.toMatch(verboten);
+      expect(sichtbar(document.body), wann).not.toMatch(verboten);
+      expect(document.body.textContent, wann).not.toMatch(verboten);
     };
     pruefen('Profilfenster zu');
 
     await user.click(within(zeileVon('Helena')).getByRole('button'));
-    await waitFor(() => expect(knopfEinladen()).not.toBeNull(), { timeout: 5000 });
-    expect(knopfEinladen()!.textContent).toBe('Zur Bewerbung einladen');
+    await waitFor(() => expect(knopfInsFormular()).not.toBeNull(), { timeout: 5000 });
     pruefen('Profilfenster offen');
     await profilSchliessen(user);
     pruefen('Profilfenster wieder zu');
@@ -753,8 +668,8 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(within(liste).getByText('Weil kein Vermittler dazwischen steht: Primundus ist Direktanbieter, die Pflegekräfte sind bei Primundus angestellt. Eine Vermittlungsgebühr gibt es nicht. Dazu gilt unsere Bestpreisgarantie: Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot.')).toBeInTheDocument();
     // Nie „vermitteln“ für Primundus.
     expect(liste.textContent).not.toMatch(/vermitteln/);
-    // Ohne die zwei Fragen zum „Einladen“ (seit #162, Martin 13.11.; #163 bringt das Einladen nur im Profil zurück, die Fragen
-    // bleiben weg), auch nicht unter „weitere Fragen“.
+    // Ohne die zwei Fragen zum „Einladen“ (im Portal gibt es kein Einladen mehr, Martin 13.11.), auch nicht unter „weitere
+    // Fragen“.
     await user.click(within(liste).getByRole('button', { name: fragen[6]! }));
     const alle = within(liste).getAllByRole('button').map((b) => b.textContent);
     expect(alle).toHaveLength(6 + weitere);
@@ -764,7 +679,7 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(alle.filter((q) => /einlad/i.test(q ?? ''))).toEqual([]);
   }, 20_000);
 
-  it('nach dem ersten Speichern lädt der Minimal-Einstieg die Vorgemerkten ein (Lauf #145): die im Profil eingeladene und eine Vormerkung von einem früheren Besuch; Hinweis „… sind eingeladen.“, Messpunkt einladung_nach_speichern, danach die Ansicht nach dem Speichern', async () => {
+  it('nach dem ersten Speichern wird im Minimal-Einstieg niemand eingeladen, auch keine Vormerkung von einem früheren Besuch; kein Messpunkt einladung_nach_speichern, danach die Ansicht nach dem Speichern', async () => {
     const TOKEN = 'token-mi-speichern';
     const eingeladen: number[] = [];
     const meldungen: Meldung[] = [];
@@ -778,20 +693,22 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
       } }),
     );
     vollerEntwurf(TOKEN);
-    // Vormerkung von einem früheren Besuch (bis 13.11.2026 merkte „Einladen“ in der Zeile vor): Helena steht gleich beim Laden
-    // als eingeladen da und wird nach dem Speichern mit eingeladen.
+    // Vormerkung aus dem Stand bis 13.11.2026 (dort merkte „Einladen“ in der Zeile Helena vor): Sie darf nach dem Speichern
+    // keine Einladung mehr auslösen.
     localStorage.setItem(vormerkSchluessel(TOKEN), JSON.stringify([50002]));
     window.history.replaceState({}, '', `/?token=${TOKEN}`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
     await waitFor(() => expect(zeilen()).toHaveLength(2), { timeout: 5000 });
-    expect(zeileVon('Helena').querySelector('[data-zeile-eingeladen]')).not.toBeNull();
-    expect(document.querySelector('[data-vormerk-zeile]')!.textContent).toBe(`Nach dem Speichern laden wir Helena${NBSP}K. für Sie ein.`);
-    // Emilia über ihr Profil dazu.
-    await vormerkenUeberProfil(user, 'Emilia');
-    expect(JSON.parse(localStorage.getItem(vormerkSchluessel(TOKEN))!)).toEqual([50002, 50003]);
-    expect(document.querySelector('[data-vormerk-zeile]')!.textContent).toBe(`Nach dem Speichern laden wir Helena${NBSP}K. und Emilia${NBSP}W. für Sie ein.`);
-    expect(eingeladen).toEqual([]);
+    // Emilias Profil ansehen und schließen: Es merkt nichts vor, die alte Vormerkung bleibt unverändert, keine Zeile über dem
+    // Formular.
+    await user.click(within(zeileVon('Emilia')).getByRole('button'));
+    await waitFor(() => expect(knopfInsFormular()).not.toBeNull(), { timeout: 5000 });
+    await profilSchliessen(user);
+    expect(JSON.parse(localStorage.getItem(vormerkSchluessel(TOKEN))!)).toEqual([50002]);
+    expect(vorgemerktImSpeicher()).toEqual([vormerkSchluessel(TOKEN)]);
+    expect(document.querySelector('[data-vormerk-zeile]')).toBeNull();
+    expect(screen.queryByText(/Nach dem Speichern laden wir/)).toBeNull();
     // Knopf unter dem Formular: „Weiter →“ (mit „Zurück“ klein in der Schrittzeile), im letzten Schritt „Speichern“
     // (Martin 10.11.2026: „letzter Schritt Button nur: Speichern“; vorher „Bewerbungen erhalten“).
     expect(screen.getByText(/Schritt 1 von 4/)).toBeInTheDocument();
@@ -809,27 +726,21 @@ describe('Minimal-Einstieg vor dem ersten Speichern (Registry #147)', () => {
     expect(screen.queryByRole('button', { name: /^Weiter →/ })).toBeNull();
     await user.click(screen.getByRole('button', { name: /^Speichern$/ }));
 
-    // Nach dem Speichern lädt der Lauf #145 beide ein, in der Reihenfolge des Vormerkens, je genau einmal, und sagt es.
-    const hinweis = await screen.findByText('Helena K. und Emilia W. sind eingeladen.', {}, { timeout: 8000 });
-    expect(hinweis.textContent).toBe(`Helena${NBSP}K. und Emilia${NBSP}W. sind eingeladen.`);
-    expect(hinweis.closest('[data-toast]')).not.toBeNull();
-    expect(eingeladen).toEqual([50002, 50003]);
-    expect(localStorage.getItem(vormerkSchluessel(TOKEN))).toBeNull();
-    await waitFor(() => expect(meldungen.find((m) => m.event === 'einladung_nach_speichern')?.metadata).toEqual({ anzahl: 2, ok: 2 }));
-    expect(meldungen.find((m) => m.event === 'einladung_nach_speichern')?.notify).toBe(false);
-    expect(meldungen.filter((m) => m.event === 'caregiver_invited').map((m) => m.metadata?.caregiver_id)).toEqual([50002, 50003]);
-
-    // Danach die Ansicht nach dem Speichern: weder Zeilen noch Minimal-Einstieg; die Navigationsleiste zeigt wieder „Hilfe“.
+    // Nach dem Speichern die Ansicht nach dem Speichern: weder Zeilen noch Minimal-Einstieg; die Navigationsleiste zeigt
+    // wieder „Hilfe“.
     expect(await screen.findByRole('button', { name: 'Hilfe' }, { timeout: 8000 })).toBeInTheDocument();
     expect(document.querySelector('[data-einstieg="minimal"]')).toBeNull();
     expect(zeilen()).toHaveLength(0);
     expect(screen.queryByRole('button', { name: HAUPTKNOPF })).toBeNull();
     expect(document.querySelector('[data-testsieger-kopf]')).toBeNull();
+    // Das Speichern ist wirklich durch (sonst sagte „niemand eingeladen“ nichts).
     await waitFor(() => expect(meldungen.find((m) => m.event === 'speichern_antwort')?.metadata).toMatchObject({ ergebnis: 'ok', vor_speichern: true }));
-    // Keine zweite Runde.
+    // Niemand eingeladen: Der Lauf #145 lädt sofort nach dem Umschalten ein und meldet einladung_nach_speichern; nach 300 ms
+    // hätte er längst gemeldet.
     await new Promise((r) => setTimeout(r, 300));
-    expect(eingeladen).toEqual([50002, 50003]);
-    expect(meldungen.filter((m) => m.event === 'einladung_nach_speichern')).toHaveLength(1);
+    expect(eingeladen).toEqual([]);
+    expect(meldungen.filter((m) => m.event === 'einladung_nach_speichern')).toEqual([]);
+    expect(screen.queryByText(/ist eingeladen\.|sind eingeladen\./)).toBeNull();
   }, 30_000);
 
   it('?einstieg=zuerst zeigt „Pflegekräfte zuerst“ (#145) unverändert, ohne Minimal-Einstieg', async () => {

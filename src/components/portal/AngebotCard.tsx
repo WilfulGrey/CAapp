@@ -999,7 +999,7 @@ export const AngebotCard: FC<{
         {schlicht && kopf?.aussen && (
           <div className="px-1 pb-3" data-formular-kopf-aussen>
             <h2 className="text-[20px] font-bold leading-[26px] text-pm-ink">{kopf.titel}</h2>
-            {step === 0 && kopf.zeile && <p className="mt-1.5 text-[15px] leading-[1.45] text-pm-body">{kopf.zeile}</p>}
+            {step === 0 && <p className="mt-1.5 text-[15px] leading-[1.45] text-pm-body">{kopf.zeile}</p>}
           </div>
         )}
         <Rahmen className={schlicht ? (kopf?.aussen ? `rounded-card bg-white px-4 shadow-lift ring-[1.5px] ring-pm-taupe-light [&_[data-knopfleiste]]:border-t-0 [&_[data-mess=weiter]]:!bg-pm-green [&_[role=progressbar]>span]:!bg-pm-green [&_[role=progressbar]]:!bg-pm-chip` : 'rounded-card bg-white px-4 shadow-lift ring-1 ring-pm-coral/20') : eingebettet ? 'pt-4' : 'px-5 pt-5'}>

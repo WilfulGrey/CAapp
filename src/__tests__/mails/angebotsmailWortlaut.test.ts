@@ -16,8 +16,8 @@ import { ERREICHBAR, TELEFON, TELEFON_HREF, whatsappHref } from '../../lib/konta
 // - Titel: Portal KOPF_TITEL („Ihr Preis für die Betreuung zu Hause“), Mail ANGEBOT_TITEL („Ihr persönliches Angebot“).
 // - Punkte: Portal KOPF_PUNKTE unter „Bestpreisgarantie“, Mail GARANTIE_PUNKTE.
 // - Liste: Portal LISTE_TITEL („Ihre Pflegekräfte-Auswahl“), Mail „Passende Pflegekräfte“.
-// - Knopf: Die Mail zeigt seit Registry #163 „Angebot & Pflegekräfte anzeigen“ (Martin 14.11.2026) mit der Zeile des früheren
-//   festen Knopfs darunter (FEST_ZEILE); im Portal gibt es den festen Knopf nicht mehr, FEST_TITEL steht nirgends mehr.
+// - Knopf: Die Mail zeigt „Bewerbungen erhalten“ mit Zeile darunter (FEST_TITEL, FEST_ZEILE); im Portal gibt es den festen
+//   Knopf nicht mehr, die Konstanten stehen dort nur noch für diesen Test.
 
 const WURZEL = join(__dirname, '..', '..', '..');
 const MAIL = readFileSync(join(WURZEL, 'project 3/supabase/functions/send-scheduled-emails/kundenMails.ts'), 'utf8');
@@ -84,11 +84,8 @@ describe('Angebotsmail wie das Portal (Registry #148)', () => {
     }
   });
 
-  it('Knopf „Angebot & Pflegekräfte anzeigen“ (Registry #163) mit der Zeile des früheren festen Knopfs darunter (FEST_ZEILE); „Bewerbungen erhalten“ (FEST_TITEL) weder in der Mail noch im Portal', () => {
-    // Martin 14.11.2026: „in der Mail würde ich den Buttontext machen: Angebot & Pflegekräfte anzeigen“.
-    expect(konst('KNOPF_TITEL')).toBe('Angebot & Pflegekräfte anzeigen');
-    // Ohne Kommentare (dort steht der frühere Knopf als Geschichte); `//` nach einem Doppelpunkt ist eine Adresse.
-    expect(ANGEBOT.replace(/\/\*[\s\S]*?\*\/|(?<!:)\/\/.*$/gm, '')).not.toContain(FEST_TITEL);
+  it('Knopf „Bewerbungen erhalten“ mit Zeile darunter: Mail behält den Wortlaut des früheren festen Knopfs (FEST_TITEL, FEST_ZEILE), im Portal gibt es diesen Knopf seit 13.11.2026 bewusst nicht mehr', () => {
+    expect(konst('KNOPF_TITEL')).toBe(FEST_TITEL);
     expect(konst('KNOPF_ZEILE').replace(/&amp;/g, '&')).toBe(FEST_ZEILE);
     // Gewollte Abweichung: Das Portal zeigt FEST_TITEL und FEST_ZEILE nirgends mehr an.
     expect(EINSTIEG).not.toContain('{FEST_TITEL}');
