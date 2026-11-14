@@ -30,11 +30,11 @@
  * ─── SYNC-PFLICHT ───────────────────────────────────────────────────────
  * Reihenfolge und Trichter MÜSSEN dieselben fünf liefern wie das Portal,
  * sonst steht in der Mail eine andere Frau als hinter dem Klick. Kopien von:
- *   src/lib/mamamia/badge.ts            → badgeTier / caregiverBadgeScore
- *   src/lib/mamamia/matchingsRanking.ts → rankComparator
+ *   src/lib/mamamia/badge.ts            → badgeTier / caregiverBadgeScore, jahreErfahrung (hier `jahreVon`)
+ *   src/lib/mamamia/matchingsRanking.ts → rankComparator (Foto → Jahre → Einsätze, Registry #166)
  *   src/lib/mamamia/mappers.ts          → requiredGermanyLevelForWish,
  *                                         matchesGermanyWish, NATIONALITY_DE
- *   src/pages/CustomerPortalPage.tsx    → Alters-/Badge-Trichter, TARGET 5
+ *   src/pages/CustomerPortalPage.tsx    → Alters-Trichter, TARGET 5, limit 1000 (Badge-Trichter seit #166 weg)
  * Edge Functions können nicht aus `src/` importieren (CI kopiert nur den
  * functions-Ordner) — gleiche Lage wie names.ts, quietHours.ts, deutschStufe.ts.
  * Ändert sich dort die Reihenfolge, muss sie hier mit.
@@ -52,9 +52,13 @@ export interface MatchCaregiver {
   year_of_birth?: number | null;
   germany_skill?: string | null;
   care_experience?: string | null;
+  /** Jahre außerhalb Deutschlands (Int) — zählt zu den Jahren dazu, wie im Portal und im SA-Portal (Registry #166). */
+  care_experience_outside_de?: number | null;
   available_from?: string | null;
   last_contact_at?: string | null;
   hp_total_jobs?: number | null;
+  /** Tage im Einsatz über mamamia — Ersatz für die Jahre, wenn `care_experience` leer ist (wie im Portal). */
+  hp_total_days?: number | null;
   /** Durchschnittliche Einsatzdauer in TAGEN — Quelle der „Ø N Wochen"-Angabe. */
   hp_avg_mission_days?: number | null;
   avatar?: { aws_url?: string | null } | null;
@@ -146,7 +150,7 @@ export function badgeTier(score: number): 0 | 1 | 2 | 3 | 4 {
   return 0;
 }
 
-/** Mindest-Score, den der Trichter bevorzugt (Tier ≥ 2 = „Bewährt"). */
+/** Tier ≥ 2 = „Bewährt". Bis Registry #166 bevorzugte der Trichter diese Kräfte; heute ohne Verwender. */
 export const MIN_BADGE_SCORE = 2;
 
 /**
@@ -187,6 +191,22 @@ export function erfahrungJahre(careExperience: string | null | undefined): numbe
     : 0;
 }
 
+/** Jahre Erfahrung wie auf der Portal-Zeile — Kopie von `jahreErfahrung` (src/lib/mamamia/badge.ts, Registry #166):
+ *  `care_experience` plus `care_experience_outside_de` (wie das SA-Portal); trägt keins einen Wert, `hp_total_days` / 365
+ *  (mindestens 1), sonst 0. „0" ist ein Wert und fällt NICHT auf die Tage zurück. */
+export function jahreVon(
+  cg: { care_experience?: string | null; care_experience_outside_de?: number | null; hp_total_days?: number | null },
+): number {
+  const inDe = typeof cg.care_experience === "string" && cg.care_experience.length > 0 ? cg.care_experience : null;
+  const ausland = typeof cg.care_experience_outside_de === "number" && Number.isFinite(cg.care_experience_outside_de)
+    ? cg.care_experience_outside_de
+    : null;
+  if (inDe !== null || ausland !== null) {
+    return Math.max(0, (inDe !== null ? erfahrungJahre(inDe) : 0) + Math.max(0, ausland ?? 0));
+  }
+  return cg.hp_total_days ? Math.max(1, Math.floor(cg.hp_total_days / 365)) : 0;
+}
+
 // ─── Sprachwunsch — Kopie aus src/lib/mamamia/mappers.ts ─────────────────
 
 export function requiredGermanyLevelForWish(wunsch: string | null | undefined): string | null {
@@ -194,7 +214,23 @@ export function requiredGermanyLevelForWish(wunsch: string | null | undefined): 
   if (v === "grundlegend") return "level_1";
   if (v === "kommunikativ") return "level_2";
   if (v === "sehr-gut" || v === "sehr_gut" || v === "gut") return "level_3";
+  // „Sehr gut" vergibt nur die Agentur im SA-Portal (Key 'sehr-gut-sa', level_4) — wie im Portal. Ohne diese Zeile
+  // filterte die Mail bei diesem Wunsch gar nicht (Registry #166).
+  if (v === "sehr-gut-sa" || v === "sehr_gut_sa") return "level_4";
   return null;
+}
+
+/** Welche Deutschstufe gilt — Kopie von `resolveDeutschWishLevel` (src/lib/mamamia/mappers.ts, Registry #166): der
+ *  Wunsch bei mamamia (`customer_caregiver_wish.germany_skill`, den die SA nachbessern kann) gewinnt, solange dort eine
+ *  echte Stufe steht; 'not_important'/'level_0' heißen „kein Filter“; sonst der Rechnerwert. So zeigt die Mail dieselben
+ *  Kräfte wie das Portal. */
+export function deutschStufeFuerListe(
+  mamamiaSkill: string | null | undefined,
+  rechnerWunsch: string | null | undefined,
+): string | null {
+  if (mamamiaSkill === "not_important" || mamamiaSkill === "level_0") return null;
+  if (typeof mamamiaSkill === "string" && /^level_[1-4]$/.test(mamamiaSkill)) return mamamiaSkill;
+  return requiredGermanyLevelForWish(rechnerWunsch);
 }
 
 export function matchesGermanyWish(
@@ -223,7 +259,6 @@ export function rangVergleich(now: Date) {
     const t = new Date(iso).getTime();
     return Number.isFinite(t) ? t : -Infinity;
   };
-  const badge = (m: Matching): number => badgeTier(caregiverBadgeScore(m.caregiver));
   const hasPhoto = (m: Matching): number => (fotoUrl(m.caregiver) ? 1 : 0);
   const isFemale = (m: Matching): number => (m.caregiver.gender === "female" ? 1 : 0);
   const isYoung = (m: Matching): number => {
@@ -232,11 +267,14 @@ export function rangVergleich(now: Date) {
     return nowYear - yob <= 60 ? 1 : 0;
   };
 
+  // Registry #166: Foto → Jahre → Einsätze → weiblich → Alter ≤ 60 → verfügbar → letzter Kontakt (wie rankComparator).
   return (a: Matching, b: Matching): number => {
-    const ba = badge(a), bb = badge(b);
-    if (ba !== bb) return bb - ba;
     const ap = hasPhoto(a), bp = hasPhoto(b);
     if (ap !== bp) return bp - ap;
+    const aj = jahreVon(a.caregiver), bj = jahreVon(b.caregiver);
+    if (aj !== bj) return bj - aj;
+    const ae = a.caregiver.hp_total_jobs ?? 0, be = b.caregiver.hp_total_jobs ?? 0;
+    if (ae !== be) return be - ae;
     const af = isFemale(a), bf = isFemale(b);
     if (af !== bf) return bf - af;
     const ay = isYoung(a), by = isYoung(b);
@@ -245,7 +283,7 @@ export function rangVergleich(now: Date) {
     if (av !== bv) return av - bv;
     const ac = contactMs(a.caregiver.last_contact_at), bc = contactMs(b.caregiver.last_contact_at);
     if (ac !== bc) return bc - ac;
-    return (b.caregiver.hp_total_jobs ?? 0) - (a.caregiver.hp_total_jobs ?? 0);
+    return 0;
   };
 }
 
@@ -259,10 +297,12 @@ export function fotoUrl(cg: MatchCaregiver): string | null {
 }
 
 // ─── Trichter — Kopie aus CustomerPortalPage `effectiveMatched` ──────────
-// Zwei Hartfilter MIT Rückfall (User-Spec 14.06.): Alter ≤ 60 und Badge ≥
-// „Bewährt" greifen nur, solange danach noch fünf übrig bleiben. Sonst
-// füllen die Aussortierten hinten wieder auf — lieber eine ältere Kraft
-// zeigen als eine leere Liste.
+// Hartfilter MIT Rückfall (User-Spec 14.06.): Alter ≤ 60 greift nur, solange
+// danach noch fünf übrig bleiben. Sonst füllen die Älteren hinten wieder auf —
+// lieber eine ältere Kraft zeigen als eine leere Liste. Der zweite Filter
+// „Badge ≥ Bewährt" und das Nach-oben-Ziehen der Kraft mit den meisten
+// Einsätzen sind seit Registry #166 weg, wie im Portal: Platz 1 ist die erste
+// nach rangVergleich (Foto, dann Jahre, dann Einsätze).
 
 export const TARGET_VISIBLE = 5;
 const MAX_AGE = 60;
@@ -271,6 +311,8 @@ export function waehleFuenf(
   matchings: Matching[],
   deutschWunsch: string | null | undefined,
   now: Date,
+  /** Deutschwunsch bei mamamia (customer_caregiver_wish.germany_skill); `undefined` = nicht gelesen → Rechnerwert. */
+  mamamiaDeutsch?: string | null,
 ): Matching[] {
   const nowYear = now.getFullYear();
 
@@ -285,7 +327,10 @@ export function waehleFuenf(
 
   const sprachGefiltert = eindeutig
     .filter((m) => m.is_show !== false)
-    .filter((m) => matchesGermanyWish(m.caregiver.germany_skill, deutschWunsch))
+    .filter((m) => {
+      const stufe = deutschStufeFuerListe(mamamiaDeutsch, deutschWunsch);
+      return !stufe || !m.caregiver.germany_skill || m.caregiver.germany_skill === stufe;
+    })
     .sort(rangVergleich(now));
 
   const zuAlt = (yob: number | null | undefined): boolean =>
@@ -296,39 +341,7 @@ export function waehleFuenf(
   const altersGefiltert =
     jung.length >= TARGET_VISIBLE ? jung : [...jung, ...altRest];
 
-  const stark = altersGefiltert.filter(
-    (m) => caregiverBadgeScore(m.caregiver) >= MIN_BADGE_SCORE,
-  );
-  const schwachRest = altersGefiltert.filter(
-    (m) => caregiverBadgeScore(m.caregiver) < MIN_BADGE_SCORE,
-  );
-  const fertig = stark.length >= TARGET_VISIBLE ? stark : [...stark, ...schwachRest];
-  const fuenf = fertig.slice(0, TARGET_VISIBLE);
-
-  return empfehlungNachOben(fuenf);
-}
-
-/**
- * Letzter Schritt des Portals: INNERHALB der sichtbaren fünf wandert die
- * Kraft mit den meisten Einsätzen auf Platz 1 („Empfehlung des Beraters",
- * CustomerPortalPage `bestIdx`). Die übrigen behalten ihre Reihenfolge, bei
- * Gleichstand gewinnt die erste.
- *
- * Ohne diesen Schritt könnte die Mail eine andere Frau zeigen als das Portal:
- * rangVergleich sortiert nach Badge-STUFE (12+ = Elite) und bricht Gleichstand
- * über Foto/Geschlecht/Alter — 20 Einsätze ohne Foto landen dort hinter 13
- * Einsätzen mit Foto, im Portal aber davor.
- */
-export function empfehlungNachOben(fuenf: Matching[]): Matching[] {
-  let bestIdx = -1;
-  let bestScore = -Infinity;
-  fuenf.forEach((m, idx) => {
-    const s = caregiverBadgeScore(m.caregiver);
-    if (s > bestScore) { bestScore = s; bestIdx = idx; }
-  });
-  return bestIdx > 0
-    ? [fuenf[bestIdx], ...fuenf.filter((_, idx) => idx !== bestIdx)]
-    : fuenf;
+  return altersGefiltert.slice(0, TARGET_VISIBLE);
 }
 
 // ─── Die drei Haken ──────────────────────────────────────────────────────
@@ -439,7 +452,7 @@ export function baueEmpfehlung(
   now: Date,
 ): EmpfehlungErgebnis {
   const cg = m.caregiver;
-  const jahre = erfahrungJahre(cg.care_experience);
+  const jahre = jahreVon(cg);
   const einsaetze = cg.hp_total_jobs ?? 0;
   const alter = cg.year_of_birth ? now.getFullYear() - cg.year_of_birth : null;
 
@@ -492,7 +505,7 @@ export function anzeigeName(vorname: string, nachname?: string | null): string {
  */
 export function kundenFakten(cg: MatchCaregiver): string {
   const teile: string[] = [];
-  const jahre = erfahrungJahre(cg.care_experience);
+  const jahre = jahreVon(cg);
   if (jahre > 0) teile.push(`${jahre} ${jahre === 1 ? "Jahr" : "Jahre"} Erfahrung`);
 
   const einsaetze = cg.hp_total_jobs ?? 0;
@@ -516,7 +529,7 @@ export function deutschBalken(skill: string | null | undefined): number {
 /** „7 J. Erfahrung" — Wortlaut der Erfahrungs-Kachel im Profil-Modal
  *  (mapCaregiverToNurse: `${jahre} J. Erfahrung`, sonst „—"). */
 export function erfahrungKurz(cg: MatchCaregiver): string {
-  const jahre = erfahrungJahre(cg.care_experience);
+  const jahre = jahreVon(cg);
   return jahre > 0 ? `${jahre} J. Erfahrung` : "—";
 }
 
@@ -539,7 +552,7 @@ export function vorstellungstext(
   const motivation = (extra?.motivation ?? "").trim();
   if (motivation) return motivation;
 
-  const jahre = erfahrungJahre(cg.care_experience);
+  const jahre = jahreVon(cg);
   const wort = deutschWortAus(cg.germany_skill);
   const niveau = wort === "Grund" ? "Grundniveau"
     : wort === "Mittel" ? "mittlerem Niveau"
@@ -670,9 +683,10 @@ async function holeMatchings(deps: HoleDeps): Promise<{
     return await res.json();
   };
 
-  // ② Matches holen. limit=200 wie im Portal — kleinere Seiten haben dort
-  //    schon einmal 80 % der besten Kräfte verschluckt.
-  const mRes = await proxy("listMatchings", { limit: 200 }) as {
+  // ② Matches holen. limit=1000 wie im Portal (Registry #166) — mit 200 fehlten im Prod-Pool vom 14.11.2026 Kräfte mit
+  //    Foto und vielen Jahren (eine mit 10 Jahren lag auf Platz 249); kleinere Seiten hatten schon einmal 80 % der besten
+  //    Kräfte verschluckt. Dauer bei 1000 wie bei 200 (ca. 2,5 s).
+  const mRes = await proxy("listMatchings", { limit: 1000 }) as {
     data?: { JobOfferMatchingsWithPagination?: { data?: Matching[] } };
     JobOfferMatchingsWithPagination?: { data?: Matching[] };
   };
@@ -680,7 +694,22 @@ async function holeMatchings(deps: HoleDeps): Promise<{
     mRes?.data?.JobOfferMatchingsWithPagination?.data ??
     mRes?.JobOfferMatchingsWithPagination?.data ??
     [];
-  const fuenf = Array.isArray(roh) ? waehleFuenf(roh, deps.formularDaten.deutschkenntnisse, now) : [];
+
+  // ③ Deutschwunsch wie im Portal (Registry #166): erst der Stand bei mamamia, dann der Rechnerwert. Scheitert das
+  //    Lesen, gilt der Rechnerwert — so wie im Portal, solange der Kunde noch nicht geladen ist.
+  let mamamiaDeutsch: string | null | undefined = undefined;
+  try {
+    const cRes = await proxy("getCustomer", {}) as {
+      data?: { Customer?: { customer_caregiver_wish?: { germany_skill?: string | null } | null } };
+      Customer?: { customer_caregiver_wish?: { germany_skill?: string | null } | null };
+    };
+    const kunde = cRes?.data?.Customer ?? cRes?.Customer;
+    mamamiaDeutsch = kunde?.customer_caregiver_wish?.germany_skill ?? null;
+  } catch (e) {
+    console.warn("[empfehlung] getCustomer für den Deutschwunsch fehlgeschlagen, Rechnerwert gilt:", e instanceof Error ? e.message : String(e));
+  }
+
+  const fuenf = Array.isArray(roh) ? waehleFuenf(roh, deps.formularDaten.deutschkenntnisse, now, mamamiaDeutsch) : [];
   return { proxy, fuenf };
 }
 
@@ -696,7 +725,7 @@ export async function holeEmpfehlung(deps: HoleDeps): Promise<EmpfehlungErgebnis
     if (!basis || basis.fuenf.length === 0) return null;
     const { proxy, fuenf } = basis;
 
-    // ③ Zusatzfelder nur für die EINE empfohlene Kraft (Raucherin,
+    // ④ Zusatzfelder nur für die EINE empfohlene Kraft (Raucherin,
     //    Führerschein, Nationalität stehen nicht in der Matching-Liste).
     //    Schlägt das fehl, bleiben eben zwei Gründe statt vier.
     let extra: CaregiverExtra | null = null;

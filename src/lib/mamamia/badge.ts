@@ -15,8 +15,10 @@
 // EVERYTHING badge-related funnels through here so the consumers can't
 // drift apart:
 //   1. nurseLevel()          (components/portal/shared.ts)      — UI badge
-//   2. rankComparator()      (lib/mamamia/matchingsRanking.ts)  — sort order
-//   3. MIN_BADGE_SCORE funnel (pages/CustomerPortalPage.tsx)    — "Bewährt+"
+//   2. rankComparator()      (lib/mamamia/matchingsRanking.ts)  — Einsätze nur noch als drittes Kriterium nach Foto und
+//      Jahren (Registry #166, 14.11.2026; vorher Stufe zuerst)
+//   3. MIN_BADGE_SCORE — der „Bewährt+"-Trichter im Portal ist seit Registry #166 weg (Martin: „die besten mit Foto und
+//      viele Jahre Erfahrung"); die Konstante bleibt für die Stufen-Tests
 //   (4. bis Registry #164 das Erklär-Popup EXPERIENCE_LEVELS im Profilfenster; seit 14.11.2026 zeigt das Portal Kunden
 //       keine Stufen mehr, Martin: „das versteht kein Mensch“)
 // Ausserhalb dieses Repos zieht `detect-caregiver-events/index.ts`
@@ -35,6 +37,26 @@ export function parseExperienceYears(careExperience: string | null | undefined):
   return typeof careExperience === 'string'
     ? Math.max(0, parseInt(careExperience, 10) || 0)
     : 0;
+}
+
+/** Jahre Erfahrung, wie sie auf der Zeile stehen („N Jahre Erfahrung"): `care_experience` (in Deutschland, Text, auch
+ *  „30+") PLUS `care_experience_outside_de` (außerhalb Deutschlands, Zahl) — wie das SA-Portal
+ *  (mamamia-sadash `resources/js/lib/experience.js`, Michał 05.08.: beide Felder summieren). Trägt keins der beiden
+ *  Felder einen Wert, zählen die Einsatztage `hp_total_days` / 365 (mindestens 1), sonst 0. „0" ist ein Wert und fällt
+ *  NICHT auf die Tage zurück.
+ *  Eine Quelle für die Anzeige (`mapCaregiverToNurse`) und die Reihenfolge (`rankComparator`, Registry #166). Die
+ *  Angebotsmail rechnet dasselbe in `send-scheduled-emails/empfehlung.ts` `jahreVon` (Kopie, Edge Function). */
+export function jahreErfahrung(
+  cg: { care_experience?: string | null; care_experience_outside_de?: number | null; hp_total_days?: number | null },
+): number {
+  const inDe = typeof cg.care_experience === 'string' && cg.care_experience.length > 0 ? cg.care_experience : null;
+  const ausland = typeof cg.care_experience_outside_de === 'number' && Number.isFinite(cg.care_experience_outside_de)
+    ? cg.care_experience_outside_de
+    : null;
+  if (inDe !== null || ausland !== null) {
+    return Math.max(0, (inDe !== null ? parseInt(inDe, 10) || 0 : 0) + Math.max(0, ausland ?? 0));
+  }
+  return cg.hp_total_days ? Math.max(1, Math.floor(cg.hp_total_days / 365)) : 0;
 }
 
 /** Score = Anzahl abgeschlossener Einsätze über uns (Nurse-Shape). */
@@ -59,5 +81,5 @@ export function badgeTier(score: number): BadgeTier {
   return 0;                  // kein Label (SA-Portal: Starter)
 }
 
-/** Mindest-Score, den der Matching-Trichter bevorzugt (Tier ≥ 2 = „Bewährt"). */
+/** Tier ≥ 2 = „Bewährt". Bis Registry #166 bevorzugte der Matching-Trichter diese Kräfte; heute ohne Verwender im Portal. */
 export const MIN_BADGE_SCORE = 2;
