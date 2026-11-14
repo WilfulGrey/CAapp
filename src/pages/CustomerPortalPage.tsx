@@ -3843,11 +3843,7 @@ const CustomerPortalPage: FC = () => {
       key={`z-${i}`}
       nurse={nurse}
       vorgemerkt={vorgemerktEinladbar.includes(caregiverId)}
-      gesperrt={inviteInFlight}
       onNurseClick={() => openNurseFromMatch(nurse, i)}
-      onInvite={() => { messeEinladen(nurse, 'karte'); return canInviteNurse(i); }}
-      onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
-      preis={lead?.kalkulation?.bruttopreis ?? null}
     />
   ));
 
@@ -5111,7 +5107,7 @@ const CustomerPortalPage: FC = () => {
               || statusOverrides.get(enrichedSelectedNurse.caregiverId) === 'invited'
               || interestStatusOverrides.get(enrichedSelectedNurse.caregiverId) === 'invited')
           }
-          // ENTWURF 14.11.2026 (Martin: „einladen zur Bewerbung … Dann Popup, wenn Daten noch fehlen“): im Minimal-Einstieg vor dem
+          // Registry #163, 14.11.2026 (Martin: „einladen zur Bewerbung … Dann Popup, wenn Daten noch fehlen“): im Minimal-Einstieg vor dem
           // Speichern EIN Knopf; er merkt vor und öffnet „{Name} einladen“ (Logik #145, `canInviteNurse`), eingeladen wird nach
           // dem ersten Speichern. „Nein danke“ entfällt dort.
           einladenVorSpeichern={minimalEinstieg && vorSpeichern && !nurseModalApp && nurseMatchIdx !== null ? () => {

@@ -290,7 +290,7 @@ export function EinladenSheetVorSpeichern({ offen, name, onClose, onVervollstaen
       onClose={onClose}
       fuss={(
         <>
-          {/* Grün wie die Knöpfe der Seite darunter (ENTWURF 14.11.2026). */}
+          {/* Grün wie die Knöpfe der Seite darunter (Registry #163). */}
           <Button variante="gruen" breit onClick={() => { onClose(); onVervollstaendigen(); }} className="px-3">
             Pflegesituation vervollständigen
           </Button>

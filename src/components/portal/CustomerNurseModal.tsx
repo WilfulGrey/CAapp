@@ -83,7 +83,7 @@ export const CustomerNurseModal: FC<{
    *  promise resolves; on rejection modal rolls back to idle and the
    *  parent surfaces the error (CLAUDE.md §1 — no fake animation). */
   onInvite?: () => Promise<void>;
-  /** ENTWURF 14.11.2026 (Martin: „wenn man ein Profil öffnet, dann muss dort nicht Button mit vervollständigen sein, sondern
+  /** Registry #163, 14.11.2026 (Martin: „wenn man ein Profil öffnet, dann muss dort nicht Button mit vervollständigen sein, sondern
    *  einladen zur Bewerbung … Dann Popup, wenn Daten noch fehlen“): vor dem Speichern EIN grüner Knopf „Zur Bewerbung
    *  einladen“ statt „Nein danke“ und „Einladen“; das Portal merkt vor und öffnet „{Name} einladen“ (Logik #145). */
   einladenVorSpeichern?: () => void;

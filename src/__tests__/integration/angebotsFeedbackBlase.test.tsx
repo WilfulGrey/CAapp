@@ -100,8 +100,12 @@ describe('Schwebende Frage „Was sagen Sie zum Angebot?“ bei echten Kunden', 
         // Die Seite vor dem Speichern ist wirklich da (Kasten von 75b8df8, die Zeile von „Pflegekräfte zuerst“ bzw. im
         // Minimal-Einstieg der grüne Knopf in „So geht es weiter“, den es nur vor dem Speichern gibt) — und die Frage bleibt weg.
         if (look === '') {
-          const knopf = await screen.findByRole('button', { name: 'Pflegesituation vervollständigen' }, { timeout: 5000 });
-          expect(knopf).toHaveAttribute('data-ablauf-link');
+          // Seit Registry #163 heißt auch der Knopf im Kasten unter der Liste so; gemeint ist der in „So geht es weiter“.
+          const knopf = await waitFor(() => {
+            const k = screen.getAllByRole('button', { name: 'Pflegesituation vervollständigen' }).find((b) => b.hasAttribute('data-ablauf-link'));
+            if (!k) throw new Error('kein Knopf in „So geht es weiter“');
+            return k;
+          }, { timeout: 5000 });
           expect(knopf.closest('[data-ablauf-gute-phase]')).not.toBeNull();
         } else {
           const kennung = look === '&einstieg=alt'

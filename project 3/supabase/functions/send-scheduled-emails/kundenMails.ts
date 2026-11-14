@@ -154,8 +154,9 @@ export function eigenanteilAus(kalk: Record<string, any> | null | undefined): Ei
    Einleitungssatz und dann …“). Aufbau wie der Minimal-Einstieg des Portals (Registry #147, live 08.11.): Anrede, ein Satz,
    Kasten „Ihr persönliches Angebot“ (Preis, grün „Nach Zuschüssen“, grau Pflegeheim-Vergleich, vier Punkte, Kennzahlen),
    eingekaufte Leads den Hinweis zu den Angaben, die passenden Pflegekräfte als Zeilen mit Foto, Preis und „Ansehen“ (ins
-   Profil) und dem Textlink „Alle Pflegekräfte anzeigen“, die Erklärung zum Portal, EIN Knopf „Bewerbungen erhalten →“ /
-   „100% kostenfrei & unverbindlich“ (ins Formular), Gruß und Kontakt. Wortlaute aus dem Portal (Gleichlauf-Test
+   Profil) und dem Textlink „Alle Pflegekräfte anzeigen“, die Erklärung zum Portal, EIN Knopf „Angebot & Pflegekräfte
+   anzeigen →“ / „100% kostenfrei & unverbindlich“ (oben ins Portal, Registry #163; bis 14.11.2026 „Bewerbungen erhalten →“ ins
+   Formular), Gruß und Kontakt. Wortlaute aus dem Portal (Gleichlauf-Test
    src/__tests__/mails/angebotsmailWortlaut.test.ts); Betreff und Vorschau wie vorher. Das Siegel steht weiter im Kopf der Hülle. */
 export type AngebotKraft = { caregiverId: number; vorname: string; alter: number | null; erfahrungJahre: number; deutschWort: string | null; cid: string | null };
 export type AngebotEingabe = {
@@ -174,7 +175,7 @@ export type AngebotEingabe = {
 /** Wortlaute wie im Portal (src/components/portal/EinstiegMinimal.tsx: ANGEBOT_TITEL, GARANTIE_*, VERTRAUEN, FEST_*). */
 export const ANGEBOT_TITEL = "Ihr persönliches Angebot";
 export const GARANTIE_PUNKTE = ["Bestpreisgarantie", "Keine Vorauszahlung", "Keine Vermittlungsgebühr", "Keine Mindestlaufzeit"] as const;
-/** Hauptknopf (ENTWURF 14.11.2026, Martin: „in der Mail würde ich den Buttontext machen: Angebot & Pflegekräfte anzeigen“);
+/** Hauptknopf (Registry #163, 14.11.2026, Martin: „in der Mail würde ich den Buttontext machen: Angebot & Pflegekräfte anzeigen“);
  *  führt seitdem oben ins Portal (Angebot und Liste), bis dahin „Bewerbungen erhalten“ ins Formular. */
 export const KNOPF_TITEL = "Angebot & Pflegekräfte anzeigen";
 export const ALLE_KRAEFTE = "Alle Pflegekräfte anzeigen";

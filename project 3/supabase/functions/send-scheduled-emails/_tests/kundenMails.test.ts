@@ -108,8 +108,11 @@ const KRAEFTE: AngebotKraft[] = [
 const eingabe = (o: Partial<AngebotEingabe> = {}): AngebotEingabe =>
   ({ kalkulation: kalkEine, herkunft: null, portalBetreff: "X", resubmit: false, empfehlung: { sichtbar: 2, kraefte: KRAEFTE }, ...o });
 const STERNE = { schnitt: "4,9", anzahl: 126 };
-/** „Bewerbungen erhalten" führt wie im Portal ins Formular, „Alle Pflegekräfte anzeigen" zur Liste, „Ansehen" ins Profil. */
-const KNOPF = `${PORTAL}/?token=tok123&m=eb&goto=anfragen`;
+/** „Angebot & Pflegekräfte anzeigen" führt oben ins Portal (Registry #163, Martin 14.11.2026; bis dahin „Bewerbungen erhalten"
+ *  ins Formular), „Alle Pflegekräfte anzeigen" zur Liste, „Ansehen" ins Profil. */
+const KNOPF = `${PORTAL}/?token=tok123&m=eb`;
+/** Der Knopftext, wie er im HTML steht (`&` maskiert) und in `lesbar` erscheint. */
+const KNOPF_HTML = "Angebot &amp; Pflegekräfte anzeigen";
 const ALLE = `${PORTAL}/?token=tok123&m=eb&goto=matches`;
 const profil = (id: number) => `${PORTAL}/?token=tok123&cg=${id}&m=eb`;
 const ERKLAERUNG = "Im Kundenportal sehen Sie Ihr Angebot und passende Pflegekräfte. Beschreiben Sie einmal kurz die Pflegesituation, das dauert etwa 2 Minuten. Danach können sich Pflegekräfte direkt bei Ihnen bewerben. Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten.";
@@ -124,12 +127,16 @@ function inFolge(name: string, text: string, teile: string[]) {
   }
 }
 
-/** Grundregeln plus der Knopf der Angebotsmail: zweizeilig wie im Portal, genau einmal, ins Formular. */
+/** Grundregeln plus der Knopf der Angebotsmail: zweizeilig, genau einmal, oben ins Portal. */
 function pruefeAngebot(name: string, m: KundenMail) {
   grundregeln(name, m, KNOPF);
-  assertEquals(zaehle(m.html, `href="${KNOPF}"`), 1, `${name}: genau ein Knopf ins Formular`);
-  inFolge(`${name} Knopf`, m.html, [`href="${KNOPF}"`, "Bewerbungen erhalten&nbsp;&rarr;</span>", "100% kostenfrei &amp; unverbindlich</span>"]);
-  assertStringIncludes(m.text, `Bewerbungen erhalten (100% kostenfrei & unverbindlich): ${KNOPF}`);
+  assertEquals(zaehle(m.html, `href="${KNOPF}"`), 1, `${name}: genau ein Knopf ins Portal`);
+  inFolge(`${name} Knopf`, m.html, [`href="${KNOPF}"`, `${KNOPF_HTML}&nbsp;&rarr;</span>`, "100% kostenfrei &amp; unverbindlich</span>"]);
+  assertStringIncludes(m.text, `Angebot & Pflegekräfte anzeigen (100% kostenfrei & unverbindlich): ${KNOPF}`);
+  // Der frühere Knopf und sein Sprung ins Formular sind weg.
+  for (const alt of ["Bewerbungen erhalten", "goto=anfragen"]) {
+    assert(!m.html.includes(alt) && !m.text.includes(alt), `${name}: enthält noch „${alt}"`);
+  }
   // „Einladen" heißt in der Mail „Ansehen" (Martin 08.11.: „weil die das noch gar nicht verstehen, was Einladen bedeutet").
   for (const wort of ["Einladen", "einladen", "Eingeladen"]) {
     assert(!m.html.includes(wort) && !m.text.includes(wort), `${name}: enthält „${wort}"`);
@@ -151,7 +158,7 @@ Deno.test("01 Angebot (#148): Inhalt und Reihenfolge wie der freigegebene Entwur
     "Ewa", "1 Jahr Erfahrung", "3.050 €", "Ansehen",
     "Alle Pflegekräfte anzeigen",
     ERKLAERUNG,
-    "Bewerbungen erhalten",
+    KNOPF_HTML,
     "Viele Grüße Marta Kapcio Pflegeberaterin bei Primundus",
     "Fragen? 089 200 000 830, täglich 8–20 Uhr, auch per WhatsApp.",
   ]);
@@ -163,7 +170,7 @@ Deno.test("01 Angebot (#148): Inhalt und Reihenfolge wie der freigegebene Entwur
       + "★★★★★ 4,9 · 126 Bewertungen · 20 Jahre Erfahrung · 6× in Folge Testsieger\n\n",
     `PASSENDE PFLEGEKRÄFTE (2)\n- Maria, 58 · 12 Jahre Erfahrung · Deutsch Gut · 3.050 € · Ansehen: ${profil(11)}\n`
       + `- Ewa · 1 Jahr Erfahrung · 3.050 € · Ansehen: ${profil(22)}\nAlle Pflegekräfte anzeigen: ${ALLE}\n\n`,
-    `${PORTAL_ERKLAERUNG}\n\nBewerbungen erhalten (100% kostenfrei & unverbindlich): ${KNOPF}\n\n`,
+    `${PORTAL_ERKLAERUNG}\n\nAngebot & Pflegekräfte anzeigen (100% kostenfrei & unverbindlich): ${KNOPF}\n\n`,
     "Viele Grüße\nMarta Kapcio\nPflegeberaterin bei Primundus",
     "Fragen? 089 200 000 830, täglich 8–20 Uhr, auch per WhatsApp (https://wa.me/4989200000830).",
   ]);
@@ -239,7 +246,7 @@ Deno.test("01 Angebot: ohne Pflegekräfte keine Karte, Erklärung und Knopf blei
     for (const weg of ["Passende Pflegekräfte", "PASSENDE PFLEGEKRÄFTE", "Alle Pflegekräfte anzeigen", "goto=matches", "cg="]) {
       assert(!m.html.includes(weg) && !m.text.includes(weg), `enthält „${weg}"`);
     }
-    inFolge("ohne Karte", lesbar(m.html), ["Keine Mindestlaufzeit", ERKLAERUNG, "Bewerbungen erhalten"]);
+    inFolge("ohne Karte", lesbar(m.html), ["Keine Mindestlaufzeit", ERKLAERUNG, KNOPF_HTML]);
     assertEquals(zaehle(m.html, "<a "), 4, "Bestpreisgarantie, Knopf, Telefon, WhatsApp");
   }
   const ohne = angebotMail(k(), eingabe({ empfehlung: null }));
@@ -275,7 +282,7 @@ Deno.test("01 Angebot: eingekaufter Lead mit Annahmen, Hinweis klein direkt unte
   assertEquals(zaehle(m.html, "<a "), 11, "der Hinweis bringt keinen Link mit");
   inFolge("HTML", lesbar(m.html), [
     "vielen Dank für Ihre Anfrage über Pflegehilfe.", "Ihr persönliches Angebot", "Keine Mindestlaufzeit", "6× in Folge Testsieger",
-    HINWEIS_ANGENOMMEN, "Passende Pflegekräfte", ERKLAERUNG, "Bewerbungen erhalten",
+    HINWEIS_ANGENOMMEN, "Passende Pflegekräfte", ERKLAERUNG, KNOPF_HTML,
   ]);
   inFolge("Text", m.text, ["IHR PERSÖNLICHES ANGEBOT\n3.050 € / Monat\n", "6× in Folge Testsieger\n\n",
     `${HINWEIS_ANGENOMMEN}\n\nPASSENDE PFLEGEKRÄFTE (2)\n`]);
@@ -304,7 +311,7 @@ Deno.test("01 Angebot: Färbung des Hinweises nach angenommene_felder, Rechner-L
   assert(!alles.html.includes("vorsichtig angenommen") && !alles.text.includes("vorsichtig angenommen"));
   // Ohne Preis kein Kasten; der Hinweis steht dann unter dem Einstieg (bis #148: bei jeder Herkunft).
   const ohnePreis = angebotMail(k(), eingabe({ kalkulation: null, herkunft: "Pflegehilfe", angenommeneFelder: [] }));
-  inFolge("ohne Preis", lesbar(ohnePreis.html), ["über Pflegehilfe.", HINWEIS_UEBERNOMMEN, "Passende Pflegekräfte", "Bewerbungen erhalten"]);
+  inFolge("ohne Preis", lesbar(ohnePreis.html), ["über Pflegehilfe.", HINWEIS_UEBERNOMMEN, "Passende Pflegekräfte", KNOPF_HTML]);
   // Rechner-Leads (ohne Herkunft) sehen nichts davon, auch wenn eine Liste in der Kalkulation stünde.
   for (const felder of [undefined, [], ["betreuung_fuer"]]) {
     const r = angebotMail(k(), eingabe({ angenommeneFelder: felder }));
