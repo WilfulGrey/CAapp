@@ -16,6 +16,7 @@ import {
   stufenWort,
   stufenZusatz,
   waehleFuenf,
+  jahreVon,
   type CaregiverExtra,
   type Matching,
 } from "../empfehlung.ts";
@@ -87,14 +88,52 @@ Deno.test("waehleFuenf: über 60 fliegt raus, sobald fünf jüngere da sind", ()
   assertEquals(ids.includes(99), false);
 });
 
-// Der Fall, der Mail und Portal auseinanderlaufen ließe.
-Deno.test("waehleFuenf: Platz 1 ist die Kraft mit den meisten Einsätzen — wie im Portal", () => {
+// Registry #166 (Martin 14.11.2026: „die besten mit Foto und viele Jahre Erfahrung") — dieselbe Reihenfolge wie das
+// Portal (rankComparator): Foto, dann Jahre, dann Einsätze; kein Nach-oben-Ziehen der meisten Einsätze mehr.
+Deno.test("waehleFuenf: Foto vor Einsätzen — 20 Einsätze ohne Foto stehen hinter 13 mit Foto", () => {
   const liste = [
+    cg({ id: 2, hp_total_jobs: 20, avatar: null }),
     cg({ id: 1, hp_total_jobs: 13, avatar: { aws_url: "https://s3/a.jpg" } }),
-    cg({ id: 2, hp_total_jobs: 20, avatar: null }), // ohne Foto, aber erfahrener
   ];
-  // rangVergleich allein setzte #1 nach vorn (Foto schlägt Gleichstand in der
-  // Stufe). Das Portal zieht danach die meisten Einsätze nach oben.
+  assertEquals(waehleFuenf(liste, null, JETZT).map((m) => m.caregiver.id), [1, 2]);
+});
+
+Deno.test("waehleFuenf: mehr Jahre vor mehr Einsätzen, beide mit Foto", () => {
+  const liste = [
+    cg({ id: 1, care_experience: "2", hp_total_jobs: 14 }),
+    cg({ id: 2, care_experience: "15", hp_total_jobs: 0 }),
+    cg({ id: 3, care_experience: "8", hp_total_jobs: 0 }),
+  ];
+  assertEquals(waehleFuenf(liste, null, JETZT).map((m) => m.caregiver.id), [2, 3, 1]);
+});
+
+Deno.test("waehleFuenf: kein Einsätze-Filter mehr — 2 Einsätze ohne Jahre verdrängen keine Kraft mit Jahren", () => {
+  const liste = [
+    ...Array.from({ length: 5 }, (_, i) => cg({ id: 10 + i, care_experience: "", hp_total_jobs: 2 })),
+    cg({ id: 1, care_experience: "12", hp_total_jobs: 0 }),
+  ];
+  // Bis #166 kamen bei fünf Kräften mit ≥ 2 Einsätzen nur diese fünf in die Mail.
+  assertEquals(waehleFuenf(liste, null, JETZT)[0].caregiver.id, 1);
+});
+
+Deno.test("waehleFuenf: gleiche Jahre → mehr Einsätze zuerst", () => {
+  const liste = [cg({ id: 1, hp_total_jobs: 1 }), cg({ id: 2, hp_total_jobs: 6 })];
+  assertEquals(waehleFuenf(liste, null, JETZT).map((m) => m.caregiver.id), [2, 1]);
+});
+
+Deno.test("jahreVon: wie die Portal-Zeile — care_experience, sonst Tage / 365, „0“ fällt nicht zurück", () => {
+  assertEquals(jahreVon({ care_experience: "9", hp_total_days: 4000 }), 9);
+  assertEquals(jahreVon({ care_experience: "", hp_total_days: 800 }), 2);
+  assertEquals(jahreVon({ care_experience: null, hp_total_days: 100 }), 1);
+  assertEquals(jahreVon({ care_experience: "0", hp_total_days: 800 }), 0);
+  assertEquals(jahreVon({ care_experience: null, hp_total_days: null }), 0);
+});
+
+Deno.test("waehleFuenf: Jahre aus den Einsatztagen zählen für die Reihenfolge", () => {
+  const liste = [
+    cg({ id: 1, care_experience: "3" }),
+    cg({ id: 2, care_experience: null, hp_total_days: 365 * 6 }),
+  ];
   assertEquals(waehleFuenf(liste, null, JETZT)[0].caregiver.id, 2);
 });
 
@@ -407,6 +446,7 @@ Deno.test("holeEmpfehlung: keine Matches → null (Ersatztext statt leerem Kaste
 
 Deno.test("holeEmpfehlung: Glücksfall — beste Kraft plus Gründe", async () => {
   const rufe: string[] = [];
+  let limit: unknown = null;
   const r = await holeEmpfehlung({
     supabaseUrl: "https://s", key: "k", token: "t", jobOfferId: 1, now: JETZT,
     formularDaten: { deutschkenntnisse: "kommunikativ", geschlecht: "weiblich", fuehrerschein: "ja" },
@@ -419,6 +459,7 @@ Deno.test("holeEmpfehlung: Glücksfall — beste Kraft plus Gründe", async () =
       const body = JSON.parse(String((init as RequestInit).body));
       rufe.push(body.action);
       if (body.action === "listMatchings") {
+        limit = body.variables?.limit;
         return Promise.resolve(Response.json({
           data: {
             JobOfferMatchingsWithPagination: {
@@ -437,6 +478,7 @@ Deno.test("holeEmpfehlung: Glücksfall — beste Kraft plus Gründe", async () =
   assertEquals(r!.sichtbarGesamt, 2);
   assertEquals(r!.empfehlung.gruende, [HAKEN_WUNSCHPROFIL, HAKEN_VERFUEGBAR]);
   assertEquals(rufe, ["onboard", "listMatchings", "getCaregiver"]);
+  assertEquals(limit, 1000, "wie das Portal (Registry #166)");
 });
 
 Deno.test("holeEmpfehlung: getCaregiver-Ausfall kostet Gründe, nicht die Empfehlung", async () => {

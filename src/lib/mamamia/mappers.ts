@@ -10,6 +10,7 @@ import type {
   MamamiaCustomerContract,
 } from './types';
 import { STANDARD_NIGHT_OPS_DE } from './patientFormMapper';
+import { jahreErfahrung } from './badge';
 
 // Deterministic 20-color palette for avatar fallback (Salead pattern).
 const COLORS = [
@@ -411,15 +412,12 @@ export function mapCaregiverToNurse(
 ): Nurse {
   const skill = GERMANY_SKILL_LEVELS[cg.germany_skill ?? ''] ?? { level: '—', bars: 0 };
   const age = computeAge(cg.birth_date, cg.year_of_birth, opts.nowYear);
-  const experienceYearsRaw = typeof cg.care_experience === 'string' && cg.care_experience.length > 0
-    ? cg.care_experience
-    : cg.hp_total_days
-      ? String(Math.max(1, Math.floor(cg.hp_total_days / 365)))
-      : '';
   // care_experience = "0" heisst „keine Jahre" — als Zahl behandeln, nicht als
   // String: sonst stand auf der Karte „0 J. Erfahrung" (Martin, 13.08.,
   // Prod-Screenshot Ewelina S.). Null Jahre = keine Angabe, wie leer.
-  const experienceYears = parseInt(experienceYearsRaw, 10) > 0 ? experienceYearsRaw : '';
+  // Rechnung in `jahreErfahrung` (badge.ts), dieselbe wie für die Reihenfolge (Registry #166).
+  const jahre = jahreErfahrung(cg);
+  const experienceYears = jahre > 0 ? String(jahre) : '';
   const experience = experienceYears ? `${experienceYears} J. Erfahrung` : '—';
 
   const avgWeeks = cg.hp_avg_mission_days

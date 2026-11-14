@@ -44,7 +44,6 @@ import {
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput, splitCustomerName } from '../lib/mamamia/patientFormMapper';
 import { customerSalutation } from '../lib/names';
-import { caregiverBadgeScore, badgeScore as nurseBadgeScore, MIN_BADGE_SCORE } from '../lib/mamamia/badge';
 import { callMamamia, MamamiaError } from '../lib/mamamia/client';
 import { buildMonthlyBreakdown, formatDeDate } from '../lib/pricing/monthlyBreakdown';
 import {
@@ -113,6 +112,8 @@ import { StatusBadge } from '../components/ui/StatusBadge';
 // (bis Teil 3 des Redesigns stand die Zahl zweimal, einmal als Literal).
 const HEIM_EIGENANTEIL = 3364;
 const HEIM_QUELLE = 'vdek-Auswertung, Stand 1. Juli 2026';
+// Registry #166: Profile (getCaregiver) im Hintergrund nur für die ersten Plätze der Reihenfolge vorladen.
+const PROFILE_VORLADEN = 20;
 
 // ─── Dev-Only Preview-Mode (NICHT für Production) ──────────────────────────
 // Aktiviert via ?preview=bewerbung oder ?preview=interesse. Skipped den
@@ -939,7 +940,10 @@ const CustomerPortalPage: FC = () => {
   // bei größeren Pools (Krentler: 112 verfügbar) ~80 % der besten PKs
   // verschluckt. Performance bleibt vertretbar — Mamamia liefert pro
   // Match einen schlanken Caregiver-Ref ohne avatar-Blob.
-  const { data: mmMatchings, loading: mmMatchingsLoading, error: mmMatchingsError, refetch: refetchMatchings } = useMatchings({ limit: 200 }, mmReady);
+  // Registry #166: 1000 statt 200. Mamamia liefert Kräfte mit Foto zuerst, aber in eigener Reihenfolge — im Prod-Pool vom
+  // 14.11.2026 (4.731 Kräfte, 265 mit Foto) lag eine Kraft mit Foto und 10 Jahren auf Platz 249, alle Fotos in den ersten
+  // 829. Gleiche Dauer gemessen (ca. 2,5 s bei 200 und 1000).
+  const { data: mmMatchings, loading: mmMatchingsLoading, error: mmMatchingsError, refetch: refetchMatchings } = useMatchings({ limit: 1000 }, mmReady);
   // Mamamia's default listMatchings excludes matchings where is_request=true
   // (already-invited caregivers), so without this second call the invited
   // ones simply vanish from the list after F5 — only their ids would survive
@@ -1223,8 +1227,7 @@ const CustomerPortalPage: FC = () => {
   // erreicht ist. Ohne diese Zahlen ist im Nachhinein nicht zu sehen, ob
   // eine Karte oder ein ganzer Eimer gewandert ist.
   const funnel = {
-    merged: 0, langFiltered: 0, young: 0, ageRest: 0,
-    goodBadge: 0, badgeRest: 0, final: 0, ageFallback: false, badgeFallback: false,
+    merged: 0, langFiltered: 0, young: 0, ageRest: 0, final: 0, ageFallback: false,
   };
 
   const effectiveMatched = (() => {
@@ -1282,27 +1285,24 @@ const CustomerPortalPage: FC = () => {
       })
       .sort(rankComparator(now));
 
-    // Zwei Hartfilter mit Fallback (User-Spec 14.06.):
-    //   (a) Alter ≤ 60 — wer drüber ist, kommt nur rein wenn sonst <5 sichtbar
-    //   (b) Badge ≥ Silber — Bronze/Starter kommen nur rein wenn sonst <5
+    // Hartfilter mit Fallback (User-Spec 14.06.): Alter ≤ 60 — wer drüber
+    // ist, kommt nur rein wenn sonst <5 sichtbar. Der zweite Filter
+    // „Badge ≥ Bewährt" (mindestens 2 Einsätze) ist seit Registry #166 weg:
+    // er schob eine Kraft mit 2 Einsätzen, ohne Foto und ohne Jahre vor eine
+    // mit Foto und 15 Jahren. Die Reihenfolge entscheidet allein rankComparator.
     //
-    // Beide Filter werden NACH dem rankComparator-Sort angewendet, damit die
-    // best-rangierten Kandidaten der jeweiligen Filter-Bucket-Ebene zuerst
-    // kommen. Eingeladene Pflegekräfte umgehen beide Filter (sonst würden
-    // sie aus Kundensicht verschwinden, was verwirrend wäre).
+    // Der Filter wird NACH dem rankComparator-Sort angewendet. Eingeladene
+    // Pflegekräfte umgehen ihn (sonst würden sie aus Kundensicht
+    // verschwinden, was verwirrend wäre).
     //
     // Unbekanntes Geburtsjahr läuft beim Alters-Filter durch (defensiv —
     // könnte jung oder alt sein).
     const TARGET_VISIBLE = 5;
     const MAX_AGE = 60;
-    // Badge-Score + Schwellen + "Silber+"-Cut (MIN_BADGE_SCORE): zentrale
-    // Quelle lib/mamamia/badge.ts (geteilt mit nurseLevel + rankComparator).
     const isTooOld = (yob: number | null): boolean =>
       yob !== null && (nowYear - yob) > MAX_AGE;
-    const badgeScore = (m: typeof langFiltered[number]): number =>
-      caregiverBadgeScore(m.caregiver);
 
-    // Stufe 1: Alter ≤ 60
+    // Alter ≤ 60
     const young = langFiltered.filter(m => {
       if (invitedIds.has(m.caregiver.id)) return true;
       return !isTooOld(m.caregiver.year_of_birth);
@@ -1311,34 +1311,18 @@ const CustomerPortalPage: FC = () => {
       if (invitedIds.has(m.caregiver.id)) return false;
       return isTooOld(m.caregiver.year_of_birth);
     });
-    const ageFiltered = young.length >= TARGET_VISIBLE
+    const final = young.length >= TARGET_VISIBLE
       ? young
       : [...young, ...ageRest];
-
-    // Stufe 2: Badge ≥ Silber (innerhalb des Alters-Buckets)
-    const goodBadge = ageFiltered.filter(m => {
-      if (invitedIds.has(m.caregiver.id)) return true;
-      return badgeScore(m) >= MIN_BADGE_SCORE;
-    });
-    const badgeRest = ageFiltered.filter(m => {
-      if (invitedIds.has(m.caregiver.id)) return false;
-      return badgeScore(m) < MIN_BADGE_SCORE;
-    });
-    const final = goodBadge.length >= TARGET_VISIBLE
-      ? goodBadge
-      : [...goodBadge, ...badgeRest];
 
     funnel.merged = merged.length;
     funnel.langFiltered = langFiltered.length;
     funnel.young = young.length;
     funnel.ageRest = ageRest.length;
-    funnel.goodBadge = goodBadge.length;
-    funnel.badgeRest = badgeRest.length;
     funnel.final = final.length;
     // true = der Rest-Eimer hängt gerade dran. Kippt dieser Wert zwischen
     // zwei Renders, wandern mehrere Karten auf einmal.
     funnel.ageFallback = young.length < TARGET_VISIBLE;
-    funnel.badgeFallback = goodBadge.length < TARGET_VISIBLE;
 
     return final.map(m => ({
       nurse: mapMatchingToNurse(m, { nowIso, nowYear }),
@@ -1428,7 +1412,11 @@ const CustomerPortalPage: FC = () => {
   useEffect(() => {
     if (!mmReady) return;
     const ids = new Set<number>();
-    for (const m of effectiveMatched) ids.add(m.caregiverId);
+    // Registry #166: nur die vorderen Plätze der Reihenfolge (5 sichtbar, zweimal „5 weitere", Rest für Ablehnungen) und
+    // die Eingeladenen. Seit 1000 statt 200 Matchings geladen werden, liefe sonst für Hunderte Kräfte je ein getCaregiver
+    // bei Mamamia (Ratenlimit ca. 60/min für das ganze Agenturkonto).
+    for (const m of effectiveMatched.slice(0, PROFILE_VORLADEN)) ids.add(m.caregiverId);
+    for (const m of mmInvitedMatchings?.data ?? []) ids.add(m.caregiver.id);
     if (mmApplications?.data) {
       for (const a of mmApplications.data) ids.add(a.caregiver.id);
     }
@@ -1437,7 +1425,7 @@ const CustomerPortalPage: FC = () => {
     }
     // intentionally not depending on `effectiveMatched` reference identity —
     // its caregiverIds is what we care about, derived from mmMatchings.
-  }, [mmReady, mmMatchings, mmApplications]);
+  }, [mmReady, mmMatchings, mmInvitedMatchings, mmApplications]);
 
   // Resolved nurse status per caregiver — DERIVED from server data + local
   // overrides every render. Replaces the previous synced-state pattern
@@ -2571,19 +2559,9 @@ const CustomerPortalPage: FC = () => {
     const weitereSichtbar = minimalEinstieg && vorSpeichern ? Math.min(5 * seiten, Math.max(0, allePending.length - visibleCount)) : 0;
     const weitere: VisibleNurse[] = allePending.slice(visibleCount, visibleCount + weitereSichtbar);
     const nochWeitere = minimalEinstieg && vorSpeichern ? Math.max(0, allePending.length - visibleCount - weitereSichtbar) : 0;
-    // Die Empfehlung (höchste Badge-Bewertung, Score = Erfahrungsjahre +
-    // Einsätze) nach ganz oben ziehen — die anderen behalten ihre
-    // Reihenfolge. So steht "Empfehlung des Beraters" immer zuoberst.
-    const badgeScore = (n: Nurse) => nurseBadgeScore(n.history?.assignments);
-    let bestIdx = -1;
-    let bestScore = -Infinity;
-    pendingNurses.forEach((p, idx) => {
-      const s = badgeScore(p.nurse);
-      if (s > bestScore) { bestScore = s; bestIdx = idx; }
-    });
-    const visibleNurses: VisibleNurse[] = [...(bestIdx > 0
-      ? [pendingNurses[bestIdx], ...pendingNurses.filter((_, idx) => idx !== bestIdx)]
-      : pendingNurses), ...weitere];
+    // Bis Registry #166 rückte hier die Kraft mit den meisten Einsätzen auf Platz 1. Seitdem steht die Reihenfolge aus
+    // rankComparator (Foto, dann Jahre, dann Einsätze) unverändert — Platz 1 ist schon die beste.
+    const visibleNurses: VisibleNurse[] = [...pendingNurses, ...weitere];
     return { allVisible, heldInvites, visibleNurses, nochWeitere, seiten };
   })();
 
@@ -2868,11 +2846,10 @@ const CustomerPortalPage: FC = () => {
       <hr style={{borderColor:'#0f04',margin:'4px 0'}}/>
       {/* Matching-Trichter — für die Diagnose „mehrere Karten verschwinden".
           Beim Ablehnen VORHER und NACHHER ablesen: ändert sich nur `sichtbar`
-          um 1, ist alles normal. Kippt `ageFallback`/`badgeFallback`, wandert
-          ein ganzer Eimer (ageRest bzw. badgeRest) rein oder raus. */}
+          um 1, ist alles normal. Kippt `ageFallback`, wandert der ganze
+          Eimer ageRest rein oder raus. (Der Badge-Eimer ist seit Registry #166 weg.) */}
       <div style={{color:'#ff0'}}>Matching-Trichter (TARGET_VISIBLE=5)</div>
-      <div>merged={funnel.merged} → sprachOk={funnel.langFiltered} → alter≤60={funnel.young} (+rest {funnel.ageRest}{funnel.ageFallback ? ' ANGEHÄNGT' : ' verworfen'})</div>
-      <div>badge≥Bewährt={funnel.goodBadge} (+rest {funnel.badgeRest}{funnel.badgeFallback ? ' ANGEHÄNGT' : ' verworfen'}) → final={funnel.final}</div>
+      <div>merged={funnel.merged} → sprachOk={funnel.langFiltered} → alter≤60={funnel.young} (+rest {funnel.ageRest}{funnel.ageFallback ? ' ANGEHÄNGT' : ' verworfen'}) → final={funnel.final}</div>
       <div>gehaltene Einladungen 24h={fmtVal(inviteRate?.used_24h)} → Slots={Math.max(0, 5 - (inviteRate?.used_24h ?? 0))} · abgelehnt lokal={statusOverrides.size}</div>
     </div>
   ) : null;
@@ -3824,13 +3801,8 @@ const CustomerPortalPage: FC = () => {
   // die übrigen Vorschläge unter „So geht es weiter". Dieselbe Karte wie im Portal (MatchCard „V"). `geladen`: echte Liste da.
   const angebotKarten = (() => {
     const { visibleNurses } = pflegekraftAuswahl;
-    let recIdx = -1;
-    let recBest = -Infinity;
-    visibleNurses.forEach(({ nurse, status }, idx) => {
-      if (status !== 'pending') return;
-      const sc = nurseBadgeScore(nurse.history?.assignments);
-      if (sc > recBest) { recBest = sc; recIdx = idx; }
-    });
+    // Empfehlung = erste offene Karte; die Reihenfolge (rankComparator) stellt die beste nach vorn (Registry #166).
+    const recIdx = visibleNurses.findIndex(({ status }) => status === 'pending');
     const karte = (idx: number) => {
       const { nurse, i, status } = visibleNurses[idx];
       return (
@@ -3860,17 +3832,12 @@ const CustomerPortalPage: FC = () => {
   })();
 
   // Rückbau Registry #122: die Karten vor dem ersten Speichern wie im Stand 75b8df8 (MatchCardVorSpeichern) — dieselbe
-  // Auswahl wie oben (Batch-Reveal, Empfehlung zuerst), genau EINE „Unsere Empfehlung für Sie": die mit der höchsten
-  // Badge-Bewertung (Erfahrungsjahre + Einsätze).
+  // Auswahl wie oben (Batch-Reveal, Empfehlung zuerst), genau EINE „Unsere Empfehlung für Sie": die erste offene Karte
+  // (seit Registry #166; vorher die mit den meisten Einsätzen).
   const kartenVorSpeichern = !rueckbau || minimalEinstieg ? [] : (() => {
     const { visibleNurses } = pflegekraftAuswahl;
-    let recIdx = -1;
-    let recBest = -Infinity;
-    visibleNurses.forEach(({ nurse, status }, idx) => {
-      if (status !== 'pending') return;
-      const sc = nurseBadgeScore(nurse.history?.assignments);
-      if (sc > recBest) { recBest = sc; recIdx = idx; }
-    });
+    // Empfehlung = erste offene Karte; die Reihenfolge (rankComparator) stellt die beste nach vorn (Registry #166).
+    const recIdx = visibleNurses.findIndex(({ status }) => status === 'pending');
     return visibleNurses.map(({ nurse, i, status, caregiverId }, idx) => (
       <MatchCardVorSpeichern
         profilFehlt={!patientSaved}
@@ -4798,19 +4765,11 @@ const CustomerPortalPage: FC = () => {
                         mehr hier — damit sie auch bei hasPending sichtbar
                         bleiben. */}
                     {(() => {
-                      // Genau EINE "Empfehlung des Beraters": die pending
-                      // Pflegekraft mit der höchsten Badge-Bewertung. Score =
-                      // Erfahrungsjahre + Einsätze (gleiche Formel wie
-                      // nurseLevel → höchster Score = bestes Tier). Eine klare
-                      // Empfehlung wirkt stärker als zwei.
-                      const badgeScore = (n: Nurse) => nurseBadgeScore(n.history?.assignments);
-                      let recIdx = -1;
-                      let recBest = -Infinity;
-                      visibleNurses.forEach(({ nurse, status }, idx) => {
-                        if (status !== 'pending') return;
-                        const s = badgeScore(nurse);
-                        if (s > recBest) { recBest = s; recIdx = idx; }
-                      });
+                      // Genau EINE "Empfehlung des Beraters": die erste
+                      // pending Pflegekraft — die Reihenfolge (rankComparator:
+                      // Foto, Jahre, Einsätze) stellt die beste nach vorn
+                      // (Registry #166). Eine klare Empfehlung wirkt stärker als zwei.
+                      const recIdx = visibleNurses.findIndex(({ status }) => status === 'pending');
                       return visibleNurses.map(({ nurse, i, status }, idx) => {
                         const isRecommended = idx === recIdx;
                         return (
