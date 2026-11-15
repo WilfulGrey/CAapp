@@ -322,6 +322,18 @@ przejścia** — klient nie czeka na maila.
 
 ### Empfehlung w Eingangsbestätigung (Bug #39, 2026-08-31)
 
+> **Stan od Registry #168 (2026-11-15, Martin: „A: Angebot + Erinnerungen“, NIE live do akceptu Martina):** Angebotsmail,
+> Nudge 1, Nudge 2 i Abschied budują się z `mailDesign.ts` (wygląd portalu, cała mail z nagłówkiem i stopką, `komplett: true`).
+> Angebotsmail: tytuł „Ihr Preis für die Betreuung zu Hause“, karta ceny z „Warum Primundus?“ (Bestpreisgarantie + `KOPF_PUNKTE`,
+> gwiazdki tylko z live-stanem), lista „Ihre Pflegekräfte-Auswahl“ + `LISTE_ZEILE`, wiersze BEZ ceny i BEZ „Ansehen“ (cały wiersz =
+> link do profilu `cg=<id>&m=eb`), jeden koralowy przycisk „Angebot & Pflegekräfte anzeigen →“ (`?token=…&m=eb`). Zdjęcia dalej jako
+> CID (`empfehlungFuerAngebot`). Łańcuch bez Pflegesituation: `profil_nudge_1` +4 h (te same wiersze + zielony przycisk do formularza,
+> `goto=anfragen&m=pn1`), `profil_nudge_2` +28 h, `nachfass_3` +72 h prosto z `KETTE_NACH_MAIL1`; `warum_primundus` i `nachfass_2`
+> w `GESTRICHENE_MAILS` (zaplanowane wiersze wygasają; dla wygasającego `nachfass_2` index.ts od razu planuje brakujący `nachfass_3`).
+> Poprawki po kontroli 15.11.: obrazki maili z `project 3/public/images/mail/` (PNG zamiast WebP, kwadratowe zdjęcie Marty)
+> — muszą być live w kalkulatorze PRZED deployem `send-scheduled-emails`; `abschiedNachholenFuer` w `abschied.ts`.
+> Opis #148 niżej jest historyczny.
+
 > **Stan od Registry #148 (2026-11-08, Martin: „genauso wie im Portal“):** Angebotsmail wygląda jak Minimal-Einstieg
 > portalu (#147): kompaktowa karta ceny („Ihr persönliches Angebot“, „Nach Zuschüssen“, porównanie z Pflegeheim,
 > Bestpreisgarantie + 3 punkty, Kennzahlen), potem do pięciu wierszy „Passende Pflegekräfte“ ze zdjęciem (CID),

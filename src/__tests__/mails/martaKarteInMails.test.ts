@@ -48,8 +48,11 @@ describe('Martas Karte kommt aus einer Vorlage', () => {
     // Die neuen Kundenmails (kundenMails.ts, 26.09.2026) bekommen die Karte über den Kontext.
     expect(quelle.slice(quelle.indexOf('function kundenKontext('))).toMatch(/marta: buildMartaSig\(siteUrl\)/);
     const neu = lies('project 3/supabase/functions/send-scheduled-emails/kundenMails.ts');
-    expect((neu.match(/\$\{k\.marta\}/g) ?? []).length).toBeGreaterThanOrEqual(10);
+    // Seit Registry #168 tragen Angebotsmail, Nudge 1, Nudge 2 und der Abschied die kurze Signatur aus mailDesign.ts statt
+    // der Karte (vorher 10 Mails mit ${k.marta}).
+    expect((neu.match(/\$\{k\.marta\}/g) ?? []).length).toBeGreaterThanOrEqual(7);
     expect(neu).not.toContain('martaKarteHtml');
+    expect(lies('project 3/supabase/functions/send-scheduled-emails/mailDesign.ts')).not.toContain('martaKarteHtml');
   });
 
   it('Edge Function lädt den Bewertungsstand pro Aufruf, bevor Mails gebaut werden', () => {

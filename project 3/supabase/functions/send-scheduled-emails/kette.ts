@@ -1,12 +1,20 @@
 // Nachfass-Kette nach Mail 1 (Eingangsbestätigung). Pure Daten, separat wegen
-// Testbarkeit. nachfass_3 hängt nicht hier, sondern an nachfass_2 (+48 h).
+// Testbarkeit. Seit Registry #168 hängt auch nachfass_3 direkt an Mail 1.
 //
 //   0h    Eingangsbestätigung
-//   +4h   profil_nudge_1        (das Warum: ohne Profil keine Bewerbungen)
-//   +28h  profil_nudge_2        („Soll ich Ihnen beim Ausfüllen helfen?")
-//   +48h  warum_primundus       (Trust/USPs)
-//   +72h  nachfass_2            (kurze persönliche Nachfrage)
-//   +120h nachfass_3            (Abschied mit drei Antwortknöpfen)
+//   +4h   profil_nudge_1        (Ihre Pflegekräfte-Auswahl: es fehlt die Pflegesituation)
+//   +28h  profil_nudge_2        („Soll ich die Angaben am Telefon mit Ihnen ausfüllen?")
+//   +72h  nachfass_3            (Abschied mit einem Knopf und zwei Antwort-Links)
+//
+// warum_primundus (+48 h, „Vier Dinge, die Primundus anders macht") und
+// nachfass_2 (+72 h, „kann ich Ihnen etwas abnehmen?") sind gestrichen
+// (Martin 15.11.2026, „A: Angebot + Erinnerungen", Registry #168): 64 gesendet /
+// 1 Klick bzw. 43 gesendet / 0 Klicks in 30 Tagen, Nachfass 2 wiederholte die
+// Telefon-Hilfe von Nudge 2. Bis dahin plante erst der Versand von nachfass_2
+// den Abschied (+48 h, also +120 h nach Mail 1). Laufende Kunden (Mail 1 vor
+// dem Deploy) haben noch eine geplante nachfass_2-Zeile und keine
+// nachfass_3-Zeile: Verfällt die nachfass_2-Zeile im Gestrichen-Zweig, plant
+// index.ts den Abschied sofort nach (abschiedNachholen unten).
 //
 // reaktivierung_wechsel (+49 d, „Steht bei Ihnen ein Pflegekraft-Wechsel an?") ist
 // gestoppt (Martin 15.11.2026, Registry #167): Der Portal-Link gilt 14 Tage
@@ -20,16 +28,44 @@
 export const KETTE_NACH_MAIL1: ReadonlyArray<readonly [typ: string, minuten: number]> = [
   ["profil_nudge_1", 4 * 60],
   ["profil_nudge_2", 28 * 60],
-  ["warum_primundus", 48 * 60],
-  ["nachfass_2", 72 * 60],
+  ["nachfass_3", 72 * 60],
 ];
 
 /** Nicht mehr versendete Mail-Typen. Schon eingeplante Zeilen verfallen beim Versand. */
-export const GESTRICHENE_MAILS: ReadonlySet<string> = new Set(["profil_nudge_3", "reaktivierung_wechsel"]);
+export const GESTRICHENE_MAILS: ReadonlySet<string> = new Set([
+  "profil_nudge_3", "reaktivierung_wechsel", "warum_primundus", "nachfass_2",
+]);
 
-/** Satz am Ende der Abschiedsmail. Ehrlich, weil die Wechsel-Mail nach 7 Wochen noch kommt.
- *  Ich-Form wie die ganze Mail (Vorschau v2, Martin 26.09.2026). */
-export const ABSCHIED_SATZ = "Wenn ich nichts von Ihnen höre, melde ich mich erst in einigen Wochen wieder.";
+/** Gestrichener Typ, der bis Registry #168 den Abschied (nachfass_3) eingeplant hat. */
+export const ABSCHIED_VORGAENGER = "nachfass_2";
+
+/** Eine nachfass_3-Zeile des Leads, so viel wie abschiedNachholen braucht. */
+export type AbschiedZeile = { status: string; created_at?: string | null; sent_at?: string | null };
+
+/** Laufende Kunden (Mail 1 vor Registry #168): Verfällt ihre geplante nachfass_2-Zeile im Gestrichen-Zweig, bekommen sie
+ *  den Abschied trotzdem, und zwar sofort statt +48 h später (die Kette plant ihn jetzt +72 h nach Mail 1, genau dort
+ *  stand nachfass_2). Nur, wenn es für diese Runde noch keinen Abschied gibt, damit nie zwei Abschiede entstehen:
+ *  - eine offene Zeile (pending/processing) zählt immer, auch aus einer früheren Runde (die geht ohnehin noch raus);
+ *  - sonst zählt jede Zeile, die nach `anker` angelegt oder versendet wurde (`anker` = created_at der verfallenden
+ *    nachfass_2-Zeile, also der Versand von Mail 1 dieser Runde). Ein Abschied aus einer älteren Runde (Kunde hat später
+ *    neu angefragt) zählt nicht, ein abgebrochener dieser Runde schon (dann hat eine Stopp-Regel gegriffen).
+ *  Ohne `anker` zählt jede Zeile. Die Stopp-Regeln laufen unverändert beim Versand der neuen Zeile. */
+export function abschiedNachholen(gestrichenerTyp: string, anker: string | null | undefined, zeilen: AbschiedZeile[]): boolean {
+  if (gestrichenerTyp !== ABSCHIED_VORGAENGER) return false;
+  const ab = anker ? Date.parse(anker) : NaN;
+  return !zeilen.some((z) => {
+    if (z.status === "pending" || z.status === "processing") return true;
+    if (!Number.isFinite(ab)) return true;
+    return [z.created_at, z.sent_at].some((t) => !!t && Date.parse(t) >= ab);
+  });
+}
+
+/** Satz am Ende der Abschiedsmail (Registry #168, OpenAI-Gegencheck 15.11.2026). Stimmt, weil die Wechsel-Mail gestoppt
+ *  ist (#167) und „Vier Dinge“ und Nachfass 2 wegfallen; bewusst ohne „letzte E-Mail“, denn Service-Mails wie ein neuer
+ *  Zugangslink bleiben möglich. Kommt die Wechsel-Mail mit frischem Link zurück, muss der Satz wieder
+ *  „… melde ich mich in einigen Wochen“ sagen. Ich-Form wie die ganze Mail. Bis #168: „Wenn ich nichts von Ihnen höre,
+ *  melde ich mich erst in einigen Wochen wieder.“ */
+export const ABSCHIED_SATZ = "Ohne Ihre Rückmeldung schreibe ich Ihnen danach nicht mehr zu dieser Anfrage.";
 
 /** Die drei Knöpfe der Abschiedsmail — Spiegel von project 3/lib/rueckmeldung.ts
  *  (Edge Fn kann nicht aus lib/ importieren; ein Test prüft den Gleichlauf). */
