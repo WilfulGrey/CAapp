@@ -13,6 +13,12 @@ Deno.test('profil_nudge_3 wird nicht mehr eingeplant und gilt als gestrichen', (
   assert(GESTRICHENE_MAILS.has('profil_nudge_3'));
 });
 
+// Registry #167 (Martin 15.11.2026): Die Wechsel-Mail an Tag 49 führte auf einen abgelaufenen Link (Token 14 Tage).
+Deno.test('reaktivierung_wechsel wird nicht mehr eingeplant, schon geplante verfallen beim Versand', () => {
+  assert(!typen.includes('reaktivierung_wechsel'));
+  assert(GESTRICHENE_MAILS.has('reaktivierung_wechsel'));
+});
+
 Deno.test('keine gestrichene Mail steht in der Kette', () => {
   for (const typ of typen) assert(!GESTRICHENE_MAILS.has(typ), typ);
 });
@@ -23,7 +29,6 @@ Deno.test('Kette bleibt sonst unverändert, zeitlich aufsteigend', () => {
     ['profil_nudge_2', 1680],
     ['warum_primundus', 2880],
     ['nachfass_2', 4320],
-    ['reaktivierung_wechsel', 70560],
   ]);
 });
 
