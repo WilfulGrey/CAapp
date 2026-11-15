@@ -7,7 +7,11 @@
 //   +48h  warum_primundus       (Trust/USPs)
 //   +72h  nachfass_2            (kurze persönliche Nachfrage)
 //   +120h nachfass_3            (Abschied mit drei Antwortknöpfen)
-//   +49d  reaktivierung_wechsel (Wechsel-Fenster nach 6–8 Wochen)
+//
+// reaktivierung_wechsel (+49 d, „Steht bei Ihnen ein Pflegekraft-Wechsel an?") ist
+// gestoppt (Martin 15.11.2026, Registry #167): Der Portal-Link gilt 14 Tage
+// (project 3/lib/calculation.ts), an Tag 49 war er in 27 von 27 Fällen
+// abgelaufen. Ob sie mit frischem Link zurückkommt, entscheidet Martin.
 //
 // profil_nudge_3 (+7 d, „Können wir Sie bei etwas unterstützen?") ist
 // gestrichen (Martin 14.09.2026, Registry #70): Sie kam zwei Tage nach der
@@ -18,11 +22,10 @@ export const KETTE_NACH_MAIL1: ReadonlyArray<readonly [typ: string, minuten: num
   ["profil_nudge_2", 28 * 60],
   ["warum_primundus", 48 * 60],
   ["nachfass_2", 72 * 60],
-  ["reaktivierung_wechsel", 49 * 24 * 60],
 ];
 
 /** Nicht mehr versendete Mail-Typen. Schon eingeplante Zeilen verfallen beim Versand. */
-export const GESTRICHENE_MAILS: ReadonlySet<string> = new Set(["profil_nudge_3"]);
+export const GESTRICHENE_MAILS: ReadonlySet<string> = new Set(["profil_nudge_3", "reaktivierung_wechsel"]);
 
 /** Satz am Ende der Abschiedsmail. Ehrlich, weil die Wechsel-Mail nach 7 Wochen noch kommt.
  *  Ich-Form wie die ganze Mail (Vorschau v2, Martin 26.09.2026). */
