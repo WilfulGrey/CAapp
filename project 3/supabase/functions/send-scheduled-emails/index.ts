@@ -14,6 +14,8 @@ import { appendJobParam, reminderBookedCancel } from "./followupJobs.ts";
 import { type LeadMilestone, MEILENSTEIN_EREIGNISSE, meilensteinAus } from "./meilenstein.ts";
 // Nachfass-Kette und Abschiedssatz (Registry #70).
 import {
+  abschiedNachholen,
+  type AbschiedZeile,
   AKTIVITAET_NACH_PAUSE,
   GESTRICHENE_MAILS,
   KETTE_NACH_MAIL1,
@@ -41,6 +43,7 @@ import { sendezeitIso } from "./quietHours.ts";
 import type { BewerbungsAngebot } from "./mailBausteine.ts";
 import {
   type AngebotEingabe,
+  type AngebotKraft,
   ANGEBOT_KRAEFTE_MAX,
   angebotMail,
   erinnerungMail,
@@ -81,8 +84,10 @@ import { anreiseTestUmleitung, testphaseUmleitung } from "./testphase.ts";
 import {
   holeEmpfehlung,
   stufenWort,
-  type EmpfehlungErgebnis, holeFuenf, fuenfListeHtml, fuenfListeText, fotoBudget,
+  type EmpfehlungErgebnis, holeFuenf, fotoBudget,
   holeFuenfStreng, esc } from "./empfehlung.ts";
+// Mails im Look des Kundenportals (Registry #168): Sterne nur mit Live-Stand, Stelle für den Hinweis im Testversand.
+import { bewertungNurLive, INHALT_MARKE } from "./mailDesign.ts";
 import {
   kraefteNochmalUm,
   vermittlerAngebotHtml, vermittlerAngebotText,
@@ -428,13 +433,19 @@ function kundenKontext(lead: Lead, siteUrl: string, portalBase: string): Kontext
     portal: (param) => portalLink(portalBase, lead.token, siteUrl, param),
     token: lead.token || null,
     marta: buildMartaSig(siteUrl),
-    bewertung: bewertungsStand,
+    /* Registry #168: die Mails aus mailDesign.ts zeigen Sterne nur mit dem Live-Stand (wie Portal und Rechner); fällt der
+       Abruf aus, fehlt die Spalte. Martas Karte (buildMartaSig) bleibt beim Ersatzwert. */
+    bewertung: bewertungNurLive(bewertungsStand),
+    // Fußzeile der Mails aus mailDesign.ts: Adresse und Abmelde-Link wie in buildEmailWrapper (Abmelden nur mit Token).
+    email: lead.email,
+    abmelden: lead.token ? `${siteUrl.replace(/\/$/, "")}/abmelden?token=${encodeURIComponent(lead.token)}` : null,
   };
 }
 
-/** Fertige Kundenmail in die Hülle setzen. */
+/** Fertige Kundenmail in die Hülle setzen. Mails aus mailDesign.ts (`komplett`, Registry #168) bringen Kopf und Fußzeile
+ *  selbst mit und gehen unverändert raus. */
 function inHuelle(lead: Lead, siteUrl: string, m: KundenMail): { subject: string; html: string; text: string } {
-  return { subject: m.betreff, html: buildEmailWrapper(lead, siteUrl, m.html), text: m.text };
+  return { subject: m.betreff, html: m.komplett ? m.html : buildEmailWrapper(lead, siteUrl, m.html), text: m.text };
 }
 
 // Pause aus /rueckmeldung (Registry #72): letzte kunde_pausiert-Zeile + ob der
@@ -1065,11 +1076,14 @@ async function hasReactionForCaregiver(
  *  Ohne diesen gemeinsamen Weg rendert der Demo-Pfad etwas anderes als der
  *  Kunde bekommt; genau das passierte am 03.09.2026 beim ersten Testversand
  *  (alter Betreff in der Testmail, neue Mail beim Kunden). Schreibt NICHTS —
- *  der lead_events-Eintrag bleibt beim Versand. */
+ *  der lead_events-Eintrag bleibt beim Versand.
+ *  Seit Registry #168 liefert er die Kräfte als Daten (`kraefte`, mit `cid` des angehängten Fotos); die Zeilen und
+ *  Profil-Links (`cg=…&m=pn1`) baut nudge1Mail wie in der Angebotsmail. Vorher fertiges HTML aus fuenfListeHtml
+ *  (große Profilkarten mit Stufe und Einsätzen). */
 async function fuenfFuerNudge(
-  lead: Lead, portalBase: string, supabaseUrl: string, key: string, darfOnboarden: boolean,
+  lead: Lead, _portalBase: string, supabaseUrl: string, key: string, darfOnboarden: boolean,
 ): Promise<{
-  html: string; text: string; anzahl: number; vornamen: string[];
+  kraefte: AngebotKraft[]; anzahl: number; vornamen: string[];
   anhaenge: { filename: string; content: Uint8Array; contentType: string; cid: string }[];
   caregiverIds: number[];
 } | null> {
@@ -1082,16 +1096,15 @@ async function fuenfFuerNudge(
     darfOnboarden,
   });
   if (!erg || erg.fuenf.length === 0) return null;
-  const basisUrl = buildPortalUrl(portalBase, tok);
   // Fotos mit Budget: die oberen zuerst, was nicht passt → Initialen.
   const roh = await Promise.all(erg.fuenf.map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
   const darf = fotoBudget(roh.map((r) => r?.content.length ?? null));
   const inlines = roh.map((r, i) => (r && darf[i]) ? r : null);
-  const profilUrls = erg.fuenf.map((e) => withMailMark(`${basisUrl}&cg=${e.caregiverId}`, "pn1"));
-  const alleUrl = withMailMark(buildPortalUrl(portalBase, tok, "matches"), "pn1");
   return {
-    html: fuenfListeHtml(erg.fuenf, inlines.map((r) => r?.cid ?? null), profilUrls, alleUrl, "Passend zu Ihrer Anfrage"),
-    text: fuenfListeText(erg.fuenf, profilUrls, alleUrl).replace("FÜR SIE VORBEREITET", "PASSEND ZU IHRER ANFRAGE"),
+    kraefte: erg.fuenf.map((e, i) => ({
+      caregiverId: e.caregiverId, vorname: e.vorname, alter: e.alter, erfahrungJahre: e.erfahrungJahre,
+      deutschWort: e.deutschWort, cid: inlines[i]?.cid ?? null,
+    })),
     anzahl: erg.fuenf.length,
     vornamen: erg.fuenf.map((e) => e.vorname),
     anhaenge: inlines.filter((r): r is NonNullable<typeof r> => r !== null),
@@ -1572,6 +1585,35 @@ async function scheduleFollowUp(
     status: "pending",
   });
 }
+
+/* Abschied für laufende Kunden nachholen (Registry #168, Regel in kette.ts abschiedNachholen): nur für eine verfallende
+   nachfass_2-Zeile und nur, wenn der Lead für diese Runde noch keine nachfass_3-Zeile hat. Anders als scheduleFollowUp
+   bricht er nichts ab, er legt höchstens EINE neue Zeile an (sofort fällig, Nachtruhe wie dort). Liefert die Sendezeit
+   der neuen Zeile oder null. */
+async function abschiedNachholenFuer(supabase: any, row: ScheduledEmail, lead: Lead): Promise<string | null> {
+  if (row.email_type !== "nachfass_2") return null;
+  const { data, error } = await supabase
+    .from("scheduled_emails")
+    .select("status, created_at, sent_at")
+    .eq("lead_id", lead.id)
+    .eq("email_type", "nachfass_3");
+  // Lesefehler: lieber kein Abschied als ein doppelter.
+  if (error) {
+    console.warn(`[abschied] nachfass_3 nicht lesbar (lead ${lead.id}): ${error.message ?? error}`);
+    return null;
+  }
+  const anker = (row as unknown as { created_at?: string | null }).created_at ?? null;
+  if (!abschiedNachholen(row.email_type, anker, (data ?? []) as AbschiedZeile[])) return null;
+  const scheduledFor = sendezeitIso(new Date());
+  await supabase.from("scheduled_emails").insert({
+    lead_id: lead.id,
+    email_type: "nachfass_3",
+    recipient_email: lead.email,
+    scheduled_for: scheduledFor,
+    status: "pending",
+  });
+  return scheduledFor;
+}
  
 
 // ── Bewertungsanfrage-Runde (Tag 7 nach Anfrage) ─────────────────────────────
@@ -1810,8 +1852,9 @@ Deno.serve(async (req: Request) => {
         }
         switch (t) {
           case "eingangsbestaetigung": return R(angebotMail(dk, angebotEingabe(lead as Lead, false, demoEmpf)));
-          case "profil_nudge_1": return R(nudge1Mail(dk, demoFuenf ? { html: demoFuenf.html, text: demoFuenf.text, vornamen: demoFuenf.vornamen } : null));
+          case "profil_nudge_1": return R(nudge1Mail(dk, demoFuenf ? { kraefte: demoFuenf.kraefte } : null));
           case "profil_nudge_2": return R(nudge2Mail(dk));
+          // Gestrichen seit Registry #168 (kette.ts), nur noch hier im Testversand zu sehen.
           case "warum_primundus": return R(vierDingeMail(dk, (lead as Lead).kalkulation));
           case "nachfass_2": return R(nachfass2Mail(dk));
           case "nachfass_3": return R(nachfass3Mail(dk, buildLeadRef(lead as Lead)));
@@ -1858,7 +1901,10 @@ Deno.serve(async (req: Request) => {
           const b = item.banner || "";
           // subjectPrefix wird VORNE an den Original-Betreff gehängt (z. B. "Test - Mail 2: ").
           const subject = item.subjectPrefix ? `${item.subjectPrefix}${m.subject}` : m.subject;
-          const html = b ? m.html.replace('<div class="email-content">', `${bannerHtml(b)}<div class="email-content">`) : m.html;
+          // Hinweis oben in die Mail: alte Hülle vor dem Inhalt, Mails aus mailDesign.ts unter dem Kopf (Registry #168).
+          const html = !b ? m.html
+            : m.html.includes(INHALT_MARKE) ? m.html.replace(INHALT_MARKE, `<tr><td>${bannerHtml(b)}</td></tr>`)
+            : m.html.replace('<div class="email-content">', `${bannerHtml(b)}<div class="email-content">`);
           const text = b ? `(${b})\n\n${m.text}` : m.text;
           const angebotFotos = (demoEmpf?.fotos ?? []).filter((r): r is InlineFoto => r !== null);
           const anhang = item.email_type === "eingangsbestaetigung" && angebotFotos.length
@@ -2073,15 +2119,21 @@ Deno.serve(async (req: Request) => {
 
         // Gestrichene Mail-Typen (kette.ts, Registry #70): nicht mehr
         // eingeplant; was schon in der Warteschlange steht, verfaellt hier.
+        // Seit Registry #168 auch „Vier Dinge“ (warum_primundus) und Nachfass 2: deren Handler weiter unten erreicht der
+        // Versand nicht mehr, nur der Testversand rendert sie noch.
         if (GESTRICHENE_MAILS.has(scheduledEmail.email_type)) {
           await supabase
             .from("scheduled_emails")
             .update({ status: "cancelled", updated_at: new Date().toISOString() })
             .eq("id", scheduledEmail.id);
+          // Laufende Kunden (Mail 1 vor #168): Bis dahin plante erst der Versand von Nachfass 2 den Abschied. Verfällt
+          // ihre Nachfass-2-Zeile hier, kommt der Abschied sofort (Nachtruhe wie scheduleFollowUp), sonst bekämen sie ihn
+          // nie. Nur ohne Abschied dieser Runde (kette.ts abschiedNachholen), Stopp-Regeln beim Versand unverändert.
+          const abschied = await abschiedNachholenFuer(supabase, scheduledEmail, lead as Lead);
           await supabase.from("lead_events").insert({
             lead_id: scheduledEmail.lead_id,
             event_type: `email_${scheduledEmail.email_type}_cancelled`,
-            metadata: { reason: "gestrichen" },
+            metadata: { reason: "gestrichen", ...(abschied ? { abschied_eingeplant: abschied } : {}) },
           });
           results.push({ id: scheduledEmail.id, success: true });
           continue;
@@ -2292,7 +2344,8 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = "email_nachfass_1_sent";
           eventTypeFailed = "email_nachfass_1_failed";
         } else if (scheduledEmail.email_type === "nachfass_2") {
-          // Nur noch vor dem Absenden (Stopp oben): eine Variante, Knopf „Bewerbungen erhalten".
+          // Gestrichen seit Registry #168: der Gestrichen-Zweig oben fängt jede Zeile vorher ab. Bleibt als Rückweg
+          // (Typ aus GESTRICHENE_MAILS nehmen und wieder in die Kette).
           neu(nachfass2Mail(k));
           eventTypeSent = "email_nachfass_2_sent";
           eventTypeFailed = "email_nachfass_2_failed";
@@ -2421,7 +2474,7 @@ Deno.serve(async (req: Request) => {
               metadata: { caregiver_ids: teile.caregiverIds, fotos_inline: teile.anhaenge.length },
             });
           }
-          neu(nudge1Mail(k, teile ? { html: teile.html, text: teile.text, vornamen: teile.vornamen } : null));
+          neu(nudge1Mail(k, teile ? { kraefte: teile.kraefte } : null));
           eventTypeSent = "email_profil_nudge_1_sent";
           eventTypeFailed = "email_profil_nudge_1_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_2") {
@@ -2686,6 +2739,7 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = `email_${scheduledEmail.email_type}_sent`;
           eventTypeFailed = `email_${scheduledEmail.email_type}_failed`;
         } else if (scheduledEmail.email_type === "warum_primundus") {
+          // Gestrichen seit Registry #168 wie nachfass_2 (Gestrichen-Zweig oben), Handler nur als Rückweg.
           // „Vier Dinge" (~48 h nach Mail 1), nur solange die Pflegesituation fehlt (Stopp oben).
           neu(vierDingeMail(k, (lead as Lead).kalkulation));
           eventTypeSent = "email_warum_primundus_sent";
@@ -2853,12 +2907,13 @@ Deno.serve(async (req: Request) => {
           // Profil-Nudges ersetzt; der Handler bleibt für Alt-Rows.
           // Alle Profil-Nudges + Nachfässe canceln sich selbst, sobald das
           // Profil steht / gebucht / nicht interessiert (Skip-Logik oben).
+          // Seit Registry #168 steht der Abschied (nachfass_3, +72 h) direkt in der Kette; bis dahin plante ihn der
+          // Versand von nachfass_2 (+48 h). scheduleFollowUp bricht eine offene Zeile desselben Typs vorher ab, eine
+          // erneute Anfrage ergibt also nie zwei offene Abschiede.
           if (scheduledEmail.email_type === "eingangsbestaetigung" || scheduledEmail.email_type === "angebot") {
             for (const [typ, minuten] of KETTE_NACH_MAIL1) {
               await scheduleFollowUp(supabase, lead as Lead, typ, minuten);
             }
-          } else if (scheduledEmail.email_type === "nachfass_2") {
-            await scheduleFollowUp(supabase, lead as Lead, "nachfass_3", 48 * 60);
           }
  
           results.push({ id: scheduledEmail.id, success: true });

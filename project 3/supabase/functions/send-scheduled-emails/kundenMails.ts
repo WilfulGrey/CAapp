@@ -11,6 +11,39 @@
 // Mail, „Bewerbungen erhalten" öffnet die Pflegesituation (goto=anfragen), dieselben vier Punkte
 // wie die Startseite, „Anreise ab 3 Tagen", jede Bewerbung 72 Stunden reserviert. Zahlen nur
 // aus echten Daten; fehlt etwas, fällt der Satz weg.
+//
+// Gruppe A im Look des Kundenportals (Registry #168, Martin 15.11.2026: „A: Angebot + Erinnerungen“): Angebotsmail,
+// Nudge 1, Nudge 2 und Abschied bauen sich aus mailDesign.ts als GANZE Mail (Kopf, Inhalt, kurze Signatur, Fußzeile;
+// `komplett: true`), index.ts setzt keine Hülle mehr darum. Wortlaute aus den Entwürfen
+// seo-reports/analysen/mails-optik-2026-11-15/g1-angebot-vor-profil/bauen.mjs (nach dem OpenAI-Gegencheck 15.11.).
+// „Vier Dinge“ (warum_primundus) und Nachfass 2 sind gestrichen (kette.ts), ihr Code bleibt für die Vorschau.
+import {
+  ALLE_KRAEFTE as LISTE_ALLE,
+  anredeTitel,
+  abstand as dAbstand,
+  absatz,
+  designMail,
+  DESIGN_FARBEN as D,
+  formularHinweis,
+  formularKnopf,
+  grussZeile,
+  hauptknopf,
+  karte,
+  KOPF_TITEL_ZEILEN,
+  LISTE_KNOPF,
+  LISTE_TITEL,
+  LISTE_UNVOLLSTAENDIG,
+  LISTE_WARUM,
+  LISTE_ZEILE,
+  liste,
+  martaSignatur,
+  martaSignaturText,
+  preiskarte,
+  textlink,
+  warumPrimundusText,
+  type ZeilenKraft,
+  zeilenFakten,
+} from "./mailDesign.ts";
 import {
   BESTPREIS_URL,
   MAIL_FARBEN as F,
@@ -18,19 +51,15 @@ import {
   TELEFON_TEXT,
   WHATSAPP_HREF,
   mAbstand,
-  mb,
   mBewerbungsKarte,
   mChip,
-  mEyebrow,
   mKarte,
   mKlein,
   mKnopf,
-  mKnopfHell,
   mKontakt,
   mp,
   mProfilText,
   mSchritte,
-  mTitel,
   mTrenner,
   mVorschau,
   type BewerbungsAngebot,
@@ -51,11 +80,17 @@ export type Kontext = {
   token: string | null;
   /** Grußformel + Martas Karte (HTML). */
   marta: string;
-  /** Bewertungsstand dieses Laufs (wie in Martas Karte); fehlt er, fällt die Sternezeile weg. */
+  /** Bewertungsstand dieses Laufs, NUR der Live-Stand (index.ts: bewertungNurLive, Registry #168); fehlt er, fallen die
+   *  Sterne weg wie im Portal. Martas Karte der übrigen Mails liest den Stand weiter selbst (mit Ersatzwert). */
   bewertung?: { schnitt: string; anzahl: number } | null;
+  /** Empfängeradresse für die Fußzeile der Mails aus mailDesign.ts („Diese E-Mail wurde versendet an …“). */
+  email?: string | null;
+  /** Abmelde-Link (nur mit Token, wie in buildEmailWrapper); fehlt er, fehlt die Zeile. */
+  abmelden?: string | null;
 };
 
-export type KundenMail = { betreff: string; vorschau: string; html: string; text: string };
+/** `komplett`: `html` ist schon die ganze Mail (mailDesign.ts designMail), index.ts setzt keine Hülle darum. */
+export type KundenMail = { betreff: string; vorschau: string; html: string; text: string; komplett?: boolean };
 
 /** Portal-Link: `${basis}/?token=…&goto=…&m=…`. Leere Parameter fallen weg. */
 export function portalLink(portalBase: string, token: string | null | undefined, siteUrl: string,
@@ -149,15 +184,18 @@ export function eigenanteilAus(kalk: Record<string, any> | null | undefined): Ei
   return { brutto, eigen, posten, pflegegrad: Number.isFinite(pg) ? pg : null, ehepaar: kalk?.formularDaten?.betreuung_fuer === "ehepaar" };
 }
 
-/* Angebotsmail wie das Portal (Registry #148; Martin 08.11.2026: „Ich finde, das haben wir jetzt ganz gut gemacht mit dem
-   kompakten Preis und dann direkt die Pflegekräfte … Ich würde das genauso machen wie im Portal. Machst du die Mail mit einem
-   Einleitungssatz und dann …“). Aufbau wie der Minimal-Einstieg des Portals (Registry #147, live 08.11.): Anrede, ein Satz,
-   Kasten „Ihr persönliches Angebot“ (Preis, grün „Nach Zuschüssen“, grau Pflegeheim-Vergleich, vier Punkte, Kennzahlen),
-   eingekaufte Leads den Hinweis zu den Angaben, die passenden Pflegekräfte als Zeilen mit Foto, Preis und „Ansehen“ (ins
-   Profil) und dem Textlink „Alle Pflegekräfte anzeigen“, die Erklärung zum Portal, EIN Knopf „Angebot & Pflegekräfte
-   anzeigen →“ (oben ins Portal, Registry #163; seit Registry #165 ohne Zeile darunter; bis 14.11.2026 „Bewerbungen erhalten →“ ins
-   Formular), Gruß und Kontakt. Wortlaute aus dem Portal (Gleichlauf-Test
-   src/__tests__/mails/angebotsmailWortlaut.test.ts); Betreff und Vorschau wie vorher. Das Siegel steht weiter im Kopf der Hülle. */
+/* Angebotsmail im Look des Kundenportals (Registry #168, Martin 15.11.2026: „A: Angebot + Erinnerungen“; Entwurf
+   g1-angebot-vor-profil/eingangsbestaetigung_neu.html). Aufbau wie der Minimal-Einstieg des Portals: Gruß klein, Titel
+   KOPF_TITEL_ZEILEN, Martins Einleitung, Preiskarte (Preis, grün „Nach Zuschüssen“, Heim-Vergleich, „Warum Primundus?“
+   mit Bestpreisgarantie + KOPF_PUNKTE, Kennzahlen; Sterne nur mit Live-Stand), eingekaufte Leads den Hinweis zu den
+   Angaben, die Liste „Ihre Pflegekräfte-Auswahl“ mit LISTE_ZEILE (Zeilen wie im Portal: Foto, Vorname und Alter, Erfahrung,
+   Deutsch, Pfeil; KEIN Preis und KEIN Knopf „Ansehen“ mehr, die ganze Zeile öffnet das Profil `cg=…&m=eb`), Textlink
+   „Alle Pflegekräfte anzeigen“, Martins Erklärsatz („ca. 2 Minuten“ statt „etwa“), EIN Knopf in Koralle
+   „Angebot & Pflegekräfte anzeigen →“ (oben ins Portal, Registry #163/#165), kurze Signatur, Fußzeile.
+   Betreff und Vorschau unverändert (Vorgabe). Wortlaute aus dem Portal: Gleichlauf-Test
+   src/__tests__/mails/angebotsmailWortlaut.test.ts.
+   Bis #168: Kasten „Ihr persönliches Angebot“ mit Mintkasten und vier Punkten (GARANTIE_PUNKTE), Zeilen mit Preis und grün
+   umrandetem „Ansehen“, Liste „Passende Pflegekräfte“, alte Hülle aus index.ts. */
 export type AngebotKraft = { caregiverId: number; vorname: string; alter: number | null; erfahrungJahre: number; deutschWort: string | null; cid: string | null };
 export type AngebotEingabe = {
   kalkulation: Record<string, any> | null | undefined;
@@ -172,123 +210,56 @@ export type AngebotEingabe = {
   empfehlung?: { sichtbar: number; kraefte?: AngebotKraft[] } | null;
 };
 
-/** Wortlaute wie im Portal (src/components/portal/EinstiegMinimal.tsx: ANGEBOT_TITEL, GARANTIE_*, VERTRAUEN, FEST_*). */
-export const ANGEBOT_TITEL = "Ihr persönliches Angebot";
-export const GARANTIE_PUNKTE = ["Bestpreisgarantie", "Keine Vorauszahlung", "Keine Vermittlungsgebühr", "Keine Mindestlaufzeit"] as const;
 /** Hauptknopf (Registry #163, 14.11.2026, Martin: „in der Mail würde ich den Buttontext machen: Angebot & Pflegekräfte anzeigen“);
  *  führt seitdem oben ins Portal (Angebot und Liste), bis dahin „Bewerbungen erhalten“ ins Formular. */
 export const KNOPF_TITEL = "Angebot & Pflegekräfte anzeigen";
-export const ALLE_KRAEFTE = "Alle Pflegekräfte anzeigen";
+export const ALLE_KRAEFTE = LISTE_ALLE;
 /** Über dem Knopf: was im Portal passiert (Martin 08.11.: „erklären, dass man im Portal nicht nur das Angebot sieht, sondern
  *  auch passende Pflegekräfte. Diese können sich auch direkt bei Ihnen bewerben. Sie müssen nur die Situation einmal kurz
- *  beschreiben …“; Fassung OpenAI 08.11., ohne „nicht nur … sondern auch“, Handlung direkt vor dem Knopf). */
-export const PORTAL_ERKLAERUNG = "Im Kundenportal sehen Sie Ihr Angebot und passende Pflegekräfte. Beschreiben Sie einmal kurz die Pflegesituation, das dauert etwa 2\u00a0Minuten. Danach können sich Pflegekräfte direkt bei Ihnen bewerben. Erste Rückmeldungen kommen häufig innerhalb von 60\u00a0Minuten.";
+ *  beschreiben …“; Fassung OpenAI 08.11., ohne „nicht nur … sondern auch“, Handlung direkt vor dem Knopf). Seit #168
+ *  „ca. 2 Minuten“ statt „etwa 2 Minuten“ (Entwurf 15.11., wie überall „ca.“). */
+export const PORTAL_ERKLAERUNG = "Im Kundenportal sehen Sie Ihr Angebot und passende Pflegekräfte. Beschreiben Sie einmal kurz die Pflegesituation, das dauert ca. 2 Minuten. Danach können sich Pflegekräfte direkt bei Ihnen bewerben. Erste Rückmeldungen kommen häufig innerhalb von 60 Minuten.";
+/** Titel ohne Preis (Kalkulation fehlt, selten): „Ihr Preis für …“ stimmte dann nicht. Wortlaut wie die Vorschau dieses
+ *  Falls („Ihr persönliches Angebot zur 24-Stunden-Betreuung.“). */
+export const TITEL_OHNE_PREIS = ["Ihr persönliches Angebot", "zur 24-Stunden-Betreuung"] as const;
 /** So viele Pflegekräfte zeigt die Mail höchstens; index.ts lädt nur für diese Fotos. */
 export const ANGEBOT_KRAEFTE_MAX = 5;
-const GOLD = "#D4A843";
 
 /** „1 Jahr Erfahrung" / „12 Jahre Erfahrung", „Deutsch Gut" — wie `zeilenFakten` im Portal. */
 export function kraftFakten(k: Pick<AngebotKraft, "erfahrungJahre" | "deutschWort">): string[] {
-  const teile: string[] = [];
-  if (k.erfahrungJahre > 0) teile.push(k.erfahrungJahre === 1 ? "1 Jahr Erfahrung" : `${k.erfahrungJahre} Jahre Erfahrung`);
-  if (k.deutschWort) teile.push(`Deutsch ${k.deutschWort}`);
-  return teile;
+  return zeilenFakten({ jahre: k.erfahrungJahre, deutsch: k.deutschWort });
 }
 
-/** Kasten „Ihr persönliches Angebot" wie die Angebotskarte im Portal. Tabellen und Inline-Stile (Outlook: eckig). */
-function angebotKasten(brutto: number, eigen: Eigenanteil | null, bewertung: Kontext["bewertung"], unten = 14): string {
-  const heim = eigen && HEIM_EIGENANTEIL > eigen.eigen ? HEIM_EIGENANTEIL - eigen.eigen : 0;
-  const zuschuss = eigen
-    ? `<p style="margin:8px 0 0;font-size:16px;font-weight:700;line-height:1.4;color:${F.green};">Nach Zuschüssen <span style="white-space:nowrap;">ca. ${euro(eigen.eigen)}&nbsp;€ im Monat</span></p>${heim
-      ? `<p style="margin:2px 0 0;font-size:14.5px;line-height:1.45;color:${F.muted};">rund ${euro(heim)}&nbsp;€ weniger als im Pflegeheim</p>` : ""}`
-    : "";
-  const haken = `<span style="color:${F.green};font-weight:700;">&#10003;</span>`;
-  const punkte = GARANTIE_PUNKTE.map((p, i) => `<tr><td width="22" style="width:22px;padding:${i ? 5 : 0}px 0 0;vertical-align:top;font-size:15px;line-height:1.4;">${haken}</td><td style="padding:${i ? 5 : 0}px 0 0;font-size:15px;line-height:1.4;color:${F.greenDeep};">${i === 0
-    ? `<a href="${BESTPREIS_URL}" target="_blank" style="color:${F.greenDeep};text-decoration:none;">${p}</a>` : p}</td></tr>`).join("");
-  const spalte = (gross: string, klein: string, rand: boolean) =>
-    `<td valign="top" style="padding:0 ${rand ? 0 : 8}px 0 0;"><p style="margin:0;font-size:15px;font-weight:700;line-height:1.35;color:${F.ink};white-space:nowrap;">${gross}</p><p style="margin:1px 0 0;font-size:12.5px;line-height:1.35;color:${F.muted};white-space:nowrap;">${klein}</p></td>`;
-  const sterne = bewertung
-    ? spalte(`${esc(bewertung.schnitt)} <span style="color:${GOLD};font-size:12px;letter-spacing:1px;">&#9733;&#9733;&#9733;&#9733;&#9733;</span>`, `${bewertung.anzahl} Bewertungen`, false)
-    : "";
-  return `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 ${unten}px;border:1px solid ${F.line};border-radius:18px;background:#ffffff;border-collapse:separate;">
-      <tr><td style="padding:16px 16px 14px;">
-        <p style="margin:0;font-size:14.5px;line-height:1.4;color:${F.muted};">${ANGEBOT_TITEL}</p>
-        <p style="margin:2px 0 0;line-height:1.15;"><span style="font-size:32px;font-weight:800;letter-spacing:-.01em;color:${F.ink};">${euro(brutto)}&nbsp;€</span><span style="font-size:16px;color:${F.muted};">&nbsp;/ Monat</span></p>
-        ${zuschuss}
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" bgcolor="${F.mint}" style="margin:14px 0 0;background-color:${F.mint};border-radius:14px;border-collapse:separate;">
-          <tr><td style="padding:12px 14px;"><table cellpadding="0" cellspacing="0" role="presentation">${punkte}</table></td></tr>
-        </table>
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:14px 0 0;border-top:1px solid ${F.line};">
-          <tr><td style="padding:12px 0 0;"><table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-            ${sterne}${spalte("20 Jahre", "Erfahrung", false)}${spalte("6× in Folge", "Testsieger", true)}
-          </tr></table></td></tr>
-        </table>
-      </td></tr>
-    </table>`;
+/** Kraft aus der Empfehlung → Zeile aus mailDesign.ts. Foto nur als angehängtes Bild (`cid:`), sonst Anfangsbuchstabe. */
+export const zeilenKraft = (x: AngebotKraft): ZeilenKraft =>
+  ({ vorname: x.vorname, alter: x.alter, jahre: x.erfahrungJahre, deutsch: x.deutschWort, foto: x.cid ? `cid:${x.cid}` : null });
+
+/** Liste „Ihre Pflegekräfte-Auswahl“ (Angebotsmail und Nudge 1) als HTML, `kasten` optional unter den Zeilen. */
+function kraefteListe(kraefte: AngebotKraft[], profil: (k: AngebotKraft) => string, alle: string, kasten?: string): string {
+  return liste({
+    titel: LISTE_TITEL, zeile: LISTE_ZEILE, kraefte: kraefte.map(zeilenKraft),
+    profilUrl: (_z, i) => profil(kraefte[i]), alle: { url: alle, text: ALLE_KRAEFTE }, kasten,
+  });
+}
+/** Dieselbe Liste als Text: je Kraft eine Zeile mit Profil-Link, darunter „Alle Pflegekräfte anzeigen“. */
+function kraefteListeText(kraefte: AngebotKraft[], profil: (k: AngebotKraft) => string, alle: string): string {
+  const zeile = (x: AngebotKraft) => [`${x.vorname}${x.alter ? `, ${x.alter}` : ""}`, ...kraftFakten(x)].join(" · ");
+  return `${LISTE_TITEL.toUpperCase()} (${kraefte.length})
+${LISTE_ZEILE}
+${kraefte.map((x) => `- ${zeile(x)}: ${profil(x)}`).join("\n")}
+${ALLE_KRAEFTE}: ${alle}`;
 }
 
-/** Foto rund (Outlook: eckig) oder Initialen auf Taupe, 56 px wie im Portal. */
-function kraftFoto(k: AngebotKraft): string {
-  if (k.cid) {
-    const bild = `src="cid:${k.cid}" alt="" width="56"`;
-    return `<!--[if mso]><img ${bild} style="display:block;border:0;" /><![endif]--><!--[if !mso]><!--><img ${bild} height="56" style="display:block;width:56px;height:56px;border-radius:28px;border:0;object-fit:cover;outline:none;" /><!--<![endif]-->`;
-  }
-  const ini = (k.vorname.trim()[0] ?? "P").toUpperCase();
-  return `<div style="width:56px;height:56px;border-radius:28px;background-color:#B5A184;color:#ffffff;font-size:20px;font-weight:700;line-height:56px;text-align:center;">${esc(ini)}</div>`;
+/** Fertige Mail aus mailDesign.ts mit Fußzeile und Abmelde-Link aus dem Kontext. */
+function ganzeMail(k: Kontext, betreff: string, vorschau: string, teile: string[], signatur?: string): string {
+  return designMail({ site: k.site, titel: betreff, vorschau, teile, signatur, email: k.email, abmeldenUrl: k.abmelden });
 }
-
-/** Karte „Passende Pflegekräfte" mit Zeilen wie im Portal: Foto, Vorname und Alter, Erfahrung, Deutsch, rechts Preis und
- *  „Ansehen“ (öffnet im Portal das Profil dieser Pflegekraft, `cg=`). In der Mail „Ansehen“ statt „Einladen“ (Martin 08.11.:
- *  „ob Einladen nicht immer verwirrend ist, vor allen Dingen in so einer Mail … weil die das noch gar nicht verstehen, was
- *  Einladen bedeutet“; der Tipp lädt auch niemanden ein, er öffnet das Profil). Darunter der Textlink „Alle Pflegekräfte
- *  anzeigen“ (Martin: „damit es nach mehr klingt“) zur Liste im Portal. */
-function kraefteKarte(kraefte: AngebotKraft[], brutto: number, profil: (k: AngebotKraft) => string, alle: string, unten = 18): string {
-  const zeilen = kraefte.map((k) => {
-    const link = profil(k);
-    const alter = k.alter ? `<span style="font-weight:400;color:${F.muted};">, ${k.alter}</span>` : "";
-    const fakten = kraftFakten(k).map((t) => `<p style="margin:1px 0 0;font-size:13.5px;line-height:1.4;color:${F.muted};">${t}</p>`).join("");
-    const preis = brutto ? `<p style="margin:0 0 6px;font-size:15px;font-weight:700;line-height:1.3;color:${F.ink};white-space:nowrap;">${euro(brutto)}&nbsp;€</p>` : "";
-    return `<tr><td style="border-top:1px solid ${F.line};padding:12px 0;">
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-        <td width="56" valign="middle" style="width:56px;"><a href="${link}" target="_blank" style="text-decoration:none;">${kraftFoto(k)}</a></td>
-        <td valign="middle" style="padding:0 8px 0 12px;"><a href="${link}" target="_blank" style="text-decoration:none;">
-          <p style="margin:0;font-size:16.5px;font-weight:700;line-height:1.3;color:${F.ink};"><span style="text-decoration:underline;text-decoration-color:${F.chip};">${esc(k.vorname)}</span>${alter}</p>${fakten}</a></td>
-        <td valign="middle" align="right" style="white-space:nowrap;">${preis}<table role="presentation" cellpadding="0" cellspacing="0" align="right"><tr><td align="center" style="border:1.5px solid ${F.green};border-radius:10px;padding:7px 14px;"><a href="${link}" target="_blank" style="color:${F.greenDeep};font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap;">Ansehen</a></td></tr></table></td>
-      </tr></table>
-    </td></tr>`;
-  }).join("");
-  return `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 ${unten}px;border:1px solid ${F.line};border-radius:18px;background:#ffffff;border-collapse:separate;">
-      <tr><td style="padding:14px 16px 2px;">
-        <p style="margin:0 0 10px;font-size:16px;font-weight:700;line-height:1.4;color:${F.ink};">Passende Pflegekräfte <span style="display:inline-block;margin-left:4px;padding:0 8px;border-radius:999px;background:${F.grau};font-size:13px;font-weight:700;color:${F.muted};">${kraefte.length}</span></p>
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation">${zeilen}
-          <tr><td style="border-top:1px solid ${F.line};padding:12px 0 14px;"><a href="${alle}" target="_blank" style="color:${F.taupeInk};font-size:15px;font-weight:700;text-decoration:none;">${ALLE_KRAEFTE}&nbsp;&rsaquo;</a></td></tr>
-        </table>
-      </td></tr>
-    </table>`;
-}
-
-/** Hauptknopf: „Angebot & Pflegekräfte anzeigen →", eine Zeile (Registry #165, Martin 14.11.2026: „beim Mail-Button ohne dieses
- *  kostenfrei und unverbindlich“; bis dahin darunter „100% kostenfrei & unverbindlich"). Innenabstand 15 px, damit der Knopf
- *  ohne die zweite Zeile nicht flacher als 48 px wird. */
-function knopfPortal(url: string, unten = 22): string {
-  return `
-    <table width="100%" role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 ${unten}px;border-collapse:separate;">
-      <tr><td align="center" bgcolor="${F.coral}" style="background-color:${F.coral};border-radius:12px;padding:15px 16px;">
-        <a href="${url}" target="_blank" style="display:block;color:#ffffff;text-decoration:none;text-align:center;">
-          <span style="display:block;font-size:17px;font-weight:700;line-height:1.3;">${esc(KNOPF_TITEL)}&nbsp;&rarr;</span>
-        </a>
-      </td></tr>
-    </table>`;
-}
-
-const kontaktLink = (href: string, t: string) => `<a href="${href}" style="color:${F.taupeInk};font-weight:700;text-decoration:none;white-space:nowrap;">${t}</a>`;
 
 export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
   const kalk = a.kalkulation ?? {};
   const brutto = typeof kalk.bruttopreis === "number" && kalk.bruttopreis > 0 ? kalk.bruttopreis : 0;
   const eigen = brutto ? eigenanteilAus(kalk) : null;
+  const heimDiff = eigen && HEIM_EIGENANTEIL > eigen.eigen ? HEIM_EIGENANTEIL - eigen.eigen : 0;
   const n = a.empfehlung ? Math.max(1, Math.min(5, a.empfehlung.sichtbar || 1)) : 0;
   const kraefte = (a.empfehlung?.kraefte ?? []).slice(0, ANGEBOT_KRAEFTE_MAX);
   // Der Hauptknopf führt oben ins Portal (Angebot und Pflegekräfte), die Zeilen zu den Pflegekräften.
@@ -296,151 +267,163 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
   const zuKraeften = k.portal({ m: "eb", goto: "matches" });
   const zumProfil = (x: AngebotKraft) => k.portal({ cg: String(x.caregiverId), m: "eb" });
 
-  // Eingekaufte Leads nennen das Portal (herkunft.ts), erneute Anfragen den angepassten Stand.
+  /* Einleitung (Vorgabe): Eingekaufte Leads nennen das Portal (herkunft.ts), erneute Anfragen den angepassten Stand. Seit
+     #168 steht der Gruß klein ohne Komma darüber („Guten Tag, Frau Müller“ wie im Portal), deshalb „Vielen“ groß. */
   const einstieg = a.herkunft
-    ? `vielen Dank für Ihre Anfrage über ${mb(esc(a.herkunft))}. Hier ist Ihr Angebot zur 24-Stunden-Betreuung.`
+    ? `Vielen Dank für Ihre Anfrage über <strong style="font-weight:600;color:${D.ink};">${esc(a.herkunft)}</strong>. Hier ist Ihr Angebot zur 24-Stunden-Betreuung.`
     : a.resubmit
-    ? "vielen Dank für Ihre erneute Anfrage. Ich habe Ihre Angaben übernommen und Ihr Angebot angepasst."
-    : "vielen Dank für Ihre Anfrage. Hier ist Ihr Angebot zur 24-Stunden-Betreuung.";
+    ? "Vielen Dank für Ihre erneute Anfrage. Ich habe Ihre Angaben übernommen und Ihr Angebot angepasst."
+    : "Vielen Dank für Ihre Anfrage. Hier ist Ihr Angebot zur 24-Stunden-Betreuung.";
   /* Eingekaufte Leads: woher die Angaben stammen und ob wir Lücken mit dem teureren Wert gefüllt haben (Bedingungen wie
      bis #148 in index.ts: jede `herkunft`, Färbung nach `angenommene_felder`). Rechner-Leads haben keine Herkunft. */
   const hinweis = a.herkunft ? portalAngabenHinweisText(a.herkunft, portalAngabenAngenommen(a.angenommeneFelder)) : null;
+  const titel = brutto ? KOPF_TITEL_ZEILEN : TITEL_OHNE_PREIS;
 
-  /* Vorschau (Vorschlag 08.10.2026): Preis, Kündbarkeit und der nächste Schritt; der Betreff nennt schon die Pflegekräfte. */
+  /* Vorschau (Vorschlag 08.10.2026, Vorgabe): Preis, Kündbarkeit und der nächste Schritt; der Betreff nennt schon die
+     Pflegekräfte. */
   const vorschau = brutto
     ? `${euro(brutto)} € im Monat, täglich kündbar${n === 0 ? ", ohne Vermittlungsgebühr."
       : `. ${n === 1 ? "Eine passende Pflegekraft ist" : `${zahlwort(n, true)} passende Pflegekräfte sind`} für Sie ausgewählt.`}`
     : "Ihr persönliches Angebot zur 24-Stunden-Betreuung.";
 
-  const html = `${mVorschau(vorschau)}
-    ${gruss(k)}
-    ${mp(einstieg, 16)}
-    ${brutto ? angebotKasten(brutto, eigen, k.bewertung, hinweis ? 10 : 14) : ""}
-    ${hinweis ? mKlein(esc(hinweis), 16) : ""}
-    ${kraefte.length ? kraefteKarte(kraefte, brutto, zumProfil, zuKraeften) : ""}
-    ${mp(PORTAL_ERKLAERUNG, 14)}
-    ${knopfPortal(start)}
-    <p style="margin:0 0 14px;font-size:16px;line-height:1.55;color:${F.text};">Viele Grüße<br><strong style="color:${F.ink};">Marta Kapcio</strong><br><span style="font-size:14.5px;color:${F.muted};">Pflegeberaterin bei Primundus</span></p>
-    ${mKlein(`Fragen? ${kontaktLink(TELEFON_HREF, TELEFON_TEXT)}, täglich <span style="white-space:nowrap;">8–20&nbsp;Uhr</span>, auch per ${kontaktLink(WHATSAPP_HREF, "WhatsApp")}.`, 0)}`;
-
-  const heim = eigen && HEIM_EIGENANTEIL > eigen.eigen ? HEIM_EIGENANTEIL - eigen.eigen : 0;
-  const kasten = brutto
-    ? `${ANGEBOT_TITEL.toUpperCase()}
-${euro(brutto)} € / Monat
-${eigen ? `Nach Zuschüssen ca. ${euro(eigen.eigen)} € im Monat\n${heim ? `rund ${euro(heim)} € weniger als im Pflegeheim\n` : ""}` : ""}${GARANTIE_PUNKTE.map((p, i) => `✓ ${p}${i === 0 ? `: ${BESTPREIS_URL}` : ""}`).join("\n")}
-${k.bewertung ? `★★★★★ ${k.bewertung.schnitt} · ${k.bewertung.anzahl} Bewertungen · ` : ""}20 Jahre Erfahrung · 6× in Folge Testsieger
-
-`
-    : "";
-  const kraefteText = kraefte.length
-    ? `PASSENDE PFLEGEKRÄFTE (${kraefte.length})
-${kraefte.map((x) => `- ${x.vorname}${x.alter ? `, ${x.alter}` : ""}${kraftFakten(x).length ? ` · ${kraftFakten(x).join(" · ")}` : ""}${brutto ? ` · ${euro(brutto)} €` : ""} · Ansehen: ${zumProfil(x)}`).join("\n")}
-${ALLE_KRAEFTE}: ${zuKraeften}
-
-`
-    : "";
-  const text = `${k.anrede},
-
-${klartext(einstieg)}
-
-${kasten}${hinweis ? `${hinweis}\n\n` : ""}${kraefteText}${PORTAL_ERKLAERUNG}
-
-${KNOPF_TITEL}: ${start}
-
-Viele Grüße
-Marta Kapcio
-Pflegeberaterin bei Primundus
-
-Fragen? 089 200 000 830, täglich 8–20 Uhr, auch per WhatsApp (${WHATSAPP_HREF}).
-
-Primundus Deutschland | www.primundus.de`;
-
-  /* Betreff (Vorschlag 08.10.2026): nennt, was in der Mail steckt — Angebot UND Pflegekräfte. Ohne „– Primundus", der
-     Absender heißt schon „Primundus 24h-Pflege". Eingekaufte Anfragen behalten ihren Betreff. */
+  /* Betreff (Vorschlag 08.10.2026, Vorgabe): nennt, was in der Mail steckt — Angebot UND Pflegekräfte. Ohne „– Primundus",
+     der Absender heißt schon „Primundus 24h-Pflege". Eingekaufte Anfragen behalten ihren Betreff. */
   const betreff = a.herkunft
     ? a.portalBetreff
     : n === 0
     ? (a.resubmit ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung – Primundus" : "Ihr Angebot zur 24-Stunden-Betreuung – Primundus")
     : `${a.resubmit ? "Ihr aktualisiertes Angebot" : "Ihr Angebot"} und ${n === 1 ? "eine passende Pflegekraft" : `${n} passende Pflegekräfte`}`;
-  return { betreff, vorschau, html, text };
+
+  const hinweisHtml = hinweis
+    ? `${dAbstand(12)}<p style="margin:0;font-size:14px;line-height:21px;color:${D.muted};">${esc(hinweis)}</p>`
+    : "";
+  const teile = [
+    anredeTitel({ gruss: grussZeile(k.anrede), zeilen: titel, einleitung: einstieg }),
+    ...(brutto ? [`${dAbstand(20)}${preiskarte({ brutto, eigen: eigen?.eigen ?? null, heimDiff, bewertung: k.bewertung ?? null })}`] : []),
+    ...(hinweisHtml ? [hinweisHtml] : []),
+    ...(kraefte.length ? [`${dAbstand(16)}${kraefteListe(kraefte, zumProfil, zuKraeften)}`] : []),
+    `${dAbstand(24)}${absatz(PORTAL_ERKLAERUNG, { unten: 20 })}`,
+    hauptknopf(start, esc(KNOPF_TITEL)),
+  ];
+  const html = ganzeMail(k, betreff, vorschau, teile);
+
+  const preisText = brutto
+    ? `${euro(brutto)} € / Monat
+${eigen ? `Nach Zuschüssen ca. ${euro(eigen.eigen)} € im Monat\n${heimDiff ? `rund ${euro(heimDiff)} € weniger als im Pflegeheim\n` : ""}` : ""}
+${warumPrimundusText(k.bewertung ?? null)}
+
+`
+    : "";
+  const text = `${grussZeile(k.anrede)}
+
+${titel.join(" ").replace(/\u00a0/g, " ")}
+
+${klartext(einstieg)}
+
+${preisText}${hinweis ? `${hinweis}\n\n` : ""}${kraefte.length ? `${kraefteListeText(kraefte, zumProfil, zuKraeften)}\n\n` : ""}${PORTAL_ERKLAERUNG}
+
+${KNOPF_TITEL}: ${start}
+
+${martaSignaturText()}`;
+
+  return { betreff, vorschau, html, text, komplett: true };
 }
 
 // ── 02 Nudge 1 (profil_nudge_1, +4 h) ─────────────────────────────────────
 
-export type FuenfListe = { html: string; text: string; vornamen: string[] };
+/* Nudge 1 im Look des Portals (Registry #168, Entwurf g1/profil_nudge_1_neu.html): dieselbe Liste wie die Angebotsmail
+   (statt der großen Profilkarten mit „★ Elite“ und Einsätzen), darunter IN der Karte der Kasten wie unter der Portal-Liste
+   („Ihre Angaben sind noch unvollständig“, grüner Knopf „Pflegesituation vervollständigen“, goto=anfragen). Der Satz „… sind
+   zum gewünschten Start frei“ ist weg (Verfügbarkeit je Kraft, T22; den Start fragt der Rechner nicht ab). Neu geschrieben
+   nur Betreff, Vorschau und Titel; Vertragssatz wortgleich mit Mail B und dem Portal (KompaktEinstieg.tsx:519). */
+export type NudgeListe = { kraefte: AngebotKraft[] };
 
-export function nudge1Betreff(n: number): string {
-  if (n <= 0) return "Passende Pflegekräfte – es fehlen nur 2 Minuten";
-  return n === 1 ? "Eine passende Pflegekraft – es fehlen nur 2 Minuten" : `${zahlwort(n, true)} passende Pflegekräfte – es fehlen nur 2 Minuten`;
-}
+export const NUDGE1_BETREFF = "Ihre Pflegekräfte-Auswahl: Es fehlt die Pflegesituation";
+export const NUDGE1_TITEL = ["Noch ein Schritt bis", "zu Ihren Bewerbungen"] as const;
+export const NUDGE1_SCHLUSS = "Jede Bewerbung bekommen Sie per E‑Mail, mit Anreisedatum und Preis. Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen und im Portal unterschreiben.";
 
 export function nudge1Vorschau(vornamen: string[]): string {
+  const satz = "Beschreiben Sie kurz die Pflegesituation, ca. 2 Minuten.";
   const [a, b] = vornamen;
   const n = vornamen.length;
-  if (n === 0) return "Noch kann sich keine Pflegekraft bei Ihnen bewerben. Es fehlen nur 2 Minuten.";
-  if (n === 1) return `${a} könnte sich bei Ihnen bewerben.`;
-  if (n === 2) return `${a} und ${b} könnten sich bei Ihnen bewerben.`;
+  if (n === 0) return `${satz} Dann können sich passende Pflegekräfte bei Ihnen bewerben.`;
+  if (n === 1) return `${satz} Dann kann sich ${a} bei Ihnen bewerben.`;
+  if (n === 2) return `${satz} Dann können sich ${a} und ${b} bei Ihnen bewerben.`;
   const rest = n - 2;
-  return `${a}, ${b} und ${rest === 1 ? "eine weitere" : `${zahlwort(rest)} weitere`} könnten sich bei Ihnen bewerben.`;
+  return `${satz} Dann können sich ${a}, ${b} und ${rest === 1 ? "eine weitere" : `${zahlwort(rest)} weitere`} bei Ihnen bewerben.`;
 }
 
-export function nudge1Mail(k: Kontext, liste: FuenfListe | null): KundenMail {
-  const n = liste?.vornamen.length ?? 0;
-  const url = k.portal({ goto: "anfragen", m: "pn1" });
-  const vorschau = nudge1Vorschau(liste?.vornamen ?? []);
-  const einstieg = n === 0 ? ""
-    : n === 1 ? "diese Pflegekraft passt zu Ihren Angaben und ist zum gewünschten Start frei:"
-    : `diese ${zahlwort(n)} Pflegekräfte passen zu Ihren Angaben und sind zum gewünschten Start frei:`;
-  const kern = n === 0
-    ? "passende Pflegekräfte können sich bei Ihnen bewerben, sobald die Pflegesituation da ist. Das dauert 2 Minuten, vieles ist schon ausgefüllt. Jede Bewerbung bekommen Sie per E-Mail, mit Anreisetermin und Preis. Ein Vertrag entsteht erst, wenn Sie zusagen."
-    : `${n === 1 ? "Bewerben kann sich die Pflegekraft" : "Bewerben können sie sich"}, sobald die Pflegesituation da ist. Das dauert 2 Minuten, vieles ist schon ausgefüllt. Jede Bewerbung bekommen Sie per E-Mail, mit Anreisetermin und Preis. Ein Vertrag entsteht erst, wenn Sie zusagen.`;
-  const html = `${mVorschau(vorschau)}
-    ${gruss(k)}
-    ${n ? `${mp(einstieg, 4)}${liste!.html}` : ""}
-    ${mp(kern, 20)}
-    ${mKnopf(url, "Bewerbungen erhalten", 0, 14)}
-    ${mKontakt()}
-    ${k.marta}`;
-  const text = `${k.anrede},
+export function nudge1Mail(k: Kontext, liste: NudgeListe | null): KundenMail {
+  const kraefte = (liste?.kraefte ?? []).slice(0, ANGEBOT_KRAEFTE_MAX);
+  const formular = k.portal({ goto: "anfragen", m: "pn1" });
+  const alle = k.portal({ goto: "matches", m: "pn1" });
+  const profil = (x: AngebotKraft) => k.portal({ cg: String(x.caregiverId), m: "pn1" });
+  const vorschau = nudge1Vorschau(kraefte.map((x) => x.vorname));
+  // Ohne Einleitung: Der Satz „… können sich … bewerben“ stünde sonst dreimal (Einleitung, Kasten, Schlusssatz).
+  // Ohne Liste (mamamia antwortet nicht) steht der Kasten allein in einer Karte.
+  const teile = [
+    anredeTitel({ gruss: grussZeile(k.anrede), zeilen: NUDGE1_TITEL }),
+    `${dAbstand(20)}${kraefte.length ? kraefteListe(kraefte, profil, alle, formularHinweis(formular)) : karte(formularHinweis(formular), { innen: "20px 16px" })}`,
+    `${dAbstand(20)}${absatz(NUDGE1_SCHLUSS.replace(/‑/g, "&#8209;"), { unten: 0 })}`,
+  ];
+  const text = `${grussZeile(k.anrede)}
 
-${n ? `${einstieg}\n\n${liste!.text}\n\n` : ""}${kern}
+${NUDGE1_TITEL.join(" ")}
 
-Bewerbungen erhalten: ${url}
+${kraefte.length ? `${kraefteListeText(kraefte, profil, alle)}\n\n` : ""}${LISTE_UNVOLLSTAENDIG}
+${LISTE_WARUM}
+${LISTE_KNOPF}: ${formular}
 
-${KONTAKT_TEXT}
+${NUDGE1_SCHLUSS.replace(/‑/g, "-")}
 
-${MARTA_TEXT}`;
-  return { betreff: nudge1Betreff(n), vorschau, html, text };
+${martaSignaturText()}`;
+  return { betreff: NUDGE1_BETREFF, vorschau, html: ganzeMail(k, NUDGE1_BETREFF, vorschau, teile), text, komplett: true };
 }
 
 // ── 03 Nudge 2 (profil_nudge_2, +28 h) ────────────────────────────────────
 
+/* Nudge 2 im Look des Portals (Registry #168, Entwurf g1/profil_nudge_2_neu.html): Telefon zuerst, darunter eine Karte
+   „Selbst ausfüllen geht auch“ mit dem grünen Formular-Knopf. WhatsApp nur für die Terminabsprache, nie für Angaben zur
+   Pflege (OpenAI-Gegencheck 15.11.); die Angaben trägt Marta am Telefon ein. Signatur ohne Kontaktzeile, weil der Text die
+   Nummer schon anbietet. Beispiel „Ort und gewünschter Start“ statt „Mobilität und Einsatzort“ (die Mobilität fragt schon
+   der Rechner; beides sind Pflichtfelder im Formular: plz, startDate). */
+export const NUDGE2_BETREFF = "Soll ich die Angaben am Telefon mit Ihnen ausfüllen?";
+export const NUDGE2_VORSCHAU = "Rufen Sie mich an, am Telefon trage ich alles für Sie ein.";
+export const NUDGE2_TITEL = ["Soll ich die Angaben", "mit Ihnen ausfüllen?"] as const;
+export const NUDGE2_EINLEITUNG = "Bei Ihnen kann sich noch keine Pflegekraft bewerben, weil Angaben zur Pflegesituation fehlen, zum Beispiel Ort und gewünschter Start.";
+const nudge2Telefon = (tel: string, wa: string) =>
+  `Rufen Sie mich an unter ${tel} oder schreiben Sie mir per ${wa}, wann ich Sie anrufen darf. Ich stelle Ihnen die Fragen am Telefon und trage alles für Sie ein.`;
+/** Wörtlich aus ABLAUF_GUTE_PHASE Schritt 1 (EinstiegMinimal.tsx), davor „Selbst ausfüllen geht auch:“. */
+export const NUDGE2_SELBST = "Selbst ausfüllen geht auch: Das dauert ca. 2 Minuten, einiges ist aus Ihren bisherigen Angaben schon übernommen.";
+
 export function nudge2Mail(k: Kontext): KundenMail {
   const url = k.portal({ goto: "anfragen", m: "pn2" });
-  const vorschau = "Noch kann sich keine Pflegekraft bei Ihnen bewerben. Es fehlen nur ein paar Angaben.";
-  const tel = `<a href="${TELEFON_HREF}" style="color:${F.taupeInk};font-weight:700;text-decoration:none;">${TELEFON_TEXT}</a>`;
-  const wa = `<a href="${WHATSAPP_HREF}" style="color:${F.taupeInk};font-weight:700;text-decoration:none;">WhatsApp</a>`;
-  const satz1 = "bei Ihnen kann sich noch keine Pflegekraft bewerben. Dafür fehlen ein paar Angaben zur Pflegesituation, zum Beispiel zur Mobilität und zum Einsatzort. Das dauert 2 Minuten, vieles haben Sie bei Ihrer Anfrage schon angegeben.";
-  const satz2 = (t: string, w: string) => `Wenn Sie das lieber zusammen mit mir erledigen möchten, rufen Sie mich an unter ${t} oder schreiben Sie mir per ${w}, wann es Ihnen passt. Ich gehe die Fragen mit Ihnen am Telefon durch und trage alles für Sie ein.`;
-  const html = `${mVorschau(vorschau)}
-    ${gruss(k)}
-    ${mp(satz1)}
-    ${mp(satz2(tel, wa), 22)}
-    ${mKnopf(url, "Bewerbungen erhalten", 0, 24)}
-    ${k.marta}`;
-  const text = `${k.anrede},
+  const teile = [
+    anredeTitel({ gruss: grussZeile(k.anrede), zeilen: NUDGE2_TITEL, einleitung: NUDGE2_EINLEITUNG }),
+    `${dAbstand(16)}${absatz(nudge2Telefon(textlink(TELEFON_HREF, TELEFON_TEXT), textlink(WHATSAPP_HREF, "WhatsApp")), { unten: 0 })}`,
+    `${dAbstand(24)}${karte(`<p style="margin:0 0 16px;font-size:16px;line-height:22px;color:${D.ink};">${NUDGE2_SELBST}</p>${formularKnopf(url)}`, { innen: "20px 16px" })}`,
+  ];
+  const text = `${grussZeile(k.anrede)}
 
-${satz1}
+${NUDGE2_TITEL.join(" ")}
 
-${satz2("089 200 000 830", "WhatsApp (https://wa.me/4989200000830)")}
+${NUDGE2_EINLEITUNG}
 
-Bewerbungen erhalten: ${url}
+${nudge2Telefon("089 200 000 830", `WhatsApp (${WHATSAPP_HREF})`)}
 
-${MARTA_TEXT}`;
-  return { betreff: "Soll ich die Angaben mit Ihnen zusammen ausfüllen?", vorschau, html, text };
+${NUDGE2_SELBST}
+${LISTE_KNOPF}: ${url}
+
+${martaSignaturText({ kontakt: false })}`;
+  return {
+    betreff: NUDGE2_BETREFF, vorschau: NUDGE2_VORSCHAU, text, komplett: true,
+    html: ganzeMail(k, NUDGE2_BETREFF, NUDGE2_VORSCHAU, teile, martaSignatur({ kontakt: false })),
+  };
 }
 
 // ── 04 Vier Dinge (warum_primundus, +48 h) ────────────────────────────────
+// GESTRICHEN seit Registry #168 (kette.ts GESTRICHENE_MAILS): wird nicht mehr eingeplant, schon geplante Zeilen verfallen im
+// Gestrichen-Zweig von index.ts, bevor sie hier ankämen. Der Code bleibt nur für den Testversand (Demo-Modus).
 
 const VIER_DINGE: [string, string][] = [
   ["Bei uns ist alles transparent.", "Ihren Preis kennen Sie sofort. Passende Pflegekräfte sehen Sie mit Profil, Erfahrung und Deutschkenntnissen und wählen selbst aus, bevor Sie sich festlegen."],
@@ -488,6 +471,9 @@ ${MARTA_TEXT}`;
 }
 
 // ── 05 Nachfass 2 (+72 h) ─────────────────────────────────────────────────
+// GESTRICHEN seit Registry #168 wie „Vier Dinge“: sie wiederholte die Telefon-Hilfe von Nudge 2 (43 gesendet, 0 Klicks).
+// Der Abschied kommt jetzt direkt aus der Kette (+72 h); eine schon geplante Nachfass-2-Zeile holt ihn im Gestrichen-Zweig
+// nach (index.ts abschiedNachholen). Code bleibt nur für den Testversand.
 
 export function nachfass2Mail(k: Kontext): KundenMail {
   const url = k.portal({ goto: "anfragen", m: "nf2" });
@@ -515,7 +501,16 @@ ${MARTA_TEXT}`;
   return { betreff: "Ihre Betreuung – kann ich Ihnen etwas abnehmen?", vorschau, html, text };
 }
 
-// ── 06 Nachfass 3 (Abschied, +120 h) ──────────────────────────────────────
+// ── 06 Nachfass 3 (Abschied, +72 h) ───────────────────────────────────────
+
+/* Abschied im Look des Portals (Registry #168, Entwurf g1/nachfass_3_neu.html): seit #168 +72 h direkt aus der Kette (bis
+   dahin +48 h nach Nachfass 2, also +120 h). Eine Frage, EIN Knopf in Koralle „Ja, ich habe noch Interesse“, die zwei
+   anderen Antworten als Textlinks in Taupe (Wortlaute RUECKMELDUNG_KNOEPFE, Ziele rueckmeldungLink unverändert). „Ein Klick
+   genügt“ ist weg (jede Antwort öffnet noch eine Seite), der Schlusssatz ist ABSCHIED_SATZ (kette.ts). */
+export const ABSCHIED_BETREFF = "Eine letzte Frage: Wie ist der Stand bei Ihnen?";
+export const ABSCHIED_VORSCHAU = "Noch Interesse, später oder nicht mehr? Tippen Sie auf die passende Antwort.";
+export const ABSCHIED_TITEL = ["Wie ist der Stand", "bei Ihnen?"] as const;
+export const ABSCHIED_EINLEITUNG = "Ich möchte Sie nicht mit weiteren E-Mails stören. Sagen Sie mir kurz, wie es bei Ihnen weitergeht.";
 
 /** Knöpfe der Abschiedsmail. Mit Token → /rueckmeldung, ohne → Mail an info@ (Lead-Ref im Betreff). */
 export function nachfass3Mail(k: Kontext, leadRef: string): KundenMail {
@@ -524,24 +519,18 @@ export function nachfass3Mail(k: Kontext, leadRef: string): KundenMail {
   const ja = k.token ? rueckmeldungLink(k.site, k.token, "interesse") : mailto("Habe noch Interesse", "ich habe noch Interesse, bitte melden Sie sich bei mir.");
   const spaeter = k.token ? rueckmeldungLink(k.site, k.token, "aktuell-nicht") : mailto("Aktuell nicht — vielleicht später", "aktuell brauche ich noch keine Pflegekraft, vielleicht später.");
   const nein = k.token ? rueckmeldungLink(k.site, k.token, "nicht-relevant") : mailto("Nicht mehr relevant", "das Thema ist für mich nicht mehr relevant.");
-  const vorschau = "Ein Klick genügt: Interesse, später oder nicht mehr relevant.";
-  const frage = mKarte(`
-    ${mEyebrow("Ihre Rückmeldung")}
-    ${mTitel("Wie ist der Stand bei Ihnen?", 8)}
-    ${mp("Ein Klick genügt, dann weiß ich, woran ich bin.", 16)}
-    ${mKnopf(ja, RUECKMELDUNG_KNOEPFE.interesse, 0, 10)}
-    ${mKnopfHell(spaeter, RUECKMELDUNG_KNOEPFE["aktuell-nicht"])}
-    ${mKnopfHell(nein, RUECKMELDUNG_KNOEPFE["nicht-relevant"], 0)}`, { rand: "#D8CDBD" });
-  const html = `${mVorschau(vorschau)}
-    ${gruss(k)}
-    ${mp("ich möchte Sie nicht mit weiteren E-Mails stören und frage deshalb einmal direkt nach.", 20)}
-    ${frage}
-    ${mKlein(ABSCHIED_SATZ, 22)}
-    ${mKontakt()}
-    ${k.marta}`;
-  const text = `${k.anrede},
+  const zeile = (url: string, t: string) =>
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td style="border-top:1px solid ${D.lineSoft};padding:14px 0;">${textlink(url, `${esc(t)}&nbsp;&rsaquo;`)}</td></tr></table>`;
+  const teile = [
+    anredeTitel({ gruss: grussZeile(k.anrede), zeilen: ABSCHIED_TITEL, einleitung: ABSCHIED_EINLEITUNG }),
+    `${dAbstand(20)}${karte(`${hauptknopf(ja, esc(RUECKMELDUNG_KNOEPFE.interesse))}${dAbstand(10)}${zeile(spaeter, RUECKMELDUNG_KNOEPFE["aktuell-nicht"])}${zeile(nein, RUECKMELDUNG_KNOEPFE["nicht-relevant"])}`, { innen: "20px 16px 6px" })}`,
+    `${dAbstand(20)}${absatz(ABSCHIED_SATZ, { unten: 0 })}`,
+  ];
+  const text = `${grussZeile(k.anrede)}
 
-ich möchte Sie nicht mit weiteren E-Mails stören und frage deshalb einmal direkt nach: Wie ist der Stand bei Ihnen? Ein Klick genügt, dann weiß ich, woran ich bin.
+${ABSCHIED_TITEL.join(" ")}
+
+${ABSCHIED_EINLEITUNG}
 
 ${RUECKMELDUNG_KNOEPFE.interesse}:
 ${ja}
@@ -554,10 +543,8 @@ ${nein}
 
 ${ABSCHIED_SATZ}
 
-${KONTAKT_TEXT}
-
-${MARTA_TEXT}`;
-  return { betreff: "Eine letzte Frage: Wie ist der Stand bei Ihnen?", vorschau, html, text };
+${martaSignaturText()}`;
+  return { betreff: ABSCHIED_BETREFF, vorschau: ABSCHIED_VORSCHAU, html: ganzeMail(k, ABSCHIED_BETREFF, ABSCHIED_VORSCHAU, teile), text, komplett: true };
 }
 
 // ── 08 Stand nach 2 Tagen (suche_stand_2tage, neu) ────────────────────────

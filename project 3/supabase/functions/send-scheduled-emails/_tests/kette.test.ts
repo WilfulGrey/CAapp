@@ -1,5 +1,8 @@
 import { assert, assertEquals } from '@std/assert';
-import { ABSCHIED_SATZ, GESTRICHENE_MAILS, KETTE_NACH_MAIL1, OFFENE_STATUS, pauseAktiv, rueckmeldungLink } from '../kette.ts';
+import {
+  ABSCHIED_SATZ, ABSCHIED_VORGAENGER, abschiedNachholen, GESTRICHENE_MAILS, KETTE_NACH_MAIL1, OFFENE_STATUS, pauseAktiv, rueckmeldungLink,
+} from '../kette.ts';
+import { VOR_DEM_ABSENDEN } from '../stopRegeln.ts';
 
 // Anlass (Martin, 14.09.2026): Die Abschiedsmail (nachfass_3) versprach
 // „Falls wir nichts hören, melden wir uns nicht mehr", zwei Tage später kam
@@ -23,18 +26,67 @@ Deno.test('keine gestrichene Mail steht in der Kette', () => {
   for (const typ of typen) assert(!GESTRICHENE_MAILS.has(typ), typ);
 });
 
-Deno.test('Kette bleibt sonst unverändert, zeitlich aufsteigend', () => {
+// Registry #168 (Martin 15.11.2026, „A: Angebot + Erinnerungen"): Kette ohne Pflegesituation mit drei Mails statt fünf.
+Deno.test('Kette: Nudge 1 +4 h, Nudge 2 +28 h, Abschied +72 h direkt nach Mail 1, zeitlich aufsteigend', () => {
   assertEquals(KETTE_NACH_MAIL1, [
     ['profil_nudge_1', 240],
     ['profil_nudge_2', 1680],
-    ['warum_primundus', 2880],
-    ['nachfass_2', 4320],
+    ['nachfass_3', 4320],
   ]);
+  const minuten = KETTE_NACH_MAIL1.map(([, m]) => m);
+  assertEquals(minuten, [...minuten].sort((a, b) => a - b));
+  assertEquals(new Set(typen).size, typen.length, 'jeder Typ einmal');
 });
 
-Deno.test('Abschiedssatz verspricht keine Funkstille mehr', () => {
-  assert(!ABSCHIED_SATZ.includes('nicht mehr'));
-  assertEquals(ABSCHIED_SATZ, 'Wenn ich nichts von Ihnen höre, melde ich mich erst in einigen Wochen wieder.');
+Deno.test('„Vier Dinge" und Nachfass 2 sind gestrichen: nicht in der Kette, schon geplante verfallen beim Versand', () => {
+  for (const typ of ['warum_primundus', 'nachfass_2']) {
+    assert(!typen.includes(typ), typ);
+    assert(GESTRICHENE_MAILS.has(typ), typ);
+  }
+  assert(!GESTRICHENE_MAILS.has('nachfass_3'), 'der Abschied bleibt');
+  assertEquals(ABSCHIED_VORGAENGER, 'nachfass_2');
+  // Die Stopp-Regel vor dem Absenden gilt weiter für den Abschied (unverändert).
+  assert(VOR_DEM_ABSENDEN.has('nachfass_3'));
+});
+
+Deno.test('Abschiedssatz in Ich-Form, ohne Versprechen einer späteren Mail und ohne „letzte E-Mail"', () => {
+  assertEquals(ABSCHIED_SATZ, 'Ohne Ihre Rückmeldung schreibe ich Ihnen danach nicht mehr zu dieser Anfrage.');
+  assert(ABSCHIED_SATZ.includes(' ich '));
+  assert(!/Wochen|letzte|wir /i.test(ABSCHIED_SATZ));
+});
+
+// Laufende Kunden (Mail 1 vor dem Deploy von #168): Ihre geplante nachfass_2-Zeile verfällt, der Abschied wird nachgeholt.
+const ANKER = '2026-11-14T10:00:00.000Z';
+Deno.test('Abschied nachholen: nur für nachfass_2 und nur ohne Abschied dieser Runde', () => {
+  // Normalfall laufender Kunde: noch keine nachfass_3-Zeile.
+  assert(abschiedNachholen('nachfass_2', ANKER, []));
+  // Andere gestrichene Typen holen nichts nach.
+  for (const typ of ['warum_primundus', 'profil_nudge_3', 'reaktivierung_wechsel', 'nachfass_3']) {
+    assert(!abschiedNachholen(typ, ANKER, []), typ);
+  }
+});
+
+Deno.test('Abschied nachholen: nie ein zweiter Abschied', () => {
+  // Offen (auch aus einer älteren Runde, die geht ohnehin noch raus).
+  for (const status of ['pending', 'processing']) {
+    assert(!abschiedNachholen('nachfass_2', ANKER, [{ status, created_at: '2026-10-01T08:00:00Z', sent_at: null }]), status);
+  }
+  // Schon gesendet oder abgebrochen in dieser Runde (angelegt oder gesendet nach dem Anker).
+  assert(!abschiedNachholen('nachfass_2', ANKER, [{ status: 'sent', created_at: '2026-11-15T09:00:00Z', sent_at: '2026-11-17T08:00:00Z' }]));
+  assert(!abschiedNachholen('nachfass_2', ANKER, [{ status: 'cancelled', created_at: '2026-11-15T09:00:00Z', sent_at: null }]));
+  // Alte Runde angelegt, aber nach dem Anker gesendet (Kunde fragte erneut an, alte Zeile lief noch): zählt.
+  assert(!abschiedNachholen('nachfass_2', ANKER, [{ status: 'sent', created_at: '2026-11-01T09:00:00Z', sent_at: '2026-11-14T12:00:00Z' }]));
+  // Ohne Anker zählt jede Zeile.
+  assert(!abschiedNachholen('nachfass_2', null, [{ status: 'sent', created_at: '2026-09-01T09:00:00Z', sent_at: '2026-09-03T09:00:00Z' }]));
+  assert(abschiedNachholen('nachfass_2', null, []));
+});
+
+Deno.test('Abschied nachholen: ein Abschied aus einer älteren Runde zählt nicht', () => {
+  // Kunde hatte im September schon einen Abschied, fragte im November neu an: diese Runde bekommt ihren eigenen.
+  assert(abschiedNachholen('nachfass_2', ANKER, [
+    { status: 'sent', created_at: '2026-09-01T09:00:00Z', sent_at: '2026-09-03T09:00:00Z' },
+    { status: 'cancelled', created_at: '2026-09-01T09:00:00Z', sent_at: null },
+  ]));
 });
 
 // Registry #72: alle drei Knöpfe der Abschiedsmail führen auf /rueckmeldung.

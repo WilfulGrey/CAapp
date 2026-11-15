@@ -1154,6 +1154,8 @@ Wir prüfen gerade, welche Betreuungskräfte zu Ihrer Anfrage passen. Sobald Pro
 
 // ─── Fünf-Liste (Nudge-Mail) ─────────────────────────────────────────────
 // Seit „V" (27.09.2026) dasselbe Profil wie überall (mailBausteine.ts mProfil).
+// Seit Registry #168 ohne Aufrufer: Nudge 1 zeigt die Zeilen aus mailDesign.ts (ohne Stufe und Einsätze), die Daten holt
+// weiter holeFuenf. fuenfListeHtml/fuenfListeText bleiben bis zum Aufräumen (Tests in _tests/fuenf.test.ts).
 
 /** Empfehlung → Profil-Daten für den gemeinsamen Baustein (mailBausteine.ts mProfil). */
 export function pkDatenAus(e: Empfehlung, cid: string | null): PflegekraftDaten {
