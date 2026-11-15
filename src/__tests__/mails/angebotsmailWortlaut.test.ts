@@ -44,12 +44,29 @@ describe('Angebotsmail wie das Portal (Registry #148, Look seit #168)', () => {
     expect(edge.TELEFON_TEXT.replace(/&nbsp;/g, ' ')).toBe(TELEFON);
     expect(edge.TELEFON_HREF).toBe(TELEFON_HREF);
     expect(edge.WHATSAPP_HREF).toBe(whatsappHref());
-    const sig = design.martaSignatur();
+    const sig = design.martaSignatur({ site: 'https://kostenrechner.primundus.de' });
     expect(sig).toContain(`href="${TELEFON_HREF}"`);
     expect(sig).toContain(`href="${whatsappHref()}"`);
     expect(flach(sig)).toContain(`Fragen? ${TELEFON}, ${ERREICHBAR}, auch per WhatsApp.`);
     // Textfassung
     expect(design.martaSignaturText()).toContain(`Fragen? ${TELEFON}, ${ERREICHBAR}, auch per WhatsApp (${whatsappHref()}).`);
+  });
+
+  it('Bilder der Mails liegen im Kostenrechner (project 3/public/images, Mailclient-Prüfung 15.11.2026)', () => {
+    // mailDesign.ts verweist auf `${site}/images/<Pfad>`; site = Kostenrechner, dessen public/images diese Dateien ausliefert.
+    const pfade = [design.MAIL_BILDER.siegel, design.MAIL_BILDER.marta,
+      ...['die-welt', 'frankfurter-allgemeine', 'ard', 'ndr', 'sat1', 'bild-der-frau'].map((n) => design.MAIL_BILDER.presse(n))];
+    for (const pfad of pfade) {
+      expect(pfad, pfad).not.toMatch(/\.webp$/);
+      const datei = readFileSync(join(WURZEL, 'project 3/public/images', pfad));
+      expect(datei.length, pfad).toBeGreaterThan(500);
+      expect(datei.length, pfad).toBeLessThan(40_000);
+    }
+    // Martas Foto quadratisch (JPEG-SOF0: Höhe/Breite ab Byte 5 nach dem Marker), sonst wieder gestaucht ohne object-fit.
+    const jpg = readFileSync(join(WURZEL, 'project 3/public/images', design.MAIL_BILDER.marta));
+    const sof = jpg.indexOf(Buffer.from([0xff, 0xc0]));
+    expect(sof).toBeGreaterThan(0);
+    expect(jpg.readUInt16BE(sof + 5)).toBe(jpg.readUInt16BE(sof + 7));
   });
 
   it('Titel, „Warum Primundus?“, Bestpreisgarantie, Punkte und Kennzahlen wörtlich wie im Portal', () => {

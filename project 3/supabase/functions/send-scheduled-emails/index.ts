@@ -14,8 +14,6 @@ import { appendJobParam, reminderBookedCancel } from "./followupJobs.ts";
 import { type LeadMilestone, MEILENSTEIN_EREIGNISSE, meilensteinAus } from "./meilenstein.ts";
 // Nachfass-Kette und Abschiedssatz (Registry #70).
 import {
-  abschiedNachholen,
-  type AbschiedZeile,
   AKTIVITAET_NACH_PAUSE,
   GESTRICHENE_MAILS,
   KETTE_NACH_MAIL1,
@@ -38,6 +36,8 @@ import { buildLeadRef, capitalizeName as capitalize, cleanNamePart } from "./nam
 // Nachtruhe-Fenster — Kopie von lib/quiet-hours.ts (Edge Fns koennen nicht aus
 // lib/ importieren); Aenderungen immer in BEIDEN Dateien.
 import { sendezeitIso } from "./quietHours.ts";
+// Abschied für laufende Kunden nachholen (Registry #168), Aufruf im Gestrichen-Zweig.
+import { abschiedNachholenFuer } from "./abschied.ts";
 // Kundenmails neu (Vorschau v2, Martin 26.09.2026): Builder in kundenMails.ts (testbar),
 // Stopp- und Countdown-Regeln in stopRegeln.ts.
 import type { BewerbungsAngebot } from "./mailBausteine.ts";
@@ -1586,40 +1586,20 @@ async function scheduleFollowUp(
   });
 }
 
-/* Abschied für laufende Kunden nachholen (Registry #168, Regel in kette.ts abschiedNachholen): nur für eine verfallende
-   nachfass_2-Zeile und nur, wenn der Lead für diese Runde noch keine nachfass_3-Zeile hat. Anders als scheduleFollowUp
-   bricht er nichts ab, er legt höchstens EINE neue Zeile an (sofort fällig, Nachtruhe wie dort). Liefert die Sendezeit
-   der neuen Zeile oder null. */
-async function abschiedNachholenFuer(supabase: any, row: ScheduledEmail, lead: Lead): Promise<string | null> {
-  if (row.email_type !== "nachfass_2") return null;
-  const { data, error } = await supabase
-    .from("scheduled_emails")
-    .select("status, created_at, sent_at")
-    .eq("lead_id", lead.id)
-    .eq("email_type", "nachfass_3");
-  // Lesefehler: lieber kein Abschied als ein doppelter.
-  if (error) {
-    console.warn(`[abschied] nachfass_3 nicht lesbar (lead ${lead.id}): ${error.message ?? error}`);
-    return null;
-  }
-  const anker = (row as unknown as { created_at?: string | null }).created_at ?? null;
-  if (!abschiedNachholen(row.email_type, anker, (data ?? []) as AbschiedZeile[])) return null;
-  const scheduledFor = sendezeitIso(new Date());
-  await supabase.from("scheduled_emails").insert({
-    lead_id: lead.id,
-    email_type: "nachfass_3",
-    recipient_email: lead.email,
-    scheduled_for: scheduledFor,
-    status: "pending",
-  });
-  return scheduledFor;
-}
+/* Abschied für laufende Kunden nachholen (Registry #168): abschiedNachholenFuer steht in abschied.ts (testbar ohne
+   Server), die Regel in kette.ts abschiedNachholen. */
  
 
 // ── Bewertungsanfrage-Runde (Tag 7 nach Anfrage) ─────────────────────────────
 // Läuft in jedem Cron-Durchgang im Vormittagsfenster; wählt dynamisch statt
 // über eingeplante Zeilen (kein Backfill nötig, Stichtag begrenzt den Start).
 // Dedupe über die nach dem Versand eingefügte scheduled_emails-Zeile.
+// ACHTUNG Abschiedssatz (Registry #168, kette.ts ABSCHIED_SATZ: „Ohne Ihre Rückmeldung schreibe ich Ihnen danach nicht
+// mehr zu dieser Anfrage.“, Abschied +72 h): Der Satz stimmt nur, solange diese Runde ruht. Sie ruht allein, weil die
+// Abfrage unten nur die 200 ältesten Leads seit dem Stichtag liest (Bestandsaufnahme der Mails 15.11., Nr. 23: „Ruht“);
+// einen Schalter gibt es nicht. Wer die Abfrage repariert, startet die Bewertungsanfrage an Tag 7 neu, also ca. 4 Tage nach dem Versprechen:
+// vorher mit Martin klären (Leads nach dem Abschied ausnehmen oder den Satz ändern). Der Wächter-Test in
+// _tests/abschied.test.ts schlägt dann an.
 async function runBewertungsRunde(
   supabase: any,
   smtpConfig: SmtpConfig,

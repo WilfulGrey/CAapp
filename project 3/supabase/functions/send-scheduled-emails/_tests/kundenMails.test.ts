@@ -29,7 +29,9 @@ import {
 } from "../kundenMails.ts";
 import { ABSCHIED_SATZ, RUECKMELDUNG_KNOEPFE } from "../kette.ts";
 import { BESTPREIS_URL, TELEFON_HREF, WHATSAPP_HREF } from "../mailBausteine.ts";
-import { ALLE_KRAEFTE, bewertungNurLive, grussZeile, LISTE_UNVOLLSTAENDIG, LISTE_WARUM } from "../mailDesign.ts";
+import {
+  ALLE_KRAEFTE, bewertungNurLive, designMail, fusszeileText, grussZeile, LISTE_UNVOLLSTAENDIG, LISTE_WARUM, VORSCHAU_FUELLER, warumPrimundus,
+} from "../mailDesign.ts";
 import { BEWERTUNGS_STAND_ERSATZ } from "../bewertungenStand.ts";
 import { martaKarteHtml } from "../martaKarte.ts";
 
@@ -165,7 +167,12 @@ function designRegeln(name: string, m: KundenMail, o: { korallen: number; gruene
   }
   assert(new TextEncoder().encode(m.html).length < 90_000, `${name}: zu groß für Gmail (${m.html.length})`);
   assert(m.vorschau.length > 20 && m.vorschau.length < 160, `${name}: Vorschautext`);
-  assertStringIncludes(m.html, `mso-hide:all;font-size:1px;line-height:1px;color:#F2F1EE;">${m.vorschau.replace(/&/g, "&amp;")}</div>`);
+  // Vorschau mit Füller dahinter, sonst zeigt die Vorschauzeile danach Kopf und Gruß (Mailclient-Prüfung 15.11.).
+  assertStringIncludes(m.html, `mso-hide:all;font-size:1px;line-height:1px;color:#F2F1EE;">${m.vorschau.replace(/&/g, "&amp;")}${VORSCHAU_FUELLER}</div>`);
+  assert(VORSCHAU_FUELLER.length > 1000);
+  // Jeder Absatz trägt die Schrift selbst (Prüfung 15.11.: zwei von Hand gebaute <p> kamen in Times).
+  const ohneSchrift = [...m.html.matchAll(/<p style="([^"]*)"/g)].filter((p) => !p[1].includes("font-family:")).map((p) => p[1]);
+  assertEquals(ohneSchrift, [], `${name}: Absatz ohne Schrift`);
 
   const s = sichtbar(m.html);
   // Keine Stufen, keine Einsätze, keine Verfügbarkeit einer einzelnen Kraft, kein Preis je Zeile (Martin 14.11.2026).
@@ -180,16 +187,29 @@ function designRegeln(name: string, m: KundenMail, o: { korallen: number; gruene
   // Kurze Signatur statt Martas großer Karte.
   inFolge(`${name} Signatur`, s, ["Viele Grüße", "Marta Kapcio", "Pflegeberaterin bei Primundus"]);
   assert(!m.html.includes("#25D366") && !m.html.includes("sig-pille"), `${name}: große Marta-Karte`);
-  assertStringIncludes(m.html, 'src="https://primundus.de/images/marta-kapcio.jpg"');
-  // Bilder wie bisher: Logo und Siegel vom Kostenrechner, Presse-Logos in der Fußzeile.
+  // Bilder vom Kostenrechner (Mailclient-Prüfung 15.11.): Martas Foto schon quadratisch (kein object-fit nötig), Siegel
+  // und Presse-Logos als PNG (Outlook für Windows zeigt kein WebP), Logos schon grau (kein filter).
+  assertStringIncludes(m.html, `src="${SITE}/images/mail/marta-kapcio-quadrat.jpg" alt="Marta Kapcio" width="52" height="52"`);
   assertStringIncludes(m.html, `src="${SITE}/images/Primundus-Logo_V6.png"`);
-  assertStringIncludes(m.html, `src="${SITE}/images/primundus_testsieger-2021.webp"`);
-  assertStringIncludes(m.html, `src="${SITE}/images/media/die-welt.webp"`);
+  assertStringIncludes(m.html, `src="${SITE}/images/mail/testsieger-siegel.png"`);
+  for (const logo of ["die-welt", "frankfurter-allgemeine", "ard", "ndr", "sat1", "bild-der-frau"]) {
+    assertStringIncludes(m.html, `src="${SITE}/images/mail/presse-${logo}.png"`);
+  }
+  assert(!/\.webp"/.test(m.html), `${name}: WebP-Bild`);
+  assert(!m.html.includes("filter:") && !m.html.includes("opacity:"), `${name}: filter/opacity`);
+  assert(!m.html.includes("marta-kapcio.jpg"), `${name}: Hochformat-Foto`);
+  for (const img of m.html.match(/<img [^>]*marta[^>]*>/g) ?? []) assert(!img.includes("object-fit"), `${name}: object-fit an Marta`);
   inFolge(`${name} Kopf`, s, ["6× Testsieger", "DIE WELT", "Preis & Qualität"]);
   // Fußzeile: Adresse und Abmelde-Link wie bisher (nur mit Token).
   inFolge(`${name} Fußzeile`, s, ["Primundus Deutschland", "24h-Pflege und Betreuung zu Hause", "Diese E-Mail wurde versendet an: kundin@beispiel.de",
     "Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.", "Keine E-Mails mehr erhalten"]);
   assertStringIncludes(m.html, `href="${SITE}/abmelden?token=tok123"`);
+  // Textfassung endet wie die Fußzeile, mit Abmelde-Link (Mailclient-Prüfung 15.11.).
+  assert(m.text.endsWith(`Primundus Deutschland | www.primundus.de
+
+Diese E-Mail wurde versendet an: kundin@beispiel.de
+Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.
+Keine E-Mails mehr erhalten: ${SITE}/abmelden?token=tok123`), `${name}: Fußzeile im Text`);
 
   // Farben: nie Blau, keine alten Farben der Hülle und Karten.
   for (const alt of ["#0066CC", "#0066cc", "blue", "#2D1F0F", "#4A4540", "#f4f4f4", "#F6EFE4", "#D39B2A"]) {
@@ -381,7 +401,7 @@ Deno.test("01 Angebot: eingekaufter Lead mit Annahmen, Hinweis klein direkt unte
   ]);
   inFolge("Text", m.text, ["3.050 € / Monat\n", "6× in Folge Testsieger\n\n", `${HINWEIS_ANGENOMMEN}\n\nIHRE PFLEGEKRÄFTE-AUSWAHL (2)\n`]);
   // Direkt nach der Preiskarte (Ende der Karte, Abstand, Hinweis), klein und grau.
-  assert(/<\/table><\/td><\/tr>\n<tr><td class="pm-rand" style="padding:0 24px;"><div style="height:12px;[^"]*">&nbsp;<\/div><p style="margin:0;font-size:14px;line-height:21px;color:#6B6B6B;">Diese Angaben haben wir/.test(m.html), "Hinweis direkt unter der Preiskarte");
+  assert(/<\/table><\/td><\/tr>\n<tr><td class="pm-rand" style="padding:0 24px;"><div style="height:12px;[^"]*">&nbsp;<\/div><p style="font-family:[^"]*;margin:0;font-size:14px;line-height:21px;color:#6B6B6B;">Diese Angaben haben wir/.test(m.html), "Hinweis direkt unter der Preiskarte");
   assertEquals(zaehle(m.html, "Diese Angaben haben wir"), 1, "einmal");
 });
 
@@ -726,3 +746,30 @@ Deno.test("Anreise: Text aus mamamia wird maskiert", () => {
   assertStringIncludes(m.html, "Weg &lt;b&gt;1&lt;/b&gt;");
   assert(!m.html.includes("<b>1</b>"));
 });
+
+// Mailclient-Prüfung 15.11.2026: schmale Handys, Textfassung, Vorschauzeile.
+Deno.test("Kennzahlen: zweite Zeile darf umbrechen, unter 360 px kleiner (keine Mail breiter als der Bildschirm)", () => {
+  const h = warumPrimundus({ bewertung: { schnitt: "4,9", anzahl: 126 } });
+  // Erste Zeile bleibt zusammen („4,9 ★★★★★“, „6× in Folge“), die zweite („126 Bewertungen“) darf umbrechen.
+  assertEquals(zaehle(h, 'class="pm-kz-wert"'), 3);
+  assertEquals(zaehle(h, 'class="pm-kz-wort"'), 3);
+  for (const p of h.match(/<p class="pm-kz-wort"[^>]*>/g) ?? []) assert(!p.includes("nowrap"), p);
+  for (const p of h.match(/<p class="pm-kz-wert"[^>]*>/g) ?? []) assertStringIncludes(p, "white-space:nowrap");
+  // Abstand zwischen den Spalten nur an den ersten beiden.
+  assertEquals(zaehle(h, 'class="pm-kz"'), 2);
+  const mail = designMail({ site: SITE, titel: "T", vorschau: "Vorschau der Mail zum Test", teile: [h] });
+  assertStringIncludes(mail, "@media only screen and (max-width:359px)");
+  assertStringIncludes(mail, ".pm-kz-wert { font-size:14px !important;");
+});
+
+Deno.test("Fußzeile als Text: Versandhinweis und Abmelde-Link wie im HTML, ohne Token kein Link", () => {
+  assertEquals(fusszeileText({ email: "a@b.de", abmeldenUrl: `${SITE}/abmelden?token=x` }),
+    `Diese E-Mail wurde versendet an: a@b.de\nSie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.\nKeine E-Mails mehr erhalten: ${SITE}/abmelden?token=x`);
+  assertEquals(fusszeileText({ email: null, abmeldenUrl: null }), "Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.");
+  const m = nachfass3Mail(k(null), "Müller");
+  assert(!m.text.includes("/abmelden"), "ohne Token kein Abmelde-Link");
+  assert(!m.html.includes("/abmelden"));
+});
+
+// Dass die Bilder in project 3/public/images/mail liegen, prüft src/__tests__/mails/angebotsmailWortlaut.test.ts (Deno
+// darf hier nur den Funktionsordner lesen).

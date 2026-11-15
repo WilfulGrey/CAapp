@@ -11,14 +11,17 @@
 // - Die Zeile einer Pflegekraft kennt keinen Preis, keine Stufe, keine Einsätze und keine Verfügbarkeit.
 // - Sterne nur mit Live-Stand (bewertungNurLive): ohne ihn fällt die Spalte weg wie im Portal, kein Ersatzwert.
 //
-// Bilder wie in den bisherigen Mails: Logo und Siegel vom Kostenrechner (`${site}/images/…`), Martas Foto von
-// primundus.de (MARTA_FOTO_URL, siehe martaKarte.ts), Presse-Logos `${site}/images/media/…`, Pflegekraft-Fotos als
-// angehängte Bilder (`cid:`), nie die rohe S3-Adresse.
+// Bilder vom Kostenrechner (`${site}/images/…`, Dateien in project 3/public/images): Logo wie bisher, Siegel, Martas Foto
+// und Presse-Logos aus `images/mail/` (MAIL_BILDER). Pflegekraft-Fotos als angehängte Bilder (`cid:`), nie die rohe
+// S3-Adresse. Warum eigene Dateien (Mailclient-Prüfung 15.11.): Outlook für Windows zeigt kein WebP (Siegel und
+// Logos waren WebP), Gmail, Outlook und GMX/WEB.DE kennen kein `filter` (die Logos sind deshalb schon grau und blass
+// gespeichert), und ohne `object-fit` (GMX, WEB.DE, Yahoo, Gmail-App mit Fremdkonto, Windows Mail) wurde Martas
+// Hochformat in den 52-px-Kreis gestaucht (die Datei ist jetzt das obere Quadrat, wie es object-position:top zeigte).
+// Die Dateien gehen mit dem Kostenrechner live; vor dem Deploy der Edge Function muss er sie ausliefern.
 //
 // Benutzt von kundenMails.ts (Angebotsmail, Nudge 1, Nudge 2, Abschied). Die übrigen Kundenmails bleiben bis zu
 // ihrer Runde bei mailBausteine.ts und der Hülle aus index.ts.
 import { BESTPREIS_URL, TELEFON_HREF, TELEFON_TEXT, WHATSAPP_HREF } from "./mailBausteine.ts";
-import { MARTA_FOTO_URL } from "./martaKarte.ts";
 import { BEWERTUNGS_STAND_ERSATZ, type BewertungsStand } from "./bewertungenStand.ts";
 
 // ── Farben (Werte aus tailwind.config.js, pm-*) ───────────────────────────────────────────────────────────────────────
@@ -47,8 +50,17 @@ export const DESIGN_FARBEN = {
 const F = DESIGN_FARBEN;
 const SCHRIFT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 const S = `font-family:${SCHRIFT};`;
+/** Schrift für jedes <p>, das ein Aufrufer selbst baut: Die Hülle setzt die Schrift zwar auch an der Inhaltsspalte,
+ *  aber Gmail und Outlook vererben sie nicht verlässlich (Prüfung 15.11.: Absätze ohne eigene Schrift kamen in Times). */
+export const SCHRIFT_STIL = S;
 const T = 'role="presentation" cellpadding="0" cellspacing="0" border="0"';
 const PRIMUNDUS = "https://primundus.de";
+/** Bilder der Mails unter `${site}/images/` (project 3/public/images/mail/): PNG statt WebP, Logos schon grau. */
+export const MAIL_BILDER = {
+  siegel: "mail/testsieger-siegel.png",
+  marta: "mail/marta-kapcio-quadrat.jpg",
+  presse: (name: string) => `mail/presse-${name}.png`,
+} as const;
 
 const esc = (s: string): string =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -100,7 +112,7 @@ export function kopf(site: string): string {
             <p style="${S}margin:0;font-size:11.5px;font-weight:700;line-height:15px;color:${F.taupe};white-space:nowrap;">DIE WELT</p>
             <p style="${S}margin:0;font-size:11px;line-height:15px;color:${F.muted};white-space:nowrap;">Preis &amp; Qualität</p>
           </td>
-          <td valign="middle" width="30" style="width:30px;"><img src="${s}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="30" style="display:block;width:30px;height:auto;border:0;"></td>
+          <td valign="middle" width="30" style="width:30px;"><img src="${s}/images/${MAIL_BILDER.siegel}" alt="Testsieger DIE WELT" width="30" style="display:block;width:30px;height:auto;border:0;"></td>
         </tr></table>
       </td>
     </tr></table>
@@ -230,9 +242,12 @@ export function warumPrimundus(o: { bewertung: BewertungsStand | null; oben?: nu
   const punkt = (inhalt: string, i: number) => `<tr>${haken(i ? 12 : 0)}<td valign="top" style="${S}padding-top:${i ? 12 : 0}px;font-size:16px;line-height:22px;color:${F.ink};">${inhalt}</td></tr>`;
   const bestpreis = `<a href="${BESTPREIS_URL}" target="_blank" style="${S}color:${F.ink};text-decoration:underline;text-decoration-color:rgba(139,115,85,0.4);text-underline-offset:4px;">${GARANTIE_TITEL}</a>`;
   const punkte = [bestpreis, ...KOPF_PUNKTE].map(punkt).join("");
-  const spalte = (wert: string, wort: string, letzte: boolean) => `<td valign="top" style="padding:0 ${letzte ? 0 : 10}px 0 0;">
-      <p style="${S}margin:0;font-size:16px;font-weight:700;line-height:22px;color:${F.ink};white-space:nowrap;">${wert}</p>
-      <p style="${S}margin:2px 0 0;font-size:14px;line-height:20px;color:${F.muted};white-space:nowrap;">${wort}</p></td>`;
+  /* Breite (Mailclient-Prüfung 15.11.): Mit Sternen brauchten die drei Spalten 286 px ohne Umbruch, die Mail lief unter
+     350 px Bildschirmbreite (ohne <style> unter 366 px) seitlich über. Deshalb darf die zweite Zeile umbrechen
+     („126 / Bewertungen“, nur wenn es eng wird), und unter 360 px werden Schrift und Abstände kleiner (pm-kz-*). */
+  const spalte = (wert: string, wort: string, letzte: boolean) => `<td${letzte ? "" : ' class="pm-kz"'} valign="top" style="padding:0 ${letzte ? 0 : 10}px 0 0;">
+      <p class="pm-kz-wert" style="${S}margin:0;font-size:16px;font-weight:700;line-height:22px;color:${F.ink};white-space:nowrap;">${wert}</p>
+      <p class="pm-kz-wort" style="${S}margin:2px 0 0;font-size:14px;line-height:20px;color:${F.muted};">${wort}</p></td>`;
   let sterne = "";
   if (o.bewertung) {
     const gold = goldSterne(o.bewertung.schnitt);
@@ -304,10 +319,11 @@ export function soGehtEsWeiter(formularUrl: string): string {
 // ── 11 Marta-Signatur ────────────────────────────────────────────────────────────────────────────────────────────────
 /** EINE Fassung für alle Kundenmails dieser Runde: Gruß, rundes Foto, Name, Rolle, eine Kontaktzeile (Wortlaut der
  *  bisherigen Angebotsmail). Ersetzt die große Marta-Karte. `kontakt: false` nur dort, wo der Text die Nummer schon
- *  anbietet (Nudge 2), sonst stünde sie dreimal in der Mail. */
-export function martaSignatur(o: { kontakt?: boolean } = {}): string {
-  const bild = `src="${MARTA_FOTO_URL}" alt="Marta Kapcio" width="52"`;
-  const bildHtml = `<!--[if mso]><img ${bild} style="display:block;border:0;"><![endif]--><!--[if !mso]><!--><img ${bild} height="52" style="display:block;width:52px;height:52px;border-radius:26px;border:0;object-fit:cover;object-position:top;"><!--<![endif]-->`;
+ *  anbietet (Nudge 2), sonst stünde sie dreimal in der Mail. Das Foto ist schon quadratisch (MAIL_BILDER.marta, oberes
+ *  Quadrat von MARTA_FOTO_URL in martaKarte.ts), braucht also kein object-fit und wird nirgends gestaucht. */
+export function martaSignatur(o: { site: string; kontakt?: boolean }): string {
+  const bild = `src="${basis(o.site)}/images/${MAIL_BILDER.marta}" alt="Marta Kapcio" width="52" height="52"`;
+  const bildHtml = `<!--[if mso]><img ${bild} style="display:block;border:0;"><![endif]--><!--[if !mso]><!--><img ${bild} style="display:block;width:52px;height:52px;border-radius:26px;border:0;"><!--<![endif]-->`;
   const kontakt = o.kontakt === false ? ""
     : `\n<p style="${S}margin:14px 0 0;font-size:15px;line-height:23px;color:${F.muted};">Fragen? ${textlink(TELEFON_HREF, TELEFON_TEXT, 15)}, täglich <span style="white-space:nowrap;">8–20&nbsp;Uhr</span>, auch per ${textlink(WHATSAPP_HREF, "WhatsApp", 15)}.</p>`;
   return `${absatz("Viele Grüße", { unten: 12 })}
@@ -319,7 +335,8 @@ export function martaSignatur(o: { kontakt?: boolean } = {}): string {
   </td>
 </tr></table>${kontakt}`;
 }
-/** Textfassung der Signatur, gleiche Wahl wie martaSignatur. */
+/** Textfassung der Signatur, gleiche Wahl wie martaSignatur. Die Fußzeile (Versandhinweis, Abmelde-Link) hängt
+ *  fusszeileText an, wie fusszeile() im HTML. */
 export function martaSignaturText(o: { kontakt?: boolean } = {}): string {
   return `Viele Grüße
 Marta Kapcio
@@ -331,33 +348,48 @@ Primundus Deutschland | www.primundus.de`;
 // ── 12 Fußzeile ──────────────────────────────────────────────────────────────────────────────────────────────────────
 /** Presse-Logos wie in Martas Karte (martaKarte.ts LOGOS; dort nicht exportiert, die Datei ist eine Kopie von
  *  lib/marta-karte.ts mit Gleichlauf-Test). */
-const PRESSE_LOGOS: readonly [datei: string, alt: string, breite: number][] = [
-  ["die-welt.webp", "DIE WELT", 68], ["frankfurter-allgemeine.webp", "Frankfurter Allgemeine", 103], ["ard.webp", "ARD", 38],
-  ["ndr.webp", "NDR", 21], ["sat1.webp", "SAT.1", 45], ["bild-der-frau.webp", "Bild der Frau", 12],
+const PRESSE_LOGOS: readonly [name: string, alt: string, breite: number][] = [
+  ["die-welt", "DIE WELT", 68], ["frankfurter-allgemeine", "Frankfurter Allgemeine", 103], ["ard", "ARD", 38],
+  ["ndr", "NDR", 21], ["sat1", "SAT.1", 45], ["bild-der-frau", "Bild der Frau", 12],
 ];
+const VERSAND_AN = "Diese E-Mail wurde versendet an:";
+const GRUND = "Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.";
+const ABMELDEN = "Keine E-Mails mehr erhalten";
 /** Weißes Band wie der Kopf: Presseleiste grau, Absender, Kontakt als Taupe-Links, Versandhinweis und Abmelden wie
  *  bisher in buildEmailWrapper (Abmelden nur mit Token). */
 export function fusszeile(o: { site: string; email?: string | null; abmeldenUrl?: string | null }): string {
   const s = basis(o.site);
-  const logos = PRESSE_LOGOS.map(([d, alt, b]) => `<td align="center" valign="middle" style="padding:0 4px;"><img src="${s}/images/media/${d}" alt="${alt}" width="${b}" height="14" style="display:inline-block;width:${b}px;max-width:100%;height:auto;border:0;opacity:0.4;filter:grayscale(100%);"></td>`).join("");
+  // Grau und blass schon in der Datei (MAIL_BILDER.presse), weil Gmail, Outlook und GMX/WEB.DE `filter` nicht kennen.
+  const logos = PRESSE_LOGOS.map(([d, alt, b]) => `<td align="center" valign="middle" style="padding:0 4px;"><img src="${s}/images/${MAIL_BILDER.presse(d)}" alt="${alt}" width="${b}" height="14" style="display:inline-block;width:${b}px;max-width:100%;height:auto;border:0;"></td>`).join("");
   // Punkt vor dem Link in derselben Klammer: bricht die Zeile um, steht der Punkt vorn, nie allein am Zeilenende.
   const link = (url: string, t: string, punkt = false) => `<span style="white-space:nowrap;">${punkt ? "&middot;&nbsp;" : ""}${textlink(url, t, 13)}</span>`;
-  const an = o.email ? `Diese E-Mail wurde versendet an: ${esc(o.email)}<br>` : "";
-  const ab = o.abmeldenUrl ? `<br><a href="${o.abmeldenUrl}" target="_blank" style="${S}color:${F.muted};text-decoration:underline;">Keine E-Mails mehr erhalten</a>` : "";
+  const an = o.email ? `${VERSAND_AN} ${esc(o.email)}<br>` : "";
+  const ab = o.abmeldenUrl ? `<br><a href="${o.abmeldenUrl}" target="_blank" style="${S}color:${F.muted};text-decoration:underline;">${ABMELDEN}</a>` : "";
   return `<table ${T} width="100%" bgcolor="${F.weiss}" style="background-color:${F.weiss};"><tr><td class="pm-rand" align="center" style="border-top:1px solid ${F.line};padding:24px 24px 32px;text-align:center;">
   <table ${T} align="center"><tr>${logos}</tr></table>
   ${abstand(20)}
   <p style="${S}margin:0;font-size:14px;font-weight:600;line-height:20px;color:${F.ink};">Primundus Deutschland</p>
   <p style="${S}margin:2px 0 0;font-size:13px;line-height:20px;color:${F.muted};">24h-Pflege und Betreuung zu Hause</p>
   <p style="${S}margin:8px 0 0;font-size:13px;line-height:22px;color:${F.muted};">${link(TELEFON_HREF, "+49&nbsp;89&nbsp;200&nbsp;000&nbsp;830")} ${link("mailto:info@primundus.de", "info@primundus.de", true)}<br>${link(PRIMUNDUS, "www.primundus.de")}</p>
-  <p style="${S}margin:16px 0 0;font-size:12px;line-height:18px;color:${F.muted};">${an}Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.${ab}</p>
+  <p style="${S}margin:16px 0 0;font-size:12px;line-height:18px;color:${F.muted};">${an}${GRUND}${ab}</p>
 </td></tr></table>`;
+}
+
+/** Textfassung der Fußzeile (Mailclient-Prüfung 15.11.): Wer nur den Text sieht (Textmodus, Uhr, Vorleser), braucht
+ *  den Abmelde-Link genauso. Wortlaute wie fusszeile(). */
+export function fusszeileText(o: { email?: string | null; abmeldenUrl?: string | null }): string {
+  return [o.email ? `${VERSAND_AN} ${o.email}` : "", GRUND, o.abmeldenUrl ? `${ABMELDEN}: ${o.abmeldenUrl}` : ""]
+    .filter(Boolean).join("\n");
 }
 
 // ── Hülle (Kopf, Inhalt auf dem Seitengrund, Fußzeile) ──────────────────────────────────────────────────────────────
 /** Merkt die Stelle direkt unter dem Kopf. Der Testversand (Demo-Modus in index.ts) setzt dort seinen Hinweis ein,
  *  wie bisher vor `<div class="email-content">` der alten Hülle. */
 export const INHALT_MARKE = "<!--pm-inhalt-->";
+
+/** Füller hinter dem Vorschautext: Ohne ihn füllen Gmail, Apple Mail und Outlook die Vorschauzeile mit dem ersten
+ *  sichtbaren Text auf („6× Testsieger DIE WELT … Guten Tag, Frau Müller“, Mailclient-Prüfung 15.11.). */
+export const VORSCHAU_FUELLER = "&#847;&zwnj;&nbsp;".repeat(90);
 
 /** Vorschautext unsichtbar oben, Seitengrund, 600 px Spalte; für Outlook (Windows) eine feste 600-px-Tabelle. */
 export function huelle(o: { titel: string; vorschau: string; inhalt: string }): string {
@@ -381,13 +413,18 @@ export function huelle(o: { titel: string; vorschau: string; inhalt: string }): 
     .pm-rand { padding-left:16px !important; padding-right:16px !important; }
     .pm-kopf { padding:12px 16px !important; }
   }
+  @media only screen and (max-width:359px) {
+    .pm-kz { padding-right:8px !important; }
+    .pm-kz-wert { font-size:14px !important; line-height:20px !important; }
+    .pm-kz-wort { font-size:12.5px !important; line-height:18px !important; }
+  }
 </style>
 </head>
 <body style="margin:0;padding:0;background-color:${F.grund};">
-<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${F.grund};">${esc(o.vorschau)}</div>
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${F.grund};">${esc(o.vorschau)}${VORSCHAU_FUELLER}</div>
 <table ${T} width="100%" bgcolor="${F.grund}" style="background-color:${F.grund};"><tr><td align="center">
 <!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
-<table ${T} width="100%" style="max-width:600px;margin:0 auto;">
+<table ${T} width="100%" style="${S}max-width:600px;margin:0 auto;">
 ${o.inhalt}
 </table>
 <!--[if mso]></td></tr></table><![endif]-->
@@ -409,7 +446,7 @@ export function designMail(o: {
     INHALT_MARKE,
     reihe(abstand(28)),
     ...o.teile.map(reihe),
-    reihe(`${abstand(32)}${o.signatur ?? martaSignatur()}${abstand(36)}`),
+    reihe(`${abstand(32)}${o.signatur ?? martaSignatur({ site: o.site })}${abstand(36)}`),
     `<tr><td>${fusszeile({ site: o.site, email: o.email, abmeldenUrl: o.abmeldenUrl })}</td></tr>`,
   ].join("\n");
   return huelle({ titel: o.titel, vorschau: o.vorschau, inhalt });

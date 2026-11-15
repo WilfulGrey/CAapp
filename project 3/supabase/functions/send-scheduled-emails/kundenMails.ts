@@ -26,6 +26,7 @@ import {
   DESIGN_FARBEN as D,
   formularHinweis,
   formularKnopf,
+  fusszeileText,
   grussZeile,
   hauptknopf,
   karte,
@@ -39,6 +40,7 @@ import {
   martaSignatur,
   martaSignaturText,
   preiskarte,
+  SCHRIFT_STIL,
   textlink,
   warumPrimundusText,
   type ZeilenKraft,
@@ -254,6 +256,12 @@ ${ALLE_KRAEFTE}: ${alle}`;
 function ganzeMail(k: Kontext, betreff: string, vorschau: string, teile: string[], signatur?: string): string {
   return designMail({ site: k.site, titel: betreff, vorschau, teile, signatur, email: k.email, abmeldenUrl: k.abmelden });
 }
+/** Schluss der Textfassung: Signatur und Fußzeile (mit Abmelde-Link) wie im HTML. */
+function schlussText(k: Kontext, o: { kontakt?: boolean } = {}): string {
+  return `${martaSignaturText(o)}
+
+${fusszeileText({ email: k.email, abmeldenUrl: k.abmelden })}`;
+}
 
 export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
   const kalk = a.kalkulation ?? {};
@@ -295,7 +303,7 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
     : `${a.resubmit ? "Ihr aktualisiertes Angebot" : "Ihr Angebot"} und ${n === 1 ? "eine passende Pflegekraft" : `${n} passende Pflegekräfte`}`;
 
   const hinweisHtml = hinweis
-    ? `${dAbstand(12)}<p style="margin:0;font-size:14px;line-height:21px;color:${D.muted};">${esc(hinweis)}</p>`
+    ? `${dAbstand(12)}<p style="${SCHRIFT_STIL}margin:0;font-size:14px;line-height:21px;color:${D.muted};">${esc(hinweis)}</p>`
     : "";
   const teile = [
     anredeTitel({ gruss: grussZeile(k.anrede), zeilen: titel, einleitung: einstieg }),
@@ -324,7 +332,7 @@ ${preisText}${hinweis ? `${hinweis}\n\n` : ""}${kraefte.length ? `${kraefteListe
 
 ${KNOPF_TITEL}: ${start}
 
-${martaSignaturText()}`;
+${schlussText(k)}`;
 
   return { betreff, vorschau, html, text, komplett: true };
 }
@@ -376,7 +384,7 @@ ${LISTE_KNOPF}: ${formular}
 
 ${NUDGE1_SCHLUSS.replace(/‑/g, "-")}
 
-${martaSignaturText()}`;
+${schlussText(k)}`;
   return { betreff: NUDGE1_BETREFF, vorschau, html: ganzeMail(k, NUDGE1_BETREFF, vorschau, teile), text, komplett: true };
 }
 
@@ -401,7 +409,7 @@ export function nudge2Mail(k: Kontext): KundenMail {
   const teile = [
     anredeTitel({ gruss: grussZeile(k.anrede), zeilen: NUDGE2_TITEL, einleitung: NUDGE2_EINLEITUNG }),
     `${dAbstand(16)}${absatz(nudge2Telefon(textlink(TELEFON_HREF, TELEFON_TEXT), textlink(WHATSAPP_HREF, "WhatsApp")), { unten: 0 })}`,
-    `${dAbstand(24)}${karte(`<p style="margin:0 0 16px;font-size:16px;line-height:22px;color:${D.ink};">${NUDGE2_SELBST}</p>${formularKnopf(url)}`, { innen: "20px 16px" })}`,
+    `${dAbstand(24)}${karte(`<p style="${SCHRIFT_STIL}margin:0 0 16px;font-size:16px;line-height:22px;color:${D.ink};">${NUDGE2_SELBST}</p>${formularKnopf(url)}`, { innen: "20px 16px" })}`,
   ];
   const text = `${grussZeile(k.anrede)}
 
@@ -414,10 +422,10 @@ ${nudge2Telefon("089 200 000 830", `WhatsApp (${WHATSAPP_HREF})`)}
 ${NUDGE2_SELBST}
 ${LISTE_KNOPF}: ${url}
 
-${martaSignaturText({ kontakt: false })}`;
+${schlussText(k, { kontakt: false })}`;
   return {
     betreff: NUDGE2_BETREFF, vorschau: NUDGE2_VORSCHAU, text, komplett: true,
-    html: ganzeMail(k, NUDGE2_BETREFF, NUDGE2_VORSCHAU, teile, martaSignatur({ kontakt: false })),
+    html: ganzeMail(k, NUDGE2_BETREFF, NUDGE2_VORSCHAU, teile, martaSignatur({ site: k.site, kontakt: false })),
   };
 }
 
@@ -543,7 +551,7 @@ ${nein}
 
 ${ABSCHIED_SATZ}
 
-${martaSignaturText()}`;
+${schlussText(k)}`;
   return { betreff: ABSCHIED_BETREFF, vorschau: ABSCHIED_VORSCHAU, html: ganzeMail(k, ABSCHIED_BETREFF, ABSCHIED_VORSCHAU, teile), text, komplett: true };
 }
 
