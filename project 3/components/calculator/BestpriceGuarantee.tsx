@@ -39,37 +39,32 @@ export function BestpreisKarte() {
         ★ {PILLE}
       </div>
 
-      <div className="flex flex-col items-start text-left mt-4">
-        {/* Ab lg steht die Karte neben der Testsieger-Karte: das Siegel sitzt dort in einem 160 px hohen Feld wie das
-            WELT-Siegel (w-40 h-40), damit beide Titel auf einer Höhe beginnen. */}
-        <div className="mb-5 lg:flex lg:h-40 lg:items-center">
-          <button
-            type="button"
-            onClick={oeffnen}
-            className="w-56 flex items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1F8F5F]/60"
-            aria-haspopup="dialog"
-            aria-label="Bestpreisgarantie – mehr Infos"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={GARANTIE.siegelSrc} alt={GARANTIE.siegelAlt} width={900} height={256} className="w-56 h-auto" loading="lazy" />
-          </button>
-        </div>
-
-        <div>
-          <h3 className="text-[22px] font-bold text-[#3D3D3D] mb-2">{GARANTIE.zusage}</h3>
-
-          <p className="text-[16px] text-[#6B6B6B] mb-4">{GARANTIE.warum}</p>
-
-          <button
-            type="button"
-            onClick={oeffnen}
-            className="inline-flex items-center gap-1.5 text-left text-[16px] font-semibold text-[#1E5C3A] hover:text-[#14532D] underline underline-offset-2 transition-colors"
-            aria-haspopup="dialog"
-          >
-            {LINK}
-          </button>
-        </div>
+      {/* ENTWURF 16.11.2026: Kopfzeile wie primundus.de und wie die Testsieger-Karte daneben (Siegel links, Titel daneben),
+          statt Siegel allein in einem 160 px hohen Feld. Ab xl nebeneinander; darunter reicht die halbe Spalte nicht.
+          Wortlaut unverändert, „Bestpreisgarantie“ steht weiter nur auf dem Siegel (Martin 12.09.). */}
+      <div className="mt-3 flex flex-col items-start gap-4 xl:min-h-[104px] xl:flex-row xl:items-center xl:gap-6">
+        <button
+          type="button"
+          onClick={oeffnen}
+          className="flex-none rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1F8F5F]/60"
+          aria-haspopup="dialog"
+          aria-label="Bestpreisgarantie – mehr Infos"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={GARANTIE.siegelSrc} alt={GARANTIE.siegelAlt} width={900} height={256} className="h-[62px] w-auto" loading="lazy" />
+        </button>
+        <h3 className="text-[21px] font-bold leading-snug text-[#1C1C1C]">{GARANTIE.zusage}</h3>
       </div>
+
+      <p className="mt-5 text-[16px] leading-[1.6] text-[#2E2E2E]">{GARANTIE.warum}</p>
+      <button
+        type="button"
+        onClick={oeffnen}
+        className="mt-4 inline-flex items-center gap-1.5 text-left text-[16px] font-semibold text-[#1E5C3A] underline underline-offset-2 transition-colors hover:text-[#14532D]"
+        aria-haspopup="dialog"
+      >
+        {LINK}
+      </button>
     </div>
   );
 }
@@ -79,8 +74,8 @@ export function BestpreisKarte() {
  *  Kopf und Hero (560 px, ab lg 1216 px), beide Karten in der gestapelten Form. */
 export function BestpriceGuarantee() {
   return (
-    <section className="px-5 py-12 md:py-16">
-      <div className="mx-auto grid max-w-[560px] gap-10 lg:max-w-[1216px] lg:grid-cols-2 lg:gap-8">
+    <section className="px-5 py-12 lg:py-16">
+      <div className="mx-auto grid max-w-[560px] gap-10 lg:max-w-[1216px] lg:grid-cols-2 lg:gap-6">
         {/* grid streckt die Karte auf die Höhe der Testsieger-Karte daneben. */}
         <div className="lg:grid"><BestpreisKarte /></div>
         {/* Anker direkt an der Testsieger-Karte: das WELT-Siegel im Kopf („zur Original-Veröffentlichung“) springt am Handy

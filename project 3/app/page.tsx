@@ -13,6 +13,7 @@ import { KeyBenefitsBar } from "@/components/calculator/KeyBenefitsBar";
 import { homePageGraph, jsonLdString } from "@/lib/seo-schema";
 import { BewertungsZeile } from "@/components/calculator/BewertungsZeile";
 import { ladeSterneStand } from "@/lib/sterne-zeile-laden";
+import { AUGENBRAUE, H2 } from "@/components/calculator/startStil";
 
 // Server-Komponente (seit 17.09.2026, vorher "use client"), damit die
 // Bewertungszahl im ersten HTML steht statt nachzuspringen. Alle Bausteine mit
@@ -208,7 +209,7 @@ export default async function HomePage() {
                   vom Testsieger") — traegt Kategorie, Keyword und
                   Vertrauensanker in EINER Zeile, das Siegel im Foto belegt
                   ihn. Damit steht "24-Stunden-Pflege" wieder IN der H1. */}
-              <h1 className="mb-3.5 tracking-tight text-[#3D3D3D]">
+              <h1 className="mb-3.5 tracking-tight text-[#1C1C1C]">
                 {/* Auf dem Desktop groesser (Martin 16.08.): 14px standen
                     dort unter einer 44px-H1 wie eine Fussnote. */}
                 <span className="mb-2.5 block text-[14px] font-semibold uppercase tracking-[0.07em] text-[#E76F63] lg:mb-3 lg:text-[18px] lg:tracking-[0.06em]">
@@ -228,7 +229,7 @@ export default async function HomePage() {
                     ab 402 px bleibt es bei 33 px. Am Computer dasselbe: Bei 44 und
                     50 px brach sie in „Passende / Pflegekräfte sofort / finden.“;
                     die Spalte ist ab 1024 px 430 px und ab 1280 px 530 px breit. */}
-                <span className="block text-[length:min(33px,calc((100vw-40px)*0.0911))] font-bold leading-[1.1] sm:text-[40px] lg:text-[39px] xl:text-[48px]">
+                <span className="block text-[length:min(33px,calc((100vw-40px)*0.0911))] font-extrabold leading-[1.1] tracking-[-0.03em] sm:text-[40px] lg:text-[39px] xl:text-[48px]">
                   Passende Pflegekräfte sofort finden.
                 </span>
               </h1>
@@ -254,7 +255,7 @@ export default async function HomePage() {
                   des Portals (Keine Vorauszahlung / Keine Vermittlungsgebühr /
                   Keine Mindestlaufzeit); „Kein Vertrag vor Ihrer Auswahl"
                   ist dort entfallen (Martin 09.11.). */}
-              <p className="mb-6 max-w-[520px] text-[16px] leading-relaxed text-[#5B5B5B] lg:text-[18px]">
+              <p className="mb-6 max-w-[520px] text-[16px] leading-relaxed text-[#2E2E2E] lg:text-[18px]">
                 Sehen Sie in 2 Minuten,{" "}
                 <span className="font-semibold text-[#3D3D3D]">was es kostet</span> und{" "}
                 {/* Die Zusage bleibt als EINE Zeile zusammen, der Strich haengt
@@ -323,13 +324,13 @@ export default async function HomePage() {
       <div className="bg-[#F2F1EE]">
         <HowItWorks />
 
-        <section id="kundenstimmen" className="scroll-mt-24 px-5 py-12 md:py-16">
+        {/* ENTWURF 16.11.2026: Stimmen auf dem dunklen Band wie primundus.de (Martin 23.09.: „überall dunkel“), Überschrift im
+            Stil von primundus.de; Karten, Wortlaut und Herkunftszeile unverändert. */}
+        <section id="kundenstimmen" className="scroll-mt-24 bg-[#191715] px-5 py-14 lg:py-20">
           <div className="mx-auto max-w-[560px] lg:max-w-[1216px]">
-            <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-2">Kundenstimmen</p>
-            <h2 className="text-[26px] md:text-[32px] lg:text-[38px] leading-[1.25] font-bold text-[#3D3D3D] mb-5">
-              Das sagen unsere Familien
-            </h2>
-            <TestimonialCard bewertung={bewertung} />
+            <p className={`${AUGENBRAUE} !text-[#C9B79C]`}>Kundenstimmen</p>
+            <h2 className={`${H2} !text-[#F2EDE5] mb-6`}>Das sagen unsere Familien</h2>
+            <TestimonialCard bewertung={bewertung} dunkel />
           </div>
         </section>
 

@@ -10,7 +10,8 @@ function initialen(name: string): string {
   return name.split(/\s+/).map((teil) => teil.charAt(0)).join("").slice(0, 2).toUpperCase();
 }
 
-export function TestimonialCard({ bewertung }: { bewertung: SterneStand | null }) {
+/** `dunkel` (ENTWURF 16.11.2026): Stimmen auf dem dunklen Band wie primundus.de; Sternezeile und Herkunft hell. */
+export function TestimonialCard({ bewertung, dunkel = false }: { bewertung: SterneStand | null; dunkel?: boolean }) {
   return (
     <div className="w-full">
       {/* Kopfzeile seit 17.09.2026 dieselbe wie im Hero (Martin: „ja alles
@@ -18,7 +19,7 @@ export function TestimonialCard({ bewertung }: { bewertung: SterneStand | null }
           oben stand dann 4,9, und von den 126 Bewertungen kommen nur 6 von
           Google. Ohne Stand keine Kopfzeile. */}
       {bewertung && (
-        <div className="mb-4">
+        <div className={dunkel ? "mb-6 [&_span]:!text-[#A9A199] [&_strong]:!text-[#F2EDE5]" : "mb-4"}>
           <SterneText stand={bewertung} />
         </div>
       )}
@@ -51,7 +52,7 @@ export function TestimonialCard({ bewertung }: { bewertung: SterneStand | null }
                   <p className="text-[12.5px] text-[#8B8B8B]">{stimme.datum}</p>
                 </div>
               </div>
-              <p className="text-[16px] text-[#3D3D3D] leading-relaxed">
+              <p className="text-[16px] text-[#2E2E2E] leading-relaxed">
                 „{stimme.text}“
               </p>
             </div>
@@ -60,7 +61,7 @@ export function TestimonialCard({ bewertung }: { bewertung: SterneStand | null }
       </div>
       {/* Herkunft ohne Link (Martin 09.11.: „keinen Link … damit er da nicht wegspringt“), immer sichtbar (§ 5b UWG, Registry
           #159); erst die Herkunft der gezeigten Stimmen, dann die Auswahl aus allen. */}
-      <p className="mt-2 text-[13px] text-[#8B8B8B]">
+      <p className={`mt-3 text-[13px] ${dunkel ? "text-[#A9A199]" : "text-[#8B8B8B]"}`}>
         {HERKUNFT_STIMMEN}{bewertung && <> Auswahl aus {anzahlText(bewertung.anzahl)} auf primundus.de.</>}
       </p>
     </div>

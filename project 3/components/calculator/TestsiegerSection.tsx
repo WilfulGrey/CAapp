@@ -1,70 +1,45 @@
 /** Testsieger-Karte (Registry #155: steht mit der Bestpreisgarantie im Abschnitt #testsieger, BestpriceGuarantee.tsx).
- *  Die content-checkliste verlangt zur Auszeichnung einen Beleg-Link; das Original-PDF hängt in der Karte. Look wie Formular
- *  und Portal: weiße Karte ohne goldenen Rahmen; Pille, Siegel und Wortlaut unverändert. Registry #160: linksbündig wie die
- *  übrigen Abschnitte, Pille an der linken Inhaltskante, Textgrau #6B6B6B wie im Portal; auch am Computer gestapelt (Siegel
- *  über dem Titel) und mit denselben Innenabständen wie die Garantie-Karte daneben (eine Innenkante). */
+ *  Die content-checkliste verlangt zur Auszeichnung einen Beleg-Link; das Original-PDF hängt in der Karte.
+ *  ENTWURF 16.11.2026: Kopfzeile wie primundus.de (VertrauensKarten): Siegel links, Titel und Zeile daneben, darunter der
+ *  Text. Vorher stand das Siegel allein in einem 160 px hohen Feld über dem Titel, die Karte wirkte am Computer leer.
+ *  Wortlaut unverändert. */
 export function TestsiegerKarte() {
   return (
-        <div className="bg-white rounded-[20px] p-7 md:p-9 relative">
-          <div className="absolute top-[-14px] left-7 md:left-9 bg-[#D4A843] text-white px-4 min-[360px]:px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
-            ★ Testsieger · 6× in Folge
-          </div>
+    <div className="relative rounded-[20px] bg-white p-7 md:p-9">
+      <div className="absolute top-[-14px] left-7 z-10 whitespace-nowrap rounded-full bg-[#D4A843] px-4 py-1.5 text-sm font-bold uppercase tracking-wide text-white shadow-md min-[360px]:px-6 md:left-9">
+        ★ Testsieger · 6× in Folge
+      </div>
 
-          <div className="flex flex-col text-left mt-4">
-            {/* Badge + Beleg-Link zeigen auf die Original-Veröffentlichung
-                (DIE WELT / ServiceValue 10/2021, primundus.de Nr. 1 im
-                Ranking Pflegekräfte-Vermittler) — PDF liegt lokal unter
-                /downloads, kein externer Host. */}
-            <a
-              href="/downloads/die-welt-service-champions-2021.pdf"
-              target="_blank"
-              rel="noopener"
-              className="w-40 h-40 mb-5 flex items-center justify-center flex-shrink-0"
-              aria-label="Original-Veröffentlichung Service-Champions als PDF öffnen"
-            >
-              <img
-                src="/images/primundus_testsieger-2021.webp"
-                alt="Testsieger DIE WELT"
-                className="w-40 h-40 object-contain object-left"
-              />
-            </a>
-
-            {/* Texte 2026-08-14 mit Martin abgestimmt: keine Prozentzahl;
-                "Nr. 1 der Pflegekräfte-Vermittler" ist der wörtliche
-                Siegel-Claim; das Preis/Qualität-Statement ist bewusst KEIN
-                Zitat (steht so nicht in der Veröffentlichung), sondern
-                eigene Aussage — deshalb ohne Anführungszeichen/Kursiv.
-                17.09.2026 (Martin): „bester Vermittler" raus, stattdessen die Linie von
-                primundus.de „DIE WELT hat Primundus sechsmal in Folge ausgezeichnet". */}
-            <div className="flex-1">
-              <h3 className="text-[22px] font-bold text-[#3D3D3D] mb-2">
-                {/* Nur "6× Testsieger": die Pille ueber dem Kasten
-                traegt bereits "Testsieger · 6× in Folge", und die
-                Zeile darunter nennt DIE WELT und ServiceValue.
-                Dreimal dasselbe untereinander liest sich wie ein
-                Aufkleber (Martin 28.08.2026: "im Kasten mach
-                6x Testsieger, damit sich das nicht doppelt"). */}
-                6× Testsieger
-              </h3>
-
-              <p className="text-[16px] text-[#6B6B6B] mb-4">
-                Nr. 1 der Pflegekräfte-Vermittler – ausgezeichnet in Deutschlands großer Service-Studie von DIE WELT und ServiceValue
-              </p>
-
-              <p className="text-[16px] text-[#5A5A5A] leading-relaxed">
-                DIE WELT hat Primundus sechsmal in Folge ausgezeichnet: Primundus steht für die beste Kombination aus Preis, Qualität und Kundenservice.
-              </p>
-
-              <a
-                href="/downloads/die-welt-service-champions-2021.pdf"
-                target="_blank"
-                rel="noopener"
-                className="inline-flex items-center gap-1.5 mt-4 text-[16px] font-semibold text-[#8B7355] hover:text-[#6B5738] underline underline-offset-2 transition-colors"
-              >
-                Original-Veröffentlichung ansehen (PDF)
-              </a>
-            </div>
-          </div>
+      <div className="mt-3 flex items-start gap-5">
+        <a
+          href="/downloads/die-welt-service-champions-2021.pdf"
+          target="_blank"
+          rel="noopener"
+          className="flex-none"
+          aria-label="Original-Veröffentlichung Service-Champions als PDF öffnen"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" className="h-[104px] w-auto rounded-[4px] shadow-[0_2px_10px_rgba(0,0,0,0.18)]" />
+        </a>
+        <div className="min-w-0">
+          <h3 className="text-[21px] font-bold leading-snug text-[#1C1C1C]">6× Testsieger</h3>
+          <p className="mt-1.5 text-[15px] leading-[1.5] text-[#6B6B6B]">
+            Nr. 1 der Pflegekräfte-Vermittler – ausgezeichnet in Deutschlands großer Service-Studie von DIE WELT und ServiceValue
+          </p>
         </div>
+      </div>
+
+      <p className="mt-5 text-[16px] leading-[1.6] text-[#2E2E2E]">
+        DIE WELT hat Primundus sechsmal in Folge ausgezeichnet: Primundus steht für die beste Kombination aus Preis, Qualität und Kundenservice.
+      </p>
+      <a
+        href="/downloads/die-welt-service-champions-2021.pdf"
+        target="_blank"
+        rel="noopener"
+        className="mt-4 inline-flex items-center gap-1.5 text-[16px] font-semibold text-[#8B7355] underline underline-offset-2 transition-colors hover:text-[#6B5738]"
+      >
+        Original-Veröffentlichung ansehen (PDF)
+      </a>
+    </div>
   );
 }
