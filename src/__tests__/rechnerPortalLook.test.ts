@@ -71,11 +71,16 @@ describe('Rechner wie das Portal (Registry #151)', () => {
     // Inhalt und Herkunft der Stimmen prüft kundenstimmen.test.ts.
   });
 
-  it('Startseite: der Ablauf ist derselbe wie im letzten Schritt (eine Quelle), Anker #ablauf bleibt (Registry #154)', () => {
+  it('Startseite: eigener Ablauf-Wortlaut für die Website, dieselben Zusagen wie im Formular, Anker #ablauf bleibt (Registry #168)', () => {
+    // Bis #168 die Portal-Schritte (AblaufSchritte quer, #154); Martin 16.11.: „im portal macht das ja sinn, aber hier ist das
+    // nicht richtig logisch und gut geschrieben auf der website“. Die Zusagen bleiben dieselben.
     const start = readFileSync(join(rechner, 'HowItWorks.tsx'), 'utf8');
-    expect(start).toContain('<AblaufSchritte quer />');
-    expect(start).toContain('{MINI_ABLAUF}');
     expect(start).toContain('id="ablauf"');
+    expect(start).toContain('Bewerbungen innerhalb von 60\\u00a0Minuten');
+    expect(start).toContain('Anreise ist schon ab 3\\u00a0Tagen möglich');
+    expect(start).toContain('Kontaktdaten');
+    // Mustervertrag-Zeile unter der Karte ist weg (Martin 16.11.: „warum ist der Mustervertrag plötzlich da verlinkt??“).
+    expect(start).not.toContain('primundus-mustervertrag.pdf');
     expect(start).not.toMatch(/>[^<]*selben Werktag/);
     expect(start).not.toMatch(/>[^<]*Profil vervollständigen/);
     expect(funktion('AblaufNachAbsenden')).toContain('<AblaufSchritte />');

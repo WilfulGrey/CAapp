@@ -14,7 +14,7 @@ import type { SterneStand } from '@/lib/sterne-zeile';
  *  diesem Handy da drin“): Aufbau, Titel und Text wie der Schluss von primundus.de (SchlussAufruf + MartaBand dort), rechts die
  *  Produktbühne. Unter dem Knopf dieselben Punkte wie im Hero und im Portal (Martin: „die Punkte darunter würde ich ändern, so
  *  wie wir sie jetzt überall haben“); primundus.de zeigt dort noch die Punkte von vor dem 09.11. */
-const TITEL = 'In 2 Minuten wissen Sie, was es kostet und wer zu Ihnen passt.';
+const TITEL = 'In 2 Minuten wissen\u00A0Sie, was es kostet und wer zu Ihnen passt.';
 const TEXT = 'Sie beantworten ein paar Fragen zur Pflegesituation. Danach sehen Sie den Monatspreis und die Betreuungskräfte, die dafür in Frage kommen, mit Foto, Erfahrung und Deutschniveau.';
 const PK_FOTOS = ['/images/caregivers/pk-1.jpg', '/images/caregivers/pk-2.jpg', '/images/caregivers/pk-3.jpg', '/images/caregivers/pk-4.jpg'];
 
@@ -76,7 +76,7 @@ export function FinalCTA({ bewertung = null }: { bewertung?: SterneStand | null 
             {/* Knopf, Plakette, Punkte und Sterne in der Reihenfolge des Hero (MultiStepForm, Modus cta). */}
             <div className="mt-8 max-w-md">
               <button onClick={() => openCalculator('final_cta')} className={KNOPF}>
-                {KNOPF_ANGEBOT}{" "}→
+                {KNOPF_ANGEBOT}{"\u00a0"}→
               </button>
               <div className="mt-3 flex justify-center">
                 <button type="button" onClick={() => openCalculator('final_badge')} aria-label="Passende Pflegekräfte sofort verfügbar — jetzt ansehen"

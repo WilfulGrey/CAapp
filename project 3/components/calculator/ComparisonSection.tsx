@@ -70,7 +70,7 @@ export function ComparisonSection() {
 
         <div className="mt-8">
           <button onClick={() => openCalculator('vergleich')} className={KNOPF}>
-            {KNOPF_ANGEBOT}{" "}→
+            {KNOPF_ANGEBOT}{"\u00a0"}→
           </button>
         </div>
       </div>

@@ -16,12 +16,12 @@ const SCHRITTE = [
     text: 'Sie beantworten ein paar kurze Fragen und geben Ihre Kontaktdaten ein. Danach sehen Sie sofort Ihren Monatspreis mit Ihren Zuschüssen und die passenden Pflegekräfte.',
   },
   {
-    titel: 'Bewerbungen innerhalb von 60 Minuten',
+    titel: 'Bewerbungen innerhalb von 60\u00a0Minuten',
     text: 'Beschreiben Sie kurz, was Ihr Angehöriger braucht. Dann bewerben sich passende Pflegekräfte direkt bei Ihnen.',
   },
   {
     titel: 'In Ruhe auswählen und starten',
-    text: 'Sie wählen Ihre Pflegekraft, erst dann unterschreiben Sie. Den Rest übernehmen wir, die Anreise ist schon ab 3 Tagen möglich.',
+    text: 'Sie wählen Ihre Pflegekraft, erst dann unterschreiben Sie. Den Rest übernehmen wir, die Anreise ist schon ab 3\u00a0Tagen möglich.',
   },
 ] as const;
 
@@ -49,7 +49,7 @@ export function HowItWorks() {
 
         <div className="mt-8 lg:mt-10">
           <button onClick={() => openCalculator('ablauf')} className={KNOPF}>
-            {KNOPF_ANGEBOT}{" "}→
+            {KNOPF_ANGEBOT}{"\u00a0"}→
           </button>
         </div>
       </div>
