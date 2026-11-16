@@ -1,18 +1,31 @@
 'use client';
 
 import { openCalculator } from '@/lib/scroll-to-calculator';
-import { KennzahlenZeile, KNOPF_ANGEBOT, KOPF_FRAGEN, KostenfreiZeile } from '@/components/calculator/FormularPortal';
+import { KNOPF_ANGEBOT, KOPF_FRAGEN } from '@/components/calculator/FormularPortal';
+import { GARANTIE_OEFFNEN_EVENT } from '@/components/calculator/BestpreisSiegelLink';
+import { GARANTIE } from '@/lib/kraefte-vorschau';
+import { PORTAL_PUNKTE } from '@/lib/hero-punkte';
 import { ABSCHNITT, H2, SPALTE } from '@/components/calculator/startStil';
 import type { SterneStand } from '@/lib/sterne-zeile';
 
+// bewertung kommt weiter aus app/page.tsx, der Schluss zeigt seit dem Entwurf 16.11. keine Kennzahlen mehr.
+
 const PHONE_HREF = 'tel:+4989200000830';
 const WHATSAPP_HREF = 'https://wa.me/4989200000830';
+
+function Haken() {
+  return (
+    <svg className="h-[18px] w-[18px] flex-none text-[#3D7A5C]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
 
 /** Schluss der Startseite (Registry #155/#160: hell, Titel über der Karte, Knopf, „100 % kostenfrei“, Kennzahlen, Marta).
  *  ENTWURF 16.11.2026 (Martin: „sieht als Desktop nicht schön aus“): Knopf-Karte und Marta ab lg nebeneinander über die volle
  *  Breite, gleich hoch; vorher beide 640 px schmal links, rechts daneben die halbe Seite leer. Marta wie auf primundus.de
  *  („Lieber erst sprechen?“-Band): größeres Foto, Erreichbarkeit, Nummer sichtbar. */
-export function FinalCTA({ bewertung = null }: { bewertung?: SterneStand | null }) {
+export function FinalCTA(_props: { bewertung?: SterneStand | null }) {
   return (
     <section className={`${ABSCHNITT} pb-14 md:pb-20`}>
       <div className={SPALTE}>
@@ -25,10 +38,21 @@ export function FinalCTA({ bewertung = null }: { bewertung?: SterneStand | null 
             >
               {KNOPF_ANGEBOT}{" "}→
             </button>
-            <div className="mt-3"><KostenfreiZeile /></div>
-            <div className="mt-4 border-t border-[#F0EDE8] pt-4">
-              <KennzahlenZeile bewertung={bewertung} />
-            </div>
+            {/* Martin 16.11.: „die Punkte darunter würde ich ändern, so wie wir sie jetzt überall haben“ – dieselben vier Punkte
+                wie unter dem Hero-Knopf und im Portal unter dem Preis (Registry #158) statt „100 % kostenfrei“ und Kennzahlen. */}
+            <ul className="mt-5 grid gap-3 sm:grid-cols-2 sm:gap-x-6">
+              <li className="flex items-center gap-2.5 text-[16px] leading-snug text-[#2E2E2E]">
+                <Haken />
+                <span>
+                  {GARANTIE.wort}{' '}
+                  <button type="button" onClick={() => window.dispatchEvent(new Event(GARANTIE_OEFFNEN_EVENT))}
+                    className="font-semibold text-[#1E5C3A] underline underline-offset-[3px]" aria-haspopup="dialog">Mehr Infos</button>
+                </span>
+              </li>
+              {PORTAL_PUNKTE.map((p) => (
+                <li key={p} className="flex items-center gap-2.5 text-[16px] leading-snug text-[#2E2E2E]"><Haken /><span>{p}</span></li>
+              ))}
+            </ul>
           </div>
 
           <div className="flex flex-col justify-center rounded-[20px] bg-white px-4 py-6 md:px-8 md:py-7">

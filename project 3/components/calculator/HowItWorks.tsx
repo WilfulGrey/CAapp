@@ -8,11 +8,12 @@ import { AUGENBRAUE, ABSCHNITT, H2, KNOPF, SPALTE } from '@/components/calculato
  *  logisch und gut geschrieben auf der website“): eigener Wortlaut für die Startseite statt der Portal-Schritte
  *  (AblaufSchritte, Registry #154). Jeder Schritt hat Titel und Satz, alle drei Zahlen gleich (die Koralle-Eins ist im Portal
  *  „Ihr nächster Schritt“ und wirkte hier wie ein Formularfortschritt). Kontaktschritt bleibt genannt (Lehre 23.09.).
- *  Der Mustervertrag-Satz unter der Karte ist entfallen (Martin: „warum ist der Mustervertrag plötzlich da verlinkt??“). */
+ *  Der Mustervertrag-Satz unter der Karte ist entfallen (Martin: „warum ist der Mustervertrag plötzlich da verlinkt??“).
+ *  Martin 16.11.: Wortlaut „von mir aus okay“; OpenAI 16.11.: „mit Ihren Zuschüssen“ statt „mit allen“ (kein Vollständigkeitsversprechen). */
 const SCHRITTE = [
   {
     titel: 'Preis und Pflegekräfte sofort sehen',
-    text: 'Sie beantworten ein paar kurze Fragen und geben Ihre Kontaktdaten ein. Sofort danach sehen Sie Ihren Monatspreis mit allen Zuschüssen und die passenden Pflegekräfte.',
+    text: 'Sie beantworten ein paar kurze Fragen und geben Ihre Kontaktdaten ein. Danach sehen Sie sofort Ihren Monatspreis mit Ihren Zuschüssen und die passenden Pflegekräfte.',
   },
   {
     titel: 'Bewerbungen innerhalb von 60 Minuten',
