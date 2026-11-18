@@ -46,6 +46,20 @@ const nextConfig = {
   // Cloudflare Pages — Render runs Next as a real Node server, so the
   // built-in optimizer works and serves responsive WebP/AVIF at the right
   // size per breakpoint). Drops the hero from 348 KB on mobile.
+  //
+  // minimumCacheTTL (Registry #169, OOM 17.11.2026): Standard ist 60 s. Bilder
+  // aus public/ liefern max-age=0, also galt jedes optimierte Bild nach 60 s
+  // als STALE, und jeder Besuch danach ließ sharp/libvips neu rechnen. Jeder
+  // Lauf blieb als nativer Speicher im Prozess (glibc gibt ihn nicht zurück):
+  // rss 150 → 502 MB in zwei Tagen bei gleichbleibendem Heap, dann Kill bei
+  // 512 MB. Mit 30 Tagen rechnet sharp jedes Bild (18 Adressen) einmal je
+  // Prozess. Dateien in public/ ändern sich nur mit einem Deploy, und der
+  // startet mit leerem Cache. Den Rest der Zersplitterung nimmt
+  // MALLOC_ARENA_MAX=2 im start-Skript (package.json, nicht render.yaml:
+  // render.yaml hängt an keinem Render-Blueprint).
+  // ponytail: Browser behalten das Bild bis 30 Tage — ein Bild unter
+  // demselben Namen ersetzen heißt, es umbenennen (wie hero-v3).
+  images: { minimumCacheTTL: 2592000 },
   generateBuildId: async () => {
     return BUILD_ID;
   },
