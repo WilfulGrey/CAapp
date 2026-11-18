@@ -20,6 +20,15 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       colors: {
+        // ENTWURF 16.11.2026: Farben von primundus.de (tailwind.config.ts dort), für die Produktbühne im Schluss.
+        pm: {
+          ink: '#1C1C1C', body: '#2E2E2E', mute: '#8B8B8B',
+          taupe: { DEFAULT: '#8B7355', light: '#A89279', deep: '#7D6E5D', ink: '#6B5A44' },
+          paper: '#F8F7F5', grund: '#F2F1EE', shell: '#F2EDE6',
+          line: { DEFAULT: '#E5E3DF', soft: '#F0EDE8' },
+          green: { DEFAULT: '#3D7A5C', deep: '#2A5C3F' }, mint: '#E8F5EE',
+          coral: { DEFAULT: '#E76F63', deep: '#D45F53', tint: '#FDF0EE' },
+        },
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

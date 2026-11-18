@@ -31,10 +31,11 @@ describe('Startseite — kein schwebender WhatsApp-Knopf', () => {
 
   it('WhatsApp bleibt aber als Kontaktweg erhalten', () => {
     // Der Knopf sollte verschwinden, nicht der Kanal.
-    // Seit Registry #155 trägt der Abschluss Martas Kasten (PersonalContact) mit Anrufen und WhatsApp.
+    // Seit Registry #155 trägt der Abschluss Marta mit Anrufen und WhatsApp, seit #168 als Marta-Band wie auf primundus.de.
     const cta = readFileSync(join(WURZEL, 'components/calculator/FinalCTA.tsx'), 'utf8');
     const marta = readFileSync(join(WURZEL, 'components/calculator/PersonalContact.tsx'), 'utf8');
-    expect(cta, 'Martas Kasten im Abschluss-CTA fehlt — zu viel entfernt').toContain('<PersonalContact headline=');
+    expect(cta, 'Marta im Abschluss fehlt — zu viel entfernt').toContain('Lieber erst sprechen?');
+    expect(cta, 'WhatsApp-Link im Marta-Band fehlt').toMatch(/wa\.me/);
     expect(marta, 'WhatsApp-Link in Martas Kasten fehlt').toMatch(/wa\.me/);
   });
 });

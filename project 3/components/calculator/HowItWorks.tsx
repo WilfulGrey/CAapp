@@ -1,45 +1,54 @@
 'use client';
 
 import { openCalculator } from '@/lib/scroll-to-calculator';
-import { AblaufSchritte, KNOPF_ANGEBOT, MINI_ABLAUF } from '@/components/calculator/FormularPortal';
+import { KNOPF_ANGEBOT } from '@/components/calculator/FormularPortal';
+import { AUGENBRAUE, ABSCHNITT, H2, KNOPF, SPALTE } from '@/components/calculator/startStil';
 
-/** Ablauf der Startseite (Registry #154, Martin 09.11.2026: „Ja, mach das mal … genau so“): wortgleich mit dem letzten
- *  Schritt des Formulars und dem Portal („So geht es weiter“, eine Quelle in FormularPortal.tsx). Vorher stand hier ein
- *  eigener Ablauf mit „Bewerbungen am selben Werktag“ und „Profil vervollständigen“, also andere Zusagen als im Formular.
- *  Überschrift und Knopf bleiben; Anker #ablauf bleibt (Sitelinks, Pria). */
+/** ENTWURF 16.11.2026 (Martin: „die steps/ablauf nicht optimal … im portal macht das ja sinn, aber hier ist das nicht richtig
+ *  logisch und gut geschrieben auf der website“): eigener Wortlaut für die Startseite statt der Portal-Schritte
+ *  (AblaufSchritte, Registry #154). Jeder Schritt hat Titel und Satz, alle drei Zahlen gleich (die Koralle-Eins ist im Portal
+ *  „Ihr nächster Schritt“ und wirkte hier wie ein Formularfortschritt). Kontaktschritt bleibt genannt (Lehre 23.09.).
+ *  Der Mustervertrag-Satz unter der Karte ist entfallen (Martin: „warum ist der Mustervertrag plötzlich da verlinkt??“).
+ *  Martin 16.11.: Wortlaut „von mir aus okay“; OpenAI 16.11.: „mit Ihren Zuschüssen“ statt „mit allen“ (kein Vollständigkeitsversprechen). */
+const SCHRITTE = [
+  {
+    titel: 'Preis und Pflegekräfte sofort sehen',
+    text: 'Sie beantworten ein paar kurze Fragen und geben Ihre Kontaktdaten ein. Danach sehen Sie sofort Ihren Monatspreis mit Ihren Zuschüssen und die passenden Pflegekräfte.',
+  },
+  {
+    titel: 'Bewerbungen innerhalb von 60\u00a0Minuten',
+    text: 'Beschreiben Sie kurz, was Ihr Angehöriger braucht. Dann bewerben sich passende Pflegekräfte direkt bei Ihnen.',
+  },
+  {
+    titel: 'In Ruhe auswählen und starten',
+    text: 'Sie wählen Ihre Pflegekraft, erst dann unterschreiben Sie. Den Rest übernehmen wir, die Anreise ist schon ab 3\u00a0Tagen möglich.',
+  },
+] as const;
+
 export function HowItWorks() {
   return (
-    <section id="ablauf" className="scroll-mt-20 px-5 py-12 md:py-16">
-      {/* Registry #160: Spalte wie Kopf und Hero (Tablet 560 px mittig, ab lg 1216 px = Innenbreite der Hero-Spalte), damit
-          H1, H2 und Knöpfe auf allen Breiten an einer linken Kante stehen. */}
-      <div className="max-w-[560px] lg:max-w-[1216px] mx-auto">
-        <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-2">
-          So funktioniert's
-        </p>
-        <h2 className="text-[26px] md:text-[32px] lg:text-[38px] leading-[1.25] font-bold text-[#3D3D3D] mb-3">
-          In 2 Minuten zu Ihrem persönlichen Angebot
-        </h2>
-        {/* Martins Mini-Ablauf (08.11.): nennt den Kontaktschritt, bevor jemand tippt (Lehre vom 23.09.). */}
-        <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-6 md:mb-8">{MINI_ABLAUF}</p>
+    <section id="ablauf" className={`scroll-mt-20 ${ABSCHNITT}`}>
+      <div className={SPALTE}>
+        <p className={AUGENBRAUE}>So funktioniert&apos;s</p>
+        <h2 className={H2}>In 2 Minuten zu Ihrem persönlichen Angebot</h2>
 
-        <div className="rounded-[20px] bg-white px-4 pt-4 pb-1 lg:px-6 lg:py-6">
-          <AblaufSchritte quer />
-        </div>
-        {/* Der Satz zum Mustervertrag stand bisher in Schritt 3 („den Mustervertrag können Sie jederzeit vorher lesen“). */}
-        <p className="mt-3 text-[14px] text-[#5A5A5A]">
-          Den{" "}
-          <a href="https://kundenportal.primundus.de/primundus-mustervertrag.pdf" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-[#3D3D3D]">Mustervertrag</a>{" "}
-          können Sie jederzeit vorher lesen.
-        </p>
+        {/* Am Handy eine Karte mit drei Zeilen (Seite nicht länger als bisher), ab lg drei Karten nebeneinander. */}
+        <ol className="mt-8 rounded-[20px] bg-white px-5 lg:mt-10 lg:grid lg:grid-cols-3 lg:gap-5 lg:bg-transparent lg:px-0">
+          {SCHRITTE.map((s, i) => (
+            <li key={s.titel} className="flex gap-4 border-b border-[#F0EDE8] py-5 last:border-b-0 lg:block lg:rounded-[20px] lg:border-b-0 lg:bg-white lg:p-7">
+              <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[#3D2314] text-[15px] font-bold text-white lg:h-10 lg:w-10 lg:text-[16px]" aria-hidden="true">
+                {i + 1}
+              </span>
+              <div>
+                <h3 className="text-[17px] font-bold leading-snug text-[#1C1C1C] lg:mt-4 lg:text-[19px]">{s.titel}</h3>
+                <p className="mt-1.5 text-[15.5px] leading-[1.55] text-[#5A5A5A] lg:mt-2 lg:text-[16px] lg:leading-[1.6]">{s.text}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
 
-        {/* Knopf an der linken Kante wie Überschrift und Karte (Martin 09.11.: „Überschriften linksbündig“); Form, Breite
-            (volle Spalte, höchstens 448 px wie max-w-md am Hero), Schrift, Schatten und Pfeil wie der Hero-Knopf
-            (MultiStepForm.tsx), Registry #160. */}
-        <div className="mt-8 md:mt-10">
-          <button
-            onClick={() => openCalculator('ablauf')}
-            className="inline-flex w-full max-w-md items-center justify-center rounded-xl bg-[#E76F63] px-4 py-[18px] text-[16px] min-[375px]:text-[17px] font-bold text-white shadow-[0_4px_14px_rgba(231,111,99,0.32)] transition-all duration-200 hover:bg-[#D65E52]"
-          >
+        <div className="mt-8 lg:mt-10">
+          <button onClick={() => openCalculator('ablauf')} className={KNOPF}>
             {KNOPF_ANGEBOT}{"\u00a0"}→
           </button>
         </div>
