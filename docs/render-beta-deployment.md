@@ -47,6 +47,7 @@ declared `sync: false` in the Blueprint and never live in repo.
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | (anon JWT) | committed |
 | `SUPABASE_SERVICE_ROLE_KEY` | (service role JWT) | Supabase dashboard → Settings → API → service_role |
 | `ADMIN_PASSWORD` | (anything) | pick one |
+| `ADMIN_SESSION_SECRET` | (random, ≥ 32 chars) | e.g. `openssl rand -base64 48`; signs the admin cookie, own value per slot (Registry #135) |
 | `SMTP_HOST` | `smtp.ionos.de` | committed |
 | `SMTP_PORT` | `587` | committed |
 | `SMTP_USER` | `kostenrechner@primundus.de` | Ionos credentials |

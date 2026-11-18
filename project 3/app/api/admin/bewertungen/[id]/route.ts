@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { istAdmin } from '@/lib/admin-sitzung';
 import { ADMIN_AKTIONEN, ADMIN_SPALTEN, adminAktionAus, adminPlan, antwortUpdate } from '@/lib/bewertungen-admin';
 import { istObjekt, type BewertungStatus } from '@/lib/bewertungen-basis';
 import { fehlerText, supabaseDienst } from '@/lib/bewertungen-server';
@@ -13,12 +14,8 @@ import { fehlerText, supabaseDienst } from '@/lib/bewertungen-server';
 
 export const dynamic = 'force-dynamic';
 
-function angemeldet(request: NextRequest): boolean {
-  return (request.cookies.get('admin_auth')?.value ?? '') === (process.env.ADMIN_PASSWORD || 'primundus2026');
-}
-
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  if (!angemeldet(request)) return NextResponse.json({ fehler: 'Nicht angemeldet.' }, { status: 401 });
+  if (!(await istAdmin(request))) return NextResponse.json({ fehler: 'Nicht angemeldet.' }, { status: 401 });
   if (!/^[0-9a-f-]{36}$/i.test(params.id)) return NextResponse.json({ fehler: 'Bewertung nicht gefunden.' }, { status: 404 });
 
   let body: unknown;
