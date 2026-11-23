@@ -20,6 +20,7 @@ import { ablaufVariante, KONTAKT_NACH_PREIS, KONTAKT_SEITE, WARTE_KURZ_ENDE_MS, 
 import { GARANTIE_OEFFNEN_EVENT } from "@/components/calculator/BestpreisSiegelLink";
 import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
+import { meldeMetaAnfrage } from "@/lib/meta-pixel";
 import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
 import { kontaktStandard, kontaktVariante, KNOPF_KONTAKT, STUFEN, STUFEN_FEHLER, type KontaktStufe, type KontaktVariante } from "@/lib/kontakt-stufen";
 import { antwortPortal, EinleitungPortal, FortschrittPortal, KNOPF_ANGEBOT, KONTAKT_FERTIG, KOPF_FRAGEN, KopfleistePortal, MINI_ABLAUF, PM, SCHATTEN_LIFT, SheetGrundPortal, TitelPortal, UnterDemFormularPortal, UnterDemKnopfPortal, UnterDemKontaktPortal, usePortalLook } from "@/components/calculator/FormularPortal";
@@ -846,6 +847,10 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
     // nichts. Das SDK sendet mit keepalive/sendBeacon, der Redirect
     // gleich darunter reisst den Request nicht ab.
     meldeAnfrage(window.oaiq, data.leadId);
+    // Meta-Pixel (Facebook/Instagram): Lead mit festem Wert, nach denselben
+    // Regeln — ohne Marketing-Einwilligung gibt es window.fbq nicht. fbevents
+    // sendet per Bild-Request bzw. sendBeacon, der Redirect stoert nicht.
+    meldeMetaAnfrage(window.fbq, data.leadId);
     // GTM-Tags (Google-Ads-Conversion auf `angebot_erfolgreich`, siehe
     // docs/google-ads-tracking.md) brauchen einen Moment zum Feuern,
     // bevor die Navigation alle offenen Requests killt: eventCallback

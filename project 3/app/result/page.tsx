@@ -8,6 +8,7 @@ import Image from "next/image";
 import { berechnePreis } from "@/lib/calculation";
 import { analytics } from "@/lib/analytics";
 import { meldeAnfrage } from "@/lib/oaiq";
+import { meldeMetaAnfrage } from "@/lib/meta-pixel";
 
 export default function ResultPage() {
   const router = useRouter();
@@ -161,6 +162,8 @@ export default function ResultPage() {
           // Normalfall, kein Fehler. Bewusst NICHT der Eigenanteil als Wert,
           // sondern die feste Staffelung; die Begruendung steht in lib/oaiq.ts.
           meldeAnfrage(window.oaiq, data.leadId);
+          // Meta-Pixel, gleiche Regeln (lib/meta-pixel.ts).
+          meldeMetaAnfrage(window.fbq, data.leadId);
 
           await analytics.trackConversion(
             'angebot_requested',

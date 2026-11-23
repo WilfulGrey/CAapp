@@ -155,7 +155,7 @@ export default function DatenschutzPage() {
             <ul className="list-disc pl-6 mb-4 space-y-2 text-gray-700">
               <li>Technisch notwendige Cookies für die Funktionalität der Website</li>
               <li>Analyse-Cookies zur Verbesserung unseres Angebots (Google Analytics)</li>
-              <li>Conversion-Tracking für Werbezwecke (Google Ads, OpenAI Ads)</li>
+              <li>Conversion-Tracking für Werbezwecke (Google Ads, OpenAI Ads, Meta)</li>
             </ul>
             <p className="text-gray-700 leading-relaxed mb-4">
               Sie können Ihre Cookie-Einstellungen jederzeit in Ihrem Browser anpassen.
@@ -194,6 +194,30 @@ export default function DatenschutzPage() {
               Anbieter: OpenAI Ireland Limited, 1st Floor, The Liffey Trust Centre,
               117&ndash;126 Sheriff Street Upper, Dublin 1, D01 YC43, Irland. Eine Übermittlung
               in die USA an OpenAI OpCo, LLC ist dabei nicht ausgeschlossen.
+            </p>
+            <p className="text-gray-700 leading-relaxed mb-4">
+              <strong>Meta-Pixel (Facebook und Instagram):</strong>{' '}
+              Wir schalten Anzeigen auf Facebook und Instagram. Nur wenn Sie im Cookie-Banner der
+              Kategorie &bdquo;Marketing&ldquo; zugestimmt haben, laden wir dafür das Mess-Skript
+              von Meta (&bdquo;Meta-Pixel&ldquo;). Es setzt bzw. liest in Ihrem Browser Kennungen
+              (Cookie &bdquo;_fbp&ldquo;, nach dem Klick auf eine Facebook-Anzeige zusätzlich
+              &bdquo;_fbc&ldquo;, Laufzeit in der Regel bis zu 90 Tage). Gemeldet wird, dass Sie
+              unsere Seite aufgerufen und gegebenenfalls den Kostenrechner abgeschlossen haben;
+              übermittelt werden dabei die aufgerufene Seite, technische Angaben zu Browser und
+              Gerät, Ihre IP-Adresse, ein pauschaler Anfragewert sowie eine interne Vorgangsnummer.
+              Wir übermitteln <strong>keine</strong> Formularinhalte, also weder Ihre Antworten im
+              Kostenrechner noch Namen, E-Mail-Adresse oder Telefonnummer. Aus dem Besuch selbst
+              kann Meta jedoch ein Interesse an Betreuungsleistungen erkennen und die Angaben Ihrem
+              Facebook- oder Instagram-Konto zuordnen. Ohne Ihre Einwilligung wird das Skript gar
+              nicht erst geladen. Rechtsgrundlage ist Ihre Einwilligung (§ 25 Abs. 1 TDDDG für das
+              Speichern und Auslesen, Art. 6 Abs. 1 lit. a DSGVO für die Verarbeitung). Sie können
+              sie jederzeit mit Wirkung für die Zukunft über den Link &bdquo;Cookie-Einstellungen&ldquo;
+              unten auf der Seite widerrufen. Für die Erhebung und Übermittlung an Meta sind wir
+              gemeinsam mit Meta verantwortlich (Art. 26 DSGVO), die Vereinbarung dazu steht unter
+              https://www.facebook.com/legal/controller_addendum; die weitere Verarbeitung
+              verantwortet Meta selbst. Anbieter: Meta Platforms Ireland Limited, Merrion Road,
+              Dublin 4, D04 X2K5, Irland. Daten können dabei an Meta Platforms, Inc. in die USA
+              übermittelt werden; Meta ist nach dem EU-US Data Privacy Framework zertifiziert.
             </p>
           </section>
 
