@@ -7,6 +7,7 @@ import { CookieConsent } from '@/components/CookieConsent';
 import Script from 'next/script';
 import { organizationGraph, jsonLdString } from '@/lib/seo-schema';
 import { OAIQ_PIXEL_ID } from '@/lib/oaiq';
+import { META_PIXEL_ID } from '@/lib/meta-pixel';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -213,6 +214,65 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       ladeOaiq();
     } else if (window.oaiqGeladen && window.oaiq) {
       window.oaiq('consent', false);
+    }
+  });
+})();
+            `,
+          }}
+        />
+        {/* Meta-Pixel (Werbung auf Facebook und Instagram), Bauart wie der
+            OpenAI-Pixel darueber: ohne Marketing-Einwilligung wird
+            fbevents.js gar nicht geholt (es setzt beim Start _fbp/_fbc).
+            Darum auch KEIN <noscript>-Bild — das wuerde ohne jede Wahl senden.
+
+            `autoConfig` aus VOR `init`: sonst sammelt das SDK selbst
+            Knopf-Klicks und Seitendaten ein. Gemeldet werden nur PageView
+            (hier) und Lead (lib/meta-pixel.ts).
+
+            Widerruf: das SDK laesst sich nicht entladen, es bekommt
+            `consent revoke` und sendet nicht mehr; eine erneute Zustimmung
+            schaltet es mit `consent grant` wieder ein. */}
+        <Script
+          id="meta-pixel-consent"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+(function() {
+  function ladeMetaPixel() {
+    if (window.metaPixelGeladen) return;
+    window.metaPixelGeladen = true;
+
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+
+    window.fbq('set', 'autoConfig', false, '${META_PIXEL_ID}');
+    window.fbq('init', '${META_PIXEL_ID}');
+    window.fbq('track', 'PageView');
+  }
+
+  var auswahl = null;
+  try {
+    var gespeichert = localStorage.getItem('primundus_cookie_consent');
+    if (gespeichert) {
+      var daten = JSON.parse(gespeichert);
+      if (daten && daten.consent) auswahl = daten.consent;
+    }
+  } catch(e) {}
+  // Zweite Quelle wie oben (Registry #99): Cookie pm_consent auf .primundus.de
+  if (!auswahl) {
+    try {
+      var treffer = document.cookie.match(/(?:^|; )pm_consent=([^;]*)/);
+      if (treffer) auswahl = JSON.parse(decodeURIComponent(treffer[1]));
+    } catch(e) {}
+  }
+  if (auswahl && auswahl.marketing) ladeMetaPixel();
+
+  window.addEventListener('cookie-consent-changed', function(e) {
+    var erlaubt = !!(e.detail && e.detail.marketing);
+    if (erlaubt) {
+      if (window.metaPixelGeladen && window.fbq) window.fbq('consent', 'grant');
+      ladeMetaPixel();
+    } else if (window.metaPixelGeladen && window.fbq) {
+      window.fbq('consent', 'revoke');
     }
   });
 })();

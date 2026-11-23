@@ -1744,6 +1744,9 @@ function kontakt(){
          dort synchron halten. Ohne Marketing-Einwilligung gibt es window.oaiq
          nicht, dann passiert nichts. */
       if(typeof window.oaiq==='function') window.oaiq('measure','lead_created',{type:'customer_action',amount:2000,currency:'EUR'},{event_id:leadId}); // amount in Cent (Doku: 4200 = 42,00), synchron zu lib/oaiq.ts WERT_ANFRAGE_MINOR
+      /* Meta-Pixel: dieselbe Meldung wie meldeMetaAnfrage() in lib/meta-pixel.ts
+         (Lead, Wert in ganzen Euro). Ohne Marketing-Einwilligung kein window.fbq. */
+      if(typeof window.fbq==='function') window.fbq('track','Lead',{value:20,currency:'EUR'},{eventID:leadId});
     }
 
     await uebergabe();
