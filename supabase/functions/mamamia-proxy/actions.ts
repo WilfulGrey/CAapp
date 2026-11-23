@@ -36,7 +36,14 @@ import {
   UPDATE_CUSTOMER,
   UPDATE_JOB_OFFER_DATES,
 } from "./operations.ts";
-import { hatOffenenJob, jobOeffnenVariablen, jobZumOeffnen, type StandJob } from "./wiederOeffnen.ts";
+import {
+  anreiseZumOeffnen,
+  hatOffenenJob,
+  heuteBerlin,
+  jobOeffnenVariablen,
+  jobZumOeffnen,
+  type StandJob,
+} from "./wiederOeffnen.ts";
 
 // ─── Helper — run GraphQL with agency token ─────────────────────────────────
 
@@ -999,26 +1006,76 @@ const updateCustomer: ActionHandler = async (session, variables, deps) => {
     }
   }
 
-  const stand = standVorher ? await standVorher : null;
+  // Höchstens STAND_WARTEN_MS über das Speichern hinaus warten: hängt Mamamia
+  // beim Lesen, geht die Antwort ohne Öffnen raus (nächstes Speichern versucht es).
+  let uhr: ReturnType<typeof setTimeout> | undefined;
+  const stand = standVorher
+    ? await Promise.race([
+      standVorher,
+      new Promise<null>((r) => { uhr = setTimeout(() => r(null), STAND_WARTEN_MS); }),
+    ]).finally(() => clearTimeout(uhr))
+    : null;
   if (stand?.Customer?.is_disabled === true) {
-    await kundeWiederOeffnen(session, stand.Customer.job_offers ?? [], deps);
+    await kundeWiederOeffnen(session, stand.Customer, (snapshot as Record<string, unknown>).startDate, deps);
   }
 
   return result;
 };
 
+const STAND_WARTEN_MS = 3000;
+
 interface OffenStand {
-  Customer: { is_disabled?: boolean | null; job_offers?: StandJob[] | null } | null;
+  Customer: { is_disabled?: boolean | null; status?: string | null; job_offers?: StandJob[] | null } | null;
 }
 
 // Registry #170 — Gegenstück zum Schließen im SA-Portal (is_disabled + Jobs
-// verbergen): Kunde öffnen und, wenn ihn kein Job mehr sichtbar hält, EINEN
-// verborgenen Job wieder veröffentlichen (Auswahl in wiederOeffnen.ts). Nach
-// dem Speichern, nie davor: das Speichern selbst darf hieran nicht scheitern.
-// Wirft nie — ein Fehler wird geloggt, der Bogen ist gespeichert, und der
-// Kostenrechner meldet den Kunden dem Team (lead-event patient_data_saved).
-async function kundeWiederOeffnen(session: SessionPayload, jobs: StandJob[], deps: ActionDeps): Promise<void> {
+// verbergen). Nach dem Speichern, nie davor: das Speichern selbst darf hieran
+// nicht scheitern. Wirft nie, Fehler gehen ins Log.
+//
+// Reihenfolge wie im SA-Portal (JobOfferController::update, dann
+// CustomerReopen): ERST den Job veröffentlichen, DANN den Kunden öffnen.
+// Scheitert der Job, bleibt der Kunde zu — so greift beim nächsten Speichern
+// derselbe Weg wieder, statt einen offenen Kunden ohne sichtbaren Job zu
+// hinterlassen (SA-Liste „Historie", den nie wieder jemand anfasst).
+//
+// Entwurf (status draft, Martins Hauptfall: zu, bevor das Profil kam): Mamamia
+// zeigt die Jobs eines Entwurfs als verborgen (SA-Portal CustomerDetail
+// toggleVisibility), hideOpenJobs überspringt sie also. Sichtbar werden sie
+// wie bei jedem neuen Kunden, wenn das Speichern ihn auf „active" hebt — dazu
+// muss er nur offen sein. Ein eigenes Veröffentlichen liefe in die Sperre des
+// Entwurfs. Dann nur den Kunden öffnen.
+async function kundeWiederOeffnen(
+  session: SessionPayload,
+  kunde: NonNullable<OffenStand["Customer"]>,
+  startDate: unknown,
+  deps: ActionDeps,
+): Promise<void> {
   const cid = session.customer_id;
+  const heute = heuteBerlin();
+  const jobs = kunde.job_offers ?? [];
+
+  if (kunde.status !== "draft" && !hatOffenenJob(jobs, heute)) {
+    const job = jobZumOeffnen(jobs, session.job_offer_id, heute);
+    if (job) {
+      const anreise = anreiseZumOeffnen(job, startDate, heute);
+      if (!anreise) {
+        console.warn(`[updateCustomer][wieder-offen] cid=${cid} Job ${job.id}: kein Anreisedatum ab heute — Kunde bleibt zu`);
+        return;
+      }
+      try {
+        const vars = jobOeffnenVariablen(job, cid, anreise);
+        const r = await runGraphQL<{ UpdateJobOffer?: { visibility?: string | null } | null }>(deps, JOB_OEFFNEN, vars);
+        if (r.UpdateJobOffer?.visibility === "hide") throw new Error("Mamamia ließ den Job verborgen");
+        console.log(`[updateCustomer][wieder-offen] cid=${cid} Job ${job.id} → ${vars.visibility}, Anreise ${anreise}`);
+      } catch (e) {
+        console.warn(`[updateCustomer][wieder-offen] cid=${cid} Job ${job.id} NICHT veröffentlicht, Kunde bleibt zu: ${(e as Error).message}`);
+        return;
+      }
+    } else {
+      console.warn(`[updateCustomer][wieder-offen] cid=${cid} kein verborgener Job zum Veröffentlichen`);
+    }
+  }
+
   try {
     const frisch = await runGraphQL<{
       Customer: { equipments?: Array<{ id: number }> | null; patients?: Array<{ id: number; tools?: Array<{ id: number }> | null }> | null } | null;
@@ -1032,21 +1089,6 @@ async function kundeWiederOeffnen(session: SessionPayload, jobs: StandJob[], dep
     console.log(`[updateCustomer][wieder-offen] cid=${cid} Kunde geöffnet`);
   } catch (e) {
     console.warn(`[updateCustomer][wieder-offen] cid=${cid} Kunde NICHT geöffnet: ${(e as Error).message}`);
-    return;
-  }
-
-  if (hatOffenenJob(jobs)) return;
-  const job = jobZumOeffnen(jobs, session.job_offer_id, todayISO());
-  if (!job) {
-    console.warn(`[updateCustomer][wieder-offen] cid=${cid} kein verborgener Job zum Veröffentlichen`);
-    return;
-  }
-  try {
-    const vars = jobOeffnenVariablen(job, cid);
-    await runGraphQL(deps, JOB_OEFFNEN, vars);
-    console.log(`[updateCustomer][wieder-offen] cid=${cid} Job ${job.id} → ${vars.visibility}`);
-  } catch (e) {
-    console.warn(`[updateCustomer][wieder-offen] cid=${cid} Job ${job.id} NICHT veröffentlicht: ${(e as Error).message}`);
   }
 }
 

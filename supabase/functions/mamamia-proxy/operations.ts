@@ -588,7 +588,7 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
 export const KUNDE_OFFEN_STAND = /* GraphQL */ `
   query KundeOffenStand($id: Int!) {
     Customer(id: $id) {
-      is_disabled
+      is_disabled status
       job_offers {
         id status visibility arrival_at departure_at
         title salary_offered salary_commission

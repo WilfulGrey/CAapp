@@ -27,6 +27,21 @@ export interface StandJob {
 }
 
 const nurDatum = (v: string | null | undefined) => (v ? v.slice(0, 10) : null);
+const ISO_TAG = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Kalendertag in Berlin — dieselbe Uhr wie das SA-Portal (Carbon
+ *  'Europe/Berlin' in hideOpenJobs). */
+export function heuteBerlin(jetzt: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" }).format(jetzt);
+}
+
+/** Beendet, abgebrochen oder abgereist (Abreisetag zählt schon) — SA-Portal
+ *  tabOf/hideOpenJobs: solche Jobs sind Historie und halten niemanden offen. */
+function historie(j: StandJob, heute: string): boolean {
+  if (["done", "aborted"].includes(j.status ?? "")) return true;
+  const abreise = nurDatum(j.departure_at);
+  return !!abreise && abreise <= heute;
+}
 
 /** Gebucht = Confirmation ohne Absage oder Mamamia-Status „besetzt". Ein
  *  besetzter Job hält den Kunden aktiv, auch wenn er verborgen ist (SA-Portal
@@ -36,36 +51,41 @@ function besetzt(j: StandJob): boolean {
     ["accepted", "on_job"].includes(j.status ?? "");
 }
 
-/** Hat der Kunde schon einen Job, der ihn für Agenturen sichtbar hält? */
-export function hatOffenenJob(jobs: StandJob[]): boolean {
+/** Hat der Kunde einen laufenden Job, der ihn für Agenturen sichtbar hält? */
+export function hatOffenenJob(jobs: StandJob[], heute: string): boolean {
   return jobs.some((j) =>
-    besetzt(j) ||
-    (["public", "public_limited"].includes(j.visibility ?? "") &&
-      !["done", "aborted"].includes(j.status ?? ""))
+    !historie(j, heute) && (besetzt(j) || ["public", "public_limited"].includes(j.visibility ?? ""))
   );
 }
 
 /** Der Job, den das Schließen verborgen hat und der wieder sichtbar werden
  *  soll — genau EINER: der Job der Portal-Sitzung, sonst der neueste passende.
  *  Spiegel der SA-Regel hideOpenJobs (verborgen wird nur, was nicht beendet,
- *  abgebrochen oder abgereist ist) plus: nicht besetzt, Anreise gesetzt
- *  (UpdateJobOffer verlangt arrival_at, wir raten kein Datum). */
+ *  abgebrochen oder abgereist ist), dazu: nicht besetzt. */
 export function jobZumOeffnen(
   jobs: StandJob[],
   sitzungsJobId: number | null | undefined,
   heute: string,
 ): StandJob | null {
-  const passt = (j: StandJob) => {
-    if (j.visibility !== "hide" || besetzt(j)) return false;
-    if (["done", "aborted"].includes(j.status ?? "")) return false;
-    const abreise = nurDatum(j.departure_at);
-    if (abreise && abreise <= heute) return false;
-    return !!nurDatum(j.arrival_at);
-  };
-  const kandidaten = jobs.filter(passt);
+  const kandidaten = jobs.filter((j) => j.visibility === "hide" && !besetzt(j) && !historie(j, heute));
   return kandidaten.find((j) => j.id === sitzungsJobId) ??
     kandidaten.sort((a, b) => b.id - a.id)[0] ??
     null;
+}
+
+/** Anreise für die Veröffentlichung. Mamamia lehnt einen öffentlichen Job mit
+ *  Anreise in der Vergangenheit ab (SA-Portal NewJobWizard), und die Anreise aus
+ *  dem Onboarding ist bei einem lange geschlossenen Kunden meist vorbei. Darum
+ *  zuerst das Startdatum, das der Kunde gerade im Bogen gewählt hat (Pflichtfeld,
+ *  das Portal schreibt es danach ohnehin per UpdateJobOfferDates), sonst die
+ *  alte Anreise, wenn sie noch kommt. Kein Datum raten: sonst null. Liegt die
+ *  Abreise vor der Anreise, auch null. */
+export function anreiseZumOeffnen(job: StandJob, startDate: unknown, heute: string): string | null {
+  const start = typeof startDate === "string" && ISO_TAG.test(startDate.trim()) ? startDate.trim() : null;
+  const alt = nurDatum(job.arrival_at);
+  const anreise = start && start >= heute ? start : alt && alt >= heute ? alt : null;
+  const abreise = nurDatum(job.departure_at);
+  return anreise && (!abreise || abreise > anreise) ? anreise : null;
 }
 
 /** Variablen für UpdateJobOffer — Fetch-Merge wie SA-Portal
@@ -73,7 +93,7 @@ export function jobZumOeffnen(
  *  title, salary_offered und arrival_at bei JEDEM Update; die CGA-Liste muss
  *  mit, sonst leert Mamamia sie (QA 02.09., Job 35894). Ist eine Liste da, war
  *  der Job „nur für diese Agenturen" — dann wieder public_limited, nie public. */
-export function jobOeffnenVariablen(job: StandJob, customerId: number): Record<string, unknown> {
+export function jobOeffnenVariablen(job: StandJob, customerId: number, anreise: string): Record<string, unknown> {
   const cga = (job.visible_caregiver_agencies ?? [])
     .map((a) => a.id)
     .filter((id) => Number.isInteger(id) && id > 0);
@@ -83,7 +103,7 @@ export function jobOeffnenVariablen(job: StandJob, customerId: number): Record<s
     title: job.title ?? null,
     salary_offered: job.salary_offered ?? null,
     salary_commission: job.salary_commission ?? null,
-    arrival_at: nurDatum(job.arrival_at),
+    arrival_at: anreise,
     visibility: cga.length ? "public_limited" : "public",
   };
   if (cga.length) vars.visible_caregiver_agency_ids = cga;

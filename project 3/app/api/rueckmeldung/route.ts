@@ -172,7 +172,13 @@ async function handlePost(request: NextRequest) {
     }
 
     // stoppen — idempotent: zweiter Klick ändert nichts und schickt keine zweite Team-Mail.
-    if (await letztesEreignis(supabase, lead.id, 'kunde_kein_interesse')) return NextResponse.json({ ok: true });
+    // Ausnahme (Registry #170): hat der Kunde danach sein Profil selbst ausgefüllt
+    // (kunde_wieder_aktiv), ist er wieder offen — dann gilt das Abmelden neu.
+    const abgemeldet = await letztesEreignis(supabase, lead.id, 'kunde_kein_interesse');
+    const wiederAktiv = abgemeldet ? await letztesEreignis(supabase, lead.id, 'kunde_wieder_aktiv') : null;
+    if (abgemeldet && !(wiederAktiv && new Date(wiederAktiv.created_at) > new Date(abgemeldet.created_at))) {
+      return NextResponse.json({ ok: true });
+    }
     if (offen) {
       const { error: statusFehler } = await supabase.from('leads').update({ status: 'nicht_interessiert' }).eq('id', lead.id);
       if (statusFehler) throw new Error(`Status-Update: ${statusFehler.message}`);
