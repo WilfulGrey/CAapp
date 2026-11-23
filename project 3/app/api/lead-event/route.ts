@@ -870,11 +870,13 @@ async function leadWiederOeffnen(supabaseAdmin: any, lead: { id: string; status?
       return false;
     }
     if (!Array.isArray(geaendert) || geaendert.length === 0) return false;
-    await supabaseAdmin.from('lead_events').insert({
+    // /api/rueckmeldung liest das Ereignis (Abmelden gilt danach neu) — ein Fehler hier wird laut.
+    const { error: eventFehler } = await supabaseAdmin.from('lead_events').insert({
       lead_id: lead.id,
       event_type: 'kunde_wieder_aktiv',
       metadata: { source: 'caapp', ausloeser: 'patient_data_saved', status_vorher: 'nicht_interessiert', status_neu: statusNeu },
     });
+    if (eventFehler) console.error(`lead-event wieder-offen: Ereignis kunde_wieder_aktiv fehlt (lead ${lead.id}): ${eventFehler.message}`);
     lead.status = statusNeu;
     console.log(`lead-event wieder-offen: lead ${lead.id} nicht_interessiert → ${statusNeu} (Patientenbogen gespeichert)`);
     return true;
