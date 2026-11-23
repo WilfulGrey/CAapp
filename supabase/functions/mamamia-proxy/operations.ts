@@ -579,6 +579,64 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
   }
 `;
 
+// Registry #170 — geschlossener Kunde speichert den Patientenbogen selbst ⇒
+// wieder offen. Drei eigene Operationen statt einer Erweiterung von
+// UPDATE_CUSTOMER: der normale Speicherweg bleibt Byte für Byte, wie er ist
+// (gotcha #2 — eine neue Variable dort trifft JEDEN Speichern-Aufruf).
+// Felder wie im SA-Portal (CustomerController-Schließen, CustomerReopen) und
+// onboard.ts:RESYNC_JOB_READ, beide täglich auf prod.
+export const KUNDE_OFFEN_STAND = /* GraphQL */ `
+  query KundeOffenStand($id: Int!) {
+    Customer(id: $id) {
+      is_disabled
+      job_offers {
+        id status visibility arrival_at departure_at
+        title salary_offered salary_commission
+        visible_caregiver_agencies { id }
+        final_confirmation { id rejected_at }
+      }
+    }
+  }
+`;
+
+// Nach dem Speichern frisch gelesen: der Bogen kann eine zweite Person ohne id
+// angelegt haben, und patients[] ist REPLACE (gotcha #3) — Stubs aus einem
+// Stand VOR dem Speichern würden sie löschen.
+export const KUNDE_OEFFNEN_LESEN = /* GraphQL */ `
+  query KundeOeffnenLesen($id: Int!) {
+    Customer(id: $id) {
+      equipments { id }
+      patients { id tools { id } }
+    }
+  }
+`;
+
+// Stubs {id, tool_ids} + equipment_ids wie _shared/acceptanceSync.ts (Beta
+// verlangt non-empty patients, Tools/Ausstattung bleiben erhalten).
+export const KUNDE_OEFFNEN = /* GraphQL */ `
+  mutation KundeOeffnen($id: Int!, $is_disabled: Boolean, $equipment_ids: [Int], $patients: [PatientInputType]) {
+    UpdateCustomer(id: $id, is_disabled: $is_disabled, equipment_ids: $equipment_ids, patients: $patients) {
+      id is_disabled
+    }
+  }
+`;
+
+export const JOB_OEFFNEN = /* GraphQL */ `
+  mutation JobOeffnen(
+    $id: Int!, $customer_id: Int, $title: String,
+    $salary_offered: Float, $salary_commission: Float,
+    $arrival_at: String, $departure_at: String, $visibility: String,
+    $visible_caregiver_agency_ids: [Int]
+  ) {
+    UpdateJobOffer(
+      id: $id, customer_id: $customer_id, title: $title,
+      salary_offered: $salary_offered, salary_commission: $salary_commission,
+      arrival_at: $arrival_at, departure_at: $departure_at, visibility: $visibility,
+      visible_caregiver_agency_ids: $visible_caregiver_agency_ids
+    ) { id visibility }
+  }
+`;
+
 // UpdateJobOfferDates — dedykowana Mamamia mutation do edycji
 // JobOffer.arrival_at + JobOffer.departure_at po onboard. Initial
 // arrival_at jest computed w onboard (`computeArrivalDate(care_start_timing)`)

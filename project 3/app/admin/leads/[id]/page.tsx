@@ -1732,6 +1732,7 @@ export default function LeadDetailPage() {
                     angebots_feedback: { label: 'Rückmeldung zum Angebot', color: 'bg-[#8B7355]' },
                     rueckruf_erbeten: { label: '📞 Rückruf erbeten (aus dem Chat)', color: 'bg-amber-500' },
                     kunde_kein_interesse: { label: '🛑 Kunde abgemeldet (Abschiedsmail)', color: 'bg-gray-600' },
+                    kunde_wieder_aktiv: { label: '🔓 Wieder offen: Kunde hat das Profil selbst ausgefüllt', color: 'bg-green-600' },
                     kunde_pausiert: { label: '⏸ Kunde: später melden (Wiedervorlage)', color: 'bg-amber-500' },
                     kontakt_variante: { label: '🧪 Kontakt-Variante im Rechner', color: 'bg-gray-400' },
                     telefon_nachgetragen: { label: '📞 Telefonnummer nachgetragen', color: 'bg-blue-500' },

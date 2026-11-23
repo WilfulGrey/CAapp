@@ -1226,6 +1226,27 @@ mutation UpdateCustomer(
 
 `$id` wymuszany z `session.customer_id`.
 
+**Registry #170 — zamknięty klient zapisuje formularz sam ⇒ znów otwarty.**
+Tylko gdy wołanie niesie `portal_form_snapshot` (= formularz pacjenta klienta,
+nie inne wołania `updateCustomer`). Proxy czyta RÓWNOLEGLE do zapisu
+`KUNDE_OFFEN_STAND` (`Customer { is_disabled job_offers {…} }`); główna mutacja
+`UPDATE_CUSTOMER` zostaje bajt w bajt ta sama (gotcha #2). Gdy klient był
+`is_disabled: true` (SA-Portal „Kunde schließen" — zamyka klienta i chowa jego
+otwarte joby, `mamamia-sadash CustomerController::hideOpenJobs`), PO udanym zapisie:
+1. `KUNDE_OEFFNEN_LESEN` (świeżo po zapisie — formularz mógł dodać drugą osobę bez
+   id, a `patients[]` to REPLACE) → `KUNDE_OEFFNEN` = `UpdateCustomer(is_disabled:
+   false, equipment_ids, patients: [{id, tool_ids}])` — stuby jak `acceptanceSync`.
+2. Jeśli żaden job nie trzyma klienta widocznym (public/public_limited albo
+   obsadzony): **jeden** schowany job wraca (`JOB_OEFFNEN` = `UpdateJobOffer`
+   fetch-merge jak SA-Portal i `onboard.ts:jobPreisNachziehen`; z listą CGA ⇒
+   `public_limited`, inaczej `public`). Wybór (`wiederOeffnen.ts:jobZumOeffnen`):
+   job sesji, inaczej najnowszy; nigdy zakończony/przerwany/po wyjeździe/obsadzony/
+   bez `arrival_at`.
+Wszystko best-effort: błąd = log `[updateCustomer][wieder-offen]`, zapis
+formularza się liczy. Stronę Kostenrechnera (status leada `nicht_interessiert` ⇒
+z powrotem otwarty + event `kunde_wieder_aktiv` + team-mail) robi bridge
+`/api/lead-event` przy `patient_data_saved` (`project 3/lib/wieder-oeffnen.ts`).
+
 ⚠️ **Mutacja WYMAGA `patients[]` w body** — bez tego Mamamia pada
 z `"Internal server error"` i WSZYSTKIE inne pola też nie zapiszą się
 (failure jest atomic). Mapper zawsze emituje `patches.patients` przynajmniej
@@ -1392,7 +1413,7 @@ jak dotąd najnowszy wiersz (test `src/__tests__/contractPdfBewerbung.test.ts`).
 |---|---|---|
 | Pierwsze wejście klienta (cache miss) | 4 onboard (LoginAgency + Locations + StoreCustomer + StoreJobOffer) + panel push (csrf + LoginAgency + UpdateCustomerToken, best-effort) + ~5 readów (getCustomer, getJobOffer, listApplications, listMatchings, listInvitedCaregiverIds) | ~6–10 s |
 | Drugie wejście (cache hit) | 0 onboard + ~5 readów | ~1 s |
-| Save patient form | PRESERVE_QUERY (1 read) + UpdateCustomer (1 write) | ~500 ms–1 s |
+| Save patient form | PRESERVE_QUERY (1 read) + UpdateCustomer (1 write) + KUNDE_OFFEN_STAND (1 read, równolegle; Registry #170 — u zamkniętego klienta +1 read + 1–2 write) | ~500 ms–1 s |
 | Akceptacja zgłoszenia | AssertAppBelongs (1 read) + StoreConfirmation (1 write) | ~500 ms–1 s |
 | Zaproszenie pielęgniarki | panel LoginAgency + StoreRequest (2 round-tripy, inny kanał) | ~1–2 s |
 
