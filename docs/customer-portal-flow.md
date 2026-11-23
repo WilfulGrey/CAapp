@@ -1226,6 +1226,40 @@ mutation UpdateCustomer(
 
 `$id` wymuszany z `session.customer_id`.
 
+**Registry #170 — zamknięty klient zapisuje formularz sam ⇒ znów otwarty.**
+Tylko gdy wołanie niesie `portal_form_snapshot` (= formularz pacjenta klienta,
+nie inne wołania `updateCustomer`). Proxy czyta RÓWNOLEGLE do zapisu
+`KUNDE_OFFEN_STAND` (`Customer { is_disabled status job_offers {…} }`); główna
+mutacja `UPDATE_CUSTOMER` zostaje bajt w bajt ta sama (gotcha #2). Po zapisie
+czeka na ten odczyt najwyżej 3 s (`STAND_WARTEN_MS`), potem odpowiada bez
+otwierania. Gdy klient był `is_disabled: true` (SA-Portal „Kunde schließen" —
+zamyka klienta i chowa jego otwarte joby, `mamamia-sadash
+CustomerController::hideOpenJobs`), PO udanym zapisie, w kolejności SA-Portalu
+(`JobOfferController::update`, potem `CustomerReopen`):
+1. **Job** — tylko gdy klient NIE jest `draft` (szkic: mamamia i tak pokazuje joby
+   jako ukryte, hideOpenJobs nic nie schował, joby robią się widoczne przy
+   przejściu na `active`) i żaden bieżący job nie trzyma go widocznym
+   (`hatOffenenJob`: public/public_limited albo obsadzony, ale NIE historia —
+   done/aborted/wyjazd dziś lub wcześniej). Wtedy **jeden** schowany job
+   (`jobZumOeffnen`: job sesji, inaczej najnowszy; nigdy obsadzony/historia) →
+   `JOB_OEFFNEN` = `UpdateJobOffer` fetch-merge jak SA-Portal i
+   `onboard.ts:jobPreisNachziehen` (z listą CGA ⇒ `public_limited`, inaczej
+   `public`). **Anreise** (`anreiseZumOeffnen`): `startDate` z formularza (pole
+   obowiązkowe), jeśli ≥ dziś (Berlin), inaczej stara `arrival_at`, jeśli ≥ dziś,
+   inaczej brak — mamamia odrzuca publiczny job z anreise w przeszłości, a
+   anreise z onboardu u dawno zamkniętego klienta zwykle minęła. Brak daty,
+   błąd lub odpowiedź `visibility: hide` ⇒ klient ZOSTAJE zamknięty (log), więc
+   następny zapis formularza próbuje tą samą drogą jeszcze raz.
+2. **Klient** — `KUNDE_OEFFNEN_LESEN` (świeżo po zapisie — formularz mógł dodać
+   drugą osobę bez id, a `patients[]` to REPLACE) → `KUNDE_OEFFNEN` =
+   `UpdateCustomer(is_disabled: false, equipment_ids, patients: [{id, tool_ids}])`
+   — stuby jak `acceptanceSync`.
+Wszystko best-effort: błąd = log `[updateCustomer][wieder-offen]`, zapis
+formularza się liczy. Stronę Kostenrechnera (status leada `nicht_interessiert` ⇒
+z powrotem otwarty + event `kunde_wieder_aktiv` + team-mail) robi bridge
+`/api/lead-event` przy `patient_data_saved` (`project 3/lib/wieder-oeffnen.ts`);
+`/api/rueckmeldung` traktuje „abmelden" po `kunde_wieder_aktiv` znów jako nowe.
+
 ⚠️ **Mutacja WYMAGA `patients[]` w body** — bez tego Mamamia pada
 z `"Internal server error"` i WSZYSTKIE inne pola też nie zapiszą się
 (failure jest atomic). Mapper zawsze emituje `patches.patients` przynajmniej
@@ -1392,7 +1426,7 @@ jak dotąd najnowszy wiersz (test `src/__tests__/contractPdfBewerbung.test.ts`).
 |---|---|---|
 | Pierwsze wejście klienta (cache miss) | 4 onboard (LoginAgency + Locations + StoreCustomer + StoreJobOffer) + panel push (csrf + LoginAgency + UpdateCustomerToken, best-effort) + ~5 readów (getCustomer, getJobOffer, listApplications, listMatchings, listInvitedCaregiverIds) | ~6–10 s |
 | Drugie wejście (cache hit) | 0 onboard + ~5 readów | ~1 s |
-| Save patient form | PRESERVE_QUERY (1 read) + UpdateCustomer (1 write) | ~500 ms–1 s |
+| Save patient form | PRESERVE_QUERY (1 read) + UpdateCustomer (1 write) + KUNDE_OFFEN_STAND (1 read, równolegle; Registry #170 — u zamkniętego klienta +1 read + 1–2 write) | ~500 ms–1 s |
 | Akceptacja zgłoszenia | AssertAppBelongs (1 read) + StoreConfirmation (1 write) | ~500 ms–1 s |
 | Zaproszenie pielęgniarki | panel LoginAgency + StoreRequest (2 round-tripy, inny kanał) | ~1–2 s |
 

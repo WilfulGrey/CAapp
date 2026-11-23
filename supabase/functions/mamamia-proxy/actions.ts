@@ -20,6 +20,10 @@ import {
   GET_CUSTOMER,
   GET_CUSTOMER_KONTAKTE,
   GET_JOB_OFFER,
+  JOB_OEFFNEN,
+  KUNDE_OEFFNEN,
+  KUNDE_OEFFNEN_LESEN,
+  KUNDE_OFFEN_STAND,
   LIST_APPLICATIONS,
   LIST_INTERESTS,
   LIST_INVITED_CAREGIVER_IDS,
@@ -32,6 +36,14 @@ import {
   UPDATE_CUSTOMER,
   UPDATE_JOB_OFFER_DATES,
 } from "./operations.ts";
+import {
+  anreiseZumOeffnen,
+  hatOffenenJob,
+  heuteBerlin,
+  jobOeffnenVariablen,
+  jobZumOeffnen,
+  type StandJob,
+} from "./wiederOeffnen.ts";
 
 // ─── Helper — run GraphQL with agency token ─────────────────────────────────
 
@@ -906,6 +918,19 @@ const updateCustomer: ActionHandler = async (session, variables, deps) => {
     patch.patients = [];
   }
 
+  // Registry #170: Nur der Patientenbogen des Kunden (portal_form_snapshot)
+  // öffnet einen geschlossenen Kunden wieder. Der Stand läuft parallel zum
+  // Speichern (die Mutation ändert weder is_disabled noch Jobs) und kostet so
+  // keine Wartezeit; ein Lesefehler heißt nur „nichts öffnen".
+  const snapshot = (variables as Record<string, unknown>).portal_form_snapshot;
+  const istBogen = !!snapshot && typeof snapshot === "object" && !Array.isArray(snapshot);
+  const standVorher: Promise<OffenStand | null> | null = istBogen
+    ? runGraphQL<OffenStand>(deps, KUNDE_OFFEN_STAND, { id: session.customer_id }).catch((e) => {
+      console.warn(`[updateCustomer][wieder-offen] cid=${session.customer_id} Stand nicht lesbar: ${(e as Error).message}`);
+      return null;
+    })
+    : null;
+
   // ── Preserve associations + wish scalars the caller didn't touch ──
   // Always re-fetch current Customer.equipments, per-patient tools, and
   // customer_caregiver_wish scalars (germany_skill, driving_license) and
@@ -973,8 +998,7 @@ const updateCustomer: ActionHandler = async (session, variables, deps) => {
   // nicht als Beleg. `portal_form_snapshot` steht nicht in UPDATE_CUSTOMER_ALLOWED
   // und erreicht Mamamia nie; hier landet es best-effort am Lead (nach dem
   // erfolgreichen Write, damit der Freeze den angelegten Stand widerspiegelt).
-  const snapshot = (variables as Record<string, unknown>).portal_form_snapshot;
-  if (snapshot && typeof snapshot === "object" && !Array.isArray(snapshot)) {
+  if (istBogen) {
     try {
       await deps.supabase?.saveLeadPatientForm?.(session.lead_id, snapshot as Record<string, unknown>);
     } catch (e) {
@@ -982,8 +1006,91 @@ const updateCustomer: ActionHandler = async (session, variables, deps) => {
     }
   }
 
+  // Höchstens STAND_WARTEN_MS über das Speichern hinaus warten: hängt Mamamia
+  // beim Lesen, geht die Antwort ohne Öffnen raus (nächstes Speichern versucht es).
+  let uhr: ReturnType<typeof setTimeout> | undefined;
+  const stand = standVorher
+    ? await Promise.race([
+      standVorher,
+      new Promise<null>((r) => { uhr = setTimeout(() => r(null), STAND_WARTEN_MS); }),
+    ]).finally(() => clearTimeout(uhr))
+    : null;
+  if (stand?.Customer?.is_disabled === true) {
+    await kundeWiederOeffnen(session, stand.Customer, (snapshot as Record<string, unknown>).startDate, deps);
+  }
+
   return result;
 };
+
+const STAND_WARTEN_MS = 3000;
+
+interface OffenStand {
+  Customer: { is_disabled?: boolean | null; status?: string | null; job_offers?: StandJob[] | null } | null;
+}
+
+// Registry #170 — Gegenstück zum Schließen im SA-Portal (is_disabled + Jobs
+// verbergen). Nach dem Speichern, nie davor: das Speichern selbst darf hieran
+// nicht scheitern. Wirft nie, Fehler gehen ins Log.
+//
+// Reihenfolge wie im SA-Portal (JobOfferController::update, dann
+// CustomerReopen): ERST den Job veröffentlichen, DANN den Kunden öffnen.
+// Scheitert der Job, bleibt der Kunde zu — so greift beim nächsten Speichern
+// derselbe Weg wieder, statt einen offenen Kunden ohne sichtbaren Job zu
+// hinterlassen (SA-Liste „Historie", den nie wieder jemand anfasst).
+//
+// Entwurf (status draft, Martins Hauptfall: zu, bevor das Profil kam): Mamamia
+// zeigt die Jobs eines Entwurfs als verborgen (SA-Portal CustomerDetail
+// toggleVisibility), hideOpenJobs überspringt sie also. Sichtbar werden sie
+// wie bei jedem neuen Kunden, wenn das Speichern ihn auf „active" hebt — dazu
+// muss er nur offen sein. Ein eigenes Veröffentlichen liefe in die Sperre des
+// Entwurfs. Dann nur den Kunden öffnen.
+async function kundeWiederOeffnen(
+  session: SessionPayload,
+  kunde: NonNullable<OffenStand["Customer"]>,
+  startDate: unknown,
+  deps: ActionDeps,
+): Promise<void> {
+  const cid = session.customer_id;
+  const heute = heuteBerlin();
+  const jobs = kunde.job_offers ?? [];
+
+  if (kunde.status !== "draft" && !hatOffenenJob(jobs, heute)) {
+    const job = jobZumOeffnen(jobs, session.job_offer_id, heute);
+    if (job) {
+      const anreise = anreiseZumOeffnen(job, startDate, heute);
+      if (!anreise) {
+        console.warn(`[updateCustomer][wieder-offen] cid=${cid} Job ${job.id}: kein Anreisedatum ab heute — Kunde bleibt zu`);
+        return;
+      }
+      try {
+        const vars = jobOeffnenVariablen(job, cid, anreise);
+        const r = await runGraphQL<{ UpdateJobOffer?: { visibility?: string | null } | null }>(deps, JOB_OEFFNEN, vars);
+        if (r.UpdateJobOffer?.visibility === "hide") throw new Error("Mamamia ließ den Job verborgen");
+        console.log(`[updateCustomer][wieder-offen] cid=${cid} Job ${job.id} → ${vars.visibility}, Anreise ${anreise}`);
+      } catch (e) {
+        console.warn(`[updateCustomer][wieder-offen] cid=${cid} Job ${job.id} NICHT veröffentlicht, Kunde bleibt zu: ${(e as Error).message}`);
+        return;
+      }
+    } else {
+      console.warn(`[updateCustomer][wieder-offen] cid=${cid} kein verborgener Job zum Veröffentlichen`);
+    }
+  }
+
+  try {
+    const frisch = await runGraphQL<{
+      Customer: { equipments?: Array<{ id: number }> | null; patients?: Array<{ id: number; tools?: Array<{ id: number }> | null }> | null } | null;
+    }>(deps, KUNDE_OEFFNEN_LESEN, { id: cid });
+    await runGraphQL(deps, KUNDE_OEFFNEN, {
+      id: cid,
+      is_disabled: false,
+      equipment_ids: (frisch.Customer?.equipments ?? []).map((e) => e.id),
+      patients: (frisch.Customer?.patients ?? []).map((p) => ({ id: p.id, tool_ids: (p.tools ?? []).map((t) => t.id) })),
+    });
+    console.log(`[updateCustomer][wieder-offen] cid=${cid} Kunde geöffnet`);
+  } catch (e) {
+    console.warn(`[updateCustomer][wieder-offen] cid=${cid} Kunde NICHT geöffnet: ${(e as Error).message}`);
+  }
+}
 
 // ─── updateJobDescription — narrow write for the AI overlay ────────────────
 //

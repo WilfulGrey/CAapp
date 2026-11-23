@@ -21,6 +21,7 @@ import { kundenEmpfaenger } from '@/lib/empfaenger';
 import { holeBewertungsStand } from '@/lib/bewertungen-stand';
 import { MESSPUNKTE } from '@/lib/messpunkte';
 import { oeffentlicheMetadata } from '@/lib/oeffentliche-ereignisse';
+import { ABSCHLUSS_EREIGNISSE, statusNachWiederOeffnen } from '@/lib/wieder-oeffnen';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
 // kostenrechner lead so the Nachfass emails can branch. Token-authenticated —
@@ -841,6 +842,50 @@ const GET_PUBLIC_EVENT_TYPES = new Set([
   'caregiver_arrival_scheduled',
 ]);
 
+/* Registry #170: geschlossener Lead (nicht_interessiert) speichert seinen
+   Patientenbogen selbst ⇒ wieder offen, sonst findet ihn das Team nur über die
+   Team-Mail. Rückkehr-Status in lib/wieder-oeffnen.ts. Das Update greift nur,
+   solange der Lead noch geschlossen ist (zwei Speichern gleichzeitig öffnen ihn
+   einmal). Gestoppte Mails bleiben gestoppt; was ab jetzt gilt, plant das
+   Speichern selbst (Mail D, suche_stand_2tage). Den Kunden in mamamia öffnet der
+   mamamia-proxy beim selben Speichern (updateCustomer). Wirft nie. */
+async function leadWiederOeffnen(supabaseAdmin: any, lead: { id: string; status?: string | null }): Promise<boolean> {
+  try {
+    const { data: zuletzt } = await supabaseAdmin
+      .from('lead_events')
+      .select('event_type, metadata')
+      .eq('lead_id', lead.id)
+      .in('event_type', [...ABSCHLUSS_EREIGNISSE])
+      .order('created_at', { ascending: false })
+      .limit(1);
+    const statusNeu = statusNachWiederOeffnen(Array.isArray(zuletzt) ? zuletzt[0] ?? null : null);
+    const { data: geaendert, error } = await supabaseAdmin
+      .from('leads')
+      .update({ status: statusNeu })
+      .eq('id', lead.id)
+      .eq('status', 'nicht_interessiert')
+      .select('id');
+    if (error) {
+      console.error(`lead-event wieder-offen: Status-Update fehlgeschlagen (lead ${lead.id}): ${error.message}`);
+      return false;
+    }
+    if (!Array.isArray(geaendert) || geaendert.length === 0) return false;
+    // /api/rueckmeldung liest das Ereignis (Abmelden gilt danach neu) — ein Fehler hier wird laut.
+    const { error: eventFehler } = await supabaseAdmin.from('lead_events').insert({
+      lead_id: lead.id,
+      event_type: 'kunde_wieder_aktiv',
+      metadata: { source: 'caapp', ausloeser: 'patient_data_saved', status_vorher: 'nicht_interessiert', status_neu: statusNeu },
+    });
+    if (eventFehler) console.error(`lead-event wieder-offen: Ereignis kunde_wieder_aktiv fehlt (lead ${lead.id}): ${eventFehler.message}`);
+    lead.status = statusNeu;
+    console.log(`lead-event wieder-offen: lead ${lead.id} nicht_interessiert → ${statusNeu} (Patientenbogen gespeichert)`);
+    return true;
+  } catch (e) {
+    console.error(`lead-event wieder-offen: ${e instanceof Error ? e.message : String(e)} (lead ${lead.id})`);
+    return false;
+  }
+}
+
 async function handleGet(request: NextRequest) {
   try {
     const token = request.nextUrl.searchParams.get('token');
@@ -988,6 +1033,13 @@ async function handlePost(request: NextRequest) {
     // die PDF-Version, ohne den Kunden erneut zu benachrichtigen.
     const teamOnlyResend = !!(metadata && typeof metadata === 'object'
       && (metadata as Record<string, unknown>).team_only_resend === true);
+
+    // Registry #170: geschlossen + Bogen selbst gespeichert ⇒ wieder offen. Vor
+    // Dedupe und Mails: gilt auch beim zweiten Speichern, und die Team-Mail
+    // geht dann trotz Dedupe (shouldNotifyTeam).
+    const wiederOffen = event === 'patient_data_saved' && !teamOnlyResend && !silent
+      && lead.status === 'nicht_interessiert'
+      && await leadWiederOeffnen(supabase, lead);
 
     // Acceptance persistence (application_accepted_internal): UPSERT a
     // dedicated row in lead_application_acceptances with the full contract
@@ -1354,7 +1406,7 @@ async function handlePost(request: NextRequest) {
     const shouldNotifyTeam =
       !silent &&
       TEAM_NOTIFY_EVENTS.includes(event) &&
-      (!isDeduped || isFirstOccurrence || teamOnlyResend);
+      (!isDeduped || isFirstOccurrence || teamOnlyResend || wiederOffen);
 
     if (shouldNotifyTeam) {
       const FEEDBACK_ANTWORT: Record<string, string> = {
