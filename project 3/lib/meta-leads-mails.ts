@@ -1,4 +1,4 @@
-// Facebook-/Instagram-Leads (Meta-Sofortformular „Rückruf"): die zwei Mails.
+// Facebook-/Instagram-Leads (Meta-Sofortformular „Anfrage"): die zwei Mails.
 //   1. Team-Mail an META_LEADS_TO (Standard info@primundus.de), eine Karte je Lead.
 //   2. Bestätigung an den Lead mit dem Link zum Kostenrechner.
 // Pure (nur email-template + mail-bausteine), getestet in
@@ -9,37 +9,40 @@
 
 import type { EmailTemplate } from './email';
 import { getEmailLayout } from './email-template';
-import { MAIL_FARBEN as F, mKnopf, mp, mTitel } from './mail-bausteine';
+import { BESTPREIS_URL, MAIL_FARBEN as F, mKnopf, mp, mSterneZeile, mTitel } from './mail-bausteine';
+import { PORTAL_PUNKTE } from './hero-punkte';
+import { martaKarteHtml } from './marta-karte';
+import type { BewertungsStand } from './bewertungen-stand';
 
 export const META_LEAD_TEXTE = {
   bestaetigung: {
-    betreff: 'Ihr Rückruf bei Primundus',
-    vorschau: 'Wir rufen Sie an. Ihre Kosten können Sie vorab selbst berechnen.',
-    titelMitName: 'Danke, {vorname}. Wir rufen Sie an.',
-    titelOhneName: 'Danke. Wir rufen Sie an.',
-    absatz1:
-      'Sie haben über Facebook oder Instagram einen Rückruf zur 24-Stunden-Betreuung zu Hause angefragt. Ich melde mich telefonisch bei Ihnen, täglich zwischen 8 und 20 Uhr.',
+    betreff: 'Ihre Anfrage zur 24-Stunden-Pflege',
+    vorschau: 'Ihren Preis und passende Pflegekräfte können Sie schon jetzt sehen.',
+    titel: 'Vielen Dank für Ihre Anfrage zur 24-Stunden-Pflege',
+    absatz1: 'Unsere Pflegeberatung meldet sich telefonisch bei Ihnen, täglich zwischen 8 und 20 Uhr.',
     absatz2:
-      'Wenn Sie vorher schon wissen möchten, womit Sie rechnen können: Im Kostenrechner beantworten Sie ein paar Fragen zur Pflegesituation und sehen sofort Ihren Monatspreis und Ihren voraussichtlichen Eigenanteil nach Pflegegeld und Zuschüssen.',
-    knopf: 'Kosten jetzt berechnen',
+      'Sie können auch direkt online weitermachen: In unserem Kostenrechner sehen Sie in 2 Minuten, was es kostet und welche Pflegekräfte verfügbar sind. Anreise in 3 Tagen möglich.',
+    knopf: 'Angebot & Pflegekräfte ansehen',
     knopfUrl: 'https://kostenrechner.primundus.de/?utm_source=facebook&utm_medium=lead_mail&utm_campaign=meta-leads-2026-11',
-    absatz3: 'Lieber gleich sprechen? Sie erreichen uns unter {telefon}, täglich von 8 bis 20 Uhr.',
-    telefon: '089 200 000 830',
-    telefonHref: 'tel:+4989200000830',
-    gruss: 'Herzliche Grüße\nMarta Kapcio\nPflegeberaterin, Primundus',
+    // Die Punkte unter dem Knopf der Startseite (Bestpreisgarantie + PORTAL_PUNKTE, lib/hero-punkte.ts).
+    punkte: ['Bestpreisgarantie', ...PORTAL_PUNKTE],
+    bestpreisUrl: BESTPREIS_URL,
+    bestpreisMehr: 'Mehr Infos',
+    // Nur Textfassung (im HTML steht Martas Karte).
+    unterschrift: 'Marta Kapcio, Pflegeberaterin, Primundus · 089 200 000 830 · täglich 8–20 Uhr',
     fussGrund:
-      'Sie erhalten diese E-Mail, weil Sie in einer Anzeige auf Facebook oder Instagram einen Rückruf angefragt haben.',
+      'Sie erhalten diese E-Mail, weil Sie in einer Anzeige auf Facebook oder Instagram eine Anfrage gestellt haben.',
     impressum: 'Impressum',
     impressumUrl: 'https://www.primundus.de/impressum',
     datenschutz: 'Datenschutz',
     datenschutzUrl: 'https://www.primundus.de/datenschutz',
   },
   team: {
-    betreffEiner: 'Facebook-Rückruf: {name}, {zeitraum}',
-    betreffEinerOhneZeitraum: 'Facebook-Rückruf: {name}',
-    betreffMehrere: '{anzahl} Facebook-Rückrufe',
-    einleitungEiner: 'Rückruf über das Formular in der Facebook-/Instagram-Anzeige angefragt. Bitte während der Telefonzeit 8–20 Uhr so schnell wie möglich zurückrufen.',
-    einleitungMehrere: 'Rückrufe über das Formular in der Facebook-/Instagram-Anzeige angefragt. Bitte während der Telefonzeit 8–20 Uhr so schnell wie möglich zurückrufen.',
+    betreffEiner: 'Facebook-Anfrage: {name}, {zeitraum}',
+    betreffEinerOhneZeitraum: 'Facebook-Anfrage: {name}',
+    betreffMehrere: '{anzahl} Facebook-Anfragen',
+    einleitungEiner: 'Anfrage über das Formular in der Facebook-/Instagram-Anzeige. Bitte während der Telefonzeit 8–20 Uhr so schnell wie möglich zurückrufen.',
+    einleitungMehrere: 'Anfragen über das Formular in der Facebook-/Instagram-Anzeige. Bitte während der Telefonzeit 8–20 Uhr so schnell wie möglich zurückrufen.',
     // Nur wenn JEDER Lead der Mail seine Bestätigung bekommen hat — sonst
     // stünde hier eine falsche Behauptung (Karte nennt dann den Grund).
     bestaetigtEiner: 'Die Bestätigungsmail mit dem Kostenrechner-Link ist schon verschickt.',
@@ -150,19 +153,6 @@ export function weitereAntworten(fields: Record<string, string> | null | undefin
   return Object.entries(fields ?? {})
     .filter(([k, v]) => v && !KONTAKT_FELDER.has(k) && !istZeitraumFeld(k))
     .map(([k, v]) => [lesbar(k), lesbar(v)]);
-}
-
-const BUCHSTABE = /^[A-Za-zÀ-ɏ][A-Za-zÀ-ɏ'-]*$/;
-
-/** Vorname für die Anrede: erstes Wort, nur Buchstaben; ganz klein/GROSS getippt ⇒ normal geschrieben. */
-export function vornameAus(name: string | null | undefined): string {
-  const erstes = (name ?? '').trim().split(/\s+/)[0] ?? '';
-  if (erstes.length < 2 || !BUCHSTABE.test(erstes)) return '';
-  if (erstes !== erstes.toLowerCase() && erstes !== erstes.toUpperCase()) return erstes;
-  return erstes
-    .split('-')
-    .map((t) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase())
-    .join('-');
 }
 
 /** Plausible einzelne Adresse (für Reply-To); sonst null. */
@@ -282,30 +272,36 @@ export function metaLeadTeamMail(
 
 export function metaLeadBestaetigung(
   lead: Pick<FbLead, 'name' | 'email'>,
+  bewertung: BewertungsStand,
   siteUrl: string = process.env.NEXT_PUBLIC_SITE_URL || 'https://kostenrechner.primundus.de',
 ): EmailTemplate {
   const B = META_LEAD_TEXTE.bestaetigung;
-  const vorname = vornameAus(lead.name);
-  const titel = vorname ? fuelle(B.titelMitName, { vorname }) : B.titelOhneName;
-  const linkFarbe = F.taupeInk;
-  const telefonLink = `<a href="${esc(B.telefonHref)}" style="color:${linkFarbe};font-weight:700;text-decoration:none;white-space:nowrap;">${esc(B.telefon)}</a>`;
-  const [gruss, ...unterschrift] = B.gruss.split('\n');
+  const site = siteUrl.replace(/\/$/, '');
+
+  // Punkte wie unter dem Knopf der Startseite, untereinander (zwei Spalten brachen auf 390 px um), Haken in Koralle.
+  const zeile = (t: string) =>
+    `<tr><td style="width:24px;padding:0 0 7px;vertical-align:top;color:${F.coral};font-weight:800;font-size:15px;line-height:1.4;">&#10003;</td><td style="padding:0 0 7px;font-size:15px;line-height:1.4;color:${F.ink};">${t}</td></tr>`;
+  const punkte = `
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:2px 0 8px;">
+        ${B.punkte.map((t, i) => zeile(i === 0 ? `${esc(t)} &nbsp;<a href="${esc(B.bestpreisUrl)}" style="color:${F.greenDeep};font-weight:700;text-decoration:underline;white-space:nowrap;">${esc(B.bestpreisMehr)}</a>` : esc(t))).join('')}
+      </table>`;
 
   const content = `
-      ${mTitel(esc(titel).replace(/ (\S+)$/, '&nbsp;$1'), 18, 24)}
-      ${mp(esc(B.absatz1))}
+      ${mTitel(esc(B.titel).replace(/ (\S+)$/, '&nbsp;$1'), 14, 24)}
+      ${mp(esc(B.absatz1), 12)}
       ${mp(esc(B.absatz2), 8)}
-      ${mKnopf(esc(B.knopfUrl), esc(B.knopf), 8, 24)}
-      ${mp(fuelle(esc(B.absatz3), { telefon: telefonLink }), 24)}
-      ${mp(`${esc(gruss)}<br><strong style="color:${F.ink};">${esc(unterschrift[0] ?? '')}</strong>${unterschrift.slice(1).map((z) => `<br>${esc(z)}`).join('')}`, 0)}`;
+      ${mKnopf(esc(B.knopfUrl), esc(B.knopf), 8, 16)}
+      ${punkte}
+      ${mSterneZeile(bewertung, 24)}
+      ${martaKarteHtml({ fuer: 'kunde', bewertung, siteUrl: site, presseLogos: true, sterne: false, abstandUnten: 8 })}`;
 
   const fussLink = (url: string, t: string) => `<a href="${esc(url)}" style="color:#999999;text-decoration:underline;">${esc(t)}</a>`;
   const grund = `${esc(B.fussGrund)}<br><br>${fussLink(B.impressumUrl, B.impressum)} &middot; ${fussLink(B.datenschutzUrl, B.datenschutz)}`;
 
-  const html = getEmailLayout({ content, preheader: esc(B.vorschau), siteUrl, grund }).replace('{{EMAIL}}', esc(lead.email ?? ''));
+  const html = getEmailLayout({ content, preheader: esc(B.vorschau), siteUrl: site, grund }).replace('{{EMAIL}}', esc(lead.email ?? ''));
 
   const text = [
-    titel,
+    B.titel,
     '',
     B.absatz1,
     '',
@@ -313,9 +309,10 @@ export function metaLeadBestaetigung(
     '',
     `${B.knopf}: ${B.knopfUrl}`,
     '',
-    fuelle(B.absatz3, { telefon: B.telefon }),
+    B.punkte.join(' · '),
+    `${bewertung.schnitt} von 5 aus ${bewertung.anzahl} Bewertungen`,
     '',
-    B.gruss,
+    B.unterschrift,
     '',
     B.fussGrund,
     `${B.impressum}: ${B.impressumUrl}`,

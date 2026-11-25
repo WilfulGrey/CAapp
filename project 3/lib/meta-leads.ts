@@ -33,6 +33,7 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { sendEmail } from './email';
+import { holeBewertungsStand, type BewertungsStand } from './bewertungen-stand';
 import {
   BESTAETIGUNG_MAX_ALTER_STUNDEN,
   mailAdresse,
@@ -178,6 +179,8 @@ export interface MetaLeadsOptionen {
   env?: NodeJS.ProcessEnv;
   jetzt?: () => Date;
   senden?: typeof sendEmail;
+  /** Sterne für die Bestätigung (Standard: live von primundus.de, Ersatzwert wie alle Mails). */
+  bewertung?: () => Promise<BewertungsStand>;
 }
 
 /** Holt die neuesten Leads aller Formulare der Seite, speichert neue und verschickt die Mails. */
@@ -231,12 +234,14 @@ export async function syncMetaLeads(opt: MetaLeadsOptionen = {}): Promise<MetaLe
   // 4. Bestätigungen — nur frisch eingefügte Leads, nur mit E-Mail, nur nicht zu alt.
   const grenze = jetzt().getTime() - BESTAETIGUNG_MAX_ALTER_STUNDEN * 3600000;
   const eintraege: Array<{ lead: FbLead; bestaetigung: BestaetigungsStand }> = [];
+  let bewertung: BewertungsStand | undefined;
   for (const lead of frisch) {
     let stand: BestaetigungsStand;
     if (!lead.email?.includes('@')) stand = 'keine_email';
     else if (new Date(lead.created_time).getTime() < grenze) stand = 'zu_alt';
     else {
-      const r = await senden(lead.email.trim(), metaLeadBestaetigung(lead)).catch(() => ({ success: false }));
+      bewertung ??= await (opt.bewertung ?? holeBewertungsStand)();
+      const r = await senden(lead.email.trim(), metaLeadBestaetigung(lead, bewertung)).catch(() => ({ success: false }));
       stand = r.success ? 'verschickt' : 'fehlgeschlagen';
       if (r.success) await markiere([lead.id], 'confirm_sent_at');
       else console.error('[meta-leads] Bestätigung fehlgeschlagen für Lead', lead.id);

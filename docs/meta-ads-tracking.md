@@ -53,9 +53,9 @@ diesen Datensatz **aus** bleiben.
 Datenschutzerklärung: `app/datenschutz/page.tsx` Abschnitt 8, Absatz
 „Meta-Pixel".
 
-## Sofortformular-Leads (Rückruf-Anzeige) — ENTWURF, nicht live
+## Sofortformular-Leads (Anfrage-Formular) — ENTWURF, nicht live
 
-Für Anzeigen mit Meta-Sofortformular („Rückruf anfragen") holt der
+Für Anzeigen mit Meta-Sofortformular („Anfrage“, ohne Begrüßungsseite) holt der
 Kostenrechner die Leads selbst ab; Meta schickt sie nicht von sich aus. Alle
 10 Minuten ruft pg_cron `POST /api/cron/meta-leads` (Bearer = Service-Key wie
 beim Portal-Abholer). Die Route holt mit `META_PAGE_TOKEN` den Seiten-Token,

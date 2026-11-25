@@ -1,4 +1,4 @@
-/* ─── Facebook-/Instagram-Leads abholen (Meta-Sofortformular „Rückruf") ───
+/* ─── Facebook-/Instagram-Leads abholen (Meta-Sofortformular „Anfrage") ───
  *
  * Getaktet von pg_cron alle 10 Minuten — Datei
  * supabase/nach-freigabe/20261125120100_setup_meta_leads_cron.sql, wird erst

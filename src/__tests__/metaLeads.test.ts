@@ -39,11 +39,12 @@ import {
   META_LEAD_TEXTE,
   metaLeadBestaetigung,
   metaLeadTeamMail,
-  vornameAus,
   zeitraumAus,
   type FbLead,
 } from '../../project 3/lib/meta-leads-mails';
 import { POST } from '../../project 3/app/api/cron/meta-leads/route';
+
+const STAND = { schnitt: '4,9', anzahl: 126 };
 
 const BASIS = 'https://graph.test/v21.0';
 const SYSTEM_TOKEN = 'systemnutzer-token-AAAA1111';
@@ -131,7 +132,7 @@ function speicherAttrappe(vorhanden: string[] = []) {
 }
 
 const lauf = (speicher: FbLeadsSpeicher, env: NodeJS.ProcessEnv = ENV) =>
-  syncMetaLeads({ speicher, env, jetzt: () => JETZT });
+  syncMetaLeads({ speicher, env, jetzt: () => JETZT, bewertung: async () => STAND });
 
 describe('syncMetaLeads: ohne Zugang inert', () => {
   it('ohne META_PAGE_ID und META_PAGE_TOKEN: nichts abgerufen, nichts verschickt', async () => {
@@ -202,16 +203,6 @@ describe('Felder', () => {
     expect(zeitraumAus({ email: 'x@y.de' })).toBeNull();
   });
 
-  it('Vorname: erstes Wort, Groß-/Kleinschreibung normalisiert, Unsinn ⇒ leer', () => {
-    expect(vornameAus('Sabine Beispiel')).toBe('Sabine');
-    expect(vornameAus('hans muster')).toBe('Hans');
-    expect(vornameAus('ANNA-LENA SCHMIDT')).toBe('Anna-Lena');
-    expect(vornameAus('McKenzie Doe')).toBe('McKenzie');
-    expect(vornameAus('Łucja Nowak')).toBe('Łucja');
-    expect(vornameAus('test@example.com')).toBe('');
-    expect(vornameAus('<b>')).toBe('');
-    expect(vornameAus(null)).toBe('');
-  });
 });
 
 describe('Nur frische Leads bekommen Mails', () => {
@@ -222,9 +213,9 @@ describe('Nur frische Leads bekommen Mails', () => {
     expect(r).toMatchObject({ configured: true, forms: 1, fetched: 2, inserted: 2, confirmations: 1, withoutConfirmation: 1, teamMail: 'verschickt' });
 
     expect(gesendet.map((g) => g.an)).toEqual(['sabine@example.com', 'info@primundus.de']);
-    expect(gesendet[0].betreff).toBe('Ihr Rückruf bei Primundus');
+    expect(gesendet[0].betreff).toBe('Ihre Anfrage zur 24-Stunden-Pflege');
     const team = gesendet[1];
-    expect(team.betreff).toBe('2 Facebook-Rückrufe');
+    expect(team.betreff).toBe('2 Facebook-Anfragen');
     expect(team.html).toContain('Sabine Beispiel');
     expect(team.html).toContain('hans muster');
     expect(team.optionen?.replyTo).toBeUndefined(); // mehrere Leads ⇒ Antworten gehen ans Team-Postfach
@@ -250,7 +241,7 @@ describe('Nur frische Leads bekommen Mails', () => {
     await lauf(speicher);
     expect(gesendet.map((g) => g.an)).toEqual(['sabine@example.com', 'info@primundus.de']);
     const team = gesendet[1];
-    expect(team.betreff).toBe('Facebook-Rückruf: Sabine Beispiel, So bald wie möglich');
+    expect(team.betreff).toBe('Facebook-Anfrage: Sabine Beispiel, So bald wie möglich');
     expect(team.html).not.toContain('hans muster');
     expect(team.optionen?.replyTo).toBe('sabine@example.com');
     expect(team.text).toContain(`${META_LEAD_TEXTE.team.einleitungEiner} ${META_LEAD_TEXTE.team.bestaetigtEiner}`);
@@ -276,7 +267,7 @@ describe('Bestätigung übersprungen', () => {
     const r = await lauf(speicher);
     expect(r).toMatchObject({ inserted: 1, confirmations: 0, withoutConfirmation: 1 });
     expect(gesendet.map((g) => g.an)).toEqual(['info@primundus.de']);
-    expect(gesendet[0].betreff).toBe('Facebook-Rückruf: hans muster');
+    expect(gesendet[0].betreff).toBe('Facebook-Anfrage: hans muster');
     expect(gesendet[0].optionen?.replyTo).toBeUndefined();
     expect(markiert).toEqual([{ ids: ['lead-hans'], feld: 'notified_at' }]);
   });
@@ -378,38 +369,48 @@ describe('Mails', () => {
     fields: { [FRAGE]: 'so_bald_wie_möglich' }, ...p,
   });
 
-  it('Bestätigung: Wortlaut aus META_LEAD_TEXTE, Vorname, Knopf, Telefon, Fußzeile mit Impressum/Datenschutz', () => {
+  it('Bestätigung: Wortlaut aus META_LEAD_TEXTE, Knopf, Punkte der Startseite, Sterne, Martas Karte, Fußzeile', () => {
     const B = META_LEAD_TEXTE.bestaetigung;
-    const m = metaLeadBestaetigung(lead({}), 'https://kostenrechner.primundus.de');
-    expect(m.subject).toBe(B.betreff);
-    expect(m.html).toContain('Danke, Sabine. Wir rufen Sie&nbsp;an.'); // letztes Wort nie allein in der Zeile
-    expect(m.text.startsWith('Danke, Sabine. Wir rufen Sie an.\n')).toBe(true);
+    const m = metaLeadBestaetigung(lead({}), STAND, 'https://kostenrechner.primundus.de');
+    expect(m.subject).toBe('Ihre Anfrage zur 24-Stunden-Pflege');
+    expect(m.html).toContain('Vielen Dank für Ihre Anfrage zur 24-Stunden-Pflege'.replace(/ (\S+)$/, '&nbsp;$1'));
+    expect(m.text.startsWith(`${B.titel}\n`)).toBe(true);
     expect(m.html).toContain(B.vorschau);
-    expect(m.html).toContain('Ihren voraussichtlichen Eigenanteil nach Pflegegeld und Zuschüssen');
+    expect(m.html).toContain(B.absatz1);
+    expect(m.html).toContain(B.absatz2);
     expect(m.html).toContain(`href="${B.knopfUrl.replace(/&/g, '&amp;')}"`);
-    expect(m.html).toContain('>Kosten jetzt berechnen<');
+    expect(m.html).toContain('>Angebot &amp; Pflegekräfte ansehen<');
+    // Punkte wie unter dem Knopf der Startseite (lib/hero-punkte.ts PORTAL_PUNKTE).
+    for (const p of ['Bestpreisgarantie', 'Keine Vorauszahlung', 'Keine Vermittlungsgebühr', 'Keine Mindestlaufzeit']) expect(m.html).toContain(p);
+    expect(m.html).toContain('href="https://kostenrechner.primundus.de/bestpreisgarantie"');
+    // Sterne einmal unter dem Knopf, nicht noch einmal in Martas Karte.
+    expect(m.html.match(/von 5 aus/g)).toHaveLength(1);
+    expect(m.html).not.toContain('class="sig-sterne-desktop"');
+    expect(m.html).toContain('Marta Kapcio');
     expect(m.html).toContain('href="tel:+4989200000830"');
-    expect(m.html).toContain('Pflegeberaterin, Primundus');
+    expect(m.html).toContain('/images/media/ard.webp');
     expect(m.html).toContain('href="https://www.primundus.de/impressum"');
     expect(m.html).toContain('href="https://www.primundus.de/datenschutz"');
-    expect(m.html).not.toContain('Primundus · 24-Stunden-Pflege zu Hause'); // doppelte Fußzeile gestrichen (OpenAI 25.11.)
+    expect(m.html).toContain(B.fussGrund);
     expect(m.html).toContain('sabine@example.com');
     expect(m.html).not.toContain('{{EMAIL}}');
-    expect(m.text).toContain(`Kosten jetzt berechnen: ${B.knopfUrl}`);
-    expect(m.text).toContain('Lieber gleich sprechen? Sie erreichen uns unter 089 200 000 830, täglich von 8 bis 20 Uhr.');
-    expect(m.text).toContain('Herzliche Grüße\nMarta Kapcio\nPflegeberaterin, Primundus');
+    expect(m.html).not.toMatch(/Rückruf/);
+    expect(m.text).toContain(`Angebot & Pflegekräfte ansehen: ${B.knopfUrl}`);
+    expect(m.text).toContain('Bestpreisgarantie · Keine Vorauszahlung · Keine Vermittlungsgebühr · Keine Mindestlaufzeit');
+    expect(m.text).toContain('4,9 von 5 aus 126 Bewertungen');
+    expect(m.text).toContain('Marta Kapcio, Pflegeberaterin, Primundus');
     // Sichtbarer Text nennt nie Martin (HTML-/CSS-Kommentare des geteilten Layouts ausgenommen).
     expect(m.html.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '') + m.text).not.toMatch(/Martin/);
   });
 
-  it('Bestätigung ohne brauchbaren Namen: „Danke. Wir rufen Sie an."', () => {
-    expect(metaLeadBestaetigung(lead({ name: null })).text).toContain('Danke. Wir rufen Sie an.');
-    expect(metaLeadBestaetigung(lead({ name: '<script>alert(1)</script>' })).html).not.toContain('<script>alert');
+  it('Bestätigung: Name wird nicht genutzt und nie roh ins HTML geschrieben', () => {
+    expect(metaLeadBestaetigung(lead({ name: '<script>alert(1)</script>' }), STAND).html).not.toContain('<script>alert');
+    expect(metaLeadBestaetigung(lead({ name: null }), STAND).text.startsWith('Vielen Dank')).toBe(true);
   });
 
   it('Team-Mail: Karte mit Anrufen-Knopf, Zeitraum, Eingang (Berlin), Kanal, Anzeige; Name wird escaped', () => {
     const m = metaLeadTeamMail([{ lead: lead({ platform: 'ig', name: 'Sabine <b>Beispiel</b>' }), bestaetigung: 'verschickt' }]);
-    expect(m.subject).toBe('Facebook-Rückruf: Sabine <b>Beispiel</b>, So bald wie möglich');
+    expect(m.subject).toBe('Facebook-Anfrage: Sabine <b>Beispiel</b>, So bald wie möglich');
     expect(m.html).not.toContain('<b>Beispiel</b>');
     expect(m.html).toContain('href="tel:+4915123456789"');
     expect(m.html).toContain('>Anrufen<');
@@ -426,7 +427,7 @@ describe('Mails', () => {
       { lead: lead({}), bestaetigung: 'verschickt' },
       { lead: lead({ id: 'l2', name: 'Hans Muster' }), bestaetigung: 'verschickt' },
     ]);
-    expect(m.subject).toBe('2 Facebook-Rückrufe');
+    expect(m.subject).toBe('2 Facebook-Anfragen');
     expect(m.text).toContain(`${META_LEAD_TEXTE.team.einleitungMehrere} ${META_LEAD_TEXTE.team.bestaetigtMehrere}`);
   });
 });
