@@ -392,7 +392,7 @@ describe('Mails', () => {
     expect(m.html).toContain('Pflegeberaterin, Primundus');
     expect(m.html).toContain('href="https://www.primundus.de/impressum"');
     expect(m.html).toContain('href="https://www.primundus.de/datenschutz"');
-    expect(m.html).toContain('6× Testsieger DIE WELT');
+    expect(m.html).not.toContain('Primundus · 24-Stunden-Pflege zu Hause'); // doppelte Fußzeile gestrichen (OpenAI 25.11.)
     expect(m.html).toContain('sabine@example.com');
     expect(m.html).not.toContain('{{EMAIL}}');
     expect(m.text).toContain(`Kosten jetzt berechnen: ${B.knopfUrl}`);

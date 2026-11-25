@@ -27,7 +27,6 @@ export const META_LEAD_TEXTE = {
     telefon: '089 200 000 830',
     telefonHref: 'tel:+4989200000830',
     gruss: 'Herzliche Grüße\nMarta Kapcio\nPflegeberaterin, Primundus',
-    fussZeile: 'Primundus · 24-Stunden-Pflege zu Hause · 6× Testsieger DIE WELT',
     fussGrund:
       'Sie erhalten diese E-Mail, weil Sie in einer Anzeige auf Facebook oder Instagram einen Rückruf angefragt haben.',
     impressum: 'Impressum',
@@ -39,8 +38,8 @@ export const META_LEAD_TEXTE = {
     betreffEiner: 'Facebook-Rückruf: {name}, {zeitraum}',
     betreffEinerOhneZeitraum: 'Facebook-Rückruf: {name}',
     betreffMehrere: '{anzahl} Facebook-Rückrufe',
-    einleitungEiner: 'Rückruf über das Formular in der Facebook-Anzeige angefragt. Bitte heute anrufen.',
-    einleitungMehrere: 'Rückrufe über das Formular in der Facebook-Anzeige angefragt. Bitte heute anrufen.',
+    einleitungEiner: 'Rückruf über das Formular in der Facebook-/Instagram-Anzeige angefragt. Bitte während der Telefonzeit 8–20 Uhr so schnell wie möglich zurückrufen.',
+    einleitungMehrere: 'Rückrufe über das Formular in der Facebook-/Instagram-Anzeige angefragt. Bitte während der Telefonzeit 8–20 Uhr so schnell wie möglich zurückrufen.',
     // Nur wenn JEDER Lead der Mail seine Bestätigung bekommen hat — sonst
     // stünde hier eine falsche Behauptung (Karte nennt dann den Grund).
     bestaetigtEiner: 'Die Bestätigungsmail mit dem Kostenrechner-Link ist schon verschickt.',
@@ -58,10 +57,12 @@ export const META_LEAD_TEXTE = {
     plattform: { fb: 'Facebook', ig: 'Instagram' } as Record<string, string>,
     // Grund, wenn ein Lead KEINE Bestätigung bekam (steht auf seiner Karte).
     ohneBestaetigung: {
-      keine_email: 'Keine Bestätigungsmail: keine E-Mail-Adresse im Formular.',
-      zu_alt: 'Keine Bestätigungsmail: Anfrage ist älter als 3 Tage.',
-      fehlgeschlagen: 'Bestätigungsmail konnte nicht verschickt werden.',
+      keine_email: 'Keine Bestätigungsmail versendet: keine E-Mail-Adresse im Formular.',
+      zu_alt: 'Keine Bestätigungsmail versendet: Anfrage älter als 3 Tage.',
+      fehlgeschlagen: 'Keine Bestätigungsmail versendet: Versandfehler.',
     },
+    // Steht hinter jedem dieser Gründe: was das Team am Telefon tun soll.
+    ohneBestaetigungTipp: 'Im Gespräch E-Mail-Adresse erfragen oder prüfen und den Kostenrechner-Link anbieten.',
   },
 } as const;
 
@@ -206,7 +207,7 @@ function zeilenFuer(l: FbLead, stand: BestaetigungsStand): { daten: Array<[strin
   if (kanal) daten.push([T.kanal, kanal]);
   if (l.ad_name) daten.push([T.anzeige, l.ad_name]);
   else if (l.form_name) daten.push([T.formular, l.form_name]);
-  return { daten, hinweis: stand === 'verschickt' ? null : T.ohneBestaetigung[stand] };
+  return { daten, hinweis: stand === 'verschickt' ? null : `${T.ohneBestaetigung[stand]} ${T.ohneBestaetigungTipp}` };
 }
 
 export function metaLeadTeamMail(
@@ -299,7 +300,7 @@ export function metaLeadBestaetigung(
       ${mp(`${esc(gruss)}<br><strong style="color:${F.ink};">${esc(unterschrift[0] ?? '')}</strong>${unterschrift.slice(1).map((z) => `<br>${esc(z)}`).join('')}`, 0)}`;
 
   const fussLink = (url: string, t: string) => `<a href="${esc(url)}" style="color:#999999;text-decoration:underline;">${esc(t)}</a>`;
-  const grund = `${esc(B.fussZeile)}<br>${esc(B.fussGrund)}<br><br>${fussLink(B.impressumUrl, B.impressum)} &middot; ${fussLink(B.datenschutzUrl, B.datenschutz)}`;
+  const grund = `${esc(B.fussGrund)}<br><br>${fussLink(B.impressumUrl, B.impressum)} &middot; ${fussLink(B.datenschutzUrl, B.datenschutz)}`;
 
   const html = getEmailLayout({ content, preheader: esc(B.vorschau), siteUrl, grund }).replace('{{EMAIL}}', esc(lead.email ?? ''));
 
@@ -316,7 +317,6 @@ export function metaLeadBestaetigung(
     '',
     B.gruss,
     '',
-    B.fussZeile,
     B.fussGrund,
     `${B.impressum}: ${B.impressumUrl}`,
     `${B.datenschutz}: ${B.datenschutzUrl}`,
