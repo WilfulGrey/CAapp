@@ -53,6 +53,48 @@ diesen Datensatz **aus** bleiben.
 Datenschutzerklärung: `app/datenschutz/page.tsx` Abschnitt 8, Absatz
 „Meta-Pixel".
 
+## Sofortformular-Leads (Rückruf-Anzeige) — ENTWURF, nicht live
+
+Für Anzeigen mit Meta-Sofortformular („Rückruf anfragen") holt der
+Kostenrechner die Leads selbst ab; Meta schickt sie nicht von sich aus. Alle
+10 Minuten ruft pg_cron `POST /api/cron/meta-leads` (Bearer = Service-Key wie
+beim Portal-Abholer). Die Route holt mit `META_PAGE_TOKEN` den Seiten-Token,
+liest alle Formulare der Seite `META_PAGE_ID` und je Formular die neuesten 100
+Leads, und fügt sie in `fb_leads` ein (`id` = Lead-ID von Meta, Duplikate
+ignoriert). Nur frisch eingefügte Leads lösen Mails aus: zuerst die
+Bestätigung an den Lead (nur mit E-Mail und höchstens 72 h alt, damit die
+erste Abholung keine alten Leads anschreibt), dann eine Team-Mail an
+`META_LEADS_TO` mit einer Karte je Lead (Name, Telefon mit „Anrufen",
+E-Mail, Zeitraum aus der Frage „Für wann planen Sie Unterstützung zu Hause?",
+Eingang, Facebook/Instagram, Anzeige). Ohne `META_PAGE_ID`/`META_PAGE_TOKEN`
+passiert nichts. Wortlaut: `META_LEAD_TEXTE` in
+`project 3/lib/meta-leads-mails.ts`; Ablauf und Umgebung: Kopf von
+`project 3/lib/meta-leads.ts`.
+
+| | |
+|---|---|
+| Tabelle | `fb_leads` — Migration `supabase/migrations/20261125120000_fb_leads.sql` (RLS ohne Policies) |
+| Cron | `supabase/nach-freigabe/20261125120100_setup_meta_leads_cron.sql` — liegt absichtlich NICHT in `migrations/` |
+| Route | `project 3/app/api/cron/meta-leads/route.ts` |
+| Env (Render, Kostenrechner) | `META_PAGE_ID`, `META_PAGE_TOKEN` (Geheimnis), optional `META_LEADS_TO` (Standard info@primundus.de), `META_GRAPH_URL` nur für Tests |
+| Test | `src/__tests__/metaLeads.test.ts` |
+
+Live schalten (Reihenfolge, nur nach Freigabe):
+
+1. Migration `20261125120000_fb_leads.sql` per `scripts/apply-migrations.sh`
+   (Staging, dann `ycdwtrklpoqprabtwahi`).
+2. Code mergen (die Route ist ohne Meta-Env inert).
+3. In Meta: Systemnutzer im Business-Portfolio mit Zugriff auf die Seite und
+   Lead-Zugriff (Seiteneinstellungen → Lead-Zugriff), Token mit
+   `leads_retrieval` (dazu `pages_show_list`, `pages_read_engagement`,
+   `pages_manage_ads`) erzeugen.
+4. Render-Env des Kostenrechners: `META_PAGE_ID`, `META_PAGE_TOKEN`,
+   optional `META_LEADS_TO`. Einmal von Hand prüfen:
+   `curl -X POST -H "Authorization: Bearer <service_role>" https://kostenrechner.primundus.de/api/cron/meta-leads`.
+5. Cron-Datei nach `supabase/migrations/` verschieben und einspielen. Die
+   Vault-Secrets `kostenrechner_url` und `supabase_service_role_key` gibt es
+   schon (Portal-Abholer).
+
 ## Offen
 
 - **Server-Weg (Conversions API):** Meta hängt an jeden Anzeigenklick `fbclid`

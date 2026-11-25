@@ -81,6 +81,8 @@ Pliki `.env` dostaniesz **osobnym kanałem** od Michała (Signal / encrypted ema
 | `/.env.local` | dla CAapp (Vite) — 3 zmienne |
 | `/project 3/.env` | dla calculatora (Next.js) — 14 zmiennych |
 
+Facebook-Formular-Leads (ENTWURF, `project 3/lib/meta-leads.ts`) dokładają w `project 3/.env` opcjonalnie `META_PAGE_ID`, `META_PAGE_TOKEN` (sekret) i `META_LEADS_TO` — bez nich route `/api/cron/meta-leads` nic nie robi, lokalnie zostaw puste.
+
 Template'y są w repo (`.env.example` w obu lokalizacjach) — pokazują które klucze są potrzebne, ale wartości są puste; podstawisz je z paczki Michała.
 
 ---
