@@ -382,7 +382,8 @@ describe('Mails', () => {
     const B = META_LEAD_TEXTE.bestaetigung;
     const m = metaLeadBestaetigung(lead({}), 'https://kostenrechner.primundus.de');
     expect(m.subject).toBe(B.betreff);
-    expect(m.html).toContain('Danke, Sabine. Wir rufen Sie an.');
+    expect(m.html).toContain('Danke, Sabine. Wir rufen Sie&nbsp;an.'); // letztes Wort nie allein in der Zeile
+    expect(m.text.startsWith('Danke, Sabine. Wir rufen Sie an.\n')).toBe(true);
     expect(m.html).toContain(B.vorschau);
     expect(m.html).toContain('Ihren voraussichtlichen Eigenanteil nach Pflegegeld und Zuschüssen');
     expect(m.html).toContain(`href="${B.knopfUrl.replace(/&/g, '&amp;')}"`);
@@ -402,7 +403,7 @@ describe('Mails', () => {
   });
 
   it('Bestätigung ohne brauchbaren Namen: „Danke. Wir rufen Sie an."', () => {
-    expect(metaLeadBestaetigung(lead({ name: null })).html).toContain('Danke. Wir rufen Sie an.');
+    expect(metaLeadBestaetigung(lead({ name: null })).text).toContain('Danke. Wir rufen Sie an.');
     expect(metaLeadBestaetigung(lead({ name: '<script>alert(1)</script>' })).html).not.toContain('<script>alert');
   });
 

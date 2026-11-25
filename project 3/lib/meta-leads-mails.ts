@@ -291,7 +291,7 @@ export function metaLeadBestaetigung(
   const [gruss, ...unterschrift] = B.gruss.split('\n');
 
   const content = `
-      ${mTitel(esc(titel), 18, 24)}
+      ${mTitel(esc(titel).replace(/ (\S+)$/, '&nbsp;$1'), 18, 24)}
       ${mp(esc(B.absatz1))}
       ${mp(esc(B.absatz2), 8)}
       ${mKnopf(esc(B.knopfUrl), esc(B.knopf), 8, 24)}
