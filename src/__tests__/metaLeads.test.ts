@@ -145,6 +145,26 @@ describe('syncMetaLeads: ohne Zugang inert', () => {
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
+  it('Env leer, Vault liefert Seite und Token: Lauf wie mit Env', async () => {
+    const { speicher } = speicherAttrappe();
+    const r = await syncMetaLeads({
+      speicher,
+      env: { META_GRAPH_URL: ENV.META_GRAPH_URL } as unknown as NodeJS.ProcessEnv,
+      jetzt: () => JETZT,
+      bewertung: async () => STAND,
+      zugang: async () => ({ seite: 'seite1', token: SYSTEM_TOKEN }),
+    });
+    expect(r.configured).toBe(true);
+    expect(aufrufe.map((a) => a.url.slice(BASIS.length + 1).split('?')[0])).toEqual(['seite1', 'seite1/leadgen_forms', 'form1/leads']);
+  });
+
+  it('Env leer und Vault leer: inert, nichts abgerufen', async () => {
+    const { speicher } = speicherAttrappe();
+    const r = await syncMetaLeads({ speicher, env: {} as NodeJS.ProcessEnv, zugang: async () => ({}) });
+    expect(r).toEqual({ configured: false, inserted: 0 });
+    expect(aufrufe).toHaveLength(0);
+  });
+
   it('nur eine der beiden Variablen gesetzt: ebenfalls inert', async () => {
     const { speicher } = speicherAttrappe();
     expect(await lauf(speicher, { META_PAGE_ID: 'seite1' } as unknown as NodeJS.ProcessEnv)).toEqual({ configured: false, inserted: 0 });

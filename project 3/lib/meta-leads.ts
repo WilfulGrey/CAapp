@@ -23,7 +23,11 @@
  * Umgebung:
  *   META_PAGE_ID      Facebook-Seite mit den Formularen
  *   META_PAGE_TOKEN   Systemnutzer- oder Seiten-Token mit leads_retrieval
- *                     (Geheimnis). Fehlt eins von beiden ⇒ inert, {configured:false}.
+ *                     (Geheimnis). Fehlt eins von beiden, liest der Lauf beide aus
+ *                     dem Supabase-Vault (RPC get_meta_leads_secrets, Einträge
+ *                     meta_page_id / meta_page_token — so auf Prod seit 27.11.2026,
+ *                     weil die Render-Env des Prod-Kostenrechners nicht in Martins
+ *                     Render-Zugang liegt). Fehlt es auch dort ⇒ inert, {configured:false}.
  *   META_LEADS_TO     Empfänger der Team-Mail, Standard info@primundus.de
  *   META_GRAPH_URL    nur für Tests (Nachbau der Graph API)
  *
@@ -104,6 +108,28 @@ function standardSpeicher(): FbLeadsSpeicher {
   /* auth-Optionen sind PFLICHT (OOM #218): ohne sie startet supabase-js je
      Client einen Refresh-Ticker, der nie wieder aufhört. */
   return supabaseSpeicher(createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }));
+}
+
+/** Meta-Zugang (Seite + Token). Felder fehlen, wenn die Quelle nichts hat. */
+export type MetaZugang = { seite?: string; token?: string };
+
+/* Zugang aus dem Supabase-Vault (RPC get_meta_leads_secrets, nur service_role,
+   Migration 20261127190000). Grund: die Render-Env des Prod-Kostenrechners
+   verwaltet Michał; der Vault lässt sich über die Management-API füllen.
+   Jeder Fehler ⇒ leer ⇒ Route bleibt inert (Staging hat keine Einträge). */
+async function zugangAusVault(env: NodeJS.ProcessEnv): Promise<MetaZugang> {
+  const url = env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return {};
+  try {
+    const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data, error } = await db.rpc('get_meta_leads_secrets');
+    if (error || !data) return {};
+    const d = data as { pageId?: string; pageToken?: string };
+    return { seite: d.pageId || undefined, token: d.pageToken || undefined };
+  } catch {
+    return {};
+  }
 }
 
 /** Entfernt jede Spur der Tokens aus einem Text (Meldungen von Meta, Netzfehler). */
@@ -196,17 +222,24 @@ export interface MetaLeadsOptionen {
   senden?: typeof sendEmail;
   /** Sterne für die Bestätigung (Standard: live von primundus.de, Ersatzwert wie alle Mails). */
   bewertung?: () => Promise<BewertungsStand>;
+  /** Zugang, wenn META_PAGE_ID/META_PAGE_TOKEN in der Env fehlen (Standard: Supabase-Vault). */
+  zugang?: () => Promise<MetaZugang>;
 }
 
 /** Holt die neuesten Leads aller Formulare der Seite, speichert neue und verschickt die Mails. */
 export async function syncMetaLeads(opt: MetaLeadsOptionen = {}): Promise<MetaLeadsErgebnis> {
   const env = opt.env ?? process.env;
-  if (!metaLeadsBereit(env)) return { configured: false, inserted: 0 };
+  let seite = env.META_PAGE_ID?.trim() || '';
+  let grundToken = env.META_PAGE_TOKEN?.trim() || '';
+  if (!metaLeadsBereit(env)) {
+    const v = await (opt.zugang ?? (() => zugangAusVault(env)))();
+    seite ||= v.seite?.trim() || '';
+    grundToken ||= v.token?.trim() || '';
+  }
+  if (!seite || !grundToken) return { configured: false, inserted: 0 };
   const senden = opt.senden ?? sendEmail;
   const jetzt = opt.jetzt ?? (() => new Date());
   const basis = (env.META_GRAPH_URL || GRAPH_STANDARD).replace(/\/$/, '');
-  const seite = env.META_PAGE_ID!.trim();
-  const grundToken = env.META_PAGE_TOKEN!.trim();
   const geheim = [grundToken];
 
   const page = await graphGet<{ access_token?: string }>(basis, seite, { fields: 'access_token' }, grundToken, geheim);
