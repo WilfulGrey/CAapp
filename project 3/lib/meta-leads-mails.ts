@@ -16,14 +16,17 @@ import type { BewertungsStand } from './bewertungen-stand';
 
 export const META_LEAD_TEXTE = {
   bestaetigung: {
-    betreff: 'Ihre Anfrage zur 24-Stunden-Pflege',
+    betreff: 'Ihre Anfrage zur 24-Stunden-Betreuung',
     vorschau: 'Ihren Preis und passende Pflegekräfte sehen Sie online in ca. 2 Minuten.',
-    titel: 'Vielen Dank für Ihre Anfrage zur 24-Stunden-Pflege',
-    // Fassung 5 (27.11.): erst der Online-Weg (über dem Knopf), dann der Rückruf (über Martas Karte).
+    // Fassung 8 (27.11., Martin: „2“): Anrede mit dem Namen aus dem Formular über dem Titel.
+    anrede: 'Hallo {name},',
+    anredeOhneName: 'Hallo,',
+    titel: 'Vielen Dank für Ihre Anfrage zur 24-Stunden-Betreuung',
+    // Erst der Online-Weg (über dem Knopf), dann der Rückruf (über Martas Karte).
     absatz1:
-      'Machen Sie direkt online weiter: Sie beantworten ein paar Fragen zur Pflegesituation und sehen nach ca. 2 Minuten Ihren Preis und passende Pflegekräfte. Anreise in 3\u00a0Tagen möglich.',
+      'Ihren Preis und passende Pflegekräfte sehen Sie schon jetzt online. Nach ein paar kurzen Fragen, zum Beispiel zum Pflegegrad, steht Ihr Angebot in ca.\u00a02\u00a0Minuten bereit, kostenfrei und unverbindlich. Ihre Pflegekraft kann schon in 3\u00a0Tagen anreisen.',
     absatz2:
-      'Sie müssen nicht online weitermachen: Unsere Pflegeberatung meldet sich telefonisch bei Ihnen und geht alles gemeinsam mit Ihnen durch, täglich zwischen 8 und 20 Uhr.',
+      'Lieber persönlich beraten lassen? Unsere Pflegeberatung ruft Sie an und geht alles in Ruhe mit Ihnen durch, täglich zwischen 8 und 20 Uhr.',
     knopf: 'Angebot & Pflegekräfte ansehen',
     knopfUrl: 'https://kostenrechner.primundus.de/?utm_source=facebook&utm_medium=lead_mail&utm_campaign=meta-leads-2026-11',
     // Die Punkte unter dem Knopf der Startseite (Bestpreisgarantie + PORTAL_PUNKTE, lib/hero-punkte.ts).
@@ -109,6 +112,19 @@ const einzeilig = (wert: string): string => wert.replace(/[\r\n]+/g, ' ').trim()
 /** Ersetzt {schluessel} durch werte[schluessel]. */
 export function fuelle(vorlage: string, werte: Record<string, string | number>): string {
   return vorlage.replace(/\{(\w+)\}/g, (ganz, k: string) => (k in werte ? String(werte[k]) : ganz));
+}
+
+/**
+ * Name aus dem Formular für die Anrede: Leerraum glätten; nur wer alles klein oder
+ * alles groß getippt hat, bekommt große Anfangsbuchstaben (auch nach „-“).
+ * Gemischte Schreibweise bleibt, wie sie ist („von der Heide“). Leer ⇒ null.
+ */
+export function anredeName(name: string | null | undefined): string | null {
+  const n = einzeilig(String(name ?? '')).replace(/\s+/g, ' ').trim();
+  if (!n) return null;
+  if (n !== n.toLowerCase() && n !== n.toUpperCase()) return n;
+  const gross = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+  return n.toLowerCase().split(' ').map((w) => w.split('-').map(gross).join('-')).join(' ');
 }
 
 /** Für Vergleiche: klein, ohne Akzente, `_` als Leerzeichen, ohne Satzzeichen am Rand. */
@@ -290,7 +306,11 @@ export function metaLeadBestaetigung(
         ${B.punkte.map((t, i) => zeile(i === 0 ? `${esc(t)} &nbsp;<a href="${esc(B.bestpreisUrl)}" style="color:${F.greenDeep};font-weight:700;text-decoration:underline;white-space:nowrap;">${esc(B.bestpreisMehr)}</a>` : esc(t))).join('')}
       </table>`;
 
+  const name = anredeName(lead.name);
+  const anrede = name ? fuelle(B.anrede, { name }) : B.anredeOhneName;
+
   const content = `
+      <p style="margin:0 0 6px;font-size:17px;line-height:1.4;color:${F.ink};">${esc(anrede)}</p>
       ${mTitel(esc(B.titel).replace(/ (\S+)$/, '&nbsp;$1'), 14, 24)}
       ${mp(esc(B.absatz1).replace(/ (\S+)$/, '&nbsp;$1'), 8)}
       ${mKnopf(esc(B.knopfUrl), esc(B.knopf), 8, 16)}
@@ -305,6 +325,8 @@ export function metaLeadBestaetigung(
   const html = getEmailLayout({ content, preheader: esc(B.vorschau), siteUrl: site, grund }).replace('{{EMAIL}}', esc(lead.email ?? ''));
 
   const text = [
+    anrede,
+    '',
     B.titel,
     '',
     B.absatz1,

@@ -37,6 +37,7 @@ import {
 } from '../../project 3/lib/meta-leads';
 import {
   META_LEAD_TEXTE,
+  anredeName,
   metaLeadBestaetigung,
   metaLeadTeamMail,
   weitereAntworten,
@@ -256,7 +257,7 @@ describe('Nur frische Leads bekommen Mails', () => {
     expect(r).toMatchObject({ configured: true, forms: 1, fetched: 2, inserted: 2, confirmations: 1, withoutConfirmation: 1, teamMail: 'verschickt' });
 
     expect(gesendet.map((g) => g.an)).toEqual(['sabine@example.com', 'info@primundus.de']);
-    expect(gesendet[0].betreff).toBe('Ihre Anfrage zur 24-Stunden-Pflege');
+    expect(gesendet[0].betreff).toBe('Ihre Anfrage zur 24-Stunden-Betreuung');
     const team = gesendet[1];
     expect(team.betreff).toBe('2 Facebook-Anfragen');
     expect(team.html).toContain('Sabine Beispiel');
@@ -412,12 +413,32 @@ describe('Mails', () => {
     fields: { [FRAGE]: 'so_bald_wie_möglich' }, ...p,
   });
 
+  it('Anrede: Name wie getippt, klein/groß getippt mit großen Anfangsbuchstaben, ohne Namen „Hallo,“', () => {
+    expect(anredeName('Sabine Beispiel')).toBe('Sabine Beispiel');
+    expect(anredeName('  hans   muster ')).toBe('Hans Muster');
+    expect(anredeName('ANNA-LENA KRÜGER')).toBe('Anna-Lena Krüger');
+    expect(anredeName('Heinz von der Heide')).toBe('Heinz von der Heide');
+    expect(anredeName('')).toBeNull();
+    expect(anredeName(null)).toBeNull();
+    const ohne = metaLeadBestaetigung(lead({ name: null }), STAND, 'https://kostenrechner.primundus.de');
+    expect(ohne.text.startsWith('Hallo,\n\n')).toBe(true);
+    expect(ohne.html).toContain('>Hallo,<');
+    const klein = metaLeadBestaetigung(lead({ name: 'hans muster' }), STAND, 'https://kostenrechner.primundus.de');
+    expect(klein.html).toContain('>Hallo Hans Muster,<');
+    // Name wird escaped (kommt aus dem Formular).
+    const boese = metaLeadBestaetigung(lead({ name: 'Eva <b>X</b>' }), STAND, 'https://kostenrechner.primundus.de');
+    expect(boese.html).toContain('Hallo Eva &lt;b&gt;X&lt;/b&gt;,');
+  });
+
   it('Bestätigung: Wortlaut aus META_LEAD_TEXTE, Knopf, Punkte der Startseite, Sterne, Martas Karte, Fußzeile', () => {
     const B = META_LEAD_TEXTE.bestaetigung;
     const m = metaLeadBestaetigung(lead({}), STAND, 'https://kostenrechner.primundus.de');
-    expect(m.subject).toBe('Ihre Anfrage zur 24-Stunden-Pflege');
-    expect(m.html).toContain('Vielen Dank für Ihre Anfrage zur 24-Stunden-Pflege'.replace(/ (\S+)$/, '&nbsp;$1'));
-    expect(m.text.startsWith(`${B.titel}\n`)).toBe(true);
+    expect(m.subject).toBe('Ihre Anfrage zur 24-Stunden-Betreuung');
+    expect(m.html).toContain('Vielen Dank für Ihre Anfrage zur 24-Stunden-Betreuung'.replace(/ (\S+)$/, '&nbsp;$1'));
+    // Fassung 8 (Martin 27.11.): Anrede mit dem Namen aus dem Formular steht über dem Titel.
+    expect(m.text.startsWith(`Hallo Sabine Beispiel,\n\n${B.titel}\n`)).toBe(true);
+    expect(m.html.indexOf('>Hallo Sabine Beispiel,<')).toBeGreaterThan(-1);
+    expect(m.html.indexOf('>Hallo Sabine Beispiel,<')).toBeLessThan(m.html.indexOf('Vielen Dank für Ihre Anfrage'));
     expect(m.html).toContain(B.vorschau);
     // Fassung 5 (27.11.): Online-Weg über dem Knopf, Rückruf erst über Martas Karte; letztes Wort hängt per &nbsp; am vorletzten.
     const a1 = m.html.indexOf(B.absatz1.replace(/ (\S+)$/, '&nbsp;$1'));
@@ -451,9 +472,8 @@ describe('Mails', () => {
     expect(m.html.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '') + m.text).not.toMatch(/Martin/);
   });
 
-  it('Bestätigung: Name wird nicht genutzt und nie roh ins HTML geschrieben', () => {
+  it('Bestätigung: Name aus dem Formular nie roh ins HTML', () => {
     expect(metaLeadBestaetigung(lead({ name: '<script>alert(1)</script>' }), STAND).html).not.toContain('<script>alert');
-    expect(metaLeadBestaetigung(lead({ name: null }), STAND).text.startsWith('Vielen Dank')).toBe(true);
   });
 
   it('Team-Mail: Karte mit Anrufen-Knopf, Zeitraum, Eingang (Berlin), Kanal, Anzeige; Name wird escaped', () => {
