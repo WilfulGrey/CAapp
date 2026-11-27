@@ -16,12 +16,16 @@ import type { BewertungsStand } from './bewertungen-stand';
 
 export const META_LEAD_TEXTE = {
   bestaetigung: {
-    betreff: 'Ihre Anfrage zur 24-Stunden-Betreuung',
+    // Martin 27.11.: „Facebook“ in Betreff und Titel, damit klar ist, woher die Mail kommt.
+    // {kanal} = Facebook oder Instagram (Feld `platform` des Leads); unbekannt ⇒ Fassung ohne Kanal.
+    betreff: 'Ihre {kanal}-Anfrage zur 24-Stunden-Betreuung',
+    betreffOhneKanal: 'Ihre Anfrage zur 24-Stunden-Betreuung',
     vorschau: 'Ihren Preis und passende Pflegekräfte sehen Sie online in ca. 2 Minuten.',
     // Fassung 8 (27.11., Martin: „2“): Anrede mit dem Namen aus dem Formular über dem Titel.
     anrede: 'Hallo {name},',
     anredeOhneName: 'Hallo,',
-    titel: 'Vielen Dank für Ihre Anfrage zur 24-Stunden-Betreuung',
+    titel: 'Vielen Dank für Ihre {kanal}-Anfrage zur 24-Stunden-Betreuung',
+    titelOhneKanal: 'Vielen Dank für Ihre Anfrage zur 24-Stunden-Betreuung',
     // Erst der Online-Weg (über dem Knopf), dann der Rückruf (über Martas Karte).
     absatz1:
       'Ihren Preis und passende Pflegekräfte sehen Sie schon jetzt online. Nach ein paar kurzen Fragen, zum Beispiel zum Pflegegrad, steht Ihr Angebot in ca.\u00a02\u00a0Minuten bereit, kostenfrei und unverbindlich. Ihre Pflegekraft kann schon in 3\u00a0Tagen anreisen.',
@@ -291,7 +295,7 @@ export function metaLeadTeamMail(
 // ─── 2. Bestätigung an den Lead ──────────────────────────────────────────
 
 export function metaLeadBestaetigung(
-  lead: Pick<FbLead, 'name' | 'email'>,
+  lead: Pick<FbLead, 'name' | 'email'> & Partial<Pick<FbLead, 'platform'>>,
   bewertung: BewertungsStand,
   siteUrl: string = process.env.NEXT_PUBLIC_SITE_URL || 'https://kostenrechner.primundus.de',
 ): EmailTemplate {
@@ -308,10 +312,18 @@ export function metaLeadBestaetigung(
 
   const name = anredeName(lead.name);
   const anrede = name ? fuelle(B.anrede, { name }) : B.anredeOhneName;
+  const kanal = META_LEAD_TEXTE.team.plattform[(lead.platform ?? '').toLowerCase()];
+  const titel = kanal ? fuelle(B.titel, { kanal }) : B.titelOhneKanal;
+  // Wörter mit Bindestrich bleiben zusammen („Facebook-Anfrage“, „24-Stunden-Betreuung“),
+  // sonst bricht der Titel auf dem Handy mitten im Wort um; das letzte Wort hängt am vorletzten.
+  const titelHtml = (t: string) =>
+    t.split(' ').map((w) => (w.includes('-') ? `<span style="white-space:nowrap;">${esc(w)}</span>` : esc(w)))
+      .reduce((acc, w, i, alle) => (i === 0 ? w : acc + (i === alle.length - 1 ? '&nbsp;' : ' ') + w), '');
+  const betreff = kanal ? fuelle(B.betreff, { kanal }) : B.betreffOhneKanal;
 
   const content = `
       <p style="margin:0 0 6px;font-size:17px;line-height:1.4;color:${F.ink};">${esc(anrede)}</p>
-      ${mTitel(esc(B.titel).replace(/ (\S+)$/, '&nbsp;$1'), 14, 24)}
+      ${mTitel(titelHtml(titel), 14, 24)}
       ${mp(esc(B.absatz1).replace(/ (\S+)$/, '&nbsp;$1'), 8)}
       ${mKnopf(esc(B.knopfUrl), esc(B.knopf), 8, 16)}
       ${punkte}
@@ -327,7 +339,7 @@ export function metaLeadBestaetigung(
   const text = [
     anrede,
     '',
-    B.titel,
+    titel,
     '',
     B.absatz1,
     '',
@@ -346,5 +358,5 @@ export function metaLeadBestaetigung(
     '',
   ].join('\n');
 
-  return { subject: B.betreff, html, text };
+  return { subject: betreff, html, text };
 }
