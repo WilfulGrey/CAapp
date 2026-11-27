@@ -18,13 +18,13 @@ export const META_LEAD_TEXTE = {
   bestaetigung: {
     betreff: 'Ihre Anfrage zur 24-Stunden-Betreuung',
     vorschau: 'Ihren Preis und passende Pflegekräfte sehen Sie online in ca. 2 Minuten.',
-    // Fassung 8 (27.11., Martin): Anrede mit dem Namen aus dem Formular über dem Titel.
+    // Fassung 8 (27.11., Martin: „2“): Anrede mit dem Namen aus dem Formular über dem Titel.
     anrede: 'Hallo {name},',
     anredeOhneName: 'Hallo,',
     titel: 'Vielen Dank für Ihre Anfrage zur 24-Stunden-Betreuung',
     // Erst der Online-Weg (über dem Knopf), dann der Rückruf (über Martas Karte).
     absatz1:
-      'Gerne können Sie sich schon jetzt Ihren Preis und passende Pflegekräfte ansehen. Dafür beantworten Sie ein paar kurze Fragen, zum Beispiel zum Pflegegrad, und sehen nach ca.\u00a02\u00a0Minuten Ihr Angebot, kostenfrei und unverbindlich. Ihre Pflegekraft kann schon in 3\u00a0Tagen anreisen.',
+      'Ihren Preis und passende Pflegekräfte sehen Sie schon jetzt online. Nach ein paar kurzen Fragen, zum Beispiel zum Pflegegrad, steht Ihr Angebot in ca.\u00a02\u00a0Minuten bereit, kostenfrei und unverbindlich. Ihre Pflegekraft kann schon in 3\u00a0Tagen anreisen.',
     absatz2:
       'Lieber persönlich beraten lassen? Unsere Pflegeberatung ruft Sie an und geht alles in Ruhe mit Ihnen durch, täglich zwischen 8 und 20 Uhr.',
     knopf: 'Angebot & Pflegekräfte ansehen',
