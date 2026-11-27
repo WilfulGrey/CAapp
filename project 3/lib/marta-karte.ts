@@ -40,6 +40,8 @@ export type MartaKarteOptionen = {
   siteUrl: string;
   /** Zeile mit den Presselogos unter den Fakten. */
   presseLogos: boolean;
+  /** Sterne in der Karte (Standard ja). Nein, wenn die Mail sie schon direkt darüber zeigt. */
+  sterne?: boolean;
   /** Abstand unter der Karte in px (Standard 24). */
   abstandUnten?: number;
 } & ({ fuer: 'kunde'; bewertung: BewertungsStand } | { fuer: 'vermittler' });
@@ -91,11 +93,11 @@ const LOGOS: [datei: string, alt: string, breite: number][] = [
 
 export function martaKarteHtml(o: MartaKarteOptionen): string {
   const site = o.siteUrl.replace(/\/$/, '');
-  const sterne = o.fuer === 'kunde' ? `
+  const sterne = o.fuer === 'kunde' && o.sterne !== false ? `
             <div class="sig-sterne-desktop">${bewertungsSterneHtml(o.bewertung)}</div>` : '';
   // Handy-Kopie der Sterne: am Desktop versteckt (mso-hide für Outlook),
   // die Media-Query blendet sie ein und die Desktop-Kopie aus.
-  const sterneHandy = o.fuer === 'kunde' ? `
+  const sterneHandy = o.fuer === 'kunde' && o.sterne !== false ? `
       <div class="sig-sterne-mobil" style="display:none;mso-hide:all;max-height:0;overflow:hidden;">${bewertungsSterneHtml(o.bewertung, 12, 12)}</div>` : '';
   const dritterFakt = o.fuer === 'kunde'
     // &shy;: auf 360–390 px ist die Faktenzelle ~110 px breit, das Wort nicht.

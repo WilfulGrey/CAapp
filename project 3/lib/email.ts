@@ -1987,7 +1987,7 @@ export async function sendEmail(
   to: string | string[],
   template: EmailTemplate,
   attachments?: any[],
-  options?: { skipBcc?: boolean; extraBcc?: string; cc?: string }
+  options?: { skipBcc?: boolean; extraBcc?: string; cc?: string; replyTo?: string }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const nodemailer = await import('nodemailer');
@@ -2037,7 +2037,9 @@ export async function sendEmail(
       // SMTP_FROM-Adresse kostenrechner@primundus.de). Die Mails bitten den
       // Kunden ausdrücklich, "einfach auf diese E-Mail zu antworten" — die
       // Antwort soll bei info@primundus.de landen. Spiegelt send-scheduled-emails.
-      replyTo: 'info@primundus.de',
+      // options.replyTo nur für Team-Mails, deren Antwort an den Kunden gehen
+      // soll (Facebook-Rückruf: Antworten geht direkt an den Lead).
+      replyTo: options?.replyTo || 'info@primundus.de',
       subject: template.subject,
       text: template.text,
       html: template.html,

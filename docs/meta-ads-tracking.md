@@ -53,6 +53,41 @@ diesen Datensatz **aus** bleiben.
 Datenschutzerklärung: `app/datenschutz/page.tsx` Abschnitt 8, Absatz
 „Meta-Pixel".
 
+## Sofortformular-Leads (Anfrage-Formular) — live seit 27.11.2026
+
+Für Anzeigen mit Meta-Sofortformular („Anfrage“, ohne Begrüßungsseite) holt der
+Kostenrechner die Leads selbst ab; Meta schickt sie nicht von sich aus. Jede
+Minute (Martin 27.11.: Bestätigung sofort) ruft pg_cron `POST /api/cron/meta-leads` (Bearer = Service-Key wie
+beim Portal-Abholer). Die Route holt mit `META_PAGE_TOKEN` den Seiten-Token,
+liest alle Formulare der Seite `META_PAGE_ID` und je Formular die neuesten 100
+Leads, und fügt sie in `fb_leads` ein (`id` = Lead-ID von Meta, Duplikate
+ignoriert). Nur frisch eingefügte Leads lösen Mails aus: zuerst die
+Bestätigung an den Lead (nur mit E-Mail und höchstens 72 h alt, damit die
+erste Abholung keine alten Leads anschreibt), dann eine Team-Mail an
+`META_LEADS_TO` mit einer Karte je Lead (Name, Telefon mit „Anrufen",
+E-Mail, Zeitraum aus der Frage „Für wann planen Sie Unterstützung zu Hause?",
+Eingang, Facebook/Instagram, Anzeige). Ohne `META_PAGE_ID`/`META_PAGE_TOKEN`
+passiert nichts. Wortlaut: `META_LEAD_TEXTE` in
+`project 3/lib/meta-leads-mails.ts`; Ablauf und Umgebung: Kopf von
+`project 3/lib/meta-leads.ts`.
+
+| | |
+|---|---|
+| Tabelle | `fb_leads` — Migration `supabase/migrations/20261125120000_fb_leads.sql` (RLS ohne Policies) |
+| Cron | `supabase/migrations/20261125120100_setup_meta_leads_cron.sql` (jede Minute; lag bis zur Freigabe am 27.11.2026 in `supabase/nach-freigabe/`) |
+| Route | `project 3/app/api/cron/meta-leads/route.ts` |
+| Zugang | Env `META_PAGE_ID` + `META_PAGE_TOKEN` (Render) ODER Supabase-Vault `meta_page_id` + `meta_page_token` über RPC `get_meta_leads_secrets` (Migration `20261127190000`, nur service_role). Prod nutzt den Vault, weil die Render-Env des Prod-Kostenrechners nicht in Martins Render-Zugang liegt. Optional `META_LEADS_TO` (Standard info@primundus.de), `META_GRAPH_URL` nur für Tests |
+| Test | `src/__tests__/metaLeads.test.ts` |
+
+Live geschaltet am 27.11.2026 (Freigabe Martin), Stand und Lehren:
+
+1. Formular „Primundus_Anfrage_DE (Stuhl, 27.11.)“ (id `2063543837689805`) auf der Seite `1384877164706432`, Typ „Höhere Lautstärke“, **Flexible Formularauslieferung AUS** (sonst darf Meta Kopfbild und Reihenfolge ändern). Kopfbild nur über „Begrüßung“ + „Hochgeladenes Bild“; Titel UND Beschreibung der Begrüßung sind Pflicht.
+2. Seite: Nutzungsbedingungen für Lead Ads angenommen (`leadgen_tos_accepted`), sonst lassen sich keine Lead-Anzeigen veröffentlichen.
+3. Token: Systemnutzer „Primundus Content-Loop“ (App 1524424276191925, Anwendungsfall „Anzeigen-Leads erfassen und verwalten“), Ablauf nie, mit `leads_retrieval`, `pages_manage_ads`, `pages_read_engagement`, `pages_show_list`. Der Systemnutzer braucht auf der Seite die Aufgabe **„Leads“** (Unternehmenseinstellungen → Systemnutzer → Seite → Verwalten). Ohne sie liefert `/{form}/leads` stillschweigend `data: []`, obwohl `leads_count` > 0 ist.
+4. **Feldnamen folgen der Formularsprache:** das deutsche Formular liefert `e-mail-adresse`, `vollständiger_name`, `telefonnummer` (nicht `email`/`full_name`/`phone_number`). `zuZeile` und `KONTAKT_FELDER` kennen beide; zusätzlich Teilwort-Suche (`mail`, `telefon`, `name`).
+5. Testanfragen aus dem Lead-Ads-Testtool (developers.facebook.com/tools/lead-ads-testing) tragen Platzhalter („<test lead: dummy data for …>“, `test@meta.com`). Vor dem Einschalten der Abholung auf Prod löschen, sonst gehen Bestätigung und Team-Mail raus.
+6. Reihenfolge auf Prod: Migrationen per `scripts/apply-migrations.sh ycdwtrklpoqprabtwahi` (Tabelle, Cron, Vault-RPC), Vault-Einträge `meta_page_id` / `meta_page_token` per `vault.create_secret` (Management-API, Wert nie im Log), Merge, Prüfaufruf `curl -X POST -H "Authorization: Bearer <service_role>" https://kostenrechner.primundus.de/api/cron/meta-leads` ⇒ `{"configured":true,"forms":1,…}`. Staging hat keine Meta-Env ⇒ `{"configured":false}`.
+
 ## Offen
 
 - **Server-Weg (Conversions API):** Meta hängt an jeden Anzeigenklick `fbclid`

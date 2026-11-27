@@ -29,6 +29,10 @@ fails fast instead of hanging):
 | **A — edge function** (`send-scheduled-emails`) | Customer mail: Eingangsbestätigung + Nachfass 1/2 (the high-volume, customer-facing ones) | **Supabase Vault** via `get_smtp_config()` RPC — secret names `smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_from`, `smtp_from_name` | Update Vault secrets on that project (SQL). No redeploy — the RPC reads Vault per-call. |
 | **B — Next.js** (`sendEmail`) | Team "neuer Lead" notifications, Vertrag confirmation, admin resend | **Render env vars** — `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_FROM_NAME` | Update the Render service env vars (dashboard — there is no Render API token here). |
 
+Path B sets Reply-To `info@primundus.de` on every mail; `sendEmail(..., { replyTo })`
+overrides it (only used by the Facebook-Rückruf team mail, `lib/meta-leads.ts`,
+so a reply goes straight to the lead). Transport and sender are unchanged.
+
 Vault (Path A) and `supabase secrets` (edge-fn env) are **different stores** —
 the SMTP secrets live in Vault, set via SQL, not via `supabase secrets set`.
 
