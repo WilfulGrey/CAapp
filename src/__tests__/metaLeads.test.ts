@@ -188,6 +188,26 @@ describe('Felder', () => {
     expect(zeitraumAus(z.fields)).toBe('So bald wie möglich');
   });
 
+  it('deutsches Formular: Feldnamen „e-mail-adresse“, „vollständiger_name“, „telefonnummer“ (Graph API 27.11.2026)', () => {
+    const z = zuZeile(
+      {
+        id: 'l9',
+        created_time: '2026-11-27T18:45:00+0000',
+        field_data: [
+          { name: 'wann_benötigen_sie_unterstützung_zu_hause?', values: ['so_bald_wie_möglich'] },
+          { name: 'e-mail-adresse', values: ['sabine@example.com'] },
+          { name: 'vollständiger_name', values: ['Sabine Beispiel'] },
+          { name: 'telefonnummer', values: ['+491511234567'] },
+        ],
+      },
+      { id: '2063543837689805', name: 'Primundus_Anfrage_DE (Stuhl, 27.11.)' },
+    );
+    expect(z.email).toBe('sabine@example.com');
+    expect(z.name).toBe('Sabine Beispiel');
+    expect(z.phone).toBe('+491511234567');
+    expect(zeitraumAus(z.fields)).toBe('So bald wie möglich');
+  });
+
   it('first_name + last_name ergeben den Namen; fehlende E-Mail bleibt null', () => {
     const z = zuZeile(HANS, { id: 'form1' });
     expect(z.name).toBe('hans muster');

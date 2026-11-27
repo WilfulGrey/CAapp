@@ -141,6 +141,16 @@ const nimm = (f: Record<string, string>, ...keys: string[]): string | null => {
   return null;
 };
 
+/* Meta benennt die Felder nach der Sprache, in der das Formular angelegt wurde:
+   das deutsche Formular „Primundus_Anfrage_DE (Stuhl, 27.11.)“ liefert
+   „e-mail-adresse“, „vollständiger_name“, „telefonnummer“ (Graph API 27.11.2026)
+   statt email / full_name / phone_number. Erst die bekannten Namen, dann ein
+   Teilwort im Feldnamen. */
+const suche = (f: Record<string, string>, test: (name: string) => boolean): string | null => {
+  for (const [k, v] of Object.entries(f)) if (test(k.toLowerCase()) && v?.trim()) return v.trim();
+  return null;
+};
+
 /** Meta-Lead → Zeile für fb_leads. */
 export function zuZeile(l: GraphLead, form: { id: string; name?: string }): FbLeadZeile {
   const fields: Record<string, string> = {};
@@ -155,9 +165,14 @@ export function zuZeile(l: GraphLead, form: { id: string; name?: string }): FbLe
     campaign_name: l.campaign_name || null,
     platform: l.platform || null,
     created_time: new Date(l.created_time).toISOString(),
-    name: nimm(fields, 'full_name', 'name') || [vor, nach].filter(Boolean).join(' ') || null,
-    email: nimm(fields, 'email', 'work_email'),
-    phone: nimm(fields, 'phone_number', 'phone', 'work_phone_number'),
+    name:
+      nimm(fields, 'full_name', 'name', 'vollständiger_name') ||
+      [vor, nach].filter(Boolean).join(' ') ||
+      suche(fields, (k) => k.includes('name')),
+    email: nimm(fields, 'email', 'work_email', 'e-mail-adresse', 'e-mail') || suche(fields, (k) => k.includes('mail')),
+    phone:
+      nimm(fields, 'phone_number', 'phone', 'work_phone_number', 'telefonnummer') ||
+      suche(fields, (k) => k.includes('telefon') || k.includes('phone')),
     fields,
   };
 }
