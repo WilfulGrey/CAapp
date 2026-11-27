@@ -56,8 +56,8 @@ Datenschutzerklärung: `app/datenschutz/page.tsx` Abschnitt 8, Absatz
 ## Sofortformular-Leads (Anfrage-Formular) — ENTWURF, nicht live
 
 Für Anzeigen mit Meta-Sofortformular („Anfrage“, ohne Begrüßungsseite) holt der
-Kostenrechner die Leads selbst ab; Meta schickt sie nicht von sich aus. Alle
-10 Minuten ruft pg_cron `POST /api/cron/meta-leads` (Bearer = Service-Key wie
+Kostenrechner die Leads selbst ab; Meta schickt sie nicht von sich aus. Jede
+Minute (Martin 27.11.: Bestätigung sofort) ruft pg_cron `POST /api/cron/meta-leads` (Bearer = Service-Key wie
 beim Portal-Abholer). Die Route holt mit `META_PAGE_TOKEN` den Seiten-Token,
 liest alle Formulare der Seite `META_PAGE_ID` und je Formular die neuesten 100
 Leads, und fügt sie in `fb_leads` ein (`id` = Lead-ID von Meta, Duplikate

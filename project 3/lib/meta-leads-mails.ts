@@ -17,11 +17,13 @@ import type { BewertungsStand } from './bewertungen-stand';
 export const META_LEAD_TEXTE = {
   bestaetigung: {
     betreff: 'Ihre Anfrage zur 24-Stunden-Pflege',
-    vorschau: 'Ihren Preis und passende Pflegekräfte können Sie schon jetzt sehen.',
+    vorschau: 'Ihren Preis und passende Pflegekräfte sehen Sie online in ca. 2 Minuten.',
     titel: 'Vielen Dank für Ihre Anfrage zur 24-Stunden-Pflege',
-    absatz1: 'Unsere Pflegeberatung meldet sich telefonisch bei Ihnen, täglich zwischen 8 und 20 Uhr.',
+    // Fassung 5 (27.11.): erst der Online-Weg (über dem Knopf), dann der Rückruf (über Martas Karte).
+    absatz1:
+      'Machen Sie direkt online weiter: Sie beantworten ein paar Fragen zur Pflegesituation und sehen nach ca. 2 Minuten Ihren Preis und passende Pflegekräfte. Anreise in 3 Tagen möglich.',
     absatz2:
-      'Sie können auch direkt online weitermachen: In unserem Kostenrechner sehen Sie in 2 Minuten, was es kostet und welche Pflegekräfte verfügbar sind. Anreise in 3 Tagen möglich.',
+      'Sie müssen nicht online weitermachen: Unsere Pflegeberatung meldet sich telefonisch bei Ihnen und geht alles gemeinsam mit Ihnen durch, täglich zwischen 8 und 20 Uhr.',
     knopf: 'Angebot & Pflegekräfte ansehen',
     knopfUrl: 'https://kostenrechner.primundus.de/?utm_source=facebook&utm_medium=lead_mail&utm_campaign=meta-leads-2026-11',
     // Die Punkte unter dem Knopf der Startseite (Bestpreisgarantie + PORTAL_PUNKTE, lib/hero-punkte.ts).
@@ -69,7 +71,7 @@ export const META_LEAD_TEXTE = {
   },
 } as const;
 
-/** Antworten der Formularfrage „Für wann planen Sie Unterstützung zu Hause?" (Meta-Formular 11/2026). */
+/** Antworten der Formularfrage „Wann benötigen Sie Unterstützung zu Hause?" (Meta-Formular 11/2026, Fassung 5). */
 export const ZEITRAUM_ANTWORTEN = ['So bald wie möglich', 'Innerhalb der nächsten 4 Wochen', 'Später oder noch unklar'] as const;
 
 /** Bestätigungen gehen nur an Leads, die höchstens so alt sind (erste Abholung holt auch ältere). */
@@ -288,11 +290,11 @@ export function metaLeadBestaetigung(
 
   const content = `
       ${mTitel(esc(B.titel).replace(/ (\S+)$/, '&nbsp;$1'), 14, 24)}
-      ${mp(esc(B.absatz1), 12)}
-      ${mp(esc(B.absatz2), 8)}
+      ${mp(esc(B.absatz1).replace(/ (\S+)$/, '&nbsp;$1'), 8)}
       ${mKnopf(esc(B.knopfUrl), esc(B.knopf), 8, 16)}
       ${punkte}
       ${mSterneZeile(bewertung, 24)}
+      ${mp(esc(B.absatz2).replace(/ (\S+)$/, '&nbsp;$1'), 14)}
       ${martaKarteHtml({ fuer: 'kunde', bewertung, siteUrl: site, presseLogos: true, sterne: false, abstandUnten: 8 })}`;
 
   const fussLink = (url: string, t: string) => `<a href="${esc(url)}" style="color:#999999;text-decoration:underline;">${esc(t)}</a>`;
@@ -305,12 +307,12 @@ export function metaLeadBestaetigung(
     '',
     B.absatz1,
     '',
-    B.absatz2,
-    '',
     `${B.knopf}: ${B.knopfUrl}`,
     '',
     B.punkte.join(' · '),
     `${bewertung.schnitt} von 5 aus ${bewertung.anzahl} Bewertungen`,
+    '',
+    B.absatz2,
     '',
     B.unterschrift,
     '',

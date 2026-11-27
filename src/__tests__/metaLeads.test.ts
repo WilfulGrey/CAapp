@@ -376,8 +376,13 @@ describe('Mails', () => {
     expect(m.html).toContain('Vielen Dank für Ihre Anfrage zur 24-Stunden-Pflege'.replace(/ (\S+)$/, '&nbsp;$1'));
     expect(m.text.startsWith(`${B.titel}\n`)).toBe(true);
     expect(m.html).toContain(B.vorschau);
-    expect(m.html).toContain(B.absatz1);
-    expect(m.html).toContain(B.absatz2);
+    // Fassung 5 (27.11.): Online-Weg über dem Knopf, Rückruf erst über Martas Karte; letztes Wort hängt per &nbsp; am vorletzten.
+    const a1 = m.html.indexOf(B.absatz1.replace(/ (\S+)$/, '&nbsp;$1'));
+    const a2 = m.html.indexOf(B.absatz2.replace(/ (\S+)$/, '&nbsp;$1'));
+    expect(a1).toBeGreaterThan(-1);
+    expect(a2).toBeGreaterThan(-1);
+    expect(a1).toBeLessThan(m.html.indexOf('>Angebot &amp; Pflegekräfte ansehen<'));
+    expect(a2).toBeGreaterThan(m.html.indexOf('Keine Mindestlaufzeit'));
     expect(m.html).toContain(`href="${B.knopfUrl.replace(/&/g, '&amp;')}"`);
     expect(m.html).toContain('>Angebot &amp; Pflegekräfte ansehen<');
     // Punkte wie unter dem Knopf der Startseite (lib/hero-punkte.ts PORTAL_PUNKTE).

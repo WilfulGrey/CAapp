@@ -5,7 +5,7 @@
  * Speicher = Tabelle fb_leads (Migration 20261125120000_fb_leads.sql) über den
  * Service-Key.
  *
- * Ablauf je Lauf (POST /api/cron/meta-leads, pg_cron alle 10 Minuten):
+ * Ablauf je Lauf (POST /api/cron/meta-leads, pg_cron jede Minute):
  *   1. Seiten-Token holen: GET /{META_PAGE_ID}?fields=access_token mit
  *      META_PAGE_TOKEN. META_PAGE_TOKEN darf ein Systemnutzer-Token sein —
  *      Meta verlangt für Formulare und Leads einen Seiten-Token; ist es schon

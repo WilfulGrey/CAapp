@@ -15,7 +15,7 @@
          scripts/apply-migrations.sh ycdwtrklpoqprabtwahi --dry-run
          scripts/apply-migrations.sh ycdwtrklpoqprabtwahi
 
-  Was der Cron tut: alle 10 Minuten POST /api/cron/meta-leads im
+  Was der Cron tut: jede Minute (Martin 27.11.: Bestätigung sofort) POST /api/cron/meta-leads im
   KOSTENRECHNER (Next.js-Route, keine Edge Function). Muster wie
   20260901120000_setup_portal_abholer_cron.sql:
     - Ziel-URL aus dem Vault-Secret `kostenrechner_url` (prod
@@ -44,7 +44,7 @@ END $$;
 
 SELECT cron.schedule(
   'meta-leads',
-  '*/10 * * * *',
+  '* * * * *',
   $$
   SELECT net.http_post(
     url := (SELECT COALESCE(
