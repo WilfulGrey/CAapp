@@ -21,7 +21,7 @@ export const META_LEAD_TEXTE = {
     titel: 'Vielen Dank für Ihre Anfrage zur 24-Stunden-Pflege',
     // Fassung 5 (27.11.): erst der Online-Weg (über dem Knopf), dann der Rückruf (über Martas Karte).
     absatz1:
-      'Machen Sie direkt online weiter: Sie beantworten ein paar Fragen zur Pflegesituation und sehen nach ca. 2 Minuten Ihren Preis und passende Pflegekräfte. Anreise in 3 Tagen möglich.',
+      'Machen Sie direkt online weiter: Sie beantworten ein paar Fragen zur Pflegesituation und sehen nach ca. 2 Minuten Ihren Preis und passende Pflegekräfte. Anreise in 3\u00a0Tagen möglich.',
     absatz2:
       'Sie müssen nicht online weitermachen: Unsere Pflegeberatung meldet sich telefonisch bei Ihnen und geht alles gemeinsam mit Ihnen durch, täglich zwischen 8 und 20 Uhr.',
     knopf: 'Angebot & Pflegekräfte ansehen',
