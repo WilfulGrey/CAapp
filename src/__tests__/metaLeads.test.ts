@@ -257,7 +257,7 @@ describe('Nur frische Leads bekommen Mails', () => {
     expect(r).toMatchObject({ configured: true, forms: 1, fetched: 2, inserted: 2, confirmations: 1, withoutConfirmation: 1, teamMail: 'verschickt' });
 
     expect(gesendet.map((g) => g.an)).toEqual(['sabine@example.com', 'info@primundus.de']);
-    expect(gesendet[0].betreff).toBe('Ihre Anfrage zur 24-Stunden-Betreuung');
+    expect(gesendet[0].betreff).toBe('Ihre Instagram-Anfrage zur 24-Stunden-Betreuung');
     const team = gesendet[1];
     expect(team.betreff).toBe('2 Facebook-Anfragen');
     expect(team.html).toContain('Sabine Beispiel');
@@ -433,12 +433,14 @@ describe('Mails', () => {
   it('Bestätigung: Wortlaut aus META_LEAD_TEXTE, Knopf, Punkte der Startseite, Sterne, Martas Karte, Fußzeile', () => {
     const B = META_LEAD_TEXTE.bestaetigung;
     const m = metaLeadBestaetigung(lead({}), STAND, 'https://kostenrechner.primundus.de');
-    expect(m.subject).toBe('Ihre Anfrage zur 24-Stunden-Betreuung');
-    expect(m.html).toContain('Vielen Dank für Ihre Anfrage zur 24-Stunden-Betreuung'.replace(/ (\S+)$/, '&nbsp;$1'));
+    // Martin 27.11.: Kanal (Facebook/Instagram) in Betreff und Titel.
+    expect(m.subject).toBe('Ihre Facebook-Anfrage zur 24-Stunden-Betreuung');
+    // Wörter mit Bindestrich bleiben zusammen, letztes Wort hängt per &nbsp; am vorletzten.
+    expect(m.html).toContain('Vielen Dank für Ihre <span style="white-space:nowrap;">Facebook-Anfrage</span> zur&nbsp;<span style="white-space:nowrap;">24-Stunden-Betreuung</span>');
     // Fassung 8 (Martin 27.11.): Anrede mit dem Namen aus dem Formular steht über dem Titel.
-    expect(m.text.startsWith(`Hallo Sabine Beispiel,\n\n${B.titel}\n`)).toBe(true);
+    expect(m.text.startsWith('Hallo Sabine Beispiel,\n\nVielen Dank für Ihre Facebook-Anfrage zur 24-Stunden-Betreuung\n')).toBe(true);
     expect(m.html.indexOf('>Hallo Sabine Beispiel,<')).toBeGreaterThan(-1);
-    expect(m.html.indexOf('>Hallo Sabine Beispiel,<')).toBeLessThan(m.html.indexOf('Vielen Dank für Ihre Anfrage'));
+    expect(m.html.indexOf('>Hallo Sabine Beispiel,<')).toBeLessThan(m.html.indexOf('Vielen Dank für Ihre'));
     expect(m.html).toContain(B.vorschau);
     // Fassung 5 (27.11.): Online-Weg über dem Knopf, Rückruf erst über Martas Karte; letztes Wort hängt per &nbsp; am vorletzten.
     const a1 = m.html.indexOf(B.absatz1.replace(/ (\S+)$/, '&nbsp;$1'));
@@ -470,6 +472,16 @@ describe('Mails', () => {
     expect(m.text).toContain('Marta Kapcio, Pflegeberaterin, Primundus');
     // Sichtbarer Text nennt nie Martin (HTML-/CSS-Kommentare des geteilten Layouts ausgenommen).
     expect(m.html.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '') + m.text).not.toMatch(/Martin/);
+  });
+
+  it('Bestätigung: Kanal Instagram bzw. unbekannt', () => {
+    const ig = metaLeadBestaetigung(lead({ platform: 'ig' }), STAND);
+    expect(ig.subject).toBe('Ihre Instagram-Anfrage zur 24-Stunden-Betreuung');
+    expect(ig.text).toContain('Vielen Dank für Ihre Instagram-Anfrage zur 24-Stunden-Betreuung\n');
+    const ohne = metaLeadBestaetigung(lead({ platform: null }), STAND);
+    expect(ohne.subject).toBe('Ihre Anfrage zur 24-Stunden-Betreuung');
+    expect(ohne.text).toContain('Vielen Dank für Ihre Anfrage zur 24-Stunden-Betreuung\n');
+    expect(ohne.html).not.toContain('{kanal}');
   });
 
   it('Bestätigung: Name aus dem Formular nie roh ins HTML', () => {
