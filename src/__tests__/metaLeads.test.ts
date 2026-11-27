@@ -39,6 +39,7 @@ import {
   META_LEAD_TEXTE,
   metaLeadBestaetigung,
   metaLeadTeamMail,
+  weitereAntworten,
   zeitraumAus,
   type FbLead,
 } from '../../project 3/lib/meta-leads-mails';
@@ -206,6 +207,8 @@ describe('Felder', () => {
     expect(z.name).toBe('Sabine Beispiel');
     expect(z.phone).toBe('+491511234567');
     expect(zeitraumAus(z.fields)).toBe('So bald wie möglich');
+    // Kontaktfelder erscheinen in der Team-Mail nicht ein zweites Mal als „weitere Antwort“.
+    expect(weitereAntworten(z.fields)).toEqual([]);
   });
 
   it('first_name + last_name ergeben den Namen; fehlende E-Mail bleibt null', () => {

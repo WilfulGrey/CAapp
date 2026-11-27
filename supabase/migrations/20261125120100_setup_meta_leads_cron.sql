@@ -1,19 +1,12 @@
 /*
-  # NUR NACH FREIGABE EINSPIELEN — Cron für die Facebook-Formular-Leads
+  # Cron für die Facebook-Formular-Leads (freigegeben von Martin 27.11.2026)
 
-  Diese Datei liegt absichtlich NICHT in supabase/migrations/: CI spielt nach
-  jedem Merge alle Dateien dort auf Staging ein, und
-  scripts/apply-migrations.sh würde sie beim nächsten Prod-Lauf mitnehmen.
-  Freigabe = Martin. Erst danach (Reihenfolge):
-
-    1. Migration 20261125120000_fb_leads.sql ist auf Prod eingespielt.
+  Lag bis zur Freigabe in supabase/nach-freigabe/. Reihenfolge beim Live-Gang:
+    1. Migration 20261125120000_fb_leads.sql auf Prod eingespielt.
     2. Kostenrechner auf Render hat META_PAGE_ID und META_PAGE_TOKEN
-       (Ohne die beiden antwortet die Route 200 {"configured":false} und tut
-       nichts.)
-    3. Datei verschieben und einspielen:
-         git mv supabase/nach-freigabe/20261125120100_setup_meta_leads_cron.sql supabase/migrations/
-         scripts/apply-migrations.sh ycdwtrklpoqprabtwahi --dry-run
-         scripts/apply-migrations.sh ycdwtrklpoqprabtwahi
+       (ohne die beiden antwortet die Route 200 {"configured":false} und tut
+       nichts — Staging bleibt so).
+    3. Diese Datei per scripts/apply-migrations.sh eingespielt.
 
   Was der Cron tut: jede Minute (Martin 27.11.: Bestätigung sofort) POST /api/cron/meta-leads im
   KOSTENRECHNER (Next.js-Route, keine Edge Function). Muster wie

@@ -9,8 +9,8 @@
 --   confirm_sent_at  Bestätigungsmail an den Lead verschickt
 --   fields           alle Antworten des Formulars roh (field_data)
 --
--- Der Cron, der die Route aufruft, steht bewusst NICHT in diesem Ordner:
--- supabase/nach-freigabe/20261125120100_setup_meta_leads_cron.sql.
+-- Der Cron, der die Route aufruft: 20261125120100_setup_meta_leads_cron.sql
+-- (lag bis zur Freigabe am 27.11.2026 in supabase/nach-freigabe/).
 --
 -- Rückwärtskompatibel (Święta zasada 3): neue Tabelle, alter Code liest und
 -- schreibt sie nicht.

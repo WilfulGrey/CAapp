@@ -132,6 +132,8 @@ function lesbar(s: string): string {
 /** Feste Kontaktfelder des Formulars — alles andere sind Antworten auf eigene Fragen. */
 const KONTAKT_FELDER = new Set([
   'full_name', 'name', 'first_name', 'last_name', 'email', 'work_email', 'phone_number', 'phone', 'work_phone_number',
+  // Deutsches Formular (Graph API 27.11.2026): Meta benennt die Kontaktfelder nach der Formularsprache.
+  'vollständiger_name', 'e-mail-adresse', 'e-mail', 'telefonnummer',
 ]);
 
 /** Ist dieser Formular-Schlüssel die Frage nach dem Zeitraum („Für wann …", „Ab wann …")? */

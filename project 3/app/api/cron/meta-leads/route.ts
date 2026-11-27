@@ -1,8 +1,7 @@
 /* ─── Facebook-/Instagram-Leads abholen (Meta-Sofortformular „Anfrage") ───
  *
- * Getaktet von pg_cron jede Minute (Martin 27.11.: Bestätigung sofort) — Datei
- * supabase/nach-freigabe/20261125120100_setup_meta_leads_cron.sql, wird erst
- * nach Freigabe eingespielt. Auth wie /api/portal-abholen: Bearer =
+ * Getaktet von pg_cron jede Minute (Martin 27.11.: Bestätigung sofort) — Migration
+ * supabase/migrations/20261125120100_setup_meta_leads_cron.sql. Auth wie /api/portal-abholen: Bearer =
  * SUPABASE_SERVICE_ROLE_KEY (Vault-Secret `supabase_service_role_key`), kein
  * eigenes Geheimnis.
  *

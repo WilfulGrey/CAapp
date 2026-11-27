@@ -53,7 +53,7 @@ diesen Datensatz **aus** bleiben.
 Datenschutzerklärung: `app/datenschutz/page.tsx` Abschnitt 8, Absatz
 „Meta-Pixel".
 
-## Sofortformular-Leads (Anfrage-Formular) — ENTWURF, nicht live
+## Sofortformular-Leads (Anfrage-Formular) — live seit 27.11.2026
 
 Für Anzeigen mit Meta-Sofortformular („Anfrage“, ohne Begrüßungsseite) holt der
 Kostenrechner die Leads selbst ab; Meta schickt sie nicht von sich aus. Jede
@@ -74,26 +74,19 @@ passiert nichts. Wortlaut: `META_LEAD_TEXTE` in
 | | |
 |---|---|
 | Tabelle | `fb_leads` — Migration `supabase/migrations/20261125120000_fb_leads.sql` (RLS ohne Policies) |
-| Cron | `supabase/nach-freigabe/20261125120100_setup_meta_leads_cron.sql` — liegt absichtlich NICHT in `migrations/` |
+| Cron | `supabase/migrations/20261125120100_setup_meta_leads_cron.sql` (jede Minute; lag bis zur Freigabe am 27.11.2026 in `supabase/nach-freigabe/`) |
 | Route | `project 3/app/api/cron/meta-leads/route.ts` |
 | Env (Render, Kostenrechner) | `META_PAGE_ID`, `META_PAGE_TOKEN` (Geheimnis), optional `META_LEADS_TO` (Standard info@primundus.de), `META_GRAPH_URL` nur für Tests |
 | Test | `src/__tests__/metaLeads.test.ts` |
 
-Live schalten (Reihenfolge, nur nach Freigabe):
+Live geschaltet am 27.11.2026 (Freigabe Martin), Stand und Lehren:
 
-1. Migration `20261125120000_fb_leads.sql` per `scripts/apply-migrations.sh`
-   (Staging, dann `ycdwtrklpoqprabtwahi`).
-2. Code mergen (die Route ist ohne Meta-Env inert).
-3. In Meta: Systemnutzer im Business-Portfolio mit Zugriff auf die Seite und
-   Lead-Zugriff (Seiteneinstellungen → Lead-Zugriff), Token mit
-   `leads_retrieval` (dazu `pages_show_list`, `pages_read_engagement`,
-   `pages_manage_ads`) erzeugen.
-4. Render-Env des Kostenrechners: `META_PAGE_ID`, `META_PAGE_TOKEN`,
-   optional `META_LEADS_TO`. Einmal von Hand prüfen:
-   `curl -X POST -H "Authorization: Bearer <service_role>" https://kostenrechner.primundus.de/api/cron/meta-leads`.
-5. Cron-Datei nach `supabase/migrations/` verschieben und einspielen. Die
-   Vault-Secrets `kostenrechner_url` und `supabase_service_role_key` gibt es
-   schon (Portal-Abholer).
+1. Formular „Primundus_Anfrage_DE (Stuhl, 27.11.)“ (id `2063543837689805`) auf der Seite `1384877164706432`, Typ „Höhere Lautstärke“, **Flexible Formularauslieferung AUS** (sonst darf Meta Kopfbild und Reihenfolge ändern). Kopfbild nur über „Begrüßung“ + „Hochgeladenes Bild“; Titel UND Beschreibung der Begrüßung sind Pflicht.
+2. Seite: Nutzungsbedingungen für Lead Ads angenommen (`leadgen_tos_accepted`), sonst lassen sich keine Lead-Anzeigen veröffentlichen.
+3. Token: Systemnutzer „Primundus Content-Loop“ (App 1524424276191925, Anwendungsfall „Anzeigen-Leads erfassen und verwalten“), Ablauf nie, mit `leads_retrieval`, `pages_manage_ads`, `pages_read_engagement`, `pages_show_list`. Der Systemnutzer braucht auf der Seite die Aufgabe **„Leads“** (Unternehmenseinstellungen → Systemnutzer → Seite → Verwalten). Ohne sie liefert `/{form}/leads` stillschweigend `data: []`, obwohl `leads_count` > 0 ist.
+4. **Feldnamen folgen der Formularsprache:** das deutsche Formular liefert `e-mail-adresse`, `vollständiger_name`, `telefonnummer` (nicht `email`/`full_name`/`phone_number`). `zuZeile` und `KONTAKT_FELDER` kennen beide; zusätzlich Teilwort-Suche (`mail`, `telefon`, `name`).
+5. Testanfragen aus dem Lead-Ads-Testtool (developers.facebook.com/tools/lead-ads-testing) tragen Platzhalter („<test lead: dummy data for …>“, `test@meta.com`). Vor dem Einschalten der Abholung auf Prod löschen, sonst gehen Bestätigung und Team-Mail raus.
+6. Reihenfolge auf Prod: Migrationen per `scripts/apply-migrations.sh ycdwtrklpoqprabtwahi` (Tabelle + Cron), Render-Env des Kostenrechners (`META_PAGE_ID`, `META_PAGE_TOKEN`), Merge, Prüfaufruf `curl -X POST -H "Authorization: Bearer <service_role>" https://kostenrechner.primundus.de/api/cron/meta-leads` ⇒ `{"configured":true,"forms":1,…}`. Staging hat keine Meta-Env ⇒ `{"configured":false}`.
 
 ## Offen
 
