@@ -22,6 +22,7 @@ import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
 import { meldeMetaAnfrage } from "@/lib/meta-pixel";
 import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
+import { FB_SPEICHER_KEY, FB_TOKEN_MUSTER, kontaktFertigVorausgefuellt, tokenAusHash, type FbKontakt } from "@/lib/fb-kontakt";
 import { kontaktStandard, kontaktVariante, KNOPF_KONTAKT, STUFEN, STUFEN_FEHLER, type KontaktStufe, type KontaktVariante } from "@/lib/kontakt-stufen";
 import { antwortPortal, EinleitungPortal, FortschrittPortal, KNOPF_ANGEBOT, KONTAKT_FERTIG, KOPF_FRAGEN, KopfleistePortal, MINI_ABLAUF, PM, SCHATTEN_LIFT, SheetGrundPortal, TitelPortal, UnterDemFormularPortal, UnterDemKnopfPortal, UnterDemKontaktPortal, usePortalLook } from "@/components/calculator/FormularPortal";
 
@@ -370,6 +371,41 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
     acceptPrivacy: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  /* Facebook-/Instagram-Formular (Registry #172, lib/fb-kontakt.ts): der Knopf der Bestätigungsmail
+     trägt `#fb=<Schlüssel>`. Wir nehmen ihn sofort aus der Adresse (sessionStorage hält ihn fürs
+     Neuladen), holen Name, E-Mail und Telefon und füllen nur leere Felder. Ohne Schlüssel oder bei
+     Fehler bleibt der Schritt wie immer leer. */
+  const fbTokenRef = useRef<string | null>(null);
+  const [fbKanal, setFbKanal] = useState<FbKontakt['kanal'] | undefined>(undefined);
+  useEffect(() => {
+    let token: string | null = null;
+    try {
+      token = tokenAusHash(window.location.hash);
+      if (token) {
+        window.sessionStorage.setItem(FB_SPEICHER_KEY, token);
+        window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
+      } else {
+        const gemerkt = window.sessionStorage.getItem(FB_SPEICHER_KEY);
+        token = gemerkt && FB_TOKEN_MUSTER.test(gemerkt) ? gemerkt : null;
+      }
+    } catch { /* ohne Speicher: nur der Schlüssel aus der Adresse */ }
+    if (!token) return;
+    fbTokenRef.current = token;
+    fetch('/api/fb-kontakt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((k: (FbKontakt & { gefunden?: boolean }) | null) => {
+        if (!k?.gefunden) return;
+        setFormData((alt) => ({
+          ...alt,
+          name: alt.name || k.name || '',
+          email: alt.email || k.email || '',
+          phone: alt.phone || (k.telefon ? telefonBereinigen(k.telefon) : ''),
+        }));
+        setFbKanal(k.kanal ?? null);
+      })
+      .catch(() => { /* leer lassen */ });
+  }, []);
   const [showResults, setShowResults] = useState(false);
 
   const totalSteps = 9; // 8 Fragen + Kontaktformular. care_start_timing wurde
@@ -769,6 +805,8 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
         telefonSpaeter: opts.telefonSpaeter,
         kontaktVariante: kontaktVarRef.current,
         ablauf: ablaufRef.current,
+        // Registry #172: Schlüssel aus der Facebook-Formular-Mail, die Route verknüpft fb_leads mit dem Lead.
+        ...(fbTokenRef.current ? { fbToken: fbTokenRef.current } : {}),
         careStartTiming: state.careStartTiming,
         adParams: analytics.getAdParams(),
         // Von welcher Seite kam die Anfrage (Martin, 27.08.). Die
@@ -1893,7 +1931,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                             {/* Portal-Look: der Titel über der Karte sagt „fertig“, hier
                                 nur der Satz über die ganze Breite (KONTAKT_FERTIG), ohne Frage und
                                 Gesichter, sonst rutscht der Knopf auf dem iPhone SE unter die Falz. */}
-                            {portalLook ? <p className="text-[15px] leading-[1.35] text-[#2E2E2E]">{KONTAKT_FERTIG.text}</p> : <>
+                            {portalLook ? <p className="text-[15px] leading-[1.35] text-[#2E2E2E]">{fbKanal !== undefined ? kontaktFertigVorausgefuellt(fbKanal) : KONTAKT_FERTIG.text}</p> : <>
                             <p className="text-[20px] font-bold leading-tight text-[#1a1a1a] [text-wrap:balance]">{SCHRANKE.frage}</p>
                             <div className="mt-2.5 flex items-center gap-2.5">
                               <div className="flex flex-shrink-0" aria-hidden="true">
