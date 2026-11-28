@@ -23,7 +23,16 @@ export default function AdminLoginPage() {
     });
 
     if (!res.ok) {
-      setError('Falsches Passwort. Bitte erneut versuchen.');
+      /* 429: nach 5 Fehlversuchen ist der Login je IP 15 Minuten zu.
+         503: ADMIN_PASSWORD oder ADMIN_SESSION_SECRET fehlt auf dem Server. */
+      if (res.status === 429) {
+        const { retryAfter } = await res.json().catch(() => ({ retryAfter: 900 }));
+        setError(`Zu viele Fehlversuche. Bitte in ${Math.max(1, Math.ceil(Number(retryAfter) / 60))} Minuten erneut versuchen.`);
+      } else if (res.status === 503) {
+        setError('Anmeldung zurzeit nicht möglich: Auf dem Server fehlt eine Einstellung.');
+      } else {
+        setError('Falsches Passwort. Bitte erneut versuchen.');
+      }
       setLoading(false);
       return;
     }
