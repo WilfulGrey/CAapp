@@ -11,6 +11,7 @@ import type { EmailTemplate } from './email';
 import { getEmailLayout } from './email-template';
 import { BESTPREIS_URL, MAIL_FARBEN as F, mKnopf, mp, mSterneZeile, mTitel } from './mail-bausteine';
 import { PORTAL_PUNKTE } from './hero-punkte';
+import { FB_TOKEN_MUSTER } from './fb-kontakt';
 import { martaKarteHtml } from './marta-karte';
 import type { BewertungsStand } from './bewertungen-stand';
 
@@ -96,6 +97,8 @@ export interface FbLead {
   email: string | null;
   phone: string | null;
   fields: Record<string, string>;
+  /** Zufallsschlüssel für den Kostenrechner (Registry #172): Knopf der Bestätigung trägt `#fb=<rechner_token>`. */
+  rechner_token?: string | null;
 }
 
 export type BestaetigungsStand = 'verschickt' | keyof typeof META_LEAD_TEXTE.team.ohneBestaetigung;
@@ -295,7 +298,7 @@ export function metaLeadTeamMail(
 // ─── 2. Bestätigung an den Lead ──────────────────────────────────────────
 
 export function metaLeadBestaetigung(
-  lead: Pick<FbLead, 'name' | 'email'> & Partial<Pick<FbLead, 'platform'>>,
+  lead: Pick<FbLead, 'name' | 'email'> & Partial<Pick<FbLead, 'platform' | 'rechner_token'>>,
   bewertung: BewertungsStand,
   siteUrl: string = process.env.NEXT_PUBLIC_SITE_URL || 'https://kostenrechner.primundus.de',
 ): EmailTemplate {
@@ -320,12 +323,15 @@ export function metaLeadBestaetigung(
     t.split(' ').map((w) => (w.includes('-') ? `<span style="white-space:nowrap;">${esc(w)}</span>` : esc(w)))
       .reduce((acc, w, i, alle) => (i === 0 ? w : acc + (i === alle.length - 1 ? '&nbsp;' : ' ') + w), '');
   const betreff = kanal ? fuelle(B.betreff, { kanal }) : B.betreffOhneKanal;
+  // Registry #172: mit Schlüssel füllt der Kostenrechner Name, E-Mail und Telefon vor (lib/fb-kontakt.ts).
+  // Fragment statt Parameter: der Schlüssel geht nicht an Server und Protokolle.
+  const knopfUrl = lead.rechner_token && FB_TOKEN_MUSTER.test(lead.rechner_token) ? `${B.knopfUrl}#fb=${lead.rechner_token}` : B.knopfUrl;
 
   const content = `
       <p style="margin:0 0 6px;font-size:17px;line-height:1.4;color:${F.ink};">${esc(anrede)}</p>
       ${mTitel(titelHtml(titel), 14, 24)}
       ${mp(esc(B.absatz1).replace(/ (\S+)$/, '&nbsp;$1'), 8)}
-      ${mKnopf(esc(B.knopfUrl), esc(B.knopf), 8, 16)}
+      ${mKnopf(esc(knopfUrl), esc(B.knopf), 8, 16)}
       ${punkte}
       ${mSterneZeile(bewertung, 24)}
       ${mp(esc(B.absatz2).replace(/ (\S+)$/, '&nbsp;$1'), 14)}
@@ -343,7 +349,7 @@ export function metaLeadBestaetigung(
     '',
     B.absatz1,
     '',
-    `${B.knopf}: ${B.knopfUrl}`,
+    `${B.knopf}: ${knopfUrl}`,
     '',
     B.punkte.join(' · '),
     `${bewertung.schnitt} von 5 aus ${bewertung.anzahl} Bewertungen`,

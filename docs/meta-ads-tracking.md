@@ -88,6 +88,32 @@ Live geschaltet am 27.11.2026 (Freigabe Martin), Stand und Lehren:
 5. Testanfragen aus dem Lead-Ads-Testtool (developers.facebook.com/tools/lead-ads-testing) tragen Platzhalter („<test lead: dummy data for …>“, `test@meta.com`). Vor dem Einschalten der Abholung auf Prod löschen, sonst gehen Bestätigung und Team-Mail raus.
 6. Reihenfolge auf Prod: Migrationen per `scripts/apply-migrations.sh ycdwtrklpoqprabtwahi` (Tabelle, Cron, Vault-RPC), Vault-Einträge `meta_page_id` / `meta_page_token` per `vault.create_secret` (Management-API, Wert nie im Log), Merge, Prüfaufruf `curl -X POST -H "Authorization: Bearer <service_role>" https://kostenrechner.primundus.de/api/cron/meta-leads` ⇒ `{"configured":true,"forms":1,…}`. Staging hat keine Meta-Env ⇒ `{"configured":false}`.
 
+### Kontaktdaten im Kostenrechner vorausfüllen (Registry #172, seit 28.11.2026)
+
+Der Knopf der Bestätigungsmail trägt `#fb=<rechner_token>` (Fragment, nicht Parameter:
+der Schlüssel geht nicht an Server, Protokolle oder Analyse-Dienste). Jeder neue Lead
+bekommt beim Einfügen einen Schlüssel (24 Zufallsbytes, base64url, `neuerRechnerToken`
+in `lib/meta-leads.ts`). Der Rechner (`MultiStepForm.tsx`) liest ihn beim Laden
+(`tokenAusHash`, `lib/fb-kontakt.ts`), nimmt ihn sofort aus der Adresse
+(`history.replaceState`, die UTM-Werte bleiben), merkt ihn in sessionStorage `_prim_fb`
+und holt über `POST /api/fb-kontakt` Name, E-Mail und Telefon (nur Leads ≤ 30 Tage,
+Service-Key, `no-store`). Gefüllt werden nur leere Felder; über den Feldern steht dann
+„Ihre Kontaktdaten haben wir aus Ihrer Facebook-Anfrage übernommen …“ (Instagram
+entsprechend, Wortlaut von Martin am 28.11.2026 freigegeben). Beim Absenden schickt der
+Rechner `fbToken` mit; `/api/angebot-anfordern` setzt in `fb_leads` einmalig `lead_id` +
+`rechner_at` und schreibt das Ereignis `facebook_formular_rechner` (best-effort, der Lead
+entsteht auch bei Fehler). So lässt sich zählen, welche Formular-Leads bis zum Profil kommen.
+
+| | |
+|---|---|
+| Migration | `supabase/migrations/20261128090000_fb_leads_rechner_token.sql` (`rechner_token` eindeutig, `lead_id` → leads, `rechner_at`; nur nullable) |
+| Route | `project 3/app/api/fb-kontakt/route.ts` |
+| Hilfen + Wortlaut | `project 3/lib/fb-kontakt.ts` |
+| Test | `src/__tests__/fbKontakt.test.ts`, `src/__tests__/metaLeads.test.ts` |
+
+Reihenfolge beim Ausrollen: Migration ZUERST (sonst scheitert das Einfügen neuer Leads an
+der fehlenden Spalte `rechner_token`), dann Merge.
+
 ## Offen
 
 - **Server-Weg (Conversions API):** Meta hängt an jeden Anzeigenklick `fbclid`

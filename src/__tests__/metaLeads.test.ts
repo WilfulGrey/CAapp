@@ -250,6 +250,20 @@ describe('Felder', () => {
 });
 
 describe('Nur frische Leads bekommen Mails', () => {
+  it('Registry #172: neue Leads bekommen einen Schlüssel, der Knopf der Bestätigung trägt #fb=…', async () => {
+    const T = 'AbCdEfGhIjKlMnOpQrStUvWxYz012-_9';
+    const { speicher, eingefuegt } = speicherAttrappe();
+    await syncMetaLeads({ speicher, env: ENV, jetzt: () => JETZT, bewertung: async () => STAND, rechnerToken: () => T });
+    expect(eingefuegt[0].every((z) => z.rechner_token === T)).toBe(true);
+    const bestaetigung = gesendet.find((g) => g.an === 'sabine@example.com')!;
+    expect(bestaetigung.html).toContain(`#fb=${T}"`);
+    expect(bestaetigung.text).toContain(`#fb=${T}`);
+    // Ohne Standard-Generator-Ersatz: echte Schlüssel im richtigen Format.
+    const zwei = speicherAttrappe();
+    await syncMetaLeads({ speicher: zwei.speicher, env: ENV, jetzt: () => JETZT, bewertung: async () => STAND });
+    expect(zwei.eingefuegt[0].every((z) => /^[A-Za-z0-9_-]{32}$/.test(z.rechner_token ?? ''))).toBe(true);
+  });
+
   it('erster Lauf: beide Leads eingefügt, eine Bestätigung (Sabine), eine Team-Mail mit beiden', async () => {
     const { speicher, eingefuegt, markiert } = speicherAttrappe();
     const r = await lauf(speicher);
@@ -482,6 +496,12 @@ describe('Mails', () => {
     expect(ohne.subject).toBe('Ihre Anfrage zur 24-Stunden-Betreuung');
     expect(ohne.text).toContain('Vielen Dank für Ihre Anfrage zur 24-Stunden-Betreuung\n');
     expect(ohne.html).not.toContain('{kanal}');
+  });
+
+  it('Bestätigung: ohne oder mit ungültigem Schlüssel normaler Link ohne #fb=', () => {
+    expect(metaLeadBestaetigung(lead({}), STAND).html).not.toContain('#fb=');
+    expect(metaLeadBestaetigung(lead({ rechner_token: 'kurz' }), STAND).html).not.toContain('#fb=');
+    expect(metaLeadBestaetigung(lead({ rechner_token: 'kurz' }), STAND).text).not.toContain('#fb=');
   });
 
   it('Bestätigung: Name aus dem Formular nie roh ins HTML', () => {

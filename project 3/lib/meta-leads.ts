@@ -35,6 +35,7 @@
  * oder Fehlermeldungen.
  */
 
+import { randomBytes } from 'crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { sendEmail } from './email';
 import { holeBewertungsStand, type BewertungsStand } from './bewertungen-stand';
@@ -88,7 +89,7 @@ export function supabaseSpeicher(db: SupabaseClient): FbLeadsSpeicher {
       const { data, error } = await db
         .from('fb_leads')
         .upsert(zeilen, { onConflict: 'id', ignoreDuplicates: true })
-        .select('id, form_id, form_name, ad_name, campaign_name, platform, created_time, name, email, phone, fields');
+        .select('id, form_id, form_name, ad_name, campaign_name, platform, created_time, name, email, phone, fields, rechner_token');
       if (error) throw new Error(`fb_leads einfügen: ${error.message}`);
       return (data ?? []) as FbLead[];
     },
@@ -224,6 +225,13 @@ export interface MetaLeadsOptionen {
   bewertung?: () => Promise<BewertungsStand>;
   /** Zugang, wenn META_PAGE_ID/META_PAGE_TOKEN in der Env fehlen (Standard: Supabase-Vault). */
   zugang?: () => Promise<MetaZugang>;
+  /** Schlüssel für den Kostenrechner je neuem Lead (Standard: 24 Zufallsbytes, Registry #172). */
+  rechnerToken?: () => string;
+}
+
+/** 24 Zufallsbytes als base64url (32 Zeichen, passt zu FB_TOKEN_MUSTER in lib/fb-kontakt.ts). */
+export function neuerRechnerToken(): string {
+  return randomBytes(24).toString('base64url');
 }
 
 /** Holt die neuesten Leads aller Formulare der Seite, speichert neue und verschickt die Mails. */
@@ -254,7 +262,8 @@ export async function syncMetaLeads(opt: MetaLeadsOptionen = {}): Promise<MetaLe
     const leads = await graphGet<{ data?: GraphLead[] }>(
       basis, `${form.id}/leads`, { fields: 'id,created_time,field_data,ad_name,campaign_name,platform', limit: '100' }, token, geheim,
     );
-    for (const l of leads.data ?? []) zeilen.set(l.id, zuZeile(l, form));
+    // Registry #172: jeder neue Lead bekommt einen Schlüssel für den Kostenrechner; vorhandene Zeilen behalten ihren (ignoreDuplicates).
+    for (const l of leads.data ?? []) zeilen.set(l.id, { ...zuZeile(l, form), rechner_token: (opt.rechnerToken ?? neuerRechnerToken)() });
   }
   const formsAnzahl = forms.data?.length ?? 0;
   const basisErgebnis = { configured: true as const, forms: formsAnzahl, fetched: zeilen.size };

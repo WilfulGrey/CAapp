@@ -12,6 +12,7 @@ import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { parseCustomerName } from '@/lib/calculation';
 import { scheduleEmail, flushScheduledEmails } from '@/lib/lead-mails';
 import { quelleBereinigen } from '@/lib/lead-quelle';
+import { FB_TOKEN_MUSTER } from '@/lib/fb-kontakt';
 
 function getSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -58,6 +59,7 @@ async function handlePost(request: NextRequest) {
       telefonSpaeter,
       kontaktVariante,
       ablauf,
+      fbToken,
     }: {
       vorname?: string;
       email: string;
@@ -82,6 +84,8 @@ async function handlePost(request: NextRequest) {
       websitePfad?: string | null;
       /* Erste Seite und Herkunft des Besuchs auf primundus.de (Registry #120), vom Server geprüft. */
       websiteEinstieg?: unknown;
+      /* Schlüssel aus dem Knopf der Facebook-Formular-Mail (Registry #172, lib/fb-kontakt.ts). */
+      fbToken?: unknown;
     } = body;
     /* Der Client schickt die Quelle, der Server entscheidet, was gültig ist —
        sonst landet beliebiger Text in leads.source (Martin, 04.09.2026). */
@@ -235,6 +239,25 @@ async function handlePost(request: NextRequest) {
       // `ablauf` (Registry #77): `preis` = Preisseite vor der Kontaktabfrage, `alt` = heutiger Weg.
       const ablaufWert = ablauf === 'preis' || ablauf === 'alt' ? ablauf : null;
       await logEvent(lead.id, 'kontakt_variante', { variante: kontaktVariante, ablauf: ablaufWert, telefon_spaeter: ohneTelefon, telefon_dabei: Boolean(lead.telefon) });
+    }
+
+    // Facebook-/Instagram-Formular (Registry #172): kam der Kunde über den Knopf der
+    // Bestätigungsmail, verknüpfen wir den Formular-Lead mit diesem Lead (nur beim ersten
+    // Mal) — so sieht man, welche Formular-Leads bis zum Profil kommen. Best-effort: der
+    // Lead ist schon angelegt, ein Fehler hier darf die Anfrage nicht scheitern lassen.
+    if (typeof fbToken === 'string' && FB_TOKEN_MUSTER.test(fbToken)) {
+      try {
+        const { data: fb, error: fbFehler } = await supabase
+          .from('fb_leads')
+          .update({ lead_id: lead.id, rechner_at: new Date().toISOString() })
+          .eq('rechner_token', fbToken)
+          .is('lead_id', null)
+          .select('id, platform');
+        if (fbFehler) throw new Error(fbFehler.message);
+        if (fb && fb.length) await logEvent(lead.id, 'facebook_formular_rechner', { fb_lead_id: fb[0].id, plattform: fb[0].platform ?? null });
+      } catch (e) {
+        console.error('fb_leads verknüpfen fehlgeschlagen (Lead trotzdem angelegt):', e instanceof Error ? e.message : String(e));
+      }
     }
 
     // Re-Submit-Dedupe: wenn der Kunde dasselbe Formular nochmal schickt UND
